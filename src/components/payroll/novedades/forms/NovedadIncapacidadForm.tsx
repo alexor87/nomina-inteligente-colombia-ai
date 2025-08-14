@@ -55,12 +55,12 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
 
   const { calculateNovedadDebounced, isLoading } = useNovedadBackendCalculation();
 
-  // ✅ CORRECCIÓN CRÍTICA: Calcular días automáticamente
+  // ✅ CORRECCIÓN V3.0: Calcular días automáticamente
   const calculatedDays = calculateDaysBetween(formData.fecha_inicio, formData.fecha_fin);
   const isValidRange = isValidDateRange(formData.fecha_inicio, formData.fecha_fin);
 
-  // ✅ LOGGING V2.0: Exhaustivo para rastrear flujo completo
-  console.log('🔍 [INCAP FORM V2.0] Estado actual:', {
+  // ✅ LOGGING V3.0: Exhaustivo para rastrear flujo completo
+  console.log('🔍 [INCAP FORM V3.0] Estado actual:', {
     subtipo: formData.subtipo,
     fechaInicio: formData.fecha_inicio,
     fechaFin: formData.fecha_fin,
@@ -72,22 +72,9 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
     timestamp: new Date().toISOString()
   });
 
-  // ✅ LOGGING V2.0: Rastrear cambios en calculatedDays
+  // ✅ CORRECCIÓN V3.0: Cálculo automático con preservación de días
   useEffect(() => {
-    console.log('📊 [INCAP V2.0] calculatedDays cambió:', {
-      previous: 'N/A',
-      current: calculatedDays,
-      fechas: {
-        inicio: formData.fecha_inicio,
-        fin: formData.fecha_fin
-      },
-      timestamp: new Date().toISOString()
-    });
-  }, [calculatedDays]);
-
-  // ✅ CORRECCIÓN: Cálculo automático con validación estricta
-  useEffect(() => {
-    console.log('🚀 [INCAP FORM V2.0] useEffect cálculo disparado:', {
+    console.log('🚀 [INCAP FORM V3.0] useEffect cálculo disparado:', {
       hasStartDate: !!formData.fecha_inicio,
       hasEndDate: !!formData.fecha_fin,
       isValidRange,
@@ -99,84 +86,85 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
 
     // Validaciones críticas
     if (!formData.fecha_inicio || !formData.fecha_fin) {
-      console.log('⏳ [INCAP V2.0] Esperando fechas completas');
+      console.log('⏳ [INCAP V3.0] Esperando fechas completas');
       return;
     }
 
     if (!isValidRange) {
-      console.log('❌ [INCAP V2.0] Rango de fechas inválido');
+      console.log('❌ [INCAP V3.0] Rango de fechas inválido');
       setFormData(prev => ({ ...prev, valor: 0 }));
       return;
     }
 
-    if (calculatedDays <= 0) {
-      console.log('❌ [INCAP V2.0] Días calculados <= 0:', calculatedDays);
+    if (calculatedDays < 0) {
+      console.log('❌ [INCAP V3.0] Días calculados < 0:', calculatedDays);
       setFormData(prev => ({ ...prev, valor: 0 }));
       return;
     }
 
     if (!employeeSalary || employeeSalary <= 0) {
-      console.log('❌ [INCAP V2.0] Salario inválido:', employeeSalary);
+      console.log('❌ [INCAP V3.0] Salario inválido:', employeeSalary);
       setFormData(prev => ({ ...prev, valor: 0 }));
       return;
     }
 
-    // ✅ CORRECCIÓN CRÍTICA: Formateo correcto de fecha
+    // ✅ CORRECCIÓN V3.0: Formateo correcto de fecha
     const fechaPeriodoISO = periodoFecha ? periodoFecha.toISOString() : new Date().toISOString();
     
-    console.log('🎯 [INCAP V2.0] ENVIANDO AL BACKEND:', {
+    console.log('🎯 [INCAP V3.0] ENVIANDO AL BACKEND:', {
       tipoNovedad: 'incapacidad',
       subtipo: formData.subtipo,
       salarioBase: employeeSalary,
-      dias: calculatedDays, // ✅ CRÍTICO: Enviar días calculados
+      dias: calculatedDays, // ✅ CRÍTICO V3.0: Enviar días calculados (puede ser 0, 1, 2, 3, 4+)
       fechaPeriodo: fechaPeriodoISO,
       timestamp: new Date().toISOString()
     });
     
-    // ✅ ENVÍO INMEDIATO PARA TESTING
+    // ✅ V3.0: ENVÍO INMEDIATO - hook ahora acepta dias >= 0 para incapacidades
     calculateNovedadDebounced(
       {
         tipoNovedad: 'incapacidad' as NovedadType,
         subtipo: formData.subtipo,
         salarioBase: employeeSalary,
-        dias: calculatedDays, // ✅ CRÍTICO: días calculados correctos
+        dias: calculatedDays, // ✅ CRÍTICO V3.0: días calculados correctos (0-N)
         fechaPeriodo: fechaPeriodoISO
       },
       (result) => {
-        console.log('📊 [INCAP V2.0] RESULTADO DEL BACKEND:', {
+        console.log('📊 [INCAP V3.0] RESULTADO DEL BACKEND:', {
           result,
           diasEnviados: calculatedDays,
           valorRecibido: result?.valor,
+          detalleCalculo: result?.detalleCalculo,
           timestamp: new Date().toISOString()
         });
         
         if (result && typeof result.valor === 'number') {
-          console.log('✅ [INCAP V2.0] Valor calculado exitoso:', result.valor);
+          console.log('✅ [INCAP V3.0] Valor calculado exitoso:', result.valor);
           setFormData(prev => ({ 
             ...prev, 
             valor: result.valor 
           }));
         } else {
-          console.log('❌ [INCAP V2.0] Error en cálculo:', result);
+          console.log('❌ [INCAP V3.0] Error en cálculo:', result);
           setFormData(prev => ({ 
             ...prev, 
             valor: 0 
           }));
         }
       },
-      0 // Sin delay para testing inmediato
+      0 // Sin delay para respuesta inmediata
     );
   }, [formData.subtipo, formData.fecha_inicio, formData.fecha_fin, calculatedDays, isValidRange, employeeSalary, calculateNovedadDebounced, periodoFecha]);
 
   const handleInputChange = (field: string, value: any) => {
-    console.log('🔄 [INCAP V2.0] Campo actualizado:', field, '=', value, 'timestamp:', new Date().toISOString());
+    console.log('🔄 [INCAP V3.0] Campo actualizado:', field, '=', value, 'timestamp:', new Date().toISOString());
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  // ✅ CORRECCIÓN CRÍTICA V2.0: Validación y envío de días correctos con logging exhaustivo
+  // ✅ CORRECCIÓN CRÍTICA V3.0: Validación y envío de días correctos
   const handleSubmit = () => {
-    console.log('📤 [INCAP V2.0] ===== INICIANDO ENVÍO =====');
-    console.log('📤 [INCAP V2.0] Estado del formulario:', {
+    console.log('📤 [INCAP V3.0] ===== INICIANDO ENVÍO =====');
+    console.log('📤 [INCAP V3.0] Estado del formulario:', {
       formData,
       calculatedDays,
       isValidRange,
@@ -185,55 +173,57 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
 
     // Validaciones básicas
     if (!formData.fecha_inicio) {
-      console.error('❌ [INCAP V2.0] Falta fecha de inicio');
+      console.error('❌ [INCAP V3.0] Falta fecha de inicio');
       alert('Por favor seleccione la fecha de inicio');
       return;
     }
 
     if (!formData.fecha_fin) {
-      console.error('❌ [INCAP V2.0] Falta fecha de fin');
+      console.error('❌ [INCAP V3.0] Falta fecha de fin');
       alert('Por favor seleccione la fecha de fin');
       return;
     }
 
     if (!isValidRange) {
-      console.error('❌ [INCAP V2.0] Rango inválido');
+      console.error('❌ [INCAP V3.0] Rango inválido');
       alert('La fecha de fin debe ser igual o posterior a la fecha de inicio');
       return;
     }
 
-    if (calculatedDays <= 0) {
-      console.error('❌ [INCAP V2.0] Días calculados inválidos:', calculatedDays);
+    if (calculatedDays < 0) {
+      console.error('❌ [INCAP V3.0] Días calculados inválidos:', calculatedDays);
       alert('El rango de fechas debe generar días válidos');
       return;
     }
 
-    // ✅ CORRECCIÓN CRÍTICA V2.0: Construcción de datos con logging
+    // ✅ CORRECCIÓN CRÍTICA V3.0: Construcción de datos con preservación de días
     const submitData = {
       tipo_novedad: 'incapacidad',
       subtipo: formData.subtipo,
-      dias: calculatedDays, // ✅ CRÍTICO: días calculados, NO formData.dias
+      dias: calculatedDays, // ✅ CRÍTICO V3.0: días calculados correctos (0-N son válidos)
       fecha_inicio: formData.fecha_inicio,
       fecha_fin: formData.fecha_fin,
       valor: formData.valor, // Valor calculado por backend
       observacion: formData.observacion || undefined
     };
 
-    console.log('📤 [INCAP V2.0] ===== DATOS FINALES DE ENVÍO =====');
-    console.log('📤 [INCAP V2.0] submitData completo:', JSON.stringify(submitData, null, 2));
-    console.log('📤 [INCAP V2.0] Verificación crítica:', {
+    console.log('📤 [INCAP V3.0] ===== DATOS FINALES DE ENVÍO =====');
+    console.log('📤 [INCAP V3.0] submitData completo:', JSON.stringify(submitData, null, 2));
+    console.log('📤 [INCAP V3.0] Verificación crítica V3.0:', {
       'submitData.dias': submitData.dias,
       'calculatedDays': calculatedDays,
       'son_iguales': submitData.dias === calculatedDays,
       'tipo_submitData_dias': typeof submitData.dias,
       'tipo_calculatedDays': typeof calculatedDays,
+      'valor_esperado_para_dias': calculatedDays > 3 ? 'Valor > 0 (EPS)' : '$0 (Empleador directo)',
+      'valor_actual': submitData.valor,
       timestamp: new Date().toISOString()
     });
     
-    // ✅ VALIDACIÓN FINAL ANTES DE ENVÍO
+    // ✅ VALIDACIÓN FINAL V3.0
     if (submitData.dias !== calculatedDays) {
-      console.error('🚨 [INCAP V2.0] INCONSISTENCIA CRÍTICA: submitData.dias != calculatedDays');
-      console.error('🚨 [INCAP V2.0] Valores:', {
+      console.error('🚨 [INCAP V3.0] INCONSISTENCIA CRÍTICA: submitData.dias != calculatedDays');
+      console.error('🚨 [INCAP V3.0] Valores:', {
         submitData_dias: submitData.dias,
         calculatedDays: calculatedDays
       });
@@ -241,7 +231,7 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
       return;
     }
 
-    console.log('📤 [INCAP V2.0] ===== LLAMANDO A onSubmit =====');
+    console.log('📤 [INCAP V3.0] ===== LLAMANDO A onSubmit =====');
     onSubmit(submitData);
   };
 
@@ -261,15 +251,16 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
         <h3 className="text-lg font-semibold text-gray-900">Incapacidad</h3>
       </div>
 
-      {/* ✅ NUEVO V2.0: Debug panel visible para tracking */}
-      <div className="bg-yellow-50 border border-yellow-200 p-3 rounded-lg">
-        <h4 className="text-yellow-800 font-medium text-sm mb-2">🔍 Debug V2.0 - Tracking de Días</h4>
-        <div className="text-xs text-yellow-700 space-y-1">
+      {/* ✅ V3.0: Debug panel mejorado */}
+      <div className="bg-green-50 border border-green-200 p-3 rounded-lg">
+        <h4 className="text-green-800 font-medium text-sm mb-2">🔍 Debug V3.0 - Corrección Aplicada</h4>
+        <div className="text-xs text-green-700 space-y-1">
           <div>Fecha inicio: <strong>{formData.fecha_inicio || 'No seleccionada'}</strong></div>
           <div>Fecha fin: <strong>{formData.fecha_fin || 'No seleccionada'}</strong></div>
-          <div>Días calculados: <strong className={calculatedDays > 0 ? 'text-green-600' : 'text-red-600'}>{calculatedDays}</strong></div>
+          <div>Días calculados: <strong className={calculatedDays >= 0 ? 'text-green-600' : 'text-red-600'}>{calculatedDays}</strong></div>
           <div>Valor calculado: <strong>${formData.valor.toLocaleString()}</strong></div>
           <div>Estado: <strong>{isValidRange ? '✅ Válido' : '❌ Inválido'}</strong></div>
+          <div>Hook validation: <strong className="text-blue-600">✅ Acepta dias ≥ 0 para incapacidades</strong></div>
         </div>
       </div>
 
@@ -340,7 +331,7 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
           </div>
         </div>
 
-        {/* ✅ MEJORADO: Días calculados con validación visual */}
+        {/* ✅ V3.0: Días calculados con validación visual mejorada */}
         {formData.fecha_inicio && formData.fecha_fin && (
           <div className="bg-white p-3 rounded border border-blue-200">
             <div className="flex items-center gap-2">
@@ -368,8 +359,8 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
           </div>
         )}
 
-        {/* ✅ MEJORADO: Estado del cálculo con más detalle */}
-        {isLoading && calculatedDays > 0 && (
+        {/* ✅ V3.0: Estado del cálculo con información específica */}
+        {isLoading && calculatedDays >= 0 && (
           <div className="bg-blue-50 p-3 rounded border border-blue-200">
             <div className="flex items-center gap-2">
               <Calculator className="h-4 w-4 text-blue-600 animate-spin" />
@@ -386,7 +377,7 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
         <div>
           <Label htmlFor="valor" className="text-gray-700">
             Valor Calculado *
-            {formData.valor > 0 && currentSubtipoInfo && (
+            {formData.valor >= 0 && currentSubtipoInfo && (
               <span className="text-xs text-green-600 ml-2">
                 ({currentSubtipoInfo.porcentaje}% según normativa colombiana)
               </span>
@@ -401,13 +392,13 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
             placeholder="0"
             className="text-lg font-medium"
           />
-          {/* ✅ MEJORADO: Feedback más claro para valor 0 */}
-          {formData.valor === 0 && calculatedDays > 0 && !isLoading && (
+          {/* ✅ V3.0: Feedback mejorado */}
+          {formData.valor === 0 && calculatedDays >= 0 && !isLoading && (
             <div className="text-xs text-amber-600 mt-1 flex items-center gap-1">
               <AlertTriangle className="h-3 w-3" />
               {currentSubtipoInfo?.value === 'general' && calculatedDays <= 3 ? 
-                'Valor $0 correcto: empleador paga primeros 3 días directamente' :
-                'Recalculando... Si persiste en $0, verificar configuración'
+                'Valor $0 correcto: empleador paga primeros 3 días directamente (Ley 100/1993)' :
+                calculatedDays > 3 ? 'Si persiste en $0 para >3 días, verificar configuración backend' : 'Valor calculado'
               }
             </div>
           )}
@@ -424,13 +415,13 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
           />
         </div>
 
-        {/* ✅ Preview mejorado con validación de consistencia */}
-        {formData.valor > 0 && calculatedDays > 0 && (
+        {/* ✅ V3.0: Preview con validación de lógica normativa */}
+        {formData.valor >= 0 && calculatedDays >= 0 && (
           <div className="bg-green-50 p-3 rounded text-center border border-green-200">
             <div className="flex items-center justify-center gap-2 mb-2">
               <CheckCircle className="h-4 w-4 text-green-600" />
               <Badge variant="secondary" className="bg-green-100 text-green-800 text-base px-4 py-2">
-                +{formatCurrency(formData.valor)}
+                {formData.valor > 0 ? `+${formatCurrency(formData.valor)}` : '$0'}
               </Badge>
             </div>
             <div className="text-sm text-gray-700 mt-2">
@@ -438,7 +429,10 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
             </div>
             {currentSubtipoInfo && (
               <div className="text-xs text-gray-600 mt-1">
-                Calculado al {currentSubtipoInfo.porcentaje}% según normativa colombiana
+                {formData.valor === 0 && calculatedDays <= 3 && currentSubtipoInfo.value === 'general' ?
+                  'Empleador paga directamente según Ley 100/1993' :
+                  `Calculado al ${currentSubtipoInfo.porcentaje}% según normativa colombiana`
+                }
               </div>
             )}
           </div>
@@ -452,14 +446,14 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
         </Button>
         <Button 
           onClick={handleSubmit}
-          disabled={!formData.fecha_inicio || !formData.fecha_fin || !isValidRange || calculatedDays <= 0 || isSubmitting}
+          disabled={!formData.fecha_inicio || !formData.fecha_fin || !isValidRange || calculatedDays < 0 || isSubmitting}
           className="bg-blue-600 hover:bg-blue-700"
         >
           {isSubmitting ? 'Guardando...' : 'Guardar Incapacidad'}
         </Button>
       </div>
 
-      {/* ✅ NUEVO: Debugger para desarrollo */}
+      {/* ✅ Debugger para desarrollo */}
       {process.env.NODE_ENV === 'development' && (
         <IncapacidadDebugger
           formData={formData}
