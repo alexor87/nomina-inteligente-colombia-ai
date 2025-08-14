@@ -94,6 +94,10 @@ export class DashboardService {
         return {
           totalEmployees: 0,
           activeEmployees: 0,
+          inactiveEmployees: 0,
+          totalPayroll: 0,
+          averageSalary: 0,
+          pendingPayments: 0,
           pendingPayrolls: 0,
           monthlyPayrollTotal: 0,
           complianceScore: 0,
@@ -149,6 +153,10 @@ export class DashboardService {
       return {
         totalEmployees: totalEmpleadosCount,
         activeEmployees: totalEmpleadosCount,
+        inactiveEmployees: 0,
+        totalPayroll: gastosNomina,
+        averageSalary: totalEmpleadosCount > 0 ? gastosNomina / totalEmpleadosCount : 0,
+        pendingPayments: 0,
         pendingPayrolls: 0,
         monthlyPayrollTotal: gastosNomina,
         complianceScore: 85,
@@ -164,6 +172,10 @@ export class DashboardService {
       return {
         totalEmployees: 0,
         activeEmployees: 0,
+        inactiveEmployees: 0,
+        totalPayroll: 0,
+        averageSalary: 0,
+        pendingPayments: 0,
         pendingPayrolls: 0,
         monthlyPayrollTotal: 0,
         complianceScore: 0,

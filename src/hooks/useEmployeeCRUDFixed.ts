@@ -14,6 +14,8 @@ export const useEmployeeCRUD = () => {
       tipoSalario: employeeData.tipoSalario || 'mensual', // Ensure it's set
       tipoContrato: employeeData.tipoContrato || 'indefinido', // Ensure it's set
       periodicidadPago: employeeData.periodicidadPago || 'mensual', // ✅ FIXED: Added default
+      estado: employeeData.estado || 'activo', // Ensure it's set
+      tipoJornada: employeeData.tipoJornada || 'completa', // Ensure it's set
       company_id: employeeData.empresaId
     });
     

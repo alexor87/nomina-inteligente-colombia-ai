@@ -18,7 +18,9 @@ export const EmployeeFormModal = ({ isOpen, onClose, employee, onSuccess }: Empl
     company_id: employee.empresaId,
     tipoDocumento: employee.tipoDocumento || 'CC',
     tipoSalario: employee.tipoSalario || 'mensual',
-    tipoContrato: employee.tipoContrato || 'indefinido' // Ensure required field is set
+    tipoContrato: employee.tipoContrato || 'indefinido',
+    estado: employee.estado || 'activo',
+    tipoJornada: employee.tipoJornada || 'completa' // Ensure required field is set
   } : undefined;
 
   return (

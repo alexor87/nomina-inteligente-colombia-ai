@@ -59,6 +59,11 @@ export class PayrollService {
     const netoPagado = totalDevengado - totalDeducciones;
 
     return {
+      employeeId: '', // Will be set by caller
+      baseSalary: salarioBase,
+      deductions: totalDeducciones,
+      bonuses: bonificaciones,
+      netPay: netoPagado,
       salarioBase: salarioProporcional,
       diasTrabajados,
       horasExtra: pagoHorasExtra,

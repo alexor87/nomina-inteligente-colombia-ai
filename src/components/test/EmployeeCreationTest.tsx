@@ -62,7 +62,12 @@ export const EmployeeCreationTest = () => {
         estadoAfiliacion: 'completa'
       };
 
-      const result = await createEmployee(employeeData);
+      const result = await createEmployee({
+        ...employeeData,
+        tipoContrato: employeeData.tipoContrato || 'indefinido',
+        estado: employeeData.estado || 'activo',
+        tipoJornada: employeeData.tipoJornada || 'completa'
+      });
 
       if (result.success) {
         toast({

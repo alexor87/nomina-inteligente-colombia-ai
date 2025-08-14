@@ -72,7 +72,12 @@ export const useEmployeeFormSubmission = () => {
       if (existingEmployee) {
         result = await updateEmployee(existingEmployee.id, employeeData as Partial<Employee>);
       } else {
-        result = await createEmployee(employeeData);
+        result = await createEmployee({
+          ...employeeData,
+          tipoContrato: employeeData.tipoContrato || 'indefinido',
+          estado: employeeData.estado || 'activo',
+          tipoJornada: employeeData.tipoJornada || 'completa' // Ensure required field is set
+        });
       }
 
       if (result.success) {

@@ -37,14 +37,11 @@ export const PayrollLiquidationTable: React.FC<PayrollLiquidationTableProps> = (
   return (
     <PayrollLiquidationSimpleTable
       employees={employees}
-      startDate={startDate}
-      endDate={endDate}
-      currentPeriodId={currentPeriodId}
-      currentPeriod={currentPeriod}
-      onRemoveEmployee={onRemoveEmployee}
-      onEmployeeNovedadesChange={onEmployeeNovedadesChange}
-      updateEmployeeCalculationsInDB={updateEmployeeCalculationsInDB}
-      year={year}
+      periodType={currentPeriod?.tipo_periodo === 'quincenal' ? 'quincenal' : 'mensual'}
+      onEmployeeCalculated={(employee) => {
+        // Handle employee calculation update if needed
+        console.log('Employee calculated:', employee);
+      }}
     />
   );
 };

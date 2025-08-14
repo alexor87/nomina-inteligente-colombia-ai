@@ -156,6 +156,9 @@ export interface DashboardMetrics {
   tendenciaMensual: number; // Monthly trend
   pendingPayrolls: number; // Added missing property
   monthlyPayrollTotal: number; // ✅ FIXED: Added missing property
+  complianceScore: number; // Added missing property
+  alerts: number; // Added missing property
+  alertasLegales: number; // Added missing property
 }
 
 // Payroll types
@@ -173,6 +176,17 @@ export interface PayrollCalculation {
   recargoDominical: number;
   bonificaciones: number;
   auxilioTransporte: number; // ✅ FIXED: Added missing property
+  cesantias: number; // Added missing property
+  interesesCesantias: number; // Added missing property
+  prima: number; // Added missing property
+  vacaciones: number; // Added missing property
+  saludEmpleado: number; // Added missing property
+  pensionEmpleado: number; // Added missing property
+  retencionFuente: number; // Added missing property
+  otrasDeducciones: number; // Added missing property
+  totalDevengado: number; // Added missing property
+  totalDeducciones: number; // Added missing property
+  netoPagado: number; // Added missing property
 }
 
 export interface LegalValidation {
