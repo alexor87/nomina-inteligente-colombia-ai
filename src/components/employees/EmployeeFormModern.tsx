@@ -2,8 +2,7 @@
 import { useMemo, useState } from 'react';
 import { EmployeeUnified } from '@/types/employee-unified';
 import { useEmployeeGlobalConfiguration } from '@/hooks/useEmployeeGlobalConfiguration';
-import { useEmployeeFormSubmissionRobust } from '@/hooks/useEmployeeFormSubmissionRobust';
-import { useEmployeeEditSubmission } from '@/hooks/useEmployeeEditSubmission';
+import { useEmployeeSubmission } from '@/hooks/useEmployeeSubmission';
 
 // Import refactored components
 import { NavigationSidebar } from './form/NavigationSidebar';
@@ -61,97 +60,36 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
     hasEmployee: !!employee
   });
 
-  // Memoize the data refresh handler to prevent unnecessary re-renders
-  const memoizedDataRefresh = useMemo(() => {
-    return (updatedEmployee: EmployeeUnified) => {
-      console.log('🔄 Data refresh callback triggered');
-      onDataRefresh?.(updatedEmployee);
-    };
-  }, [onDataRefresh]);
-
-  // Use edit submission hook for employee updates
-  const { handleSubmit: handleEditSubmission, isSubmitting: isSubmittingEdit } = useEmployeeEditSubmission(
-    employee || null,
+  // ✅ KISS: Single unified submission hook
+  const { handleSubmit: handleSubmission, isSubmitting } = useEmployeeSubmission({
+    employee,
     onSuccess
-  );
+  });
+  console.log('🔥 Loading state:', isSubmitting, 'Mode:', isEditMode ? 'edit' : 'create');
 
-  // Use robust submission hook for new employees
-  const { 
-    submitEmployee, 
-    isSubmitting: isSubmittingCreate
-  } = useEmployeeFormSubmissionRobust();
-
-  const isLoading = isEditMode ? isSubmittingEdit : isSubmittingCreate;
-  console.log('🔥 Loading state:', isLoading, 'Mode:', isEditMode ? 'edit' : 'create');
-
+  // ✅ KISS: Simplified submission handler
   const onSubmit = async (data: any) => {
-    console.log('🔥🔥🔥 MAIN FORM SUBMISSION TRIGGERED 🔥🔥🔥');
-    console.log('🔥 Form data received in onSubmit:', data);
-    console.log('🔥 Submission mode:', isEditMode ? 'edit' : 'create');
-    console.log('🔥 IsDraft:', isDraft);
-    console.log('🔥 Employee:', employee ? `${employee.nombre} ${employee.apellido}` : 'none');
+    console.log('🔥 FORM SUBMISSION - Unified handler');
+    console.log('👤 Mode:', isEditMode ? 'EDIT' : 'CREATE');
+    console.log('📝 Form data:', data);
     
-    // Verificar que tenemos los datos necesarios
-    if (!data) {
-      console.error('❌ No form data received');
-      return;
-    }
+    // Add company and draft info to data
+    const submissionData = {
+      ...data,
+      empresaId: companyId,
+      company_id: companyId,
+      isDraft
+    };
     
-    try {
-      if (isEditMode && employee) {
-        console.log('🔥 Processing EDIT submission');
-        console.log('🔥 Employee ID:', employee.id);
-        console.log('🔥 Company ID:', employee.company_id || employee.empresaId);
-        
-        // Preparar datos para edición
-        const editData = {
-          ...data,
-          id: employee.id,
-          company_id: employee.company_id || employee.empresaId,
-          isDraft
-        };
-        
-        console.log('📤 Sending edit data:', editData);
-        const result = await handleEditSubmission(editData);
-        console.log('📥 Edit result:', result);
-        
-      } else {
-        console.log('🔥 Processing CREATE submission');
-        if (!companyId) {
-          console.error('❌ No company ID available for creation');
-          return;
-        }
-
-        const formDataWithCompany = {
-          ...data,
-          empresaId: companyId,
-          company_id: companyId,
-          custom_fields: data.custom_fields || {},
-          isDraft
-        };
-
-        console.log('📤 Sending create data:', formDataWithCompany);
-        const result = await submitEmployee(formDataWithCompany);
-        
-        if (result.success) {
-          console.log('✅ Create submission completed successfully');
-          onSuccess();
-          if (result.employeeId && memoizedDataRefresh) {
-            const updatedEmployee: EmployeeUnified = { ...formDataWithCompany, id: result.employeeId } as EmployeeUnified;
-            memoizedDataRefresh(updatedEmployee);
-          }
-        } else {
-          console.error('❌ Create submission failed:', result.error);
-        }
-      }
-    } catch (error) {
-      console.error('❌ Error in form submission:', error);
-      
-      // Mostrar error al usuario si es posible
-      if (error instanceof Error) {
-        alert(`Error al guardar: ${error.message}`);
-      } else {
-        alert('Error desconocido al guardar el empleado');
+    await handleSubmission(submissionData);
+    
+    // Call onDataRefresh if available (for edit mode)
+    if (onDataRefresh && employee) {
+      try {
+        console.log('🔄 Refreshing data after submission...');
+        onDataRefresh(employee);
+      } catch (refreshError) {
+        console.warn('⚠️ Error refreshing data:', refreshError);
       }
     }
   };
@@ -165,7 +103,7 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
     id: employee?.id,
     name: employee ? `${employee.nombre} ${employee.apellido}` : 'New Employee',
     mode: isEditMode ? 'edit' : 'create',
-    isLoading,
+    isLoading: isSubmitting,
     customFieldsCount: configuration?.custom_fields?.length || 0,
     completionPercentage,
     formIsValid: isValid,
@@ -237,7 +175,7 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
             completionPercentage={completionPercentage}
             isDraft={isDraft}
             setIsDraft={setIsDraft}
-            isLoading={isLoading}
+            isLoading={isSubmitting}
           />
         </form>
       </div>
