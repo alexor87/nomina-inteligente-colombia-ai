@@ -42,6 +42,7 @@ export const PayrollLiquidationTable: React.FC<PayrollLiquidationTableProps> = (
         // Handle employee calculation update if needed
         console.log('Employee calculated:', employee);
       }}
+      onRemoveEmployee={onRemoveEmployee}
     />
   );
 };

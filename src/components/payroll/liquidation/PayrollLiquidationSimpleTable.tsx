@@ -9,6 +9,8 @@ import {
 } from "@/components/ui/table"
 import { PayrollEmployee } from '@/types/payroll';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Calculator, Trash2 } from 'lucide-react';
 import { calculateEmployeeBackend } from '@/utils/payrollCalculationsBackend';
 import { PayrollCalculationInput } from '@/services/PayrollCalculationBackendService';
 
@@ -16,12 +18,24 @@ interface PayrollLiquidationSimpleTableProps {
   employees: PayrollEmployee[];
   periodType: 'quincenal' | 'mensual';
   onEmployeeCalculated: (employee: PayrollEmployee) => void;
+  onRemoveEmployee?: (employeeId: string) => void;
 }
+
+// Helper function to format currency
+const formatCurrency = (amount: number): string => {
+  return new Intl.NumberFormat('es-CO', {
+    style: 'currency',
+    currency: 'COP',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount);
+};
 
 export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTableProps> = ({
   employees,
   periodType,
-  onEmployeeCalculated
+  onEmployeeCalculated,
+  onRemoveEmployee
 }) => {
 
   const handleCalculateEmployee = async (employee: PayrollEmployee) => {
@@ -51,30 +65,62 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
           </TableRow>
         </TableHeader>
         <TableBody>
-          {employees.map((employee) => (
-            <TableRow key={employee.id}>
-              <TableCell className="font-medium">{employee.id}</TableCell>
-              <TableCell>{employee.name}</TableCell>
-              <TableCell>{employee.position}</TableCell>
-              <TableCell>{employee.baseSalary}</TableCell>
-              <TableCell>{employee.workedDays}</TableCell>
-              <TableCell>
-                {employee.status === 'valid' ? (
-                  <Badge variant="outline">Valid</Badge>
-                ) : (
-                  <Badge variant="destructive">Error</Badge>
-                )}
-              </TableCell>
-              <TableCell className="text-right">{employee.grossPay}</TableCell>
-              <TableCell className="text-right">{employee.deductions}</TableCell>
-              <TableCell className="text-right">{employee.netPay}</TableCell>
-              <TableCell className="text-center">
-                <button onClick={() => handleCalculateEmployee(employee)}>
-                  Calcular
-                </button>
-              </TableCell>
-            </TableRow>
-          ))}
+           {employees.map((employee) => (
+             <TableRow key={employee.id}>
+               <TableCell className="font-medium">{employee.id}</TableCell>
+               <TableCell className="font-medium">{employee.name}</TableCell>
+               <TableCell className="text-muted-foreground">{employee.position}</TableCell>
+               <TableCell className="text-right">{formatCurrency(employee.baseSalary || 0)}</TableCell>
+               <TableCell className="text-center">{employee.workedDays || 0}</TableCell>
+               <TableCell>
+                 {employee.status === 'valid' ? (
+                   <Badge variant="outline" className="text-green-600 border-green-600">
+                     Válido
+                   </Badge>
+                 ) : employee.status === 'error' ? (
+                   <Badge variant="destructive">
+                     Error
+                   </Badge>
+                 ) : (
+                   <Badge variant="secondary">
+                     Incompleto
+                   </Badge>
+                 )}
+               </TableCell>
+               <TableCell className="text-right font-medium">
+                 {formatCurrency(employee.grossPay || 0)}
+               </TableCell>
+               <TableCell className="text-right font-medium">
+                 {formatCurrency(employee.deductions || 0)}
+               </TableCell>
+               <TableCell className="text-right font-semibold">
+                 {formatCurrency(employee.netPay || 0)}
+               </TableCell>
+               <TableCell className="text-center">
+                 <div className="flex items-center justify-center gap-2">
+                   <Button
+                     size="sm"
+                     variant="outline"
+                     onClick={() => handleCalculateEmployee(employee)}
+                     className="h-8 px-3"
+                   >
+                     <Calculator className="h-4 w-4 mr-1" />
+                     Calcular
+                   </Button>
+                   {onRemoveEmployee && (
+                     <Button
+                       size="sm"
+                       variant="ghost"
+                       onClick={() => onRemoveEmployee(employee.id)}
+                       className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                     >
+                       <Trash2 className="h-4 w-4" />
+                     </Button>
+                   )}
+                 </div>
+               </TableCell>
+             </TableRow>
+           ))}
         </TableBody>
       </Table>
     </div>
