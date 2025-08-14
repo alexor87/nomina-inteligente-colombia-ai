@@ -135,39 +135,98 @@ serve(async (req) => {
 async function calculateNovedad(data: any) {
   const { tipoNovedad, subtipo, salarioBase, horas, dias, fechaPeriodo } = data
 
-  console.log('🔍 [CALC NOVEDAD v7.0] Iniciando cálculo:', {
+  console.log('🔍 [CALC NOVEDAD V2.0] ===== INICIANDO CÁLCULO =====')
+  console.log('🔍 [CALC NOVEDAD V2.0] Datos completos recibidos:', JSON.stringify(data, null, 2))
+  console.log('🔍 [CALC NOVEDAD V2.0] Análisis específico:', {
     tipo: tipoNovedad,
     subtipo,
     salarioBase,
     horas,
-    dias
+    dias,
+    'typeof dias': typeof dias,
+    'dias === 0': dias === 0,
+    'dias === undefined': dias === undefined,
+    'dias === null': dias === null,
+    timestamp: new Date().toISOString()
   })
 
   // Validaciones básicas
   if (!salarioBase || salarioBase <= 0) {
-    console.log('❌ [CALC] Salario inválido:', salarioBase)
+    console.log('❌ [CALC V2.0] Salario inválido:', salarioBase)
     return null
   }
 
-  // ✅ CORRECCIÓN ESPECÍFICA PARA INCAPACIDADES
+  // ✅ CORRECCIÓN ESPECÍFICA PARA INCAPACIDADES V2.0
   if (tipoNovedad === 'incapacidad') {
-    console.log('🏥 [INCAPACIDAD v7.0] Procesando cálculo:', {
+    console.log('🏥 [INCAPACIDAD V2.0] ===== PROCESANDO CÁLCULO =====')
+    console.log('🏥 [INCAPACIDAD V2.0] Datos de entrada:', {
       subtipo: subtipo || 'general',
       dias,
       salarioBase,
-      nota: 'días = 0 es VÁLIDO para incapacidades de 1-3 días generales'
+      fechaPeriodo,
+      timestamp: new Date().toISOString()
     })
 
-    // ✅ VALIDACIÓN CORREGIDA: dias = 0 ES VÁLIDO para incapacidades generales de 1-3 días
+    // ✅ VALIDACIÓN DEFENSIVA V2.0: Recalcular días si es necesario
+    let diasFinales = dias;
+    
     if (dias === undefined || dias === null || dias < 0) {
-      console.log('❌ [INCAPACIDAD] Días inválidos para incapacidad:', dias)
-      return {
-        valor: 0,
-        factorCalculo: 0,
-        detalleCalculo: `Error: Incapacidad con días inválidos (${dias}). Debe ser >= 0.`,
-        jornadaInfo: getJornadaInfo(salarioBase)
+      console.log('⚠️ [INCAPACIDAD V2.0] Días inválidos detectados, intentando validación defensiva...')
+      
+      // ✅ VALIDACIÓN DEFENSIVA: Si tenemos fechas, recalcular días
+      if (data.fecha_inicio && data.fecha_fin) {
+        console.log('🔧 [INCAPACIDAD V2.0] Recalculando días desde fechas:', {
+          fecha_inicio: data.fecha_inicio,
+          fecha_fin: data.fecha_fin
+        })
+        
+        try {
+          const fechaInicio = new Date(data.fecha_inicio + 'T00:00:00');
+          const fechaFin = new Date(data.fecha_fin + 'T00:00:00');
+          const diffTime = fechaFin.getTime() - fechaInicio.getTime();
+          const recalculatedDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+          
+          if (recalculatedDays > 0) {
+            diasFinales = recalculatedDays;
+            console.log('✅ [INCAPACIDAD V2.0] Días recalculados exitosamente:', {
+              dias_originales: dias,
+              dias_recalculados: diasFinales,
+              fechas: `${data.fecha_inicio} a ${data.fecha_fin}`
+            });
+          } else {
+            console.error('❌ [INCAPACIDAD V2.0] Recálculo resultó en días <= 0:', recalculatedDays);
+            return {
+              valor: 0,
+              factorCalculo: 0,
+              detalleCalculo: `Error: Recálculo de días resultó en ${recalculatedDays}. Verificar fechas.`,
+              jornadaInfo: getJornadaInfo(salarioBase)
+            };
+          }
+        } catch (error) {
+          console.error('❌ [INCAPACIDAD V2.0] Error en recálculo de días:', error);
+          return {
+            valor: 0,
+            factorCalculo: 0,
+            detalleCalculo: `Error: No se pudieron recalcular días. Días recibidos: ${dias}`,
+            jornadaInfo: getJornadaInfo(salarioBase)
+          };
+        }
+      } else {
+        console.error('❌ [INCAPACIDAD V2.0] No hay fechas para recalcular días');
+        return {
+          valor: 0,
+          factorCalculo: 0,
+          detalleCalculo: `Error: Incapacidad con días inválidos (${dias}) y sin fechas para recalcular.`,
+          jornadaInfo: getJornadaInfo(salarioBase)
+        };
       }
     }
+
+    console.log('🏥 [INCAPACIDAD V2.0] Días finales para cálculo:', {
+      dias_originales: dias,
+      dias_finales: diasFinales,
+      subtipo: subtipo || 'general'
+    });
 
     const valorHoraDiaria = salarioBase / 30
     let valor = 0
@@ -177,29 +236,31 @@ async function calculateNovedad(data: any) {
     // Cálculo según normativa colombiana actualizada
     if (subtipo === 'laboral') {
       // ARL paga 100% desde día 1
-      valor = valorHoraDiaria * dias
+      valor = valorHoraDiaria * diasFinales
       factorCalculo = 1.0
-      detalleCalculo = `Incapacidad laboral: ${dias} días × $${valorHoraDiaria.toFixed(0)} × 100% = $${valor.toFixed(0)}`
+      detalleCalculo = `Incapacidad laboral: ${diasFinales} días × $${valorHoraDiaria.toFixed(0)} × 100% = $${valor.toFixed(0)}`
     } else {
       // EPS: empleador paga 66.67% desde día 4 (días 1-3 los paga empleador directamente)
-      if (dias <= 3) {
+      if (diasFinales <= 3) {
         valor = 0 // ✅ CORRECTO: Empleador paga directamente, no se registra en nómina
         factorCalculo = 0
-        detalleCalculo = `Incapacidad general: ${dias} días - Empleador paga directamente los primeros 3 días (Ley 100/1993)`
+        detalleCalculo = `Incapacidad general: ${diasFinales} días - Empleador paga directamente los primeros 3 días (Ley 100/1993)`
       } else {
-        const diasEps = dias - 3
+        const diasEps = diasFinales - 3
         valor = valorHoraDiaria * diasEps * 0.6667
         factorCalculo = 0.6667
         detalleCalculo = `Incapacidad general: ${diasEps} días EPS (desde día 4) × $${valorHoraDiaria.toFixed(0)} × 66.67% = $${valor.toFixed(0)}`
       }
     }
 
-    console.log('✅ [INCAPACIDAD v7.0] Cálculo completado:', {
-      dias_procesados: dias,
+    console.log('✅ [INCAPACIDAD V2.0] ===== CÁLCULO COMPLETADO =====')
+    console.log('✅ [INCAPACIDAD V2.0] Resultado final:', {
+      dias_procesados: diasFinales,
       valor_final: Math.round(valor),
       factorCalculo,
-      es_valor_cero_correcto: valor === 0 && dias <= 3 && subtipo === 'general',
-      detalleCalculo
+      es_valor_cero_correcto: valor === 0 && diasFinales <= 3 && subtipo === 'general',
+      detalleCalculo,
+      timestamp: new Date().toISOString()
     })
 
     return {
