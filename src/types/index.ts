@@ -1,12 +1,46 @@
+export interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+}
 
-// Employee interface
-export interface Employee {
-  // Core identification
+export interface ApiListResponse<T> {
+  success: boolean;
+  data?: T[];
+  error?: string;
+  total?: number;
+}
+
+export interface Company {
   id: string;
+  name: string;
+  legalId: string;
+  phone: string;
+  email: string;
+  address: string;
+  city: string;
+  country: string;
+  industry: string;
+  logoUrl?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  companyId?: string;
+  role: 'admin' | 'employee';
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Employee {
+  id: string;
+  empresaId: string;
   cedula: string;
-  tipoDocumento: 'CC' | 'TI' | 'CE' | 'PA' | 'RC' | 'NIT' | 'PEP' | 'PPT';
-  
-  // Personal information
+  tipoDocumento?: 'CC' | 'TI' | 'CE' | 'PA' | 'RC' | 'NIT' | 'PEP' | 'PPT';
   nombre: string;
   segundoNombre?: string;
   apellido: string;
@@ -17,39 +51,28 @@ export interface Employee {
   direccion?: string;
   ciudad?: string;
   departamento?: string;
-  
-  // Company relationship
-  empresaId: string;
-  company_id?: string;
-  
-  // Labor information
   salarioBase: number;
-  tipoContrato: 'indefinido' | 'fijo' | 'obra' | 'aprendizaje';
+  tipoSalario?: 'mensual' | 'integral' | 'medio_tiempo'; // ✅ ADDED: Include tipoSalario
+  tipoContrato?: 'indefinido' | 'fijo' | 'obra' | 'aprendizaje';
   fechaIngreso: string;
-  periodicidadPago: 'quincenal' | 'mensual';
+  periodicidadPago?: 'mensual' | 'quincenal';
   cargo?: string;
   codigoCIIU?: string;
   nivelRiesgoARL?: 'I' | 'II' | 'III' | 'IV' | 'V';
-  estado: 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad' | 'eliminado'; // ✅ ADDED eliminado
+  estado?: 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad' | 'eliminado';
   centroCostos?: string;
-  
-  // Contract details
   fechaFirmaContrato?: string;
   fechaFinalizacionContrato?: string;
-  tipoJornada: 'completa' | 'parcial' | 'horas';
+  tipoJornada?: 'completa' | 'parcial' | 'horas';
   diasTrabajo?: number;
   horasTrabajo?: number;
   beneficiosExtralegales?: boolean;
   clausulasEspeciales?: string;
-  
-  // Banking information
   banco?: string;
   tipoCuenta?: 'ahorros' | 'corriente';
   numeroCuenta?: string;
   titularCuenta?: string;
   formaPago?: 'dispersion' | 'manual';
-  
-  // Affiliations
   eps?: string;
   afp?: string;
   arl?: string;
@@ -58,72 +81,63 @@ export interface Employee {
   subtipoCotizanteId?: string;
   regimenSalud?: 'contributivo' | 'subsidiado';
   estadoAfiliacion?: 'completa' | 'pendiente' | 'inconsistente';
-  
-  // Custom fields
-  custom_fields?: Record<string, any>;
-  
-  // UI/Display properties
-  avatar?: string;
-  centrosocial?: string;
-  ultimaLiquidacion?: string;
-  contratoVencimiento?: string;
-  
-  // Timestamps
   createdAt?: string;
   updatedAt?: string;
 }
 
-// Payroll related types
-export interface PayrollCalculation {
-  salarioBase: number;
-  diasTrabajados: number;
-  horasExtra: number;
-  recargoNocturno: number;
-  recargoDominical: number;
-  bonificaciones: number;
-  auxilioTransporte: number;
-  totalDevengado: number;
-  saludEmpleado: number;
-  pensionEmpleado: number;
-  retencionFuente: number;
-  otrasDeducciones: number;
-  totalDeducciones: number;
-  netoPagado: number;
-  cesantias: number;
-  interesesCesantias: number;
-  prima: number;
-  vacaciones: number;
-}
-
-export interface Payroll {
+export interface Novedad {
   id: string;
-  employeeId: string;
-  companyId: string;
-  periodo: string;
-  calculation: PayrollCalculation;
-  estado: 'borrador' | 'procesado' | 'pagado';
-  createdAt: string;
-  updatedAt: string;
+  empleado_id: string;
+  tipo_novedad: string;
+  fecha_inicio: string;
+  fecha_fin?: string;
+  valor?: number;
+  descripcion?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-export interface LegalValidation {
-  isValid: boolean;
-  errors: string[];
-  warnings: string[];
+export interface Nomina {
+  id: string;
+  empresa_id: string;
+  periodo_inicio: string;
+  periodo_fin: string;
+  fecha_generacion: string;
+  estado: 'pendiente' | 'procesada' | 'aprobada' | 'pagada';
+  total_devengado: number;
+  total_deducciones: number;
+  total_pagado: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-// Dashboard types
-export interface DashboardMetrics {
-  totalEmployees: number;
-  activeEmployees: number;
-  pendingPayrolls: number;
-  monthlyPayrollTotal: number;
-  complianceScore: number;
-  alerts: number;
-  // Legacy Spanish property names for compatibility
-  totalEmpleados: number;
-  nominasProcesadas: number;
-  alertasLegales: number;
-  gastosNomina: number;
-  tendenciaMensual: number;
+export interface NominaEmpleado {
+  id: string;
+  nomina_id: string;
+  empleado_id: string;
+  devengado: number;
+  deducciones: number;
+  neto_pagado: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Configuration {
+  id: string;
+  year: string;
+  salarioMinimo: number;
+  auxilioTransporte: number;
+  uvt: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface SecureAuditLog {
+  id: string;
+  company_id: string;
+  table_name: string;
+  operation_type: string;
+  details: string;
+  user_id: string;
+  timestamp: string;
 }

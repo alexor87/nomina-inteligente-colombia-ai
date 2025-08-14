@@ -25,17 +25,18 @@ export const useEmployeeFormSubmission = () => {
       ciudad: formData.ciudad,
       departamento: formData.departamento,
       salarioBase: Number(formData.salarioBase),
-      tipoContrato: formData.tipoContrato, // ✅ FIXED: Direct assignment
+      tipoSalario: formData.tipoSalario || 'mensual', // ✅ ADDED: Include tipoSalario
+      tipoContrato: formData.tipoContrato,
       fechaIngreso: formData.fechaIngreso,
-      periodicidadPago: formData.periodicidadPago, // ✅ FIXED: Direct assignment
+      periodicidadPago: formData.periodicidadPago,
       cargo: formData.cargo,
       codigoCIIU: formData.codigo_ciiu,
-      nivelRiesgoARL: formData.nivelRiesgoARL || 'I', // ✅ FIXED: Ensure valid ARL level
-      estado: formData.estado, // ✅ FIXED: Direct assignment
+      nivelRiesgoARL: formData.nivelRiesgoARL || 'I',
+      estado: formData.estado,
       centroCostos: formData.centroCostos,
       fechaFirmaContrato: formData.fechaFirmaContrato,
       fechaFinalizacionContrato: formData.fechaFinalizacionContrato,
-      tipoJornada: formData.tipoJornada, // ✅ FIXED: Direct assignment
+      tipoJornada: formData.tipoJornada,
       diasTrabajo: formData.diasTrabajo,
       horasTrabajo: formData.horasTrabajo,
       beneficiosExtralegales: formData.beneficiosExtralegales,
@@ -44,7 +45,7 @@ export const useEmployeeFormSubmission = () => {
       tipoCuenta: formData.tipoCuenta,
       numeroCuenta: formData.numeroCuenta,
       titularCuenta: formData.titularCuenta,
-      formaPago: formData.formaPago, // ✅ FIXED: Direct assignment
+      formaPago: formData.formaPago,
       eps: formData.eps,
       afp: formData.afp,
       arl: formData.arl,
@@ -52,7 +53,7 @@ export const useEmployeeFormSubmission = () => {
       tipoCotizanteId: formData.tipoCotizanteId,
       subtipoCotizanteId: formData.subtipoCotizanteId,
       regimenSalud: formData.regimenSalud,
-      estadoAfiliacion: formData.estadoAfiliacion // ✅ FIXED: Direct assignment
+      estadoAfiliacion: formData.estadoAfiliacion
     };
   };
 
