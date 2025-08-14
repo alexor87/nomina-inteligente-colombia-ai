@@ -166,8 +166,8 @@ async function calculatePayroll(input: PayrollCalculationRequest) {
   const SMLMV_2024 = 1300000;
   const transportAllowance = (effectiveBaseSalary <= SMLMV_2024 * 2) ? 162000 : 0;
   
-  // Calcular IBC (base para deducciones) - PROPORCIONAL AL PERÍODO
-  let ibc = (ibcBaseSalary / 30) * effectiveDays; // ✅ CORRECCIÓN: IBC proporcional al período
+  // Calcular IBC (base para deducciones)
+  let ibc = ibcBaseSalary;
   
   // Agregar novedades constitutivas al IBC
   const constitutiveNovedades = novedades
