@@ -283,14 +283,17 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       for (const entry of dataArray) {
         console.log('🔍 [V9.0] procesando entry del loop:', JSON.stringify(entry, null, 2));
         
-        // KISS: Simple assignment usando los datos correctos del formulario
-        const diasFinales = entry.dias || entry.calculatedDays || 0;
+        // PLAN V13.0: Usar verificación explícita en lugar de || para preservar valores numéricos válidos
+        const diasFinales = entry.dias !== undefined && entry.dias !== null ? entry.dias : 
+                           (entry.calculatedDays !== undefined && entry.calculatedDays !== null ? entry.calculatedDays : 0);
         
-        console.log('🔍 [V9.0] análisis diasFinales:', {
+        console.log('🔍 [V13.0] análisis diasFinales:', {
           'entry.dias': entry.dias,
           'entry.calculatedDays': entry.calculatedDays,
           'diasFinales': diasFinales,
-          'entry.valor': entry.valor
+          'entry.valor': entry.valor,
+          'dias_type': typeof entry.dias,
+          'valor_type': typeof entry.valor
         });
         
         const constitutivo = determineConstitutivo(selectedType!, entry.subtipo);
@@ -300,7 +303,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
           periodo_id: periodId,
           company_id: companyId || '',
           tipo_novedad: selectedType!,
-          valor: entry.valor || 0,
+          valor: entry.valor !== undefined && entry.valor !== null ? entry.valor : 0,
           horas: entry.horas !== undefined ? entry.horas : undefined,
           dias: diasFinales,
           observacion: entry.observacion || undefined,
