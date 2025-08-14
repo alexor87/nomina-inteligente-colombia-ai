@@ -281,8 +281,17 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       const dataArray = isArrayData ? formData : [formData];
       
       for (const entry of dataArray) {
+        console.log('🔍 [V9.0] procesando entry del loop:', JSON.stringify(entry, null, 2));
+        
         // KISS: Simple assignment usando los datos correctos del formulario
         const diasFinales = entry.dias || entry.calculatedDays || 0;
+        
+        console.log('🔍 [V9.0] análisis diasFinales:', {
+          'entry.dias': entry.dias,
+          'entry.calculatedDays': entry.calculatedDays,
+          'diasFinales': diasFinales,
+          'entry.valor': entry.valor
+        });
         
         const constitutivo = determineConstitutivo(selectedType!, entry.subtipo);
         
@@ -302,7 +311,9 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
           constitutivo_salario: constitutivo
         };
         
+        console.log('🔍 [V9.0] submitData final enviado a onSubmit:', JSON.stringify(submitData, null, 2));
         await onSubmit(submitData);
+        console.log('🔍 [V9.0] onSubmit completado para entry');
       }
       
       // En modo ajustes, cerrar el modal directamente

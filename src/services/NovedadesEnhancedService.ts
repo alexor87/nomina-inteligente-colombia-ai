@@ -79,8 +79,15 @@ export class NovedadesEnhancedService {
 
   static async createNovedad(novedadData: CreateNovedadData): Promise<PayrollNovedad | null> {
     try {
+      console.log('🔍 [V9.0] ===== SERVICIO RECIBIÓ DATOS PARA GUARDAR =====');
+      console.log('🔍 [V9.0] novedadData completo:', JSON.stringify(novedadData, null, 2));
+      
       // Validación simple para incapacidades
       if (novedadData.tipo_novedad === 'incapacidad' && (!novedadData.dias || novedadData.dias <= 0)) {
+        console.error('🔍 [V9.0] validación falló para incapacidad:', {
+          dias: novedadData.dias,
+          tipo: typeof novedadData.dias
+        });
         throw new Error(`Incapacidades requieren días válidos (recibido: ${novedadData.dias})`);
       }
       
@@ -120,11 +127,15 @@ export class NovedadesEnhancedService {
         constitutivo_salario: Boolean(novedadData.constitutivo_salario)
       };
 
+      console.log('🔍 [V9.0] insertData que se enviará a BD:', JSON.stringify(insertData, null, 2));
+
       const { data: novedad, error } = await supabase
         .from('payroll_novedades')
         .insert(insertData as any)
         .select()
         .single();
+
+      console.log('🔍 [V9.0] respuesta de BD:', { novedad, error });
 
       if (error) {
         console.error('Error insertando novedad:', error);

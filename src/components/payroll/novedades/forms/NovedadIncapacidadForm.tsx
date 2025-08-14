@@ -183,15 +183,13 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  // ✅ V8.0: handleSubmit con logging exhaustivo CRÍTICO
+  // 🔍 V9.0: handleSubmit con logging crítico de diagnóstico
   const handleSubmit = () => {
-    console.log('📤 [FORM V8.0] ===== INICIANDO ENVÍO CON DEBUGGING EXHAUSTIVO =====');
-    console.log('📤 [FORM V8.0] Estado del formulario PRE-VALIDACIÓN:', {
-      formData,
-      calculatedDays,
-      isValidRange,
-      timestamp: new Date().toISOString()
-    });
+    console.log('🔍 [V9.0] ===== INCAPACIDAD FORM SUBMIT - INICIANDO DIAGNÓSTICO =====');
+    console.log('🔍 [V9.0] formData completo:', JSON.stringify(formData, null, 2));
+    console.log('🔍 [V9.0] calculatedDays:', calculatedDays);
+    console.log('🔍 [V9.0] isValidRange:', isValidRange);
+    console.log('🔍 [V9.0] employeeSalary:', employeeSalary);
 
     // Validaciones básicas
     if (!formData.fecha_inicio) {
@@ -230,38 +228,37 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
       observacion: formData.observacion || undefined
     };
 
-    console.log('📤 [FORM V8.0] ===== DATOS FINALES CONSTRUIDOS =====');
-    console.log('📤 [FORM V8.0] submitData COMPLETO:', JSON.stringify(submitData, null, 2));
-    console.log('📤 [FORM V8.0] VERIFICACIÓN CRÍTICA V8.0:', {
+    console.log('🔍 [V9.0] ===== DATOS FINALES CONSTRUIDOS PARA MODAL =====');
+    console.log('🔍 [V9.0] submitData completo:', JSON.stringify(submitData, null, 2));
+    console.log('🔍 [V9.0] verificación crítica:', {
       'submitData.dias': submitData.dias,
-      'submitData.calculatedDays': submitData.calculatedDays,
-      'calculatedDays_original': calculatedDays,
-      'todos_son_iguales': submitData.dias === calculatedDays && submitData.calculatedDays === calculatedDays,
-      'tipo_submitData_dias': typeof submitData.dias,
-      'tipo_calculatedDays': typeof calculatedDays,
-      'valor_numerico': !isNaN(submitData.dias),
-      'valor_positivo': submitData.dias > 0,
-      'test_case_validation': calculatedDays === 4 ? '✅ CASO TEST CORRECTO' : `⚠️ No es caso test (${calculatedDays} días)`,
-      timestamp: new Date().toISOString()
+      'submitData.valor': submitData.valor,
+      'calculatedDays': calculatedDays,
+      'formData.valor': formData.valor,
+      'empleado_salary': employeeSalary,
+      'tipo_dias': typeof submitData.dias,
+      'tipo_valor': typeof submitData.valor,
+      'dias_positivo': submitData.dias > 0,
+      'valor_positivo': submitData.valor > 0
     });
 
-    // ✅ V8.0: VALIDACIÓN FINAL ANTES DE ENVÍO
+    // 🔍 V9.0: VALIDACIÓN FINAL ANTES DE ENVÍO
     if (submitData.dias === undefined || submitData.dias === null || submitData.dias <= 0) {
-      console.error('🚨 [FORM V8.0] VALIDACIÓN FINAL FALLÓ:', {
+      console.error('🔍 [V9.0] VALIDACIÓN FINAL FALLÓ - DÍAS INVÁLIDOS:', {
         dias: submitData.dias,
         calculatedDays: calculatedDays,
-        error: 'Días inválidos detectados en formulario antes de envío',
-        timestamp: new Date().toISOString()
+        formData_valor: formData.valor,
+        error: 'Días inválidos detectados en formulario antes de envío'
       });
       
       alert(`Error crítico: Días calculados inválidos (${submitData.dias}). Verificar cálculo de fechas.`);
       return;
     }
     
-    console.log('📤 [FORM V8.0] ===== ENVIANDO A MODAL =====');
-    console.log('📤 [FORM V8.0] Llamando onSubmit con:', submitData);
+    console.log('🔍 [V9.0] ===== ENVIANDO A MODAL =====');
+    console.log('🔍 [V9.0] llamando onSubmit con submitData:', submitData);
     onSubmit(submitData);
-    console.log('📤 [FORM V8.0] ===== onSubmit EJECUTADO =====');
+    console.log('🔍 [V9.0] ===== onSubmit EJECUTADO =====');
   };
 
   const getCurrentSubtipoInfo = () => {
