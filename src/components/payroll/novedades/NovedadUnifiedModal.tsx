@@ -277,23 +277,59 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
 
     setIsSubmitting(true);
     try {
+      // PLAN V14.0: Diagnóstico completo con validación específica por tipo de novedad
+      console.log('🚀 [V14.0] ===== INICIANDO PROCESAMIENTO =====');
+      console.log('🚀 [V14.0] formData recibido:', JSON.stringify(formData, null, 2));
+      console.log('🚀 [V14.0] selectedType:', selectedType);
+      console.log('🚀 [V14.0] Array.isArray(formData):', Array.isArray(formData));
+      
       const isArrayData = Array.isArray(formData);
       const dataArray = isArrayData ? formData : [formData];
       
+      // Validación específica para incapacidades
+      if (selectedType === 'incapacidad' && !isArrayData) {
+        console.log('🔍 [V14.0] INCAPACIDAD DETECTADA - Validando estructura:');
+        console.log('🔍 [V14.0] - formData.dias:', formData.dias, typeof formData.dias);
+        console.log('🔍 [V14.0] - formData.calculatedDays:', formData.calculatedDays, typeof formData.calculatedDays);
+        console.log('🔍 [V14.0] - formData.valor:', formData.valor, typeof formData.valor);
+        console.log('🔍 [V14.0] - formData.subtipo:', formData.subtipo);
+      }
+      
       for (const entry of dataArray) {
-        console.log('🔍 [V9.0] procesando entry del loop:', JSON.stringify(entry, null, 2));
+        console.log('🔍 [V14.0] ===== PROCESANDO ENTRY =====');
+        console.log('🔍 [V14.0] entry completo:', JSON.stringify(entry, null, 2));
         
-        // PLAN V13.0: Usar verificación explícita en lugar de || para preservar valores numéricos válidos
-        const diasFinales = entry.dias !== undefined && entry.dias !== null ? entry.dias : 
-                           (entry.calculatedDays !== undefined && entry.calculatedDays !== null ? entry.calculatedDays : 0);
+        // PLAN V14.0: Verificación robusta que preserva valores numéricos válidos incluido el 0
+        let diasFinales = 0;
+        let valorFinal = 0;
         
-        console.log('🔍 [V13.0] análisis diasFinales:', {
-          'entry.dias': entry.dias,
-          'entry.calculatedDays': entry.calculatedDays,
+        // Para días: usar dias si está definido, sino calculatedDays, sino 0
+        if (entry.dias !== undefined && entry.dias !== null) {
+          diasFinales = entry.dias;
+          console.log('🔍 [V14.0] Usando entry.dias:', diasFinales);
+        } else if (entry.calculatedDays !== undefined && entry.calculatedDays !== null) {
+          diasFinales = entry.calculatedDays;
+          console.log('🔍 [V14.0] Usando entry.calculatedDays:', diasFinales);
+        } else {
+          diasFinales = 0;
+          console.log('🔍 [V14.0] Usando valor por defecto dias:', diasFinales);
+        }
+        
+        // Para valor: usar valor si está definido, sino 0
+        if (entry.valor !== undefined && entry.valor !== null) {
+          valorFinal = entry.valor;
+          console.log('🔍 [V14.0] Usando entry.valor:', valorFinal);
+        } else {
+          valorFinal = 0;
+          console.log('🔍 [V14.0] Usando valor por defecto valor:', valorFinal);
+        }
+        
+        console.log('🔍 [V14.0] VALORES FINALES CALCULADOS:', {
           'diasFinales': diasFinales,
-          'entry.valor': entry.valor,
-          'dias_type': typeof entry.dias,
-          'valor_type': typeof entry.valor
+          'valorFinal': valorFinal,
+          'diasFinales_type': typeof diasFinales,
+          'valorFinal_type': typeof valorFinal,
+          'selectedType': selectedType
         });
         
         const constitutivo = determineConstitutivo(selectedType!, entry.subtipo);
@@ -303,7 +339,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
           periodo_id: periodId,
           company_id: companyId || '',
           tipo_novedad: selectedType!,
-          valor: entry.valor !== undefined && entry.valor !== null ? entry.valor : 0,
+          valor: valorFinal,
           horas: entry.horas !== undefined ? entry.horas : undefined,
           dias: diasFinales,
           observacion: entry.observacion || undefined,
@@ -314,9 +350,9 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
           constitutivo_salario: constitutivo
         };
         
-        console.log('🔍 [V9.0] submitData final enviado a onSubmit:', JSON.stringify(submitData, null, 2));
+        console.log('🔍 [V14.0] submitData FINAL enviado a onSubmit:', JSON.stringify(submitData, null, 2));
         await onSubmit(submitData);
-        console.log('🔍 [V9.0] onSubmit completado para entry');
+        console.log('🔍 [V14.0] onSubmit completado exitosamente para entry');
       }
       
       // En modo ajustes, cerrar el modal directamente
