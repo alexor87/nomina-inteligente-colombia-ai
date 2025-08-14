@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Database, Tables } from '@/integrations/supabase/types';
 
@@ -171,8 +170,8 @@ export class NovedadesEnhancedService {
         fecha_fin: novedadData.fecha_fin,
         base_calculo: novedadData.base_calculo,
         subtipo: novedadData.subtipo,
-        // ✅ V8.0 CORRECCIÓN CRÍTICA: Convertir explícitamente a boolean
-        constitutivo_salario: novedadData.constitutivo_salario === true || novedadData.constitutivo_salario === 'true' ? true : false
+        // ✅ V8.0 CORRECCIÓN CRÍTICA: Conversión robusta a boolean
+        constitutivo_salario: Boolean(novedadData.constitutivo_salario)
       };
 
       console.log('💾 [SERVICE V8.0] ===== DATOS FINALES PARA INSERCIÓN BD =====');
