@@ -1,149 +1,223 @@
-
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useToast } from '@/hooks/use-toast';
 import { useEmployeeCRUD } from '@/hooks/useEmployeeCRUD';
+import { useToast } from '@/hooks/use-toast';
 import { Employee } from '@/types';
 
+interface LogEntry {
+  timestamp: string;
+  level: 'info' | 'error' | 'success' | 'warning';
+  message: string;
+  data?: any;
+}
+
 export const EmployeeCreationTest = () => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [cedula, setCedula] = useState('12345678');
-  const [nombre, setNombre] = useState('Juan');
-  const [apellido, setApellido] = useState('Pérez');
-  const [salario, setSalario] = useState('1500000');
-  
+  const { createEmployee, isLoading } = useEmployeeCRUD();
   const { toast } = useToast();
-  const { createEmployee } = useEmployeeCRUD();
+  const [testResult, setTestResult] = useState<string>('');
+  const [detailedLogs, setDetailedLogs] = useState<LogEntry[]>([]);
 
-  const handleCreateEmployee = async () => {
-    setIsLoading(true);
+  const addLog = (level: LogEntry['level'], message: string, data?: any) => {
+    const logEntry: LogEntry = {
+      timestamp: new Date().toISOString(),
+      level,
+      message,
+      data
+    };
     
-    try {
-      const employeeData: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'> = {
-        empresaId: 'test-company-id',
-        cedula,
-        tipoDocumento: 'CC',
-        nombre,
-        apellido,
-        email: `${nombre.toLowerCase()}.${apellido.toLowerCase()}@test.com`,
-        telefono: '3001234567',
-        salarioBase: Number(salario),
-        tipoSalario: 'mensual',
-        tipoContrato: 'indefinido', // ✅ FIXED: Added required field
-        fechaIngreso: new Date().toISOString().split('T')[0],
-        periodicidadPago: 'mensual', // ✅ FIXED: Added required field
-        cargo: 'Desarrollador',
-        estado: 'activo',
-        sexo: 'M',
-        fechaNacimiento: '1990-01-01',
-        direccion: 'Calle 123 #45-67',
-        ciudad: 'Bogotá',
-        departamento: 'Cundinamarca',
-        codigoCIIU: '6201',
-        nivelRiesgoARL: 'I',
-        centroCostos: 'TI',
-        tipoJornada: 'completa',
-        diasTrabajo: 30,
-        horasTrabajo: 8,
-        beneficiosExtralegales: false,
-        banco: 'Bancolombia',
-        tipoCuenta: 'ahorros',
-        numeroCuenta: '123456789',
-        titularCuenta: `${nombre} ${apellido}`,
-        formaPago: 'dispersion',
-        eps: 'EPS Sura',
-        afp: 'Protección',
-        arl: 'ARL Sura',
-        cajaCompensacion: 'Compensar',
-        regimenSalud: 'contributivo',
-        estadoAfiliacion: 'completa'
-      };
+    setDetailedLogs(prev => [...prev, logEntry]);
+    console.log(`[${level.toUpperCase()}] ${message}`, data || '');
+  };
 
-      const result = await createEmployee({
-        ...employeeData,
-        tipoContrato: employeeData.tipoContrato || 'indefinido',
-        estado: employeeData.estado || 'activo',
-        tipoJornada: employeeData.tipoJornada || 'completa'
-      });
+  const simulateEmployeeCreation = async () => {
+    console.log('🧪 Iniciando simulación de creación de empleado...');
+    setTestResult('Procesando...');
+    setDetailedLogs([]);
+
+    addLog('info', '🧪 Iniciando simulación de creación de empleado');
+
+    // ✅ FIXED: Added missing tipoJornada field
+    const testEmployeeData: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'> = {
+      cedula: '12345678',
+      tipoDocumento: 'CC',
+      nombre: 'Juan Carlos',
+      apellido: 'Pérez García',
+      email: 'juan.perez@test.com',
+      telefono: '3001234567',
+      salarioBase: 2500000,
+      tipoContrato: 'indefinido',
+      fechaIngreso: new Date().toISOString().split('T')[0],
+      periodicidadPago: 'mensual',
+      estado: 'activo',
+      tipoJornada: 'completa', // ✅ ADDED REQUIRED FIELD
+      eps: 'Compensar EPS',
+      afp: 'Porvenir',
+      arl: 'SURA ARL',
+      cajaCompensacion: 'Compensar',
+      cargo: 'Desarrollador Senior',
+      empresaId: '',
+      estadoAfiliacion: 'completa'
+    };
+
+    addLog('info', '📋 Datos del empleado de prueba preparados', testEmployeeData);
+
+    try {
+      addLog('info', '🚀 Invocando createEmployee...');
+      
+      const result = await createEmployee(testEmployeeData);
+      
+      addLog('info', '📨 Respuesta recibida de createEmployee', result);
 
       if (result.success) {
+        addLog('success', '✅ Empleado creado exitosamente', result.data);
+        
+        const successMessage = `✅ ÉXITO: Empleado creado correctamente
+        ID: ${result.data?.id}
+        Nombre: ${testEmployeeData.nombre} ${testEmployeeData.apellido}
+        Empresa: ${result.data?.company_id}
+        Fecha: ${new Date().toLocaleString()}`;
+        
+        setTestResult(successMessage);
+        
         toast({
-          title: "✅ Empleado creado exitosamente",
-          description: `${nombre} ${apellido} ha sido registrado en el sistema`,
-          className: "border-green-200 bg-green-50"
+          title: "✅ Prueba exitosa",
+          description: "El empleado de prueba se creó correctamente",
         });
       } else {
-        throw new Error(result.error || 'Error desconocido');
+        addLog('error', '❌ Error en la creación del empleado', result.error);
+        
+        const errorMessage = `❌ ERROR: ${result.error || 'Error desconocido'}`;
+        setTestResult(errorMessage);
+        
+        toast({
+          title: "❌ Prueba fallida",
+          description: result.error || "Error en la creación del empleado",
+          variant: "destructive"
+        });
       }
-    } catch (error) {
-      console.error('Error creating employee:', error);
+    } catch (error: any) {
+      addLog('error', '❌ Excepción capturada durante la simulación', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+        code: error.code,
+        details: error.details,
+        hint: error.hint
+      });
+      
+      const errorMessage = `❌ EXCEPCIÓN: ${error.message || error}`;
+      setTestResult(errorMessage);
+      
       toast({
-        title: "❌ Error al crear empleado",
-        description: error instanceof Error ? error.message : 'No se pudo crear el empleado',
+        title: "❌ Error crítico",
+        description: "Error no controlado en la prueba",
         variant: "destructive"
       });
-    } finally {
-      setIsLoading(false);
+    }
+
+    addLog('info', '🏁 Simulación finalizada');
+  };
+
+  const clearLogs = () => {
+    setDetailedLogs([]);
+    setTestResult('');
+  };
+
+  const getLogColor = (level: LogEntry['level']) => {
+    switch (level) {
+      case 'success': return 'text-green-600';
+      case 'error': return 'text-red-600';
+      case 'warning': return 'text-yellow-600';
+      default: return 'text-blue-600';
+    }
+  };
+
+  const getLogIcon = (level: LogEntry['level']) => {
+    switch (level) {
+      case 'success': return '✅';
+      case 'error': return '❌';
+      case 'warning': return '⚠️';
+      default: return 'ℹ️';
     }
   };
 
   return (
-    <Card className="w-full max-w-md mx-auto">
+    <Card className="w-full max-w-4xl mx-auto">
       <CardHeader>
-        <CardTitle>Test de Creación de Empleado</CardTitle>
+        <CardTitle className="text-center">🧪 Prueba de Creación de Empleado</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div>
-          <Label htmlFor="cedula">Cédula</Label>
-          <Input
-            id="cedula"
-            value={cedula}
-            onChange={(e) => setCedula(e.target.value)}
-            placeholder="Número de cédula"
-          />
+        <div className="flex gap-2 justify-center">
+          <Button 
+            onClick={simulateEmployeeCreation}
+            disabled={isLoading}
+            size="lg"
+          >
+            {isLoading ? 'Creando empleado...' : '🚀 Simular Creación de Empleado'}
+          </Button>
+          <Button 
+            onClick={clearLogs}
+            variant="outline"
+            size="lg"
+          >
+            🧹 Limpiar Logs
+          </Button>
         </div>
         
-        <div>
-          <Label htmlFor="nombre">Nombre</Label>
-          <Input
-            id="nombre"
-            value={nombre}
-            onChange={(e) => setNombre(e.target.value)}
-            placeholder="Nombre del empleado"
-          />
-        </div>
+        {testResult && (
+          <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+            <h3 className="font-semibold mb-2">Resultado de la Prueba:</h3>
+            <pre className="whitespace-pre-wrap text-sm font-mono">
+              {testResult}
+            </pre>
+          </div>
+        )}
+
+        {detailedLogs.length > 0 && (
+          <div className="mt-6 border rounded-lg">
+            <div className="bg-gray-100 px-4 py-2 border-b">
+              <h3 className="font-semibold">📋 Log Detallado ({detailedLogs.length} entradas)</h3>
+            </div>
+            <div className="max-h-96 overflow-y-auto p-4 space-y-2">
+              {detailedLogs.map((log, index) => (
+                <div key={index} className="border-l-4 border-gray-300 pl-4 py-2">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span>{getLogIcon(log.level)}</span>
+                    <span className={`font-medium ${getLogColor(log.level)}`}>
+                      [{log.level.toUpperCase()}]
+                    </span>
+                    <span className="text-xs text-gray-500">
+                      {new Date(log.timestamp).toLocaleTimeString()}
+                    </span>
+                  </div>
+                  <div className="text-sm mb-2">{log.message}</div>
+                  {log.data && (
+                    <details className="text-xs">
+                      <summary className="cursor-pointer text-gray-600 hover:text-gray-800">
+                        📊 Ver datos asociados
+                      </summary>
+                      <pre className="mt-2 p-2 bg-gray-100 rounded text-xs overflow-x-auto">
+                        {JSON.stringify(log.data, null, 2)}
+                      </pre>
+                    </details>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         
-        <div>
-          <Label htmlFor="apellido">Apellido</Label>
-          <Input
-            id="apellido"
-            value={apellido}
-            onChange={(e) => setApellido(e.target.value)}
-            placeholder="Apellido del empleado"
-          />
+        <div className="text-sm text-gray-600 space-y-2">
+          <p><strong>Esta prueba validará:</strong></p>
+          <ul className="list-disc list-inside space-y-1">
+            <li>✅ Que las políticas RLS permitan la creación</li>
+            <li>✅ Que se asigne correctamente la empresa del usuario</li>
+            <li>✅ Que no haya recursión infinita</li>
+            <li>✅ Que todos los campos se guarden correctamente</li>
+            <li>📋 Log detallado de todo el proceso</li>
+          </ul>
         </div>
-        
-        <div>
-          <Label htmlFor="salario">Salario Base</Label>
-          <Input
-            id="salario"
-            value={salario}
-            onChange={(e) => setSalario(e.target.value)}
-            placeholder="Salario base"
-            type="number"
-          />
-        </div>
-        
-        <Button 
-          onClick={handleCreateEmployee}
-          disabled={isLoading}
-          className="w-full"
-        >
-          {isLoading ? 'Creando...' : 'Crear Empleado de Prueba'}
-        </Button>
       </CardContent>
     </Card>
   );

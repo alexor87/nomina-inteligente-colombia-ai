@@ -103,8 +103,8 @@ export const EmployeeFiltersCollapsible = ({
                 <SelectContent>
                   <SelectItem value="all">Todos los centros</SelectItem>
                   {CENTROS_COSTO.map((centro) => (
-                    <SelectItem key={centro.value} value={centro.value}>
-                      {centro.label}
+                    <SelectItem key={centro} value={centro}>
+                      {centro}
                     </SelectItem>
                   ))}
                 </SelectContent>

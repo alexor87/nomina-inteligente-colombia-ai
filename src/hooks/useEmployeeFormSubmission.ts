@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { EmployeeFormData } from '@/components/employees/form/types';
@@ -14,7 +13,7 @@ export const useEmployeeFormSubmission = () => {
     return {
       empresaId: companyId,
       cedula: formData.cedula,
-      tipoDocumento: formData.tipoDocumento || 'CC', // Ensure it's always set
+      tipoDocumento: formData.tipoDocumento,
       nombre: formData.nombre,
       segundoNombre: formData.segundoNombre,
       apellido: formData.apellido,
@@ -26,18 +25,17 @@ export const useEmployeeFormSubmission = () => {
       ciudad: formData.ciudad,
       departamento: formData.departamento,
       salarioBase: Number(formData.salarioBase),
-      tipoSalario: formData.tipoSalario || 'mensual', // Add this required field
-      tipoContrato: formData.tipoContrato || 'indefinido', // Ensure it's always set
+      tipoContrato: formData.tipoContrato, // ✅ FIXED: Direct assignment
       fechaIngreso: formData.fechaIngreso,
-      periodicidadPago: formData.periodicidadPago || 'mensual', // ✅ FIXED: Added default
+      periodicidadPago: formData.periodicidadPago, // ✅ FIXED: Direct assignment
       cargo: formData.cargo,
       codigoCIIU: formData.codigo_ciiu,
-      nivelRiesgoARL: formData.nivelRiesgoARL || 'I',
-      estado: formData.estado,
+      nivelRiesgoARL: formData.nivelRiesgoARL || 'I', // ✅ FIXED: Ensure valid ARL level
+      estado: formData.estado, // ✅ FIXED: Direct assignment
       centroCostos: formData.centroCostos,
       fechaFirmaContrato: formData.fechaFirmaContrato,
       fechaFinalizacionContrato: formData.fechaFinalizacionContrato,
-      tipoJornada: formData.tipoJornada,
+      tipoJornada: formData.tipoJornada, // ✅ FIXED: Direct assignment
       diasTrabajo: formData.diasTrabajo,
       horasTrabajo: formData.horasTrabajo,
       beneficiosExtralegales: formData.beneficiosExtralegales,
@@ -46,7 +44,7 @@ export const useEmployeeFormSubmission = () => {
       tipoCuenta: formData.tipoCuenta,
       numeroCuenta: formData.numeroCuenta,
       titularCuenta: formData.titularCuenta,
-      formaPago: formData.formaPago,
+      formaPago: formData.formaPago, // ✅ FIXED: Direct assignment
       eps: formData.eps,
       afp: formData.afp,
       arl: formData.arl,
@@ -54,7 +52,7 @@ export const useEmployeeFormSubmission = () => {
       tipoCotizanteId: formData.tipoCotizanteId,
       subtipoCotizanteId: formData.subtipoCotizanteId,
       regimenSalud: formData.regimenSalud,
-      estadoAfiliacion: formData.estadoAfiliacion
+      estadoAfiliacion: formData.estadoAfiliacion // ✅ FIXED: Direct assignment
     };
   };
 
@@ -72,12 +70,7 @@ export const useEmployeeFormSubmission = () => {
       if (existingEmployee) {
         result = await updateEmployee(existingEmployee.id, employeeData as Partial<Employee>);
       } else {
-        result = await createEmployee({
-          ...employeeData,
-          tipoContrato: employeeData.tipoContrato || 'indefinido',
-          estado: employeeData.estado || 'activo',
-          tipoJornada: employeeData.tipoJornada || 'completa' // Ensure required field is set
-        });
+        result = await createEmployee(employeeData);
       }
 
       if (result.success) {

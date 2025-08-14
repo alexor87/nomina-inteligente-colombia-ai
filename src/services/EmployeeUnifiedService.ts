@@ -1,7 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { SecureEmployeeService } from './SecureEmployeeService';
-// ✅ KISS: Removed EmployeeCRUDService - now using SecureEmployeeService only
+import { EmployeeCRUDService } from './EmployeeCRUDService';
 import { EmployeeUnified } from '@/types/employee-unified';
 import { PayrollLiquidationNewService } from './PayrollLiquidationNewService';
 import { SALARIO_MINIMO_2025, AUXILIO_TRANSPORTE_2025, LIMITE_AUXILIO_TRANSPORTE_2025 } from '@/constants';

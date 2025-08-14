@@ -1,64 +1,70 @@
-import { EmployeeUnified } from '@/types/employee-unified';
+
 import { EmployeeWithStatus } from '@/types/employee-extended';
 
 export class EmployeeTransformationService {
-  static transformEmployeeData(employees: any[]): EmployeeWithStatus[] {
-    if (!employees) return [];
+  static transformEmployeeData(rawData: any[]): EmployeeWithStatus[] {
+    return rawData.map((emp: any): EmployeeWithStatus => {
+      console.log('🔄 Transforming employee:', emp.nombre, emp.apellido);
+      
+      const transformed = {
+        id: emp.id,
+        cedula: emp.cedula,
+        tipoDocumento: emp.tipo_documento || 'CC',
+        nombre: emp.nombre,
+        segundoNombre: emp.segundo_nombre || undefined,
+        apellido: emp.apellido,
+        email: emp.email || '',
+        telefono: emp.telefono,
+        salarioBase: Number(emp.salario_base) || 0,
+        tipoContrato: emp.tipo_contrato || 'indefinido',
+        fechaIngreso: emp.fecha_ingreso,
+        estado: emp.estado || 'activo',
+        eps: emp.eps,
+        afp: emp.afp,
+        arl: emp.arl,
+        cajaCompensacion: emp.caja_compensacion,
+        cargo: emp.cargo,
+        empresaId: emp.company_id,
+        estadoAfiliacion: emp.estado_afiliacion || 'pendiente',
+        nivelRiesgoARL: emp.nivel_riesgo_arl,
+        createdAt: emp.created_at,
+        updatedAt: emp.updated_at,
+        // Banking information
+        banco: emp.banco,
+        tipoCuenta: emp.tipo_cuenta || 'ahorros',
+        numeroCuenta: emp.numero_cuenta,
+        titularCuenta: emp.titular_cuenta,
+        // Extended personal information
+        sexo: emp.sexo,
+        fechaNacimiento: emp.fecha_nacimiento,
+        direccion: emp.direccion,
+        ciudad: emp.ciudad,
+        departamento: emp.departamento,
+        // Labor information extended
+        periodicidadPago: emp.periodicidad_pago || 'mensual',
+        codigoCIIU: emp.codigo_ciiu,
+        centroCostos: emp.centro_costos,
+        // Contract details
+        fechaFirmaContrato: emp.fecha_firma_contrato,
+        fechaFinalizacionContrato: emp.fecha_finalizacion_contrato,
+        tipoJornada: emp.tipo_jornada,
+        diasTrabajo: emp.dias_trabajo,
+        horasTrabajo: emp.horas_trabajo,
+        beneficiosExtralegales: emp.beneficios_extralegales,
+        clausulasEspeciales: emp.clausulas_especiales,
+        formaPago: emp.forma_pago,
+        regimenSalud: emp.regimen_salud,
+        // Types de cotizante
+        tipoCotizanteId: emp.tipo_cotizante_id,
+        subtipoCotizanteId: emp.subtipo_cotizante_id,
+        // Legacy fields for compatibility
+        avatar: emp.avatar,
+        centrosocial: emp.centro_costos,
+        ultimaLiquidacion: emp.ultima_liquidacion,
+        contratoVencimiento: emp.contrato_vencimiento
+      };
 
-    return employees.map(employee => ({
-      id: employee.id,
-      cedula: employee.cedula,
-      tipoDocumento: employee.tipo_documento,
-      nombre: employee.nombre,
-      segundoNombre: employee.segundo_nombre,
-      apellido: employee.apellido,
-      email: employee.email,
-      telefono: employee.telefono,
-      salarioBase: Number(employee.salario_base),
-      tipoSalario: employee.tipo_salario || 'mensual', // Add required field
-      tipoContrato: employee.tipo_contrato,
-      fechaIngreso: employee.fecha_ingreso,
-      estado: employee.estado,
-      eps: employee.eps,
-      afp: employee.afp,
-      arl: employee.arl,
-      cajaCompensacion: employee.caja_compensacion,
-      regimenSalud: employee.regimen_salud,
-      estadoAfiliacion: employee.estado_afiliacion,
-      centroCostos: employee.centro_costos,
-      cargo: employee.cargo,
-      nivelRiesgoARL: employee.nivel_riesgo_arl,
-      fechaFirmaContrato: employee.fecha_firma_contrato,
-      fechaFinalizacionContrato: employee.fecha_finalizacion_contrato,
-      tipoJornada: employee.tipo_jornada,
-      diasTrabajo: employee.dias_trabajo,
-      horasTrabajo: employee.horas_trabajo,
-      beneficiosExtralegales: employee.beneficios_extralegales,
-      clausulasEspeciales: employee.clausulas_especiales,
-      banco: employee.banco,
-      tipoCuenta: employee.tipo_cuenta,
-      numeroCuenta: employee.numero_cuenta,
-      titularCuenta: employee.titular_cuenta,
-      formaPago: employee.forma_pago,
-      tipoCotizanteId: employee.tipo_cotizante_id,
-      subtipoCotizanteId: employee.subtipo_cotizante_id,
-      custom_fields: employee.custom_fields,
-      createdAt: employee.created_at,
-      updatedAt: employee.updated_at,
-      company_id: employee.company_id, // Add required field
-      empresaId: employee.company_id,
-      periodicidadPago: employee.periodicidad_pago,
-      sexo: employee.sexo,
-      fechaNacimiento: employee.fecha_nacimiento,
-      direccion: employee.direccion,
-      ciudad: employee.ciudad,
-      departamento: employee.departamento,
-      codigoCIIU: employee.codigo_ciiu,
-      // UI-specific fields
-      avatar: undefined,
-      centrosocial: employee.centro_costos,
-      ultimaLiquidacion: employee.ultima_liquidacion,
-      contratoVencimiento: employee.fecha_finalizacion_contrato
-    }));
+      return transformed;
+    });
   }
 }

@@ -18,7 +18,6 @@ export const useEmployeeFormDefaults = (employee?: EmployeeUnified | null): Empl
     ciudad: employee?.ciudad || '',
     departamento: employee?.departamento || '',
     salarioBase: employee?.salarioBase || 0,
-    tipoSalario: employee?.tipoSalario || 'mensual',
     tipoContrato: employee?.tipoContrato || 'indefinido',
     fechaIngreso: employee?.fechaIngreso || new Date().toISOString().split('T')[0],
     periodicidadPago: employee?.periodicidadPago || 'mensual',

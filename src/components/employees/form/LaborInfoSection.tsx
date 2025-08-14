@@ -41,25 +41,25 @@ export const LaborInfoSection: React.FC<LaborInfoSectionProps> = ({
   const tipoSalario = watch?.('tipoSalario') || 'mensual';
   const salarioBase = watch?.('salarioBase') || 0;
   
-  // Calcular SMLMV para 2025 (legal colombiano)
-  const SALARIO_MINIMO_2025 = 1423500; // Salario mínimo vigente 2025
-  const is13SMLMV = salarioBase >= (SALARIO_MINIMO_2025 * 13);
+  // Calcular SMLMV para 2024 (ejemplo)
+  const SMLMV_2024 = 1300000; // Este valor debería venir de configuración
+  const is10SMLMV = salarioBase >= (SMLMV_2024 * 10);
   
   const getSalarioAlert = () => {
-    if (tipoSalario === 'integral' && salarioBase > 0 && !is13SMLMV) {
+    if (tipoSalario === 'integral' && salarioBase > 0 && !is10SMLMV) {
       return (
         <Alert className="mt-2 border-orange-200 bg-orange-50">
           <AlertTriangle className="h-4 w-4 text-orange-600" />
           <AlertDescription className="text-orange-800">
-            <strong>Atención:</strong> El salario integral debe ser mínimo 13 SMMLV ($
-            {(SALARIO_MINIMO_2025 * 13).toLocaleString()}). Valor actual: $
+            <strong>Atención:</strong> El salario integral debe ser mínimo 10 SMLMV ($
+            {(SMLMV_2024 * 10).toLocaleString()}). Valor actual: $
             {salarioBase.toLocaleString()}
           </AlertDescription>
         </Alert>
       );
     }
     
-    if (tipoSalario === 'integral' && is13SMLMV) {
+    if (tipoSalario === 'integral' && is10SMLMV) {
       return (
         <Alert className="mt-2 border-blue-200 bg-blue-50">
           <Info className="h-4 w-4 text-blue-600" />
@@ -102,7 +102,7 @@ export const LaborInfoSection: React.FC<LaborInfoSectionProps> = ({
             required
             options={[
               { value: 'mensual', label: 'Salario Mensual Tradicional' },
-              { value: 'integral', label: 'Salario Integral (mín. 13 SMMLV)' },
+              { value: 'integral', label: 'Salario Integral (mín. 10 SMLMV)' },
               { value: 'medio_tiempo', label: 'Salario Medio Tiempo' }
             ]}
             placeholder="Seleccionar tipo de salario"

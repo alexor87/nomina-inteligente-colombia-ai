@@ -2,7 +2,6 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { EmployeeFormWizard } from './EmployeeFormWizard';
 import { Employee } from '@/types';
-import { EmployeeUnified } from '@/types/employee-unified';
 
 interface EmployeeFormModalProps {
   isOpen: boolean;
@@ -12,17 +11,6 @@ interface EmployeeFormModalProps {
 }
 
 export const EmployeeFormModal = ({ isOpen, onClose, employee, onSuccess }: EmployeeFormModalProps) => {
-  // Convert Employee to EmployeeUnified if needed
-  const convertedEmployee: EmployeeUnified | undefined = employee ? {
-    ...employee,
-    company_id: employee.empresaId,
-    tipoDocumento: employee.tipoDocumento || 'CC',
-    tipoSalario: employee.tipoSalario || 'mensual',
-    tipoContrato: employee.tipoContrato || 'indefinido',
-    estado: employee.estado || 'activo',
-    tipoJornada: employee.tipoJornada || 'completa' // Ensure required field is set
-  } : undefined;
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
@@ -38,7 +26,7 @@ export const EmployeeFormModal = ({ isOpen, onClose, employee, onSuccess }: Empl
           </DialogDescription>
         </DialogHeader>
         <EmployeeFormWizard
-          employee={convertedEmployee}
+          employee={employee}
           onSuccess={onSuccess}
           onCancel={onClose}
         />

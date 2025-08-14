@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Card } from '@/components/ui/card';
@@ -127,9 +128,8 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
     // Create the object with the structure expected by EmployeeUnified type
     const employeeData: Omit<EmployeeUnified, 'id' | 'createdAt' | 'updatedAt'> = {
       empresaId: companyId,
-      company_id: companyId, // Add this for compatibility
       cedula: data.cedula,
-      tipoDocumento: data.tipoDocumento || 'CC', // Ensure it's always set
+      tipoDocumento: data.tipoDocumento,
       nombre: data.nombre,
       segundoNombre: data.segundoNombre,
       apellido: data.apellido,
@@ -141,7 +141,6 @@ export const EmployeeForm = ({ employee, onSuccess, onCancel }: EmployeeFormProp
       ciudad: data.ciudad,
       departamento: data.departamento,
       salarioBase: Number(data.salarioBase),
-      tipoSalario: data.tipoSalario || 'mensual', // Add this required field
       tipoContrato: data.tipoContrato,
       fechaIngreso: data.fechaIngreso,
       periodicidadPago: data.periodicidadPago,

@@ -22,7 +22,6 @@ export class EmployeeDataMapper {
       ciudad: formData.ciudad || null,
       departamento: formData.departamento || null,
       salario_base: formData.salarioBase,
-      tipo_salario: formData.tipoSalario || 'mensual', // ✅ ADDED: Map tipoSalario
       tipo_contrato: formData.tipoContrato,
       fecha_ingreso: formData.fechaIngreso,
       periodicidad_pago: formData.periodicidadPago,
@@ -76,7 +75,6 @@ export class EmployeeDataMapper {
       ciudad: dbData.ciudad || undefined,
       departamento: dbData.departamento || undefined,
       salarioBase: Number(dbData.salario_base || 0),
-      tipoSalario: dbData.tipo_salario || 'mensual', // ✅ ADDED: Map tipoSalario from database
       tipoContrato: dbData.tipo_contrato || 'indefinido',
       fechaIngreso: dbData.fecha_ingreso || new Date().toISOString().split('T')[0],
       periodicidadPago: dbData.periodicidad_pago || 'mensual',

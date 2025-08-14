@@ -195,7 +195,7 @@ export class SecureEmployeeService extends SecureBaseService {
   static async updateEmployee(id: string, updates: Partial<EmployeeUnified>): Promise<{ success: boolean; data?: EmployeeUnified; error?: string }> {
     try {
       console.log('🔒 SecureEmployeeService: Updating employee:', id);
-      console.log('📝 Update data received:', JSON.stringify(updates, null, 2));
+      console.log('📝 Update data received:', updates);
       
       // ✅ IMPROVED: Clean the updates data before mapping
       const cleanUpdates = { ...updates };
@@ -229,23 +229,12 @@ export class SecureEmployeeService extends SecureBaseService {
       );
 
       if (error) {
-        console.error('❌ SecureEmployeeService: Database error updating employee:', error);
-        console.error('❌ Database error details:', {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code
-        });
-        
+        console.error('❌ SecureEmployeeService: Error updating employee:', error);
         await this.logSecurityViolation('employees', 'update', 'query_error', { 
           employeeId: id,
-          error: error.message,
-          errorDetails: error.details,
-          errorCode: error.code
+          error: error.message 
         });
-        
-        // Return specific database error for better debugging
-        throw new Error(`Database error: ${error.message}${error.details ? ` (${error.details})` : ''}`);
+        throw error;
       }
 
       // ✅ IMPROVED: Better error handling for no data returned
