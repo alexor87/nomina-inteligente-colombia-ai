@@ -489,10 +489,6 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
                                 <Edit className="w-4 h-4 mr-2" />
                                 Editar
                               </DropdownMenuItem>
-                              <DropdownMenuItem>
-                                <Mail className="w-4 h-4 mr-2" />
-                                Enviar Comprobante
-                              </DropdownMenuItem>
                               <DropdownMenuItem 
                                 onClick={() => handleSoftDelete(employee.id, `${employee.nombre} ${employee.apellido}`)}
                                 className="text-red-600"
