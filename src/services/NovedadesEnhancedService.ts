@@ -79,25 +79,14 @@ export class NovedadesEnhancedService {
 
   static async createNovedad(novedadData: CreateNovedadData): Promise<PayrollNovedad | null> {
     try {
-      console.log('🚨 [V11.0] ===== INICIO DIAGNÓSTICO TOTAL =====');
-      console.log('🚨 [V11.0] novedadData RAW received:', {
+      console.log('🚀 [V12.0] ===== PLAN DEFINITIVO SR. BACKEND =====');
+      console.log('🚀 [V12.0] novedadData RAW:', {
         tipo: novedadData.tipo_novedad,
         valor_raw: novedadData.valor,
         valor_type: typeof novedadData.valor,
         dias_raw: novedadData.dias,
-        dias_type: typeof novedadData.dias,
-        is_incapacidad: novedadData.tipo_novedad === 'incapacidad'
+        dias_type: typeof novedadData.dias
       });
-      console.log('🚨 [V11.0] novedadData COMPLETO:', JSON.stringify(novedadData, null, 2));
-      
-      // 🚨 VALIDACIÓN CRÍTICA ANTES DE CONVERSIÓN
-      if (novedadData.tipo_novedad === 'incapacidad' && (!novedadData.dias || novedadData.dias <= 0)) {
-        console.error('🔍 [V9.0] validación falló para incapacidad:', {
-          dias: novedadData.dias,
-          tipo: typeof novedadData.dias
-        });
-        throw new Error(`Incapacidades requieren días válidos (recibido: ${novedadData.dias})`);
-      }
       
       // Obtener company_id si no viene
       let companyId = novedadData.company_id;
@@ -118,62 +107,78 @@ export class NovedadesEnhancedService {
         throw new Error('No se pudo determinar la empresa');
       }
 
-      // 🔧 [V10.0] CONVERSIÓN EXPLÍCITA DE TIPOS - SOLUCIÓN QUIRÚRGICA
-      const diasFinal = Number(novedadData.dias) || 0;
-      const valorFinal = Number(novedadData.valor) || 0;
+      // 🚀 [V12.0] SOLUCIÓN DEFINITIVA - NUNCA ENVIAR NULL A LA BD
+      // Conversión defensiva que garantiza que NUNCA se envíe null o undefined
+      let diasFinal: number;
+      let valorFinal: number;
       
-      console.log('🔧 [V10.0] CONVERSIÓN DE TIPOS:', {
+      // Para días: convertir a entero, si es 0 entonces 0, si es null/undefined entonces 0
+      if (typeof novedadData.dias === 'number' && !isNaN(novedadData.dias)) {
+        diasFinal = Math.floor(novedadData.dias);
+      } else if (typeof novedadData.dias === 'string' && novedadData.dias !== '') {
+        diasFinal = Math.floor(parseFloat(novedadData.dias)) || 0;
+      } else {
+        diasFinal = 0;
+      }
+      
+      // Para valor: convertir a decimal, si es 0 entonces 0, si es null/undefined entonces 0
+      if (typeof novedadData.valor === 'number' && !isNaN(novedadData.valor)) {
+        valorFinal = novedadData.valor;
+      } else if (typeof novedadData.valor === 'string' && novedadData.valor !== '') {
+        valorFinal = parseFloat(novedadData.valor) || 0;
+      } else {
+        valorFinal = 0;
+      }
+      
+      console.log('🚀 [V12.0] CONVERSIÓN DEFENSIVA:', {
         dias_original: novedadData.dias,
-        dias_tipo: typeof novedadData.dias,
         dias_final: diasFinal,
+        dias_type_final: typeof diasFinal,
         valor_original: novedadData.valor,
-        valor_tipo: typeof novedadData.valor,
-        valor_final: valorFinal
+        valor_final: valorFinal,
+        valor_type_final: typeof valorFinal,
+        garantia_no_null: diasFinal !== null && valorFinal !== null
       });
 
-      // 🔧 [V10.0] VALIDACIÓN ESTRICTA PARA INCAPACIDADES
+      // 🚀 [V12.0] VALIDACIÓN ESPECÍFICA PARA INCAPACIDADES
       if (novedadData.tipo_novedad === 'incapacidad') {
         if (diasFinal <= 0) {
-          console.error('🚨 [V10.0] VALIDACIÓN FALLÓ - Días inválidos:', {
-            diasFinal,
-            valorFinal,
-            tipo: novedadData.tipo_novedad
-          });
           throw new Error(`Incapacidad requiere días válidos. Recibido: ${diasFinal}`);
         }
         if (valorFinal <= 0) {
-          console.error('🚨 [V10.0] VALIDACIÓN FALLÓ - Valor inválido:', {
-            diasFinal,
-            valorFinal,
-            tipo: novedadData.tipo_novedad
-          });
           throw new Error(`Incapacidad requiere valor válido. Recibido: ${valorFinal}`);
         }
-        console.log('✅ [V10.0] VALIDACIÓN EXITOSA para incapacidad:', {
-          diasFinal,
-          valorFinal,
-          esTipoIncapacidad: true
-        });
+        console.log('✅ [V12.0] VALIDACIÓN INCAPACIDAD OK:', { diasFinal, valorFinal });
       }
 
+      // 🚀 [V12.0] INSERT DATA CON GARANTÍA ANTI-NULL
       const insertData = {
         empleado_id: novedadData.empleado_id,
         periodo_id: novedadData.periodo_id,
         tipo_novedad: novedadData.tipo_novedad,
-        valor: valorFinal, // 🔧 [V10.0] VALOR CONVERTIDO EXPLÍCITAMENTE
-        dias: diasFinal,   // 🔧 [V10.0] DÍAS CONVERTIDOS EXPLÍCITAMENTE
-        horas: novedadData.horas ? Number(novedadData.horas) : null,
-        observacion: novedadData.observacion,
+        // GARANTÍA: Si es 0, insertamos 0 explícitamente. Si no, usamos el valor o 0
+        valor: valorFinal === 0 ? 0 : (valorFinal || 0),
+        dias: diasFinal === 0 ? 0 : (diasFinal || 0),
+        horas: novedadData.horas ? Math.floor(Number(novedadData.horas)) : null,
+        observacion: novedadData.observacion || null,
         company_id: companyId,
         creado_por: (await supabase.auth.getUser()).data.user?.id,
-        fecha_inicio: novedadData.fecha_inicio,
-        fecha_fin: novedadData.fecha_fin,
-        base_calculo: novedadData.base_calculo,
-        subtipo: novedadData.subtipo,
+        fecha_inicio: novedadData.fecha_inicio || null,
+        fecha_fin: novedadData.fecha_fin || null,
+        base_calculo: novedadData.base_calculo || null,
+        subtipo: novedadData.subtipo || null,
         constitutivo_salario: Boolean(novedadData.constitutivo_salario)
       };
 
-      console.log('🔍 [V9.0] insertData que se enviará a BD:', JSON.stringify(insertData, null, 2));
+      console.log('🚀 [V12.0] INSERT DATA FINAL - GARANTIZADO SIN NULL:', JSON.stringify(insertData, null, 2));
+      console.log('🚀 [V12.0] VERIFICACIÓN FINAL VALORES:', {
+        valor_es_numero: typeof insertData.valor === 'number',
+        valor_no_es_null: insertData.valor !== null,
+        dias_es_numero: typeof insertData.dias === 'number',
+        dias_no_es_null: insertData.dias !== null,
+        valor_value: insertData.valor,
+        dias_value: insertData.dias
+      });
 
       const { data: novedad, error } = await supabase
         .from('payroll_novedades')
