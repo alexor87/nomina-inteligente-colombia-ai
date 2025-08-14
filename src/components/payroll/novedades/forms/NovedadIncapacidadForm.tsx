@@ -185,69 +185,84 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
 
   // 🔍 V9.0: handleSubmit con logging crítico de diagnóstico
   const handleSubmit = () => {
-    console.log('🔍 [V9.0] ===== INCAPACIDAD FORM SUBMIT - INICIANDO DIAGNÓSTICO =====');
-    console.log('🔍 [V9.0] formData completo:', JSON.stringify(formData, null, 2));
-    console.log('🔍 [V9.0] calculatedDays:', calculatedDays);
-    console.log('🔍 [V9.0] isValidRange:', isValidRange);
-    console.log('🔍 [V9.0] employeeSalary:', employeeSalary);
+    console.log('🚀 [V15.0] ===== INCAPACIDAD FORM SUBMIT - PLAN V15.0 INICIADO =====');
+    console.log('🚀 [V15.0] DIAGNÓSTICO COMPLETO DEL ESTADO:');
+    console.log('🚀 [V15.0] - formData completo:', JSON.stringify(formData, null, 2));
+    console.log('🚀 [V15.0] - calculatedDays:', calculatedDays, 'tipo:', typeof calculatedDays);
+    console.log('🚀 [V15.0] - formData.valor:', formData.valor, 'tipo:', typeof formData.valor);
+    console.log('🚀 [V15.0] - isValidRange:', isValidRange);
+    console.log('🚀 [V15.0] - employeeSalary:', employeeSalary);
 
     // Validaciones básicas
     if (!formData.fecha_inicio) {
-      console.error('❌ [FORM V8.0] Falta fecha de inicio');
+      console.error('❌ [V15.0] Falta fecha de inicio');
       alert('Por favor seleccione la fecha de inicio');
       return;
     }
 
     if (!formData.fecha_fin) {
-      console.error('❌ [FORM V8.0] Falta fecha de fin');
+      console.error('❌ [V15.0] Falta fecha de fin');
       alert('Por favor seleccione la fecha de fin');
       return;
     }
 
     if (!isValidRange) {
-      console.error('❌ [FORM V8.0] Rango inválido');
+      console.error('❌ [V15.0] Rango inválido');
       alert('La fecha de fin debe ser igual o posterior a la fecha de inicio');
       return;
     }
 
     if (calculatedDays < 0) {
-      console.error('❌ [FORM V8.0] Días calculados inválidos:', calculatedDays);
+      console.error('❌ [V15.0] Días calculados inválidos:', calculatedDays);
       alert('El rango de fechas debe generar días válidos');
       return;
     }
 
-    // ✅ V8.0: CONSTRUCCIÓN DE DATOS CON LOGGING CRÍTICO
+    // 🚀 V15.0: CONSTRUCCIÓN ROBUSTA DE DATOS CON PRESERVACIÓN DE VALORES NUMÉRICOS
+    const valorFinal = formData.valor !== undefined && formData.valor !== null && String(formData.valor) !== '' 
+      ? Number(formData.valor) 
+      : 0;
+    
+    const diasFinales = calculatedDays !== undefined && calculatedDays !== null 
+      ? Number(calculatedDays) 
+      : 0;
+
     const submitData = {
       tipo_novedad: 'incapacidad',
       subtipo: formData.subtipo,
-      dias: calculatedDays, // ✅ V8.0: Valor calculado correctamente
-      calculatedDays: calculatedDays, // ✅ V8.0: BACKUP explícito
+      dias: diasFinales, // 🚀 V15.0: Valor numérico preservado
+      calculatedDays: diasFinales, // 🚀 V15.0: BACKUP explícito
       fecha_inicio: formData.fecha_inicio,
       fecha_fin: formData.fecha_fin,
-      valor: formData.valor,
+      valor: valorFinal, // 🚀 V15.0: Valor numérico preservado
       observacion: formData.observacion || undefined
     };
 
-    console.log('🔍 [V9.0] ===== DATOS FINALES CONSTRUIDOS PARA MODAL =====');
-    console.log('🔍 [V9.0] submitData completo:', JSON.stringify(submitData, null, 2));
-    console.log('🔍 [V9.0] verificación crítica:', {
+    console.log('🚀 [V15.0] ===== DATOS FINALES CONSTRUIDOS PARA MODAL =====');
+    console.log('🚀 [V15.0] submitData completo:', JSON.stringify(submitData, null, 2));
+    console.log('🚀 [V15.0] VERIFICACIÓN CRÍTICA DE VALORES NUMÉRICOS:', {
       'submitData.dias': submitData.dias,
       'submitData.valor': submitData.valor,
-      'calculatedDays': calculatedDays,
-      'formData.valor': formData.valor,
-      'empleado_salary': employeeSalary,
-      'tipo_dias': typeof submitData.dias,
-      'tipo_valor': typeof submitData.valor,
+      'valorFinal': valorFinal,
+      'diasFinales': diasFinales,
+      'calculatedDays_original': calculatedDays,
+      'formData.valor_original': formData.valor,
+      'tipo_dias_final': typeof submitData.dias,
+      'tipo_valor_final': typeof submitData.valor,
+      'dias_es_numero': !isNaN(submitData.dias),
+      'valor_es_numero': !isNaN(submitData.valor),
       'dias_positivo': submitData.dias > 0,
       'valor_positivo': submitData.valor > 0
     });
 
-    // 🔍 V9.0: VALIDACIÓN FINAL ANTES DE ENVÍO
-    if (submitData.dias === undefined || submitData.dias === null || submitData.dias <= 0) {
-      console.error('🔍 [V9.0] VALIDACIÓN FINAL FALLÓ - DÍAS INVÁLIDOS:', {
+    // 🚀 V15.0: VALIDACIÓN FINAL ROBUSTA
+    if (submitData.dias === undefined || submitData.dias === null || isNaN(submitData.dias) || submitData.dias <= 0) {
+      console.error('❌ [V15.0] VALIDACIÓN FINAL FALLÓ - DÍAS INVÁLIDOS:', {
         dias: submitData.dias,
         calculatedDays: calculatedDays,
+        diasFinales: diasFinales,
         formData_valor: formData.valor,
+        valorFinal: valorFinal,
         error: 'Días inválidos detectados en formulario antes de envío'
       });
       
@@ -255,10 +270,13 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
       return;
     }
     
-    console.log('🔍 [V9.0] ===== ENVIANDO A MODAL =====');
-    console.log('🔍 [V9.0] llamando onSubmit con submitData:', submitData);
+    console.log('🚀 [V15.0] ===== ENVIANDO A MODAL - BUSCAR LOGS V14.0 =====');
+    console.log('🚀 [V15.0] Llamando onSubmit con submitData preservando valores numéricos...');
+    console.log('🚀 [V15.0] EXPECT: Los próximos logs deben ser [V14.0] del modal');
+    
     onSubmit(submitData);
-    console.log('🔍 [V9.0] ===== onSubmit EJECUTADO =====');
+    
+    console.log('🚀 [V15.0] ===== onSubmit EJECUTADO - SI NO VES LOGS V14.0, HAY PROBLEMA DE COMUNICACIÓN =====');
   };
 
   const getCurrentSubtipoInfo = () => {
