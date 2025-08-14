@@ -79,10 +79,18 @@ export class NovedadesEnhancedService {
 
   static async createNovedad(novedadData: CreateNovedadData): Promise<PayrollNovedad | null> {
     try {
-      console.log('🔍 [V9.0] ===== SERVICIO RECIBIÓ DATOS PARA GUARDAR =====');
-      console.log('🔍 [V9.0] novedadData completo:', JSON.stringify(novedadData, null, 2));
+      console.log('🚨 [V11.0] ===== INICIO DIAGNÓSTICO TOTAL =====');
+      console.log('🚨 [V11.0] novedadData RAW received:', {
+        tipo: novedadData.tipo_novedad,
+        valor_raw: novedadData.valor,
+        valor_type: typeof novedadData.valor,
+        dias_raw: novedadData.dias,
+        dias_type: typeof novedadData.dias,
+        is_incapacidad: novedadData.tipo_novedad === 'incapacidad'
+      });
+      console.log('🚨 [V11.0] novedadData COMPLETO:', JSON.stringify(novedadData, null, 2));
       
-      // Validación simple para incapacidades
+      // 🚨 VALIDACIÓN CRÍTICA ANTES DE CONVERSIÓN
       if (novedadData.tipo_novedad === 'incapacidad' && (!novedadData.dias || novedadData.dias <= 0)) {
         console.error('🔍 [V9.0] validación falló para incapacidad:', {
           dias: novedadData.dias,
