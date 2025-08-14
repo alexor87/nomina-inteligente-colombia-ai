@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { Database, Tables } from '@/integrations/supabase/types';
 
@@ -94,6 +95,8 @@ export class NovedadesEnhancedService {
         'fecha_inicio': novedadData.fecha_inicio,
         'fecha_fin': novedadData.fecha_fin,
         'company_id': novedadData.company_id,
+        'constitutivo_salario': novedadData.constitutivo_salario,
+        'constitutivo_salario_type': typeof novedadData.constitutivo_salario,
         timestamp: new Date().toISOString()
       });
 
@@ -153,6 +156,7 @@ export class NovedadesEnhancedService {
         throw new Error('No se pudo determinar la empresa');
       }
 
+      // ✅ V8.0 FIX CRÍTICO: Corrección del campo boolean constitutivo_salario
       const insertData = {
         empleado_id: novedadData.empleado_id,
         periodo_id: novedadData.periodo_id,
@@ -167,7 +171,8 @@ export class NovedadesEnhancedService {
         fecha_fin: novedadData.fecha_fin,
         base_calculo: novedadData.base_calculo,
         subtipo: novedadData.subtipo,
-        constitutivo_salario: novedadData.constitutivo_salario || false
+        // ✅ V8.0 CORRECCIÓN CRÍTICA: Convertir explícitamente a boolean
+        constitutivo_salario: novedadData.constitutivo_salario === true || novedadData.constitutivo_salario === 'true' ? true : false
       };
 
       console.log('💾 [SERVICE V8.0] ===== DATOS FINALES PARA INSERCIÓN BD =====');
@@ -180,6 +185,8 @@ export class NovedadesEnhancedService {
         'valor_final': insertData.valor,
         'fechas_finales': `${insertData.fecha_inicio} - ${insertData.fecha_fin}`,
         'company_id_final': insertData.company_id,
+        'constitutivo_salario_final': insertData.constitutivo_salario,
+        'constitutivo_salario_type': typeof insertData.constitutivo_salario,
         'validation_pass': insertData.tipo_novedad === 'incapacidad' ? (insertData.dias > 0) : true,
         timestamp: new Date().toISOString()
       });
@@ -203,6 +210,14 @@ export class NovedadesEnhancedService {
       if (error) {
         console.error('❌ [SERVICE V8.0] Error insertando en BD:', error);
         console.error('❌ [SERVICE V8.0] Datos que causaron error:', insertData);
+        console.error('❌ [SERVICE V8.0] Error específico V8.0:', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+          constitutivo_salario_value: insertData.constitutivo_salario,
+          constitutivo_salario_type: typeof insertData.constitutivo_salario
+        });
         throw error;
       }
 
@@ -214,6 +229,7 @@ export class NovedadesEnhancedService {
         'valor_en_bd': novedad.valor,
         'tipo_en_bd': novedad.tipo_novedad,
         'fechas_en_bd': `${novedad.fecha_inicio} - ${novedad.fecha_fin}`,
+        'constitutivo_salario_bd': novedad.constitutivo_salario,
         'success_validation': novedad.tipo_novedad === 'incapacidad' ? (novedad.dias > 0) : true,
         timestamp: new Date().toISOString()
       });
