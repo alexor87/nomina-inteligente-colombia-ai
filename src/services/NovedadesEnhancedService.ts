@@ -79,8 +79,8 @@ export class NovedadesEnhancedService {
 
   static async createNovedad(novedadData: CreateNovedadData): Promise<PayrollNovedad | null> {
     try {
-      console.log('🚀 [V12.0] ===== PLAN DEFINITIVO SR. BACKEND =====');
-      console.log('🚀 [V12.0] novedadData RAW:', {
+      console.log('🚀 [V16.0] ===== PLAN DEFINITIVO MODAL EXPERT =====');
+      console.log('🚀 [V16.0] novedadData RAW:', {
         tipo: novedadData.tipo_novedad,
         valor_raw: novedadData.valor,
         valor_type: typeof novedadData.valor,
@@ -107,58 +107,66 @@ export class NovedadesEnhancedService {
         throw new Error('No se pudo determinar la empresa');
       }
 
-      // 🚀 [V12.0] SOLUCIÓN DEFINITIVA - NUNCA ENVIAR NULL A LA BD
-      // Conversión defensiva que garantiza que NUNCA se envíe null o undefined
+      // 🚀 [V16.0] CONVERSIÓN SIMPLIFICADA - PRESERVAR VALORES VÁLIDOS
+      // Solo convertir cuando sea necesario, preservar valores numéricos válidos
       let diasFinal: number;
       let valorFinal: number;
       
-      // Para días: convertir a entero, si es 0 entonces 0, si es null/undefined entonces 0
-      if (typeof novedadData.dias === 'number' && !isNaN(novedadData.dias)) {
+      // Para días: preservar valores válidos, solo convertir si es string
+      if (typeof novedadData.dias === 'number') {
         diasFinal = Math.floor(novedadData.dias);
       } else if (typeof novedadData.dias === 'string' && novedadData.dias !== '') {
-        diasFinal = Math.floor(parseFloat(novedadData.dias)) || 0;
+        diasFinal = Math.floor(parseFloat(novedadData.dias));
       } else {
         diasFinal = 0;
       }
       
-      // Para valor: convertir a decimal, si es 0 entonces 0, si es null/undefined entonces 0
-      if (typeof novedadData.valor === 'number' && !isNaN(novedadData.valor)) {
+      // Para valor: preservar valores válidos, solo convertir si es string
+      if (typeof novedadData.valor === 'number') {
         valorFinal = novedadData.valor;
       } else if (typeof novedadData.valor === 'string' && novedadData.valor !== '') {
-        valorFinal = parseFloat(novedadData.valor) || 0;
+        valorFinal = parseFloat(novedadData.valor);
       } else {
         valorFinal = 0;
       }
       
-      console.log('🚀 [V12.0] CONVERSIÓN DEFENSIVA:', {
+      console.log('🚀 [V16.0] CONVERSIÓN SIMPLIFICADA:', {
         dias_original: novedadData.dias,
         dias_final: diasFinal,
         dias_type_final: typeof diasFinal,
         valor_original: novedadData.valor,
         valor_final: valorFinal,
         valor_type_final: typeof valorFinal,
-        garantia_no_null: diasFinal !== null && valorFinal !== null
+        valores_preservados: valorFinal > 0 && diasFinal > 0
       });
 
-      // 🚀 [V12.0] VALIDACIÓN ESPECÍFICA PARA INCAPACIDADES
+      // 🚀 [V16.0] VALIDACIÓN ESPECÍFICA PARA INCAPACIDADES
       if (novedadData.tipo_novedad === 'incapacidad') {
+        console.log('🚀 [V16.0] VALIDANDO INCAPACIDAD:', { 
+          tipo: novedadData.tipo_novedad,
+          diasFinal, 
+          valorFinal,
+          diasValid: diasFinal > 0,
+          valorValid: valorFinal > 0
+        });
+        
         if (diasFinal <= 0) {
-          throw new Error(`Incapacidad requiere días válidos. Recibido: ${diasFinal}`);
+          throw new Error(`[V16.0] Incapacidad requiere días válidos. Recibido: ${diasFinal}`);
         }
         if (valorFinal <= 0) {
-          throw new Error(`Incapacidad requiere valor válido. Recibido: ${valorFinal}`);
+          throw new Error(`[V16.0] Incapacidad requiere valor válido. Recibido: ${valorFinal}`);
         }
-        console.log('✅ [V12.0] VALIDACIÓN INCAPACIDAD OK:', { diasFinal, valorFinal });
+        console.log('✅ [V16.0] VALIDACIÓN INCAPACIDAD EXITOSA:', { diasFinal, valorFinal });
       }
 
-      // 🚀 [V12.0] INSERT DATA CON GARANTÍA ANTI-NULL
+      // 🚀 [V16.0] INSERT DATA SIMPLIFICADO - VALORES DIRECTOS
       const insertData = {
         empleado_id: novedadData.empleado_id,
         periodo_id: novedadData.periodo_id,
         tipo_novedad: novedadData.tipo_novedad,
-        // GARANTÍA: Si es 0, insertamos 0 explícitamente. Si no, usamos el valor o 0
-        valor: valorFinal === 0 ? 0 : (valorFinal || 0),
-        dias: diasFinal === 0 ? 0 : (diasFinal || 0),
+        // DIRECTO: Usar valores convertidos directamente
+        valor: valorFinal,
+        dias: diasFinal,
         horas: novedadData.horas ? Math.floor(Number(novedadData.horas)) : null,
         observacion: novedadData.observacion || null,
         company_id: companyId,
@@ -170,14 +178,15 @@ export class NovedadesEnhancedService {
         constitutivo_salario: Boolean(novedadData.constitutivo_salario)
       };
 
-      console.log('🚀 [V12.0] INSERT DATA FINAL - GARANTIZADO SIN NULL:', JSON.stringify(insertData, null, 2));
-      console.log('🚀 [V12.0] VERIFICACIÓN FINAL VALORES:', {
+      console.log('🚀 [V16.0] INSERT DATA FINAL:', JSON.stringify(insertData, null, 2));
+      console.log('🚀 [V16.0] VERIFICACIÓN PRE-INSERT:', {
         valor_es_numero: typeof insertData.valor === 'number',
         valor_no_es_null: insertData.valor !== null,
         dias_es_numero: typeof insertData.dias === 'number',
         dias_no_es_null: insertData.dias !== null,
         valor_value: insertData.valor,
-        dias_value: insertData.dias
+        dias_value: insertData.dias,
+        tipo_novedad: insertData.tipo_novedad
       });
 
       const { data: novedad, error } = await supabase
