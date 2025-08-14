@@ -110,13 +110,51 @@ export class NovedadesEnhancedService {
         throw new Error('No se pudo determinar la empresa');
       }
 
+      // 🔧 [V10.0] CONVERSIÓN EXPLÍCITA DE TIPOS - SOLUCIÓN QUIRÚRGICA
+      const diasFinal = Number(novedadData.dias) || 0;
+      const valorFinal = Number(novedadData.valor) || 0;
+      
+      console.log('🔧 [V10.0] CONVERSIÓN DE TIPOS:', {
+        dias_original: novedadData.dias,
+        dias_tipo: typeof novedadData.dias,
+        dias_final: diasFinal,
+        valor_original: novedadData.valor,
+        valor_tipo: typeof novedadData.valor,
+        valor_final: valorFinal
+      });
+
+      // 🔧 [V10.0] VALIDACIÓN ESTRICTA PARA INCAPACIDADES
+      if (novedadData.tipo_novedad === 'incapacidad') {
+        if (diasFinal <= 0) {
+          console.error('🚨 [V10.0] VALIDACIÓN FALLÓ - Días inválidos:', {
+            diasFinal,
+            valorFinal,
+            tipo: novedadData.tipo_novedad
+          });
+          throw new Error(`Incapacidad requiere días válidos. Recibido: ${diasFinal}`);
+        }
+        if (valorFinal <= 0) {
+          console.error('🚨 [V10.0] VALIDACIÓN FALLÓ - Valor inválido:', {
+            diasFinal,
+            valorFinal,
+            tipo: novedadData.tipo_novedad
+          });
+          throw new Error(`Incapacidad requiere valor válido. Recibido: ${valorFinal}`);
+        }
+        console.log('✅ [V10.0] VALIDACIÓN EXITOSA para incapacidad:', {
+          diasFinal,
+          valorFinal,
+          esTipoIncapacidad: true
+        });
+      }
+
       const insertData = {
         empleado_id: novedadData.empleado_id,
         periodo_id: novedadData.periodo_id,
         tipo_novedad: novedadData.tipo_novedad,
-        valor: novedadData.valor,
-        dias: novedadData.dias,
-        horas: novedadData.horas,
+        valor: valorFinal, // 🔧 [V10.0] VALOR CONVERTIDO EXPLÍCITAMENTE
+        dias: diasFinal,   // 🔧 [V10.0] DÍAS CONVERTIDOS EXPLÍCITAMENTE
+        horas: novedadData.horas ? Number(novedadData.horas) : null,
         observacion: novedadData.observacion,
         company_id: companyId,
         creado_por: (await supabase.auth.getUser()).data.user?.id,
