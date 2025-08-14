@@ -66,9 +66,27 @@ export const useEmployeeEditSubmission = (
     } catch (error) {
       console.error('❌ Unexpected error during employee update:', error);
       
+      // Mejorar el manejo de errores específicos
+      let errorMessage = "Ocurrió un error al actualizar el empleado";
+      
+      if (error instanceof Error) {
+        console.error('❌ Error específico:', error.message);
+        
+        // Detectar errores específicos del salario integral
+        if (error.message.includes('Salario integral debe ser mínimo 13 SMMLV')) {
+          errorMessage = error.message;
+        } else if (error.message.includes('tipo_salario')) {
+          errorMessage = "Error en la validación del tipo de salario";
+        } else if (error.message.includes('salario_base')) {
+          errorMessage = "Error en la validación del salario base";
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
       toast({
-        title: "Error inesperado",
-        description: "Ocurrió un error al actualizar el empleado",
+        title: "Error al actualizar empleado",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {

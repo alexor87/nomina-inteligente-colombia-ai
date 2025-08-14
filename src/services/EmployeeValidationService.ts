@@ -70,6 +70,8 @@ export class EmployeeValidationService {
       periodicidad_pago: employeeData.periodicidadPago || 'mensual',
       codigo_ciiu: cleanTextField(employeeData.codigoCIIU),
       centro_costos: cleanTextField(employeeData.centroCostos),
+      // ✅ CRÍTICO: Agregar tipo_salario que faltaba
+      tipo_salario: employeeData.tipoSalario || 'mensual',
       // Detalles del contrato
       fecha_firma_contrato: employeeData.fechaFirmaContrato || null,
       fecha_finalizacion_contrato: employeeData.fechaFinalizacionContrato || null,
@@ -130,6 +132,10 @@ export class EmployeeValidationService {
     if (updates.email !== undefined) supabaseData.email = cleanTextField(updates.email);
     if (updates.telefono !== undefined) supabaseData.telefono = cleanTextField(updates.telefono);
     if (updates.salarioBase !== undefined) supabaseData.salario_base = updates.salarioBase;
+    
+    // ✅ CRÍTICO: Mapear tipo_salario que faltaba
+    if (updates.tipoSalario !== undefined) supabaseData.tipo_salario = updates.tipoSalario;
+    
     if (updates.tipoContrato !== undefined) supabaseData.tipo_contrato = updates.tipoContrato;
     if (updates.fechaIngreso !== undefined) supabaseData.fecha_ingreso = updates.fechaIngreso;
     if (updates.estado !== undefined) supabaseData.estado = updates.estado;
