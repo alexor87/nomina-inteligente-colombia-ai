@@ -12,7 +12,7 @@ import { NovedadDeduccionesConsolidatedForm } from './forms/NovedadDeduccionesCo
 import { NovedadRetefuenteForm } from './forms/NovedadRetefuenteForm';
 import { NovedadTypeSelector, NovedadCategory } from './NovedadTypeSelector';
 import { NovedadExistingList } from './NovedadExistingList';
-import { NovedadType, CreateNovedadData } from '@/types/novedades-enhanced';
+import { NovedadType, CreateNovedadData, NOVEDAD_CATEGORIES } from '@/types/novedades-enhanced';
 import { useToast } from '@/hooks/use-toast';
 import { NovedadRecargoConsolidatedForm } from './forms/NovedadRecargoConsolidatedForm';
 import { NovedadVacacionesConsolidatedForm } from './forms/NovedadVacacionesConsolidatedForm';
@@ -47,6 +47,34 @@ const categoryToNovedadType: Record<NovedadCategory, NovedadType> = {
   'deducciones': 'descuento_voluntario',
   'prestamos': 'libranza',
   'retefuente': 'retencion_fuente'
+};
+
+// ✅ V8.1 NUEVO: Función para determinar constitutivo_salario
+const determineConstitutivo = (tipoNovedad: NovedadType, subtipo?: string): boolean => {
+  console.log('🎯 [V8.1] Determinando constitutivo_salario:', { tipoNovedad, subtipo });
+  
+  // Buscar en todas las categorías
+  for (const category of Object.values(NOVEDAD_CATEGORIES)) {
+    const novedadConfig = category.types[tipoNovedad];
+    if (novedadConfig) {
+      const constitutivo = novedadConfig.constitutivo_default ?? true; // Default true si no está definido
+      console.log('✅ [V8.1] Constitutivo determinado:', { 
+        tipo: tipoNovedad, 
+        constitutivo,
+        fuente: 'NOVEDAD_CATEGORIES'
+      });
+      return constitutivo;
+    }
+  }
+  
+  // Fallback: usar false para incapacidades y licencias, true para el resto
+  const fallbackValue = ['incapacidad', 'licencia_remunerada'].includes(tipoNovedad) ? false : true;
+  console.log('⚠️ [V8.1] Constitutivo por fallback:', { 
+    tipo: tipoNovedad, 
+    constitutivo: fallbackValue,
+    fuente: 'fallback_logic'
+  });
+  return fallbackValue;
 };
 
 export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
@@ -214,23 +242,10 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     }
   }, [employeeSalary, getPeriodDate, calculateNovedad]);
 
-  // ✅ V8.0: handleFormSubmit con logging exhaustivo CRÍTICO
+  // ✅ V8.1: handleFormSubmit con corrección del campo constitutivo_salario
   const handleFormSubmit = async (formData: any) => {
-    console.log('📥 [MODAL V8.0] ===== RECIBIENDO DATOS DEL FORMULARIO (DEBUGGING EXHAUSTIVO) =====');
-    console.log('📥 [MODAL V8.0] formData ORIGINAL recibido:', JSON.stringify(formData, null, 2));
-    console.log('📥 [MODAL V8.0] Análisis detallado de formData:', {
-      'tipo': typeof formData,
-      'es_array': Array.isArray(formData),
-      'keys': Object.keys(formData),
-      'formData.dias': formData.dias,
-      'formData.calculatedDays': formData.calculatedDays,
-      'formData.tipo_novedad': formData.tipo_novedad,
-      'formData.fecha_inicio': formData.fecha_inicio,
-      'formData.fecha_fin': formData.fecha_fin,
-      'formData.valor': formData.valor,
-      'selectedType': selectedType,
-      timestamp: new Date().toISOString()
-    });
+    console.log('📥 [MODAL V8.1] ===== RECIBIENDO DATOS DEL FORMULARIO =====');
+    console.log('📥 [MODAL V8.1] formData ORIGINAL recibido:', JSON.stringify(formData, null, 2));
     
     if (!employeeId || !periodId) {
       toast({
@@ -246,18 +261,18 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       const isArrayData = Array.isArray(formData);
       const dataArray = isArrayData ? formData : [formData];
       
-      console.log(`🔄 [MODAL V8.0] Procesando ${dataArray.length} entradas de novedad`);
+      console.log(`🔄 [MODAL V8.1] Procesando ${dataArray.length} entradas de novedad`);
       
       for (const entry of dataArray) {
-        console.log('🔍 [MODAL V8.0] ===== PROCESANDO ENTRADA =====');
-        console.log('🔍 [MODAL V8.0] Entry data COMPLETO:', JSON.stringify(entry, null, 2));
+        console.log('🔍 [MODAL V8.1] ===== PROCESANDO ENTRADA =====');
+        console.log('🔍 [MODAL V8.1] Entry data COMPLETO:', JSON.stringify(entry, null, 2));
         
-        // ✅ V8.0 LOGGING CRÍTICO: Análisis específico para incapacidades
+        // ✅ V8.1 LOGGING CRÍTICO: Análisis específico para incapacidades
         let diasFinales = entry.dias;
         
         if (selectedType === 'incapacidad') {
-          console.log('🏥 [MODAL V8.0] ===== INCAPACIDAD DETECTADA - ANÁLISIS EXHAUSTIVO =====');
-          console.log('🏥 [MODAL V8.0] Valores recibidos:', {
+          console.log('🏥 [MODAL V8.1] ===== INCAPACIDAD DETECTADA - ANÁLISIS EXHAUSTIVO =====');
+          console.log('🏥 [MODAL V8.1] Valores recibidos:', {
             'entry.dias_original': entry.dias,
             'entry.calculatedDays': entry.calculatedDays,
             'typeof entry.dias': typeof entry.dias,
@@ -269,10 +284,10 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
             timestamp: new Date().toISOString()
           });
 
-          // ✅ V8.0: Lógica de selección mejorada con logging
+          // ✅ V8.1: Lógica de selección mejorada con logging
           if (entry.calculatedDays !== undefined && entry.calculatedDays !== null && entry.calculatedDays > 0) {
             diasFinales = entry.calculatedDays;
-            console.log('✅ [MODAL V8.0] USANDO calculatedDays:', {
+            console.log('✅ [MODAL V8.1] USANDO calculatedDays:', {
               valor_original: entry.dias,
               valor_final: diasFinales,
               fuente: 'calculatedDays prioritario',
@@ -280,7 +295,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
             });
           } else if (entry.dias !== undefined && entry.dias !== null && entry.dias > 0) {
             diasFinales = entry.dias;
-            console.log('⚠️ [MODAL V8.0] FALLBACK a entry.dias:', {
+            console.log('⚠️ [MODAL V8.1] FALLBACK a entry.dias:', {
               valor_original: entry.dias,
               valor_final: diasFinales,
               fuente: 'entry.dias fallback',
@@ -288,7 +303,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
               timestamp: new Date().toISOString()
             });
           } else {
-            console.error('🚨 [MODAL V8.0] AMBOS VALORES SON INVÁLIDOS:', {
+            console.error('🚨 [MODAL V8.1] AMBOS VALORES SON INVÁLIDOS:', {
               'entry.dias': entry.dias,
               'entry.calculatedDays': entry.calculatedDays,
               'fecha_inicio': entry.fecha_inicio,
@@ -297,11 +312,11 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
               timestamp: new Date().toISOString()
             });
             
-            throw new Error(`Error crítico V8.0: Incapacidad recibida en modal sin días válidos. entry.dias: ${entry.dias}, calculatedDays: ${entry.calculatedDays}`);
+            throw new Error(`Error crítico V8.1: Incapacidad recibida en modal sin días válidos. entry.dias: ${entry.dias}, calculatedDays: ${entry.calculatedDays}`);
           }
         }
         
-        console.log('🔍 [MODAL V8.0] DÍAS FINALES SELECCIONADOS:', {
+        console.log('🔍 [MODAL V8.1] DÍAS FINALES SELECCIONADOS:', {
           'entry.dias_original': entry.dias,
           'entry.calculatedDays': entry.calculatedDays,
           'diasFinales_final': diasFinales,
@@ -312,6 +327,9 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
           timestamp: new Date().toISOString()
         });
 
+        // ✅ V8.1 CORRECCIÓN CRÍTICA: Incluir constitutivo_salario
+        const constitutivo = determineConstitutivo(selectedType!, entry.subtipo);
+        
         const submitData: CreateNovedadData = {
           empleado_id: employeeId,
           periodo_id: periodId,
@@ -319,24 +337,28 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
           tipo_novedad: selectedType!,
           valor: entry.valor || 0,
           horas: entry.horas !== undefined ? entry.horas : undefined,
-          dias: diasFinales, // ✅ V8.0: Usar días corregidos
+          dias: diasFinales, // ✅ V8.1: Usar días corregidos
           observacion: entry.observacion || undefined,
           fecha_inicio: entry.fecha_inicio || undefined,
           fecha_fin: entry.fecha_fin || undefined,
           subtipo: entry.subtipo || entry.tipo || undefined,
-          base_calculo: entry.base_calculo || undefined
+          base_calculo: entry.base_calculo || undefined,
+          constitutivo_salario: constitutivo // ✅ V8.1: CAMPO AGREGADO
         };
 
-        console.log('🚨 [MODAL V8.0] ===== DATOS FINALES ANTES DE ENVÍO A SERVICIO =====');
-        console.log('🚨 [MODAL V8.0] submitData COMPLETO:', JSON.stringify(submitData, null, 2));
-        console.log('🚨 [MODAL V8.0] VERIFICACIÓN CRÍTICA FINAL:', {
+        console.log('🚨 [MODAL V8.1] ===== DATOS FINALES ANTES DE ENVÍO A SERVICIO =====');
+        console.log('🚨 [MODAL V8.1] submitData COMPLETO:', JSON.stringify(submitData, null, 2));
+        console.log('🚨 [MODAL V8.1] VERIFICACIÓN CRÍTICA FINAL V8.1:', {
           tipo_novedad: submitData.tipo_novedad,
           valor: submitData.valor,
           horas: submitData.horas,
-          dias: submitData.dias, // ✅ V8.0: Este debe ser el valor correcto
+          dias: submitData.dias, // ✅ V8.1: Este debe ser el valor correcto
           subtipo: submitData.subtipo,
           fecha_inicio: submitData.fecha_inicio,
           fecha_fin: submitData.fecha_fin,
+          constitutivo_salario: submitData.constitutivo_salario, // ✅ V8.1: NUEVO CAMPO
+          'constitutivo_salario_type': typeof submitData.constitutivo_salario,
+          'constitutivo_salario_is_boolean': typeof submitData.constitutivo_salario === 'boolean',
           'dias_type': typeof submitData.dias,
           'dias_is_zero': submitData.dias === 0,
           'dias_is_undefined': submitData.dias === undefined,
@@ -345,10 +367,10 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
           timestamp: new Date().toISOString()
         });
 
-        // ✅ V8.0: VALIDACIÓN FINAL CRÍTICA
+        // ✅ V8.1: VALIDACIÓN FINAL CRÍTICA
         if (submitData.tipo_novedad === 'incapacidad') {
           if (submitData.dias === undefined || submitData.dias === null || submitData.dias <= 0) {
-            console.error('🚨 [MODAL V8.0] VALIDACIÓN FINAL FALLÓ EN MODAL:', {
+            console.error('🚨 [MODAL V8.1] VALIDACIÓN FINAL FALLÓ EN MODAL:', {
               dias_final: submitData.dias,
               entry_original: {
                 dias: entry.dias,
@@ -358,24 +380,25 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
               timestamp: new Date().toISOString()
             });
             
-            throw new Error(`Error crítico V8.0 en Modal: Incapacidad con días inválidos (${submitData.dias}). Verificar lógica de mapeo.`);
+            throw new Error(`Error crítico V8.1 en Modal: Incapacidad con días inválidos (${submitData.dias}). Verificar lógica de mapeo.`);
           }
           
-          console.log('✅ [MODAL V8.0] Incapacidad validada correctamente en modal:', {
+          console.log('✅ [MODAL V8.1] Incapacidad validada correctamente en modal:', {
             dias: submitData.dias,
             fechas: `${submitData.fecha_inicio} a ${submitData.fecha_fin}`,
             valor: submitData.valor,
+            constitutivo_salario: submitData.constitutivo_salario,
             paso_validacion: true
           });
         }
 
-        console.log('💾 [MODAL V8.0] ===== LLAMANDO A onSubmit (SERVICIO) =====');
-        console.log('💾 [MODAL V8.0] Enviando a NovedadesEnhancedService:', submitData);
+        console.log('💾 [MODAL V8.1] ===== LLAMANDO A onSubmit (SERVICIO) =====');
+        console.log('💾 [MODAL V8.1] Enviando a NovedadesEnhancedService:', submitData);
         await onSubmit(submitData);
-        console.log('✅ [MODAL V8.0] onSubmit completado exitosamente');
+        console.log('✅ [MODAL V8.1] onSubmit completado exitosamente');
       }
       
-      console.log('✅ [MODAL V8.0] Todas las entradas procesadas exitosamente');
+      console.log('✅ [MODAL V8.1] Todas las entradas procesadas exitosamente');
       
       // En modo ajustes, cerrar el modal directamente
       if (mode === 'ajustes') {
@@ -387,8 +410,8 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       }
       
     } catch (error: any) {
-      console.error('❌ [MODAL V8.0] ERROR CRÍTICO procesando novedades:', error);
-      console.error('❌ [MODAL V8.0] Stack trace:', error.stack);
+      console.error('❌ [MODAL V8.1] ERROR CRÍTICO procesando novedades:', error);
+      console.error('❌ [MODAL V8.1] Stack trace:', error.stack);
       toast({
         title: "Error",
         description: error.message || "No se pudieron guardar las novedades",
