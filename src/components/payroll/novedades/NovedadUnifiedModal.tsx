@@ -304,89 +304,24 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
           timestamp: new Date().toISOString()
         });
 
-        // ✅ V8.3 SOLUCIÓN QUIRÚRGICA: Determinar días finales con múltiples fuentes
-        let diasFinales: number;
+        // ✅ V8.4: SOLUCIÓN DEFINITIVA - El formulario ya envía dias correctamente
+        const diasFinales = entry.dias || 0;
         
-        if (selectedType === 'incapacidad') {
-          console.log('🏥 [MODAL V8.3] ===== INCAPACIDAD - SOLUCIÓN QUIRÚRGICA V8.3 =====');
-          
-          // OPCIÓN 1: calculatedDays
-          if (entry.calculatedDays !== undefined && entry.calculatedDays !== null && entry.calculatedDays > 0) {
-            diasFinales = entry.calculatedDays;
-            console.log('✅ [MODAL V8.3] USANDO calculatedDays (opción 1):', {
-              valor_seleccionado: diasFinales,
-              fuente: 'calculatedDays',
-              timestamp: new Date().toISOString()
-            });
-          }
-          // OPCIÓN 2: entry.dias
-          else if (entry.dias !== undefined && entry.dias !== null && entry.dias > 0) {
-            diasFinales = entry.dias;
-            console.log('✅ [MODAL V8.3] USANDO entry.dias (opción 2):', {
-              valor_seleccionado: diasFinales,
-              fuente: 'entry.dias',
-              timestamp: new Date().toISOString()
-            });
-          }
-          // OPCIÓN 3: Cálculo independiente desde fechas
-          else if (entry.fecha_inicio && entry.fecha_fin) {
-            diasFinales = calculateDaysIndependently(entry.fecha_inicio, entry.fecha_fin);
-            console.log('🧮 [MODAL V8.3] CÁLCULO INDEPENDIENTE (opción 3):', {
-              valor_seleccionado: diasFinales,
-              fuente: 'calculo_independiente',
-              fecha_inicio: entry.fecha_inicio,
-              fecha_fin: entry.fecha_fin,
-              timestamp: new Date().toISOString()
-            });
-          }
-          // OPCIÓN 4: Hardcodeo temporal para testing
-          else {
-            diasFinales = 4; // HARDCODEO TEMPORAL PARA DIAGNÓSTICO
-            console.log('🚨 [MODAL V8.3] HARDCODEO TEMPORAL (opción 4):', {
-              valor_seleccionado: diasFinales,
-              fuente: 'hardcodeo_temporal',
-              razon: 'Todas las opciones anteriores fallaron',
-              timestamp: new Date().toISOString()
-            });
-          }
-        } else {
-          // Para otros tipos de novedad, usar la lógica original
-          diasFinales = entry.dias || entry.calculatedDays || 0;
-          console.log('📝 [MODAL V8.3] Novedad no-incapacidad:', {
-            tipo: selectedType,
-            diasFinales: diasFinales,
-            timestamp: new Date().toISOString()
-          });
-        }
-        
-        console.log('🎯 [MODAL V8.3] ===== DÍAS FINALES DETERMINADOS - RESULTADO QUIRÚRGICO =====');
-        console.log('🎯 [MODAL V8.3] Resultado final análisis quirúrgico:', {
-          'diasFinales_FINAL': diasFinales,
-          'tipo_de_dato': typeof diasFinales,
-          'es_positivo': diasFinales > 0,
-          'es_cero': diasFinales === 0,
+        console.log('🏥 [MODAL V8.4] ===== PLAN V8.4 - SOLUCIÓN DEFINITIVA =====');
+        console.log('🏥 [MODAL V8.4] Usando entry.dias directamente:', {
+          'entry.dias': entry.dias,
+          'diasFinales': diasFinales,
           'selectedType': selectedType,
-          'metodo_usado': selectedType === 'incapacidad' 
-            ? (entry.calculatedDays > 0 ? 'calculatedDays' : 
-               entry.dias > 0 ? 'entry_dias' : 
-               entry.fecha_inicio && entry.fecha_fin ? 'calculo_independiente' : 'hardcodeo')
-            : 'logica_original',
+          'entry_completo': JSON.stringify(entry, null, 2),
           timestamp: new Date().toISOString()
         });
-
-        // ✅ V8.3 VALIDACIÓN QUIRÚRGICA FINAL
+        
+        // ✅ V8.4: Validación simplificada
         if (selectedType === 'incapacidad' && diasFinales <= 0) {
-          console.error('🚨 [MODAL V8.3] VALIDACIÓN QUIRÚRGICA FALLÓ:', {
-            diasFinales: diasFinales,
-            selectedType: selectedType,
-            entry_completo: entry,
-            error: 'Incapacidad con días <= 0 después de solución quirúrgica',
-            timestamp: new Date().toISOString()
-          });
-          
+          console.error('❌ [MODAL V8.4] Incapacidad con días inválidos:', diasFinales);
           toast({
-            title: "Error crítico V8.3",
-            description: `Los días calculados siguen siendo inválidos (${diasFinales}) después del diagnóstico quirúrgico.`,
+            title: "Error",
+            description: `Los días calculados son inválidos (${diasFinales}).`,
             variant: "destructive",
           });
           return;
@@ -411,31 +346,14 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
           constitutivo_salario: constitutivo
         };
 
-        console.log('🚨 [MODAL V8.3] ===== OBJETO submitData FINAL - VERIFICACIÓN QUIRÚRGICA =====');
-        console.log('🚨 [MODAL V8.3] submitData COMPLETO:', JSON.stringify(submitData, null, 2));
-        console.log('🚨 [MODAL V8.3] VERIFICACIÓN FINAL QUIRÚRGICA V8.3:', {
+        console.log('💾 [MODAL V8.4] Enviando datos al servicio:', {
           tipo_novedad: submitData.tipo_novedad,
-          valor: submitData.valor,
-          horas: submitData.horas,
-          dias: submitData.dias, // ✅ V8.3: ESTE ES EL CAMPO CRÍTICO
-          subtipo: submitData.subtipo,
-          fecha_inicio: submitData.fecha_inicio,
-          fecha_fin: submitData.fecha_fin,
-          constitutivo_salario: submitData.constitutivo_salario,
-          // V8.3 Validaciones quirúrgicas específicas
-          'dias_type': typeof submitData.dias,
-          'dias_value': submitData.dias,
-          'dias_is_positive': submitData.dias > 0,
-          'validation_passed': submitData.tipo_novedad === 'incapacidad' ? (submitData.dias > 0) : true,
-          'ready_for_service': true,
-          'plan_version': 'V8.3_QUIRURGICO',
-          timestamp: new Date().toISOString()
+          dias: submitData.dias,
+          valor: submitData.valor
         });
-
-        console.log('💾 [MODAL V8.3] ===== ENVIANDO A SERVICIO - SOLUCIÓN QUIRÚRGICA =====');
-        console.log('💾 [MODAL V8.3] Datos finales quirúrgicos para NovedadesEnhancedService:', submitData);
+        
         await onSubmit(submitData);
-        console.log('✅ [MODAL V8.3] onSubmit completado exitosamente con solución quirúrgica');
+        console.log('✅ [MODAL V8.4] Novedad creada exitosamente');
       }
       
       console.log('✅ [MODAL V8.3] Todas las entradas procesadas exitosamente con Plan V8.3');
