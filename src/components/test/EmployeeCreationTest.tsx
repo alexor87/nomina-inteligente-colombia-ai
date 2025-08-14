@@ -20,50 +20,22 @@ const EmployeeCreationTest = () => {
       return;
     }
 
-    const newEmployee: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'> = {
+    const testEmployeeData: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'> = {
       empresaId: companyId || '',
-      cedula: `12345${Date.now()}`,
-      tipoDocumento: 'CC', // Made required
+      cedula: `TEST${Date.now()}`,
+      tipoDocumento: 'CC', // Make required
       nombre: 'Juan',
       apellido: 'Pérez',
-      email: 'juan.perez@email.com',
-      telefono: '123456789',
-      sexo: 'M',
-      fechaNacimiento: '1990-01-01',
-      direccion: 'Calle 123',
-      ciudad: 'Bogotá',
-      departamento: 'Cundinamarca',
+      email: `test${Date.now()}@example.com`,
       salarioBase: 2500000,
-      tipoSalario: 'mensual', // Made required
-      tipoContrato: 'indefinido',
+      tipoSalario: 'mensual', // Add required field
+      tipoContrato: 'indefinido', // Add required field
       fechaIngreso: new Date().toISOString().split('T')[0],
-      periodicidadPago: 'mensual',
-      cargo: 'Desarrollador',
-      codigoCIIU: '6201',
-      nivelRiesgoARL: 'I',
-      estado: 'activo',
-      centroCostos: 'CC001',
-      tipoJornada: 'completa',
-      diasTrabajo: 30,
-      horasTrabajo: 8,
-      beneficiosExtralegales: false,
-      banco: 'Bancolombia',
-      tipoCuenta: 'ahorros',
-      numeroCuenta: '123456789',
-      titularCuenta: 'Juan Pérez',
-      formaPago: 'dispersion',
-      eps: 'Sanitas',
-      afp: 'Protección',
-      arl: 'ARL Sura',
-      cajaCompensacion: 'Compensar',
-      tipoCotizanteId: '01',
-      subtipoCotizanteId: '00',
-      regimenSalud: 'contributivo',
-      estadoAfiliacion: 'completa'
+      estado: 'activo'
     };
 
     try {
-      const result = await SecureEmployeeService.createEmployee(newEmployee);
+      const result = await SecureEmployeeService.createEmployee(testEmployeeData);
 
       if (result.success && result.data) {
         toast({

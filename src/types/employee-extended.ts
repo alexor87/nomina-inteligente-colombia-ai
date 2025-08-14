@@ -1,3 +1,4 @@
+
 import { EmployeeUnified } from './employee-unified';
 
 export interface EmployeeWithStatus extends EmployeeUnified {
@@ -7,6 +8,7 @@ export interface EmployeeWithStatus extends EmployeeUnified {
   ultimaLiquidacion?: string;
   contratoVencimiento?: string;
   company_id: string; // Ensure this is always present
+  tipoSalario: 'mensual' | 'integral' | 'medio_tiempo'; // Make required
 }
 
 export const ESTADOS_EMPLEADO = [
@@ -16,3 +18,28 @@ export const ESTADOS_EMPLEADO = [
   { value: 'incapacidad', label: 'Incapacitado', color: 'bg-purple-100 text-purple-800' },
   { value: 'eliminado', label: 'Eliminado', color: 'bg-gray-100 text-gray-800' },
 ];
+
+// Added missing exports
+export interface EmployeeFilters {
+  searchTerm: string;
+  estado: string;
+  tipoContrato: string;
+  centroCosto: string;
+  fechaIngresoInicio: string;
+  fechaIngresoFin: string;
+  nivelRiesgoARL: string;
+  afiliacionIncompleta?: boolean;
+}
+
+export const CENTROS_COSTO = [
+  { value: 'admin', label: 'Administración' },
+  { value: 'ventas', label: 'Ventas' },
+  { value: 'produccion', label: 'Producción' },
+  { value: 'it', label: 'Tecnología' },
+];
+
+export interface ComplianceIndicator {
+  status: 'compliant' | 'warning' | 'critical';
+  message: string;
+  priority: number;
+}

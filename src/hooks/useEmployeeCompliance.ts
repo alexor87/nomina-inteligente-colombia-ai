@@ -1,54 +1,63 @@
-import { useState, useEffect } from 'react';
+import { useMemo } from 'react';
 import { EmployeeWithStatus } from '@/types/employee-extended';
-import { isWithinDays } from 'date-fns';
+import { isAfter, parseISO, addMonths } from 'date-fns'; // Fixed import
 
-interface ComplianceAlert {
-  type: 'warning' | 'error';
-  message: string;
-}
+export const useEmployeeCompliance = (employees: EmployeeWithStatus[]) => {
+  const complianceData = useMemo(() => {
+    const issues: any[] = [];
+    const warnings: any[] = [];
+    
+    employees.forEach(employee => {
+      // Check for missing affiliations
+      if (!employee.eps || !employee.afp || !employee.arl) {
+        issues.push({
+          employeeId: employee.id,
+          type: 'missing_affiliations',
+          message: `${employee.nombre} ${employee.apellido} tiene afiliaciones incompletas`,
+          priority: 'high'
+        });
+      }
 
-export const useEmployeeCompliance = (employee: EmployeeWithStatus | null) => {
-  const [alerts, setAlerts] = useState<ComplianceAlert[]>([]);
+      // Check for contract expiration
+      if (employee.fechaFinalizacionContrato || employee.contratoVencimiento) {
+        const expirationDate = employee.fechaFinalizacionContrato || employee.contratoVencimiento;
+        if (expirationDate) {
+          const expDate = parseISO(expirationDate);
+          const warningDate = addMonths(new Date(), 1); // 1 month from now
+          
+          if (isAfter(warningDate, expDate)) {
+            warnings.push({
+              employeeId: employee.id,
+              type: 'contract_expiring',
+              message: `Contrato de ${employee.nombre} ${employee.apellido} vence pronto`,
+              priority: 'medium'
+            });
+          }
+        }
+      }
 
-  useEffect(() => {
-    if (!employee) {
-      setAlerts([]);
-      return;
-    }
+      // Check for outdated documents or certifications
+      // if (employee.lastCertificationDate) {
+      //   const lastCertDate = parseISO(employee.lastCertificationDate);
+      //   const renewalDate = addYears(lastCertDate, 2); // Example: Certifications need renewal every 2 years
+      //   if (isBefore(renewalDate, new Date())) {
+      //     issues.push({
+      //       employeeId: employee.id,
+      //       type: 'certification_expired',
+      //       message: `Certificación de ${employee.nombre} ${employee.apellido} ha expirado`,
+      //       priority: 'medium'
+      //     });
+      //   }
+      // }
+    });
 
-    const newAlerts: ComplianceAlert[] = [];
+    return {
+      issues,
+      warnings,
+      totalIssues: issues.length,
+      totalWarnings: warnings.length
+    };
+  }, [employees]);
 
-    // Check for missing affiliations
-    if (!employee.eps) {
-      newAlerts.push({
-        type: 'warning',
-        message: 'No EPS asignada'
-      });
-    }
-    if (!employee.afp) {
-      newAlerts.push({
-        type: 'warning',
-        message: 'No AFP asignada'
-      });
-    }
-    if (!employee.arl) {
-      newAlerts.push({
-        type: 'warning',
-        message: 'No ARL asignada'
-      });
-    }
-
-    // Check contract expiration
-    const contractExpirationDate = employee.fechaFinalizacionContrato || (employee as any).contratoVencimiento;
-    if (contractExpirationDate && isWithinDays(contractExpirationDate, 30)) {
-      alerts.push({
-        type: 'warning',
-        message: `Contrato vence el ${new Date(contractExpirationDate).toLocaleDateString('es-CO')}`
-      });
-    }
-
-    setAlerts(newAlerts);
-  }, [employee]);
-
-  return alerts;
+  return complianceData;
 };

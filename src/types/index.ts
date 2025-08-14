@@ -1,4 +1,3 @@
-
 export interface ApiResponse<T> {
   success: boolean;
   data?: T;
@@ -151,6 +150,11 @@ export interface DashboardMetrics {
   totalPayroll: number;
   averageSalary: number;
   pendingPayments: number;
+  totalEmpleados: number; // Spanish equivalent
+  nominasProcesadas: number; // Processed payrolls
+  gastosNomina: number; // Payroll expenses
+  tendenciaMensual: number; // Monthly trend
+  pendingPayrolls: number; // Added missing property
 }
 
 // Payroll types
@@ -160,6 +164,13 @@ export interface PayrollCalculation {
   deductions: number;
   bonuses: number;
   netPay: number;
+  // Added missing properties
+  salarioBase: number;
+  diasTrabajados: number;
+  horasExtra: number;
+  recargoNocturno: number;
+  recargoDominical: number;
+  bonificaciones: number;
 }
 
 export interface LegalValidation {

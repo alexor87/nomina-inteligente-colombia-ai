@@ -26,7 +26,7 @@ export const useEmployeeFormSubmission = () => {
       departamento: formData.departamento,
       salarioBase: Number(formData.salarioBase),
       tipoSalario: formData.tipoSalario || 'mensual', // Add this required field
-      tipoContrato: formData.tipoContrato,
+      tipoContrato: formData.tipoContrato || 'indefinido', // Ensure it's always set
       fechaIngreso: formData.fechaIngreso,
       periodicidadPago: formData.periodicidadPago,
       cargo: formData.cargo,

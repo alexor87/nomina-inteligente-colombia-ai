@@ -1,3 +1,4 @@
+
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { SecureEmployeeService } from '@/services/SecureEmployeeService';
 import { Employee } from '@/types';
@@ -11,6 +12,7 @@ export const useEmployeeCRUD = () => {
       ...employeeData,
       tipoDocumento: employeeData.tipoDocumento || 'CC', // Ensure it's set
       tipoSalario: employeeData.tipoSalario || 'mensual', // Ensure it's set
+      tipoContrato: employeeData.tipoContrato || 'indefinido', // Ensure it's set
       company_id: employeeData.empresaId
     });
     
