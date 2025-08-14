@@ -132,7 +132,7 @@ export abstract class SecureBaseService {
     });
 
     console.log(`🔒 [SECURITY] Secure update to ${tableName} for company ${companyId}`);
-    return query;
+    return query.select();
   }
 
   /**
