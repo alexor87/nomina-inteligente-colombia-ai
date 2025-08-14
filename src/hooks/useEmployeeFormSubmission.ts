@@ -13,7 +13,7 @@ export const useEmployeeFormSubmission = () => {
     return {
       empresaId: companyId,
       cedula: formData.cedula,
-      tipoDocumento: formData.tipoDocumento,
+      tipoDocumento: formData.tipoDocumento || 'CC', // Ensure it's always set
       nombre: formData.nombre,
       segundoNombre: formData.segundoNombre,
       apellido: formData.apellido,
@@ -25,7 +25,7 @@ export const useEmployeeFormSubmission = () => {
       ciudad: formData.ciudad,
       departamento: formData.departamento,
       salarioBase: Number(formData.salarioBase),
-      tipoSalario: formData.tipoSalario || 'mensual', // ✅ ADDED: Include tipoSalario
+      tipoSalario: formData.tipoSalario || 'mensual', // Add this required field
       tipoContrato: formData.tipoContrato,
       fechaIngreso: formData.fechaIngreso,
       periodicidadPago: formData.periodicidadPago,

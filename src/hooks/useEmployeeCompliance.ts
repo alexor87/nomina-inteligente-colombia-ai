@@ -1,58 +1,54 @@
+import { useState, useEffect } from 'react';
+import { EmployeeWithStatus } from '@/types/employee-extended';
+import { isWithinDays } from 'date-fns';
 
-import { EmployeeWithStatus, ComplianceIndicator } from '@/types/employee-extended';
+interface ComplianceAlert {
+  type: 'warning' | 'error';
+  message: string;
+}
 
-export const useEmployeeCompliance = () => {
-  const getComplianceIndicators = (employee: EmployeeWithStatus): ComplianceIndicator[] => {
-    const indicators: ComplianceIndicator[] = [];
+export const useEmployeeCompliance = (employee: EmployeeWithStatus | null) => {
+  const [alerts, setAlerts] = useState<ComplianceAlert[]>([]);
 
+  useEffect(() => {
+    if (!employee) {
+      setAlerts([]);
+      return;
+    }
+
+    const newAlerts: ComplianceAlert[] = [];
+
+    // Check for missing affiliations
     if (!employee.eps) {
-      indicators.push({
-        type: 'eps',
-        status: 'pendiente',
-        message: 'Falta afiliación a EPS'
+      newAlerts.push({
+        type: 'warning',
+        message: 'No EPS asignada'
       });
     }
-
     if (!employee.afp) {
-      indicators.push({
-        type: 'pension',
-        status: 'pendiente',
-        message: 'Falta afiliación a fondo de pensiones'
+      newAlerts.push({
+        type: 'warning',
+        message: 'No AFP asignada'
+      });
+    }
+    if (!employee.arl) {
+      newAlerts.push({
+        type: 'warning',
+        message: 'No ARL asignada'
       });
     }
 
-    if (!employee.nivelRiesgoARL) {
-      indicators.push({
-        type: 'arl',
-        status: 'pendiente',
-        message: 'Falta asignar nivel de riesgo ARL'
+    // Check contract expiration
+    const contractExpirationDate = employee.fechaFinalizacionContrato || (employee as any).contratoVencimiento;
+    if (contractExpirationDate && isWithinDays(contractExpirationDate, 30)) {
+      alerts.push({
+        type: 'warning',
+        message: `Contrato vence el ${new Date(contractExpirationDate).toLocaleDateString('es-CO')}`
       });
     }
 
-    if (employee.contratoVencimiento || employee.fechaFinalizacionContrato) {
-      const vencimiento = new Date(employee.contratoVencimiento || employee.fechaFinalizacionContrato || '');
-      const hoy = new Date();
-      const diasRestantes = Math.ceil((vencimiento.getTime() - hoy.getTime()) / (1000 * 3600 * 24));
-      
-      if (diasRestantes <= 0) {
-        indicators.push({
-          type: 'contrato',
-          status: 'vencido',
-          message: 'Contrato vencido'
-        });
-      } else if (diasRestantes <= 30) {
-        indicators.push({
-          type: 'contrato',
-          status: 'pendiente',
-          message: `Contrato vence en ${diasRestantes} días`
-        });
-      }
-    }
+    setAlerts(newAlerts);
+  }, [employee]);
 
-    return indicators;
-  };
-
-  return {
-    getComplianceIndicators
-  };
+  return alerts;
 };

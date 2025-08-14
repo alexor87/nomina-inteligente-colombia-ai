@@ -1,62 +1,36 @@
-import { EmployeeWithStatus, EmployeeFilters } from '@/types/employee-extended';
+import { EmployeeWithStatus } from '@/types/employee-extended';
 
-export const filterEmployees = (employees: EmployeeWithStatus[], filters: EmployeeFilters): EmployeeWithStatus[] => {
+export const filterByStatus = (employees: EmployeeWithStatus[], status: string): EmployeeWithStatus[] => {
+  if (status === 'all') return employees;
+  return employees.filter(employee => employee.estado === status);
+};
+
+export const filterByContractType = (employees: EmployeeWithStatus[], contractType: string): EmployeeWithStatus[] => {
+  if (contractType === 'all') return employees;
+  return employees.filter(employee => employee.tipoContrato === contractType);
+};
+
+export const filterBySearchTerm = (employees: EmployeeWithStatus[], searchTerm: string): EmployeeWithStatus[] => {
+  if (!searchTerm) return employees;
+  const lowerSearchTerm = searchTerm.toLowerCase();
   return employees.filter(employee => {
-    // Search term filter
-    if (filters.searchTerm) {
-      const searchLower = filters.searchTerm.toLowerCase();
-      const fullName = `${employee.nombre} ${employee.apellido}`.toLowerCase();
-      const matchesName = fullName.includes(searchLower);
-      const matchesCedula = employee.cedula.includes(searchLower);
-      const matchesEmail = employee.email?.toLowerCase().includes(searchLower) || false;
-      
-      if (!matchesName && !matchesCedula && !matchesEmail) {
-        return false;
-      }
-    }
+    return employee.nombre.toLowerCase().includes(lowerSearchTerm) ||
+           employee.apellido.toLowerCase().includes(lowerSearchTerm) ||
+           employee.cedula.toLowerCase().includes(lowerSearchTerm) ||
+           (employee.email && employee.email.toLowerCase().includes(lowerSearchTerm)) ||
+           (employee.cargo && employee.cargo.toLowerCase().includes(lowerSearchTerm));
+  });
+};
 
-    // Status filter
-    if (filters.estado && employee.estado !== filters.estado) {
-      return false;
-    }
+export const filterBySalaryRange = (employees: EmployeeWithStatus[], minSalary: number, maxSalary: number): EmployeeWithStatus[] => {
+  return employees.filter(employee => employee.salarioBase >= minSalary && employee.salarioBase <= maxSalary);
+};
 
-    // Contract type filter
-    if (filters.tipoContrato && employee.tipoContrato !== filters.tipoContrato) {
-      return false;
-    }
-
-    // Cost center filter
-    if (filters.centroCosto && 
-        (employee.centroCostos || employee.centrosocial || '') !== filters.centroCosto) {
-      return false;
-    }
-
-    // Filtro por nivel de riesgo ARL
-    if (filters.nivelRiesgoARL && employee.nivelRiesgoARL !== filters.nivelRiesgoARL) {
-      return false;
-    }
-
-    // Filtro por afiliación incompleta
-    if (filters.afiliacionIncompleta !== undefined) {
-      const hasIncompleteAffiliation = employee.estadoAfiliacion !== 'completa';
-      if (filters.afiliacionIncompleta !== hasIncompleteAffiliation) {
-        return false;
-      }
-    }
-
-    // Filtro por rango de fechas de ingreso
-    if (filters.fechaIngresoInicio) {
-      if (new Date(employee.fechaIngreso) < new Date(filters.fechaIngresoInicio)) {
-        return false;
-      }
-    }
-
-    if (filters.fechaIngresoFin) {
-      if (new Date(employee.fechaIngreso) > new Date(filters.fechaIngresoFin)) {
-        return false;
-      }
-    }
-
-    return true;
+export const filterByDepartment = (employees: EmployeeWithStatus[], department: string): EmployeeWithStatus[] => {
+  if (!department || department === 'all') return employees;
+  
+  return employees.filter(employee => {
+    const employeeDepartment = employee.centroCostos || (employee as any).centrosocial || '';
+    return employeeDepartment.toLowerCase().includes(department.toLowerCase());
   });
 };

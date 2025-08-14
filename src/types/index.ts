@@ -1,3 +1,4 @@
+
 export interface ApiResponse<T> {
   success: boolean;
   data?: T;
@@ -40,7 +41,7 @@ export interface Employee {
   id: string;
   empresaId: string;
   cedula: string;
-  tipoDocumento?: 'CC' | 'TI' | 'CE' | 'PA' | 'RC' | 'NIT' | 'PEP' | 'PPT';
+  tipoDocumento: 'CC' | 'TI' | 'CE' | 'PA' | 'RC' | 'NIT' | 'PEP' | 'PPT'; // Made required to match EmployeeUnified
   nombre: string;
   segundoNombre?: string;
   apellido: string;
@@ -52,7 +53,7 @@ export interface Employee {
   ciudad?: string;
   departamento?: string;
   salarioBase: number;
-  tipoSalario?: 'mensual' | 'integral' | 'medio_tiempo'; // ✅ ADDED: Include tipoSalario
+  tipoSalario: 'mensual' | 'integral' | 'medio_tiempo'; // Made required to match EmployeeUnified
   tipoContrato?: 'indefinido' | 'fijo' | 'obra' | 'aprendizaje';
   fechaIngreso: string;
   periodicidadPago?: 'mensual' | 'quincenal';
@@ -140,4 +141,40 @@ export interface SecureAuditLog {
   details: string;
   user_id: string;
   timestamp: string;
+}
+
+// Dashboard types
+export interface DashboardMetrics {
+  totalEmployees: number;
+  activeEmployees: number;
+  inactiveEmployees: number;
+  totalPayroll: number;
+  averageSalary: number;
+  pendingPayments: number;
+}
+
+// Payroll types
+export interface PayrollCalculation {
+  employeeId: string;
+  baseSalary: number;
+  deductions: number;
+  bonuses: number;
+  netPay: number;
+}
+
+export interface LegalValidation {
+  isValid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+export interface Payroll {
+  id: string;
+  companyId: string;
+  periodStart: string;
+  periodEnd: string;
+  status: 'draft' | 'processing' | 'completed' | 'paid';
+  totalAmount: number;
+  createdAt: string;
+  updatedAt: string;
 }

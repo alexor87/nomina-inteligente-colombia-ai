@@ -23,7 +23,7 @@ const EmployeeCreationTest = () => {
     const newEmployee: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'> = {
       empresaId: companyId || '',
       cedula: `12345${Date.now()}`,
-      tipoDocumento: 'CC',
+      tipoDocumento: 'CC', // Made required
       nombre: 'Juan',
       apellido: 'Pérez',
       email: 'juan.perez@email.com',
@@ -34,7 +34,7 @@ const EmployeeCreationTest = () => {
       ciudad: 'Bogotá',
       departamento: 'Cundinamarca',
       salarioBase: 2500000,
-      tipoSalario: 'mensual', // ✅ ADDED: Include tipoSalario
+      tipoSalario: 'mensual', // Made required
       tipoContrato: 'indefinido',
       fechaIngreso: new Date().toISOString().split('T')[0],
       periodicidadPago: 'mensual',

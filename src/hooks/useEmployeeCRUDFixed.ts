@@ -9,7 +9,8 @@ export const useEmployeeCRUD = () => {
   const createEmployee = async (employeeData: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>) => {
     const result = await SecureEmployeeService.createEmployee({
       ...employeeData,
-      tipoSalario: employeeData.tipoSalario || 'mensual', // ✅ ADDED: Ensure tipoSalario is included
+      tipoDocumento: employeeData.tipoDocumento || 'CC', // Ensure it's set
+      tipoSalario: employeeData.tipoSalario || 'mensual', // Ensure it's set
       company_id: employeeData.empresaId
     });
     

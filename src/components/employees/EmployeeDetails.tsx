@@ -1,4 +1,3 @@
-
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -31,7 +30,7 @@ export const EmployeeDetails = ({ employee, onEdit, onClose }: EmployeeDetailsPr
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <Avatar className="h-16 w-16">
-            <AvatarImage src={employee.avatar || ''} alt={`${employee.nombre} ${employee.apellido}`} />
+            <AvatarImage src={(employee as any).avatar || ''} alt={`${employee.nombre} ${employee.apellido}`} />
             <AvatarFallback className="bg-blue-600 text-white text-xl">
               {employee.nombre[0]}{employee.apellido[0]}
             </AvatarFallback>
@@ -95,7 +94,7 @@ export const EmployeeDetails = ({ employee, onEdit, onClose }: EmployeeDetailsPr
             </div>
             <div>
               <label className="text-sm font-medium text-gray-500">Centro de Costo</label>
-              <p className="text-gray-900">{employee.centroCostos || employee.centrosocial || 'No asignado'}</p>
+              <p className="text-gray-900">{employee.centroCostos || (employee as any).centrosocial || 'No asignado'}</p>
             </div>
           </div>
         </Card>
@@ -146,8 +145,8 @@ export const EmployeeDetails = ({ employee, onEdit, onClose }: EmployeeDetailsPr
             <div>
               <label className="text-sm font-medium text-gray-500">Última Liquidación</label>
               <p className="text-gray-900">
-                {employee.ultimaLiquidacion ? 
-                  new Date(employee.ultimaLiquidacion).toLocaleDateString('es-CO') : 
+                {(employee as any).ultimaLiquidacion ? 
+                  new Date((employee as any).ultimaLiquidacion).toLocaleDateString('es-CO') : 
                   'Sin procesar'}
               </p>
             </div>
