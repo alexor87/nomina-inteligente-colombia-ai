@@ -265,11 +265,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     }
   }, [employeeSalary, getPeriodDate, calculateNovedad]);
 
-  // ✅ V8.5: PLAN DEFINITIVO CON LOGGING CRÍTICO
   const handleFormSubmit = async (formData: any) => {
-    console.log('🚨 [MODAL V8.5] ===== PLAN V8.5 - SOLUCIÓN DEFINITIVA IDENTIFICADA =====');
-    console.log('🚨 [MODAL V8.5] formData ORIGINAL recibido:', JSON.stringify(formData, null, 2));
-    
     if (!employeeId || !periodId) {
       toast({
         title: "Error",
@@ -284,73 +280,10 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       const isArrayData = Array.isArray(formData);
       const dataArray = isArrayData ? formData : [formData];
       
-      console.log(`🔄 [MODAL V8.5] Procesando ${dataArray.length} entradas de novedad`);
-      
       for (const entry of dataArray) {
-        console.log('🚨 [MODAL V8.5] ===== ENTRADA ORIGINAL COMPLETA =====');
-        console.log('🚨 [MODAL V8.5] Entry data COMPLETO:', JSON.stringify(entry, null, 2));
+        // KISS: Simple assignment usando los datos correctos del formulario
+        const diasFinales = entry.dias || entry.calculatedDays || 0;
         
-        // ✅ V8.5 LOGGING CRÍTICO: Rastrear exactamente el flujo de días
-        console.log('🔬 [MODAL V8.5] ===== RASTREO CRÍTICO DE DIAS =====');
-        console.log('🔬 [MODAL V8.5] ANTES DE CUALQUIER TRANSFORMACIÓN:', {
-          'entry.dias': entry.dias,
-          'entry.calculatedDays': entry.calculatedDays,
-          'entry.fecha_inicio': entry.fecha_inicio,
-          'entry.fecha_fin': entry.fecha_fin,
-          'typeof entry.dias': typeof entry.dias,
-          'entry.dias === undefined': entry.dias === undefined,
-          'entry.dias === null': entry.dias === null,
-          'entry.dias === 0': entry.dias === 0,
-          'Boolean(entry.dias)': Boolean(entry.dias),
-          'selectedType': selectedType,
-          timestamp: new Date().toISOString()
-        });
-
-        // ✅ V8.5: CORRECCIÓN DEFINITIVA - Preservar el valor exacto de días
-        let diasFinales;
-        
-        if (selectedType === 'incapacidad') {
-          // Para incapacidades, usar entry.dias directamente sin fallback a 0
-          diasFinales = entry.dias;
-          
-          console.log('🏥 [MODAL V8.5] ===== INCAPACIDAD - PRESERVACIÓN DE DÍAS =====');
-          console.log('🏥 [MODAL V8.5] Preservando días exactos para incapacidad:', {
-            'entry.dias_original': entry.dias,
-            'diasFinales_asignado': diasFinales,
-            'typeof diasFinales': typeof diasFinales,
-            'diasFinales_valid': diasFinales !== undefined && diasFinales !== null && diasFinales > 0,
-            timestamp: new Date().toISOString()
-          });
-          
-          // Validación crítica
-          if (diasFinales === undefined || diasFinales === null || diasFinales <= 0) {
-            console.error('❌ [MODAL V8.5] PROBLEMA CRÍTICO: Días de incapacidad inválidos');
-            console.error('❌ [MODAL V8.5] DATOS PROBLEMÁTICOS:', {
-              'entry_completo': JSON.stringify(entry, null, 2),
-              'dias_recibido': diasFinales,
-              'formulario_origen': 'NovedadIncapacidadForm'
-            });
-            toast({
-              title: "Error Crítico",
-              description: `Días de incapacidad inválidos: ${diasFinales}. Verifique el formulario.`,
-              variant: "destructive",
-            });
-            return;
-          }
-        } else {
-          // Para otros tipos, usar el fallback normal
-          diasFinales = entry.dias || 0;
-        }
-        
-        console.log('📊 [MODAL V8.5] ===== RESULTADO FINAL DE DÍAS =====');
-        console.log('📊 [MODAL V8.5] Días finales calculados:', {
-          'diasFinales': diasFinales,
-          'typeof diasFinales': typeof diasFinales,
-          'es_mayor_que_cero': diasFinales > 0,
-          'valor_esperado_para_incapacidad': selectedType === 'incapacidad' ? 4 : 'N/A'
-        });
-
-        // ✅ V8.5: Construcción de datos con preservación crítica
         const constitutivo = determineConstitutivo(selectedType!, entry.subtipo);
         
         const submitData: CreateNovedadData = {
@@ -360,7 +293,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
           tipo_novedad: selectedType!,
           valor: entry.valor || 0,
           horas: entry.horas !== undefined ? entry.horas : undefined,
-          dias: diasFinales, // ✅ V8.5: Preservación crítica de días
+          dias: diasFinales,
           observacion: entry.observacion || undefined,
           fecha_inicio: entry.fecha_inicio || undefined,
           fecha_fin: entry.fecha_fin || undefined,
@@ -368,22 +301,9 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
           base_calculo: entry.base_calculo || undefined,
           constitutivo_salario: constitutivo
         };
-
-        console.log('💾 [MODAL V8.5] ===== DATOS ENVIADOS AL SERVICIO =====');
-        console.log('💾 [MODAL V8.5] submitData FINAL:', {
-          tipo_novedad: submitData.tipo_novedad,
-          dias: submitData.dias,
-          valor: submitData.valor,
-          empleado_id: submitData.empleado_id,
-          periodo_id: submitData.periodo_id,
-          'submitData_completo': JSON.stringify(submitData, null, 2)
-        });
         
         await onSubmit(submitData);
-        console.log('✅ [MODAL V8.5] Novedad creada exitosamente con Plan V8.5');
       }
-      
-      console.log('✅ [MODAL V8.3] Todas las entradas procesadas exitosamente con Plan V8.3');
       
       // En modo ajustes, cerrar el modal directamente
       if (mode === 'ajustes') {

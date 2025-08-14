@@ -79,38 +79,12 @@ export class NovedadesEnhancedService {
 
   static async createNovedad(novedadData: CreateNovedadData): Promise<PayrollNovedad | null> {
     try {
-      console.log('💾 [SERVICE V8.5] ===== PLAN V8.5 - RASTREO DEFINITIVO =====');
-      console.log('💾 [SERVICE V8.5] Datos recibidos COMPLETOS:', JSON.stringify(novedadData, null, 2));
-      console.log('💾 [SERVICE V8.5] Campos críticos:', { 
-        tipo_novedad: novedadData.tipo_novedad, 
-        dias: novedadData.dias, 
-        valor: novedadData.valor,
-        'typeof dias': typeof novedadData.dias,
-        'dias === undefined': novedadData.dias === undefined,
-        'dias === null': novedadData.dias === null,
-        'dias === 0': novedadData.dias === 0
-      });
-
-      // ✅ V8.5: Validación crítica con logging detallado
-      if (novedadData.tipo_novedad === 'incapacidad') {
-        console.log('🏥 [SERVICE V8.5] ===== VALIDACIÓN INCAPACIDAD =====');
-        console.log('🏥 [SERVICE V8.5] Días recibidos para incapacidad:', {
-          valor: novedadData.dias,
-          tipo: typeof novedadData.dias,
-          es_valido: novedadData.dias && novedadData.dias > 0
-        });
-        
-        if (!novedadData.dias || novedadData.dias <= 0) {
-          console.error('❌ [SERVICE V8.5] CRÍTICO: Incapacidad sin días válidos');
-          console.error('❌ [SERVICE V8.5] Datos problemáticos:', {
-            dias_recibido: novedadData.dias,
-            datos_completos: JSON.stringify(novedadData, null, 2)
-          });
-          throw new Error(`Incapacidades requieren días válidos (recibido: ${novedadData.dias})`);
-        }
+      // Validación simple para incapacidades
+      if (novedadData.tipo_novedad === 'incapacidad' && (!novedadData.dias || novedadData.dias <= 0)) {
+        throw new Error(`Incapacidades requieren días válidos (recibido: ${novedadData.dias})`);
       }
       
-      // ✅ CORRECCIÓN: Usar el tipo correcto y obtener company_id si no viene
+      // Obtener company_id si no viene
       let companyId = novedadData.company_id;
       
       if (!companyId) {
@@ -129,7 +103,6 @@ export class NovedadesEnhancedService {
         throw new Error('No se pudo determinar la empresa');
       }
 
-      // ✅ V8.3 CONSTRUCCIÓN QUIRÚRGICA: Corrección del campo boolean constitutivo_salario
       const insertData = {
         empleado_id: novedadData.empleado_id,
         periodo_id: novedadData.periodo_id,
@@ -144,21 +117,8 @@ export class NovedadesEnhancedService {
         fecha_fin: novedadData.fecha_fin,
         base_calculo: novedadData.base_calculo,
         subtipo: novedadData.subtipo,
-        // ✅ V8.3 CORRECCIÓN QUIRÚRGICA: Conversión robusta a boolean
         constitutivo_salario: Boolean(novedadData.constitutivo_salario)
       };
-
-      console.log('💾 [SERVICE V8.5] ===== DATOS PREPARADOS PARA INSERCIÓN =====');
-      console.log('💾 [SERVICE V8.5] insertData COMPLETO:', JSON.stringify(insertData, null, 2));
-      console.log('💾 [SERVICE V8.5] Campos críticos a insertar:', {
-        tipo_novedad: insertData.tipo_novedad,
-        dias: insertData.dias,
-        valor: insertData.valor,
-        'typeof dias': typeof insertData.dias,
-        'dias > 0': insertData.dias > 0,
-        empleado_id: insertData.empleado_id,
-        periodo_id: insertData.periodo_id
-      });
 
       const { data: novedad, error } = await supabase
         .from('payroll_novedades')
@@ -167,42 +127,19 @@ export class NovedadesEnhancedService {
         .single();
 
       if (error) {
-        console.error('❌ [SERVICE V8.3] Error insertando en BD:', error);
-        console.error('❌ [SERVICE V8.3] Datos que causaron error V8.3:', insertData);
-        console.error('❌ [SERVICE V8.3] Error específico V8.3 quirúrgico:', {
-          message: error.message,
-          code: error.code,
-          details: error.details,
-          hint: error.hint,
-          constitutivo_salario_value: insertData.constitutivo_salario,
-          constitutivo_salario_type: typeof insertData.constitutivo_salario,
-          plan_version: 'V8.3_QUIRURGICO'
-        });
+        console.error('Error insertando novedad:', error);
         throw error;
       }
 
-      console.log('✅ [SERVICE V8.5] ===== NOVEDAD CREADA EXITOSAMENTE =====');
-      console.log('✅ [SERVICE V8.5] Datos insertados en BD:', {
-        id: novedad.id,
-        tipo_novedad: novedad.tipo_novedad,
-        dias: novedad.dias,
-        valor: novedad.valor,
-        'dias_en_bd': novedad.dias,
-        'typeof dias_en_bd': typeof novedad.dias,
-        'dias_correctos': novedad.tipo_novedad === 'incapacidad' ? novedad.dias === 4 : true,
-        novedad_completa: JSON.stringify(novedad, null, 2)
-      });
-
-      // Log manual audit action for business context
+      // Log audit action
       try {
         const { PayrollAuditEnhancedService } = await import('@/services/PayrollAuditEnhancedService');
         await PayrollAuditEnhancedService.logManualAction(novedad.id, 'ADJUSTMENT', {
-          reason: 'Novedad creada desde interfaz de ajustes - Plan V8.3 Quirúrgico',
+          reason: 'Novedad creada desde interfaz de ajustes',
           source: 'adjustment',
           metadata: {
             original_data: insertData,
             user_context: 'PayrollHistoryDetailPage',
-            plan_version: 'V8.3_QUIRURGICO',
             timestamp: new Date().toISOString()
           }
         });
@@ -210,7 +147,6 @@ export class NovedadesEnhancedService {
         console.warn('⚠️ No se pudo registrar acción de auditoría:', auditError);
       }
 
-      console.log('✅ [SERVICE V8.3] Novedad creada exitosamente con Plan V8.3 Quirúrgico');
       return novedad as PayrollNovedad;
       
     } catch (error) {
