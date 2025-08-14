@@ -93,11 +93,11 @@ async function calculatePayroll(input: PayrollCalculationRequest) {
 
   // 🔥 SALARIO INTEGRAL: Aplicar factor 70% para IBC
   if (tipoSalario === 'integral') {
-    const SMLMV_2024 = 1300000; // Debería venir de configuración
+    const SALARIO_MINIMO_2025 = 1423500; // Salario mínimo 2025
     
-    // Validar mínimo 10 SMLMV
-    if (baseSalary < (SMLMV_2024 * 10)) {
-      throw new Error(`Salario integral debe ser mínimo ${(SMLMV_2024 * 10).toLocaleString()}`);
+    // Validar mínimo 13 SMLMV (legal colombiano)
+    if (baseSalary < (SALARIO_MINIMO_2025 * 13)) {
+      throw new Error(`Salario integral debe ser mínimo 13 SMMLV (${(SALARIO_MINIMO_2025 * 13).toLocaleString()})`);
     }
     
     // Calcular factores
