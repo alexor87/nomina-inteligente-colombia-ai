@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { NovedadesEnhancedService } from '@/services/NovedadesEnhancedService';
 import { PayrollIntegratedDataService } from '@/services/PayrollIntegratedDataService';
@@ -172,7 +173,7 @@ export const useNovedades = (periodId: string) => {
         totalElementos: unifiedData.length,
         novedades: unifiedData.filter(item => item.origen === 'novedades').length,
         ausenciasFragmentadas: unifiedData.filter(item => item.origen === 'vacaciones').length,
-        incapacidades: unifiedData.filter(item => item.tipo === 'incapacidad').map(item => ({
+        incapacidades: unifiedData.filter(item => item.tipo_novedad === 'incapacidad').map(item => ({
           id: item.id,
           valor: item.valor,
           dias: item.dias,

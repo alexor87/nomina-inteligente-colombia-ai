@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { DisplayNovedad, convertNovedadToDisplay } from '@/types/vacation-integration';
 import { NovedadesEnhancedService } from './NovedadesEnhancedService';
@@ -71,7 +72,7 @@ export class PayrollIntegratedDataService {
           originalDias: novedad.dias,
           convertedValor: converted.valor,
           convertedDias: converted.dias,
-          tipo: converted.tipo
+          tipo_novedad: converted.tipo_novedad
         });
         
         return converted;
@@ -86,7 +87,7 @@ export class PayrollIntegratedDataService {
         totalElementos: sortedData.length,
         novedades: sortedData.filter(item => item.origen === 'novedades').length,
         ausenciasFragmentadas: sortedData.filter(item => item.origen === 'vacaciones').length,
-        incapacidades: sortedData.filter(item => item.tipo === 'incapacidad').map(item => ({
+        incapacidades: sortedData.filter(item => item.tipo_novedad === 'incapacidad').map(item => ({
           id: item.id,
           valor: item.valor,
           dias: item.dias,
