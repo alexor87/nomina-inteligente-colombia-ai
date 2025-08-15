@@ -49,55 +49,15 @@ const categoryToNovedadType: Record<NovedadCategory, NovedadType> = {
   'retefuente': 'retencion_fuente'
 };
 
-// ✅ V8.3: Función para determinar constitutivo_salario
 const determineConstitutivo = (tipoNovedad: NovedadType, subtipo?: string): boolean => {
-  console.log('🎯 [V8.3] Determinando constitutivo_salario:', { tipoNovedad, subtipo });
-  
-  // Buscar en todas las categorías
   for (const category of Object.values(NOVEDAD_CATEGORIES)) {
     const novedadConfig = category.types[tipoNovedad];
     if (novedadConfig) {
-      const constitutivo = novedadConfig.constitutivo_default ?? true;
-      console.log('✅ [V8.3] Constitutivo determinado:', { 
-        tipo: tipoNovedad, 
-        constitutivo,
-        fuente: 'NOVEDAD_CATEGORIES'
-      });
-      return constitutivo;
+      return novedadConfig.constitutivo_default ?? true;
     }
   }
   
-  // Fallback: usar false para incapacidades y licencias, true para el resto
-  const fallbackValue = ['incapacidad', 'licencia_remunerada'].includes(tipoNovedad) ? false : true;
-  console.log('⚠️ [V8.3] Constitutivo por fallback:', { 
-    tipo: tipoNovedad, 
-    constitutivo: fallbackValue,
-    fuente: 'fallback_logic'
-  });
-  return fallbackValue;
-};
-
-// ✅ V8.3 NUEVA FUNCIÓN: Cálculo independiente de días
-const calculateDaysIndependently = (fechaInicio: string, fechaFin: string): number => {
-  if (!fechaInicio || !fechaFin) return 0;
-  
-  const startDate = new Date(fechaInicio);
-  const endDate = new Date(fechaFin);
-  
-  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) return 0;
-  
-  const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 para incluir ambos días
-  
-  console.log('🧮 [V8.3] Cálculo independiente de días:', {
-    fechaInicio,
-    fechaFin,
-    startDate: startDate.toISOString(),
-    endDate: endDate.toISOString(),
-    diffDays
-  });
-  
-  return diffDays;
+  return ['incapacidad', 'licencia_remunerada'].includes(tipoNovedad) ? false : true;
 };
 
 export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
@@ -125,11 +85,9 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   
   const { calculateNovedad } = useNovedadBackendCalculation();
 
-  // ✅ KISS: Fecha del período sin complejidad
   const getPeriodDate = useCallback(() => {
     if (startDate) {
       const date = new Date(startDate + 'T00:00:00');
-      console.log('📅 Fecha período:', date.toISOString().split('T')[0]);
       return date;
     }
     return new Date();
@@ -140,7 +98,6 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       setSelectedType(selectedNovedadType);
       setCurrentStep('form');
     } else {
-      // En modo ajustes, ir directamente al selector
       if (mode === 'ajustes') {
         setCurrentStep('selector');
       } else {
@@ -182,7 +139,6 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   }, [employeeId]);
 
   const handleClose = () => {
-    // Reset all states before closing
     setIsSubmitting(false);
     setCurrentStep('list');
     setSelectedType(null);
@@ -203,7 +159,6 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   };
 
   const handleBackToList = () => {
-    // En modo ajustes, cerrar el modal en lugar de ir a la lista
     if (mode === 'ajustes') {
       handleClose();
     } else {
@@ -224,22 +179,12 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     dias?: number
   ): Promise<number | null> => {
     if (!employeeSalary) {
-      console.warn('❌ Salario del empleado no definido');
       return null;
     }
 
     try {
       const fechaPeriodo = getPeriodDate().toISOString().split('T')[0];
       
-      console.log('🎯 MODAL: Calculando novedad:', {
-        tipo: tipoNovedad,
-        subtipo,
-        salario: employeeSalary,
-        horas,
-        dias,
-        fecha: fechaPeriodo
-      });
-
       const result = await calculateNovedad({
         tipoNovedad,
         subtipo,
@@ -249,18 +194,9 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
         fechaPeriodo
       });
 
-      if (result) {
-        console.log('✅ MODAL: Cálculo exitoso:', {
-          tipo: subtipo || tipoNovedad,
-          valor: result.valor,
-          detalle: result.detalleCalculo
-        });
-        return result.valor;
-      }
-
-      return null;
+      return result?.valor || null;
     } catch (error) {
-      console.error('❌ Error en cálculo:', error);
+      console.error('Error en cálculo:', error);
       return null;
     }
   }, [employeeSalary, getPeriodDate, calculateNovedad]);
@@ -277,85 +213,32 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
 
     setIsSubmitting(true);
     try {
-      // PLAN V14.0: Diagnóstico completo con validación específica por tipo de novedad
-      console.log('🚀 [V14.0] ===== INICIANDO PROCESAMIENTO =====');
-      console.log('🚀 [V14.0] formData recibido:', JSON.stringify(formData, null, 2));
-      console.log('🚀 [V14.0] selectedType:', selectedType);
-      console.log('🚀 [V14.0] Array.isArray(formData):', Array.isArray(formData));
-      
       const isArrayData = Array.isArray(formData);
       const dataArray = isArrayData ? formData : [formData];
       
-      // Validación específica para incapacidades
-      if (selectedType === 'incapacidad' && !isArrayData) {
-        console.log('🔍 [V14.0] INCAPACIDAD DETECTADA - Validando estructura:');
-        console.log('🔍 [V14.0] - formData.dias:', formData.dias, typeof formData.dias);
-        console.log('🔍 [V14.0] - formData.calculatedDays:', formData.calculatedDays, typeof formData.calculatedDays);
-        console.log('🔍 [V14.0] - formData.valor:', formData.valor, typeof formData.valor);
-        console.log('🔍 [V14.0] - formData.subtipo:', formData.subtipo);
-      }
-      
       for (const entry of dataArray) {
-        console.log('🔍 [V14.0] ===== PROCESANDO ENTRY =====');
-        console.log('🔍 [V14.0] entry completo:', JSON.stringify(entry, null, 2));
-        
-        // PLAN V14.0: Verificación robusta que preserva valores numéricos válidos incluido el 0
-        let diasFinales = 0;
-        let valorFinal = 0;
-        
-        // Para días: usar dias si está definido, sino calculatedDays, sino 0
-        if (entry.dias !== undefined && entry.dias !== null) {
-          diasFinales = entry.dias;
-          console.log('🔍 [V14.0] Usando entry.dias:', diasFinales);
-        } else if (entry.calculatedDays !== undefined && entry.calculatedDays !== null) {
-          diasFinales = entry.calculatedDays;
-          console.log('🔍 [V14.0] Usando entry.calculatedDays:', diasFinales);
-        } else {
-          diasFinales = 0;
-          console.log('🔍 [V14.0] Usando valor por defecto dias:', diasFinales);
-        }
-        
-        // Para valor: usar valor si está definido, sino 0
-        if (entry.valor !== undefined && entry.valor !== null) {
-          valorFinal = entry.valor;
-          console.log('🔍 [V14.0] Usando entry.valor:', valorFinal);
-        } else {
-          valorFinal = 0;
-          console.log('🔍 [V14.0] Usando valor por defecto valor:', valorFinal);
-        }
-        
-        console.log('🔍 [V14.0] VALORES FINALES CALCULADOS:', {
-          'diasFinales': diasFinales,
-          'valorFinal': valorFinal,
-          'diasFinales_type': typeof diasFinales,
-          'valorFinal_type': typeof valorFinal,
-          'selectedType': selectedType
-        });
-        
         const constitutivo = determineConstitutivo(selectedType!, entry.subtipo);
         
+        // Simple, direct data passing
         const submitData: CreateNovedadData = {
           empleado_id: employeeId,
           periodo_id: periodId,
           company_id: companyId || '',
           tipo_novedad: selectedType!,
-          valor: valorFinal,
-          horas: entry.horas !== undefined ? entry.horas : undefined,
-          dias: diasFinales,
-          observacion: entry.observacion || undefined,
-          fecha_inicio: entry.fecha_inicio || undefined,
-          fecha_fin: entry.fecha_fin || undefined,
-          subtipo: entry.subtipo || entry.tipo || undefined,
-          base_calculo: entry.base_calculo || undefined,
+          valor: entry.valor,
+          horas: entry.horas,
+          dias: entry.dias,
+          observacion: entry.observacion,
+          fecha_inicio: entry.fecha_inicio,
+          fecha_fin: entry.fecha_fin,
+          subtipo: entry.subtipo || entry.tipo,
+          base_calculo: entry.base_calculo,
           constitutivo_salario: constitutivo
         };
         
-        console.log('🔍 [V14.0] submitData FINAL enviado a onSubmit:', JSON.stringify(submitData, null, 2));
         await onSubmit(submitData);
-        console.log('🔍 [V14.0] onSubmit completado exitosamente para entry');
       }
       
-      // En modo ajustes, cerrar el modal directamente
       if (mode === 'ajustes') {
         handleClose();
       } else {
@@ -365,8 +248,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       }
       
     } catch (error: any) {
-      console.error('❌ [MODAL V8.3] ERROR CRÍTICO procesando novedades:', error);
-      console.error('❌ [MODAL V8.3] Stack trace:', error.stack);
+      console.error('Error procesando novedades:', error);
       toast({
         title: "Error",
         description: error.message || "No se pudieron guardar las novedades",

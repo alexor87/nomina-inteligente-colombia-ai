@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,7 +11,6 @@ import { formatCurrency } from '@/lib/utils';
 import { useNovedadBackendCalculation } from '@/hooks/useNovedadBackendCalculation';
 import { NovedadType } from '@/types/novedades-enhanced';
 import { calculateDaysBetween, isValidDateRange } from '@/utils/dateUtils';
-import { IncapacidadDebugger } from '../IncapacidadDebugger';
 
 interface NovedadIncapacidadFormProps {
   onBack: () => void;
@@ -54,229 +54,57 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
 
   const { calculateNovedadDebounced, isLoading } = useNovedadBackendCalculation();
 
-  // ✅ V8.0: Cálculo de días con logging exhaustivo ACTIVADO
   const calculatedDays = React.useMemo(() => {
-    console.log('🔍 [FORM V8.0] ===== CALCULANDO DÍAS (DEBUGGING ACTIVADO) =====');
-    console.log('🔍 [FORM V8.0] Input para cálculo:', {
-      fecha_inicio: formData.fecha_inicio,
-      fecha_fin: formData.fecha_fin,
-      timestamp: new Date().toISOString()
-    });
-    
-    const days = calculateDaysBetween(formData.fecha_inicio, formData.fecha_fin);
-    
-    console.log('🔍 [FORM V8.0] Resultado calculateDaysBetween:', {
-      resultado: days,
-      tipo: typeof days,
-      es_numero: !isNaN(days),
-      es_positivo: days > 0,
-      caso_test: formData.fecha_inicio === '2025-08-05' && formData.fecha_fin === '2025-08-08' ? `CASO TEST - debería ser 4, obtuvo: ${days}` : 'otro caso',
-      timestamp: new Date().toISOString()
-    });
-    
-    return days;
+    return calculateDaysBetween(formData.fecha_inicio, formData.fecha_fin);
   }, [formData.fecha_inicio, formData.fecha_fin]);
 
   const isValidRange = isValidDateRange(formData.fecha_inicio, formData.fecha_fin);
 
-  // ✅ V8.0: Logging exhaustivo del estado
-  console.log('🔍 [FORM V8.0] Estado actual completo:', {
-    subtipo: formData.subtipo,
-    fechaInicio: formData.fecha_inicio,
-    fechaFin: formData.fecha_fin,
-    calculatedDays,
-    isValidRange,
-    employeeSalary,
-    valorActual: formData.valor,
-    periodoFecha: periodoFecha?.toISOString(),
-    timestamp: new Date().toISOString()
-  });
-
-  // ✅ V8.0: useEffect mejorado con validación específica
   useEffect(() => {
-    console.log('🚀 [FORM V8.0] useEffect cálculo disparado:', {
-      hasStartDate: !!formData.fecha_inicio,
-      hasEndDate: !!formData.fecha_fin,
-      isValidRange,
-      calculatedDays,
-      employeeSalary,
-      subtipo: formData.subtipo,
-      timestamp: new Date().toISOString()
-    });
-
-    // Validaciones críticas
-    if (!formData.fecha_inicio || !formData.fecha_fin) {
-      console.log('⏳ [FORM V8.0] Esperando fechas completas');
+    if (!formData.fecha_inicio || !formData.fecha_fin || !isValidRange || calculatedDays < 0 || !employeeSalary) {
       return;
     }
 
-    if (!isValidRange) {
-      console.log('❌ [FORM V8.0] Rango de fechas inválido');
-      setFormData(prev => ({ ...prev, valor: 0 }));
-      return;
-    }
-
-    if (calculatedDays < 0) {
-      console.log('❌ [FORM V8.0] Días calculados < 0:', calculatedDays);
-      setFormData(prev => ({ ...prev, valor: 0 }));
-      return;
-    }
-
-    if (!employeeSalary || employeeSalary <= 0) {
-      console.log('❌ [FORM V8.0] Salario inválido:', employeeSalary);
-      setFormData(prev => ({ ...prev, valor: 0 }));
-      return;
-    }
-
-    // ✅ V8.0: Formateo correcto de fecha
     const fechaPeriodoISO = periodoFecha ? periodoFecha.toISOString() : new Date().toISOString();
     
-    console.log('🎯 [FORM V8.0] ENVIANDO AL BACKEND (corregido):', {
-      tipoNovedad: 'incapacidad',
-      subtipo: formData.subtipo,
-      salarioBase: employeeSalary,
-      dias: calculatedDays,
-      fechaPeriodo: fechaPeriodoISO,
-      testCase: calculatedDays === 4 && formData.fecha_inicio === '2025-08-05' && formData.fecha_fin === '2025-08-08' ? 'CASO DE PRUEBA 4 DÍAS' : 'OTRO CASO',
-      timestamp: new Date().toISOString()
-    });
-    
-    // ✅ V8.0: ENVÍO INMEDIATO con días corregidos
     calculateNovedadDebounced(
       {
         tipoNovedad: 'incapacidad' as NovedadType,
         subtipo: formData.subtipo,
         salarioBase: employeeSalary,
-        dias: calculatedDays, // ✅ V8.0: días calculados correctamente
+        dias: calculatedDays,
         fechaPeriodo: fechaPeriodoISO
       },
       (result) => {
-        console.log('📊 [FORM V8.0] RESULTADO DEL BACKEND (corregido):', {
-          result,
-          diasEnviados: calculatedDays,
-          valorRecibido: result?.valor,
-          detalleCalculo: result?.detalleCalculo,
-          esCasoTest: calculatedDays === 4 ? 'SÍ - DEBE SER > $0' : 'NO',
-          timestamp: new Date().toISOString()
-        });
-        
         if (result && typeof result.valor === 'number') {
-          console.log('✅ [FORM V8.0] Valor calculado exitoso:', result.valor);
-          setFormData(prev => ({ 
-            ...prev, 
-            valor: result.valor 
-          }));
-        } else {
-          console.log('❌ [FORM V8.0] Error en cálculo:', result);
-          setFormData(prev => ({ 
-            ...prev, 
-            valor: 0 
-          }));
+          setFormData(prev => ({ ...prev, valor: result.valor }));
         }
       },
-      0 // Sin delay para respuesta inmediata
+      0
     );
   }, [formData.subtipo, formData.fecha_inicio, formData.fecha_fin, calculatedDays, isValidRange, employeeSalary, calculateNovedadDebounced, periodoFecha]);
 
   const handleInputChange = (field: string, value: any) => {
-    console.log('🔄 [FORM V8.0] Campo actualizado:', field, '=', value, 'timestamp:', new Date().toISOString());
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  // 🔍 V9.0: handleSubmit con logging crítico de diagnóstico
   const handleSubmit = () => {
-    console.log('🚀 [V15.0] ===== INCAPACIDAD FORM SUBMIT - PLAN V15.0 INICIADO =====');
-    console.log('🚀 [V15.0] DIAGNÓSTICO COMPLETO DEL ESTADO:');
-    console.log('🚀 [V15.0] - formData completo:', JSON.stringify(formData, null, 2));
-    console.log('🚀 [V15.0] - calculatedDays:', calculatedDays, 'tipo:', typeof calculatedDays);
-    console.log('🚀 [V15.0] - formData.valor:', formData.valor, 'tipo:', typeof formData.valor);
-    console.log('🚀 [V15.0] - isValidRange:', isValidRange);
-    console.log('🚀 [V15.0] - employeeSalary:', employeeSalary);
-
-    // Validaciones básicas
-    if (!formData.fecha_inicio) {
-      console.error('❌ [V15.0] Falta fecha de inicio');
-      alert('Por favor seleccione la fecha de inicio');
+    if (!formData.fecha_inicio || !formData.fecha_fin || !isValidRange || calculatedDays < 0) {
       return;
     }
 
-    if (!formData.fecha_fin) {
-      console.error('❌ [V15.0] Falta fecha de fin');
-      alert('Por favor seleccione la fecha de fin');
-      return;
-    }
-
-    if (!isValidRange) {
-      console.error('❌ [V15.0] Rango inválido');
-      alert('La fecha de fin debe ser igual o posterior a la fecha de inicio');
-      return;
-    }
-
-    if (calculatedDays < 0) {
-      console.error('❌ [V15.0] Días calculados inválidos:', calculatedDays);
-      alert('El rango de fechas debe generar días válidos');
-      return;
-    }
-
-    // 🚀 V15.0: CONSTRUCCIÓN ROBUSTA DE DATOS CON PRESERVACIÓN DE VALORES NUMÉRICOS
-    const valorFinal = formData.valor !== undefined && formData.valor !== null && String(formData.valor) !== '' 
-      ? Number(formData.valor) 
-      : 0;
-    
-    const diasFinales = calculatedDays !== undefined && calculatedDays !== null 
-      ? Number(calculatedDays) 
-      : 0;
-
+    // Simple, direct data submission
     const submitData = {
       tipo_novedad: 'incapacidad',
       subtipo: formData.subtipo,
-      dias: diasFinales, // 🚀 V15.0: Valor numérico preservado
-      calculatedDays: diasFinales, // 🚀 V15.0: BACKUP explícito
+      dias: calculatedDays,
       fecha_inicio: formData.fecha_inicio,
       fecha_fin: formData.fecha_fin,
-      valor: valorFinal, // 🚀 V15.0: Valor numérico preservado
+      valor: formData.valor,
       observacion: formData.observacion || undefined
     };
 
-    console.log('🚀 [V15.0] ===== DATOS FINALES CONSTRUIDOS PARA MODAL =====');
-    console.log('🚀 [V15.0] submitData completo:', JSON.stringify(submitData, null, 2));
-    console.log('🚀 [V15.0] VERIFICACIÓN CRÍTICA DE VALORES NUMÉRICOS:', {
-      'submitData.dias': submitData.dias,
-      'submitData.valor': submitData.valor,
-      'valorFinal': valorFinal,
-      'diasFinales': diasFinales,
-      'calculatedDays_original': calculatedDays,
-      'formData.valor_original': formData.valor,
-      'tipo_dias_final': typeof submitData.dias,
-      'tipo_valor_final': typeof submitData.valor,
-      'dias_es_numero': !isNaN(submitData.dias),
-      'valor_es_numero': !isNaN(submitData.valor),
-      'dias_positivo': submitData.dias > 0,
-      'valor_positivo': submitData.valor > 0
-    });
-
-    // 🚀 V15.0: VALIDACIÓN FINAL ROBUSTA
-    if (submitData.dias === undefined || submitData.dias === null || isNaN(submitData.dias) || submitData.dias <= 0) {
-      console.error('❌ [V15.0] VALIDACIÓN FINAL FALLÓ - DÍAS INVÁLIDOS:', {
-        dias: submitData.dias,
-        calculatedDays: calculatedDays,
-        diasFinales: diasFinales,
-        formData_valor: formData.valor,
-        valorFinal: valorFinal,
-        error: 'Días inválidos detectados en formulario antes de envío'
-      });
-      
-      alert(`Error crítico: Días calculados inválidos (${submitData.dias}). Verificar cálculo de fechas.`);
-      return;
-    }
-    
-    console.log('🚀 [V15.0] ===== ENVIANDO A MODAL - BUSCAR LOGS V14.0 =====');
-    console.log('🚀 [V15.0] Llamando onSubmit con submitData preservando valores numéricos...');
-    console.log('🚀 [V15.0] EXPECT: Los próximos logs deben ser [V14.0] del modal');
-    
     onSubmit(submitData);
-    
-    console.log('🚀 [V15.0] ===== onSubmit EJECUTADO - SI NO VES LOGS V14.0, HAY PROBLEMA DE COMUNICACIÓN =====');
   };
 
   const getCurrentSubtipoInfo = () => {
@@ -293,25 +121,6 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <h3 className="text-lg font-semibold text-gray-900">Incapacidad</h3>
-      </div>
-
-      {/* ✅ V8.0: Debug panel con información crítica actualizada */}
-      <div className="bg-red-50 border border-red-200 p-3 rounded-lg">
-        <h4 className="text-red-800 font-medium text-sm mb-2">🔍 Debug V8.0 ACTIVO - Logging Exhaustivo</h4>
-        <div className="text-xs text-red-700 space-y-1">
-          <div>Fecha inicio: <strong>{formData.fecha_inicio || 'No seleccionada'}</strong></div>
-          <div>Fecha fin: <strong>{formData.fecha_fin || 'No seleccionada'}</strong></div>
-          <div>Días calculados: <strong className={calculatedDays >= 0 ? calculatedDays === 4 ? 'text-green-600' : 'text-blue-600' : 'text-red-600'}>{calculatedDays}</strong></div>
-          <div>Valor calculado: <strong>${formData.valor.toLocaleString()}</strong></div>
-          <div>Estado: <strong>{isValidRange ? '✅ Válido' : '❌ Inválido'}</strong></div>
-          <div>Caso test (5-8 ago): <strong className={formData.fecha_inicio === '2025-08-05' && formData.fecha_fin === '2025-08-08' ? calculatedDays === 4 ? 'text-green-600' : 'text-red-600' : 'text-gray-600'}>
-            {formData.fecha_inicio === '2025-08-05' && formData.fecha_fin === '2025-08-08' ? 
-              (calculatedDays === 4 ? '✅ CORRECTO (4 días)' : `❌ INCORRECTO (${calculatedDays} días)`) : 
-              'N/A'
-            }
-          </strong></div>
-          <div className="text-red-800 font-bold">📊 DEBUGGING: Revisa la consola para logs detallados</div>
-        </div>
       </div>
 
       {/* Form Section */}
@@ -381,7 +190,7 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
           </div>
         </div>
 
-        {/* ✅ V4.0: Días calculados con validación visual mejorada */}
+        {/* Días calculados */}
         {formData.fecha_inicio && formData.fecha_fin && (
           <div className="bg-white p-3 rounded border border-blue-200">
             <div className="flex items-center gap-2">
@@ -390,11 +199,7 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
                 Días calculados: 
               </span>
               {isValidRange ? (
-                <Badge variant="secondary" className={
-                  calculatedDays === 4 ? "bg-green-100 text-green-800" : 
-                  calculatedDays > 0 ? "bg-blue-100 text-blue-800" : 
-                  "bg-gray-100 text-gray-800"
-                }>
+                <Badge variant="secondary" className="bg-blue-100 text-blue-800">
                   <CheckCircle className="h-3 w-3 mr-1" />
                   {calculatedDays} días
                 </Badge>
@@ -413,7 +218,7 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
           </div>
         )}
 
-        {/* ✅ V4.0: Estado del cálculo con información específica */}
+        {/* Estado del cálculo */}
         {isLoading && calculatedDays >= 0 && (
           <div className="bg-blue-50 p-3 rounded border border-blue-200">
             <div className="flex items-center gap-2">
@@ -446,16 +251,6 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
             placeholder="0"
             className="text-lg font-medium"
           />
-          {/* ✅ V4.0: Feedback mejorado con casos específicos */}
-          {formData.valor === 0 && calculatedDays >= 0 && !isLoading && (
-            <div className="text-xs text-amber-600 mt-1 flex items-center gap-1">
-              <AlertTriangle className="h-3 w-3" />
-              {currentSubtipoInfo?.value === 'general' && calculatedDays <= 3 ? 
-                'Valor $0 correcto: empleador paga primeros 3 días directamente (Ley 100/1993)' :
-                calculatedDays > 3 ? 'Si es >3 días y persiste en $0, verificar cálculo de días en dateUtils.ts' : 'Valor calculado'
-              }
-            </div>
-          )}
         </div>
 
         <div>
@@ -469,7 +264,7 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
           />
         </div>
 
-        {/* ✅ V3.0: Preview con validación de lógica normativa */}
+        {/* Preview */}
         {formData.valor >= 0 && calculatedDays >= 0 && (
           <div className="bg-green-50 p-3 rounded text-center border border-green-200">
             <div className="flex items-center justify-center gap-2 mb-2">
@@ -481,14 +276,6 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
             <div className="text-sm text-gray-700 mt-2">
               {calculatedDays} días de incapacidad {currentSubtipoInfo?.label.toLowerCase()}
             </div>
-            {currentSubtipoInfo && (
-              <div className="text-xs text-gray-600 mt-1">
-                {formData.valor === 0 && calculatedDays <= 3 && currentSubtipoInfo.value === 'general' ?
-                  'Empleador paga directamente según Ley 100/1993' :
-                  `Calculado al ${currentSubtipoInfo.porcentaje}% según normativa colombiana`
-                }
-              </div>
-            )}
           </div>
         )}
       </div>
@@ -506,16 +293,6 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
           {isSubmitting ? 'Guardando...' : 'Guardar Incapacidad'}
         </Button>
       </div>
-
-      {/* ✅ Debugger para desarrollo */}
-      {process.env.NODE_ENV === 'development' && (
-        <IncapacidadDebugger
-          formData={formData}
-          employeeSalary={employeeSalary}
-          calculatedDays={calculatedDays}
-          isLoading={isLoading}
-        />
-      )}
     </div>
   );
 };
