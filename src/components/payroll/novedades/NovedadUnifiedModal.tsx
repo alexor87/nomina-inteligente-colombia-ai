@@ -70,6 +70,8 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   const [employeeFullName, setEmployeeFullName] = useState<string>('');
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [periodStartDate, setPeriodStartDate] = useState<string>('');
+  const [periodEndDate, setPeriodEndDate] = useState<string>('');
   const { toast } = useToast();
   
   const { calculateNovedad } = useNovedadBackendCalculation();
@@ -83,6 +85,30 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     }
     return new Date();
   }, [startDate]);
+
+  // ✅ Obtener fechas del período para validación
+  useEffect(() => {
+    const loadPeriodDates = async () => {
+      if (!periodId) return;
+      
+      try {
+        const { data: period } = await supabase
+          .from('payroll_periods_real')
+          .select('fecha_inicio, fecha_fin')
+          .eq('id', periodId)
+          .single();
+        
+        if (period) {
+          setPeriodStartDate(period.fecha_inicio);
+          setPeriodEndDate(period.fecha_fin);
+        }
+      } catch (error) {
+        console.error('Error loading period dates:', error);
+      }
+    };
+
+    loadPeriodDates();
+  }, [periodId]);
 
   useEffect(() => {
     if (selectedNovedadType) {
@@ -289,7 +315,13 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
 
     switch (selectedType) {
       case 'horas_extra':
-        return <NovedadHorasExtraConsolidatedForm {...baseProps} />;
+        return (
+          <NovedadHorasExtraConsolidatedForm 
+            {...baseProps} 
+            periodStartDate={periodStartDate}
+            periodEndDate={periodEndDate}
+          />
+        );
       
       case 'recargo_nocturno':
         return (

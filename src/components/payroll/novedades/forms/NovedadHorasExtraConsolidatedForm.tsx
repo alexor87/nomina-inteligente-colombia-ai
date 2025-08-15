@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -5,10 +6,12 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Clock, Plus, Trash2, Calculator } from 'lucide-react';
+import { ArrowLeft, Clock, Plus, Trash2, Calculator, AlertCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { formatCurrency } from '@/lib/utils';
 import { useNovedadBackendCalculation } from '@/hooks/useNovedadBackendCalculation';
+import { formatDateForDisplay } from '@/utils/dateUtils';
 
 interface HorasExtraEntry {
   id: string;
@@ -34,6 +37,8 @@ interface NovedadHorasExtraConsolidatedFormProps {
   employeeSalary: number;
   isSubmitting?: boolean;
   periodoFecha?: Date;
+  periodStartDate?: string;
+  periodEndDate?: string;
 }
 
 export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsolidatedFormProps> = ({
@@ -41,7 +46,9 @@ export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsol
   onSubmit,
   employeeSalary,
   isSubmitting = false,
-  periodoFecha
+  periodoFecha,
+  periodStartDate,
+  periodEndDate
 }) => {
   const [entries, setEntries] = useState<HorasExtraEntry[]>([]);
   const [currentEntry, setCurrentEntry] = useState({
@@ -50,8 +57,20 @@ export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsol
     horas: '',
     observacion: ''
   });
+  const [dateError, setDateError] = useState<string>('');
 
   const { calculateNovedad, isLoading: isCalculating } = useNovedadBackendCalculation();
+
+  // ✅ KISS: Validación simple de fecha en período
+  const isDateInPeriod = (fecha: string): boolean => {
+    if (!fecha || !periodStartDate || !periodEndDate) return true; // Si no hay datos, permitir
+    
+    const selectedDate = new Date(fecha);
+    const startDate = new Date(periodStartDate);
+    const endDate = new Date(periodEndDate);
+    
+    return selectedDate >= startDate && selectedDate <= endDate;
+  };
 
   const calculateHorasExtraValue = async (tipo: string, horas: number, fecha: string) => {
     if (!tipo || horas <= 0 || !fecha) return 0;
@@ -76,7 +95,18 @@ export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsol
   };
 
   const handleAddEntry = async () => {
+    // ✅ Limpiar error previo
+    setDateError('');
+
     if (!currentEntry.fecha || !currentEntry.tipo || !currentEntry.horas || parseFloat(currentEntry.horas) <= 0) {
+      return;
+    }
+
+    // ✅ KISS: Validación simple de fecha
+    if (!isDateInPeriod(currentEntry.fecha)) {
+      const startFormatted = periodStartDate ? formatDateForDisplay(periodStartDate) : '';
+      const endFormatted = periodEndDate ? formatDateForDisplay(periodEndDate) : '';
+      setDateError(`La fecha de las horas extra debe estar dentro del período de liquidación (${startFormatted} - ${endFormatted})`);
       return;
     }
 
@@ -132,13 +162,24 @@ export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsol
         <CardContent className="p-4 space-y-4">
           <h4 className="font-medium text-blue-800">Agregar Horas Extra</h4>
           
+          {/* ✅ Mostrar error de fecha si existe */}
+          {dateError && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{dateError}</AlertDescription>
+            </Alert>
+          )}
+          
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Fecha *</Label>
               <Input
                 type="date"
                 value={currentEntry.fecha}
-                onChange={(e) => setCurrentEntry(prev => ({ ...prev, fecha: e.target.value }))}
+                onChange={(e) => {
+                  setCurrentEntry(prev => ({ ...prev, fecha: e.target.value }));
+                  setDateError(''); // Limpiar error al cambiar fecha
+                }}
               />
             </div>
 
