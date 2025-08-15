@@ -47,8 +47,14 @@ export const NovedadFormEnhanced: React.FC<NovedadFormEnhancedProps> = ({
 
   const config = getCurrentNovedadConfig();
 
-  // ✅ CORRECCIÓN: Auto-cálculo mejorado con logging
+  // ✅ CORRECCIÓN: Auto-cálculo mejorado con logging - DESHABILITADO PARA INCAPACIDADES
   useEffect(() => {
+    // 🚀 SIMPLE FIX: Skip auto-calculation for incapacidades
+    if (formData.tipo_novedad === 'incapacidad') {
+      console.log('🚀 SIMPLE FIX: Skipping auto-calculation for incapacidad');
+      return;
+    }
+
     if (!config?.auto_calculo || !empleadoSalario) {
       return;
     }
@@ -184,6 +190,143 @@ export const NovedadFormEnhanced: React.FC<NovedadFormEnhancedProps> = ({
       </div>
     );
   };
+
+  // 🚀 SIMPLE FIX: Show notice for incapacidades
+  if (formData.tipo_novedad === 'incapacidad') {
+    return (
+      <div className="space-y-4">
+        <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <div className="flex items-start gap-2">
+            <div className="text-yellow-600">ℹ️</div>
+            <div>
+              <h4 className="font-medium text-yellow-800 mb-1">Funcionalidad Simplificada</h4>
+              <p className="text-yellow-700 text-sm">
+                Temporalmente, las incapacidades usan un formulario manual simple. 
+                Los cálculos automáticos están deshabilitados para mayor estabilidad.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Tipo de Novedad */}
+        <div className="space-y-2">
+          <Label htmlFor="tipo_novedad">Tipo de Novedad *</Label>
+          <Select
+            value={formData.tipo_novedad}
+            onValueChange={(value: NovedadType) => {
+              console.log('🔄 NOVEDAD TYPE CHANGED:', value);
+              setFormData(prev => ({ 
+                ...prev, 
+                tipo_novedad: value,
+                subtipo: undefined,
+                horas: undefined,
+                dias: undefined,
+                valor: undefined
+              }));
+              setCalculatedValue(0);
+              setShowCalculation(false);
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(NOVEDAD_CATEGORIES).map(([categoryKey, category]) => (
+                <div key={categoryKey}>
+                  <div className="px-2 py-1 text-sm font-medium text-gray-500 bg-gray-50">
+                    {category.label}
+                  </div>
+                  {Object.entries(category.types).map(([key, type]) => (
+                    <SelectItem key={key} value={key}>
+                      <div className="flex items-center gap-2">
+                        <span>{type.label}</span>
+                        {type.auto_calculo && key !== 'incapacidad' && (
+                          <Badge variant="secondary" className="text-xs">
+                            <Calculator className="h-3 w-3 mr-1" />
+                            Auto
+                          </Badge>
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </div>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Manual Form for Incapacidades */}
+        {renderSubtipoSelect()}
+
+        {/* Manual Days Input */}
+        <div className="space-y-2">
+          <Label htmlFor="dias">Días *</Label>
+          <Input
+            id="dias"
+            type="number"
+            min="1"
+            value={formData.dias || ''}
+            onChange={(e) => setFormData(prev => ({ 
+              ...prev, 
+              dias: e.target.value ? parseInt(e.target.value) : undefined 
+            }))}
+            placeholder="Número de días"
+            required
+          />
+        </div>
+
+        {/* Manual Value Input */}
+        <div className="space-y-2">
+          <Label htmlFor="valor">Valor *</Label>
+          <Input
+            id="valor"
+            type="number"
+            min="0"
+            value={formData.valor || ''}
+            onChange={(e) => setFormData(prev => ({ 
+              ...prev, 
+              valor: e.target.value ? parseFloat(e.target.value) : undefined 
+            }))}
+            placeholder="Valor en pesos colombianos"
+            required
+          />
+        </div>
+
+        {/* Observación */}
+        <div className="space-y-2">
+          <Label htmlFor="observacion">Observación</Label>
+          <Textarea
+            id="observacion"
+            value={formData.observacion || ''}
+            onChange={(e) => setFormData(prev => ({ ...prev, observacion: e.target.value }))}
+            placeholder="Información adicional sobre la novedad"
+            rows={3}
+          />
+        </div>
+
+        {/* Botones */}
+        <div className="flex justify-end space-x-2 pt-4">
+          <Button type="button" variant="outline" onClick={onCancel}>
+            Cancelar
+          </Button>
+          <Button 
+            type="submit" 
+            disabled={isSubmitting || !formData.dias || !formData.valor}
+            onClick={handleSubmit}
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Guardando...
+              </>
+            ) : (
+              'Crear Novedad'
+            )}
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
