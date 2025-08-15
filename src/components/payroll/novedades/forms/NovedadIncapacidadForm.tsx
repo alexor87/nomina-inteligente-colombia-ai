@@ -10,6 +10,7 @@ import { formatCurrency } from '@/lib/utils';
 import { useNovedadBackendCalculation } from '@/hooks/useNovedadBackendCalculation';
 import { NovedadType } from '@/types/novedades-enhanced';
 import { calculateDaysBetween, isValidDateRange } from '@/utils/dateUtils';
+import { PeriodValidationService } from '@/services/PeriodValidationService';
 
 interface NovedadIncapacidadFormProps {
   onBack: () => void;
@@ -17,6 +18,8 @@ interface NovedadIncapacidadFormProps {
   employeeSalary: number;
   isSubmitting: boolean;
   periodoFecha?: Date;
+  periodStartDate?: string;
+  periodEndDate?: string;
 }
 
 const INCAPACIDAD_SUBTIPOS = [
@@ -41,7 +44,9 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
   onSubmit,
   employeeSalary,
   isSubmitting,
-  periodoFecha
+  periodoFecha,
+  periodStartDate,
+  periodEndDate
 }) => {
   const [formData, setFormData] = useState({
     subtipo: 'general',
@@ -51,15 +56,48 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
     observacion: ''
   });
 
+  const [dateValidation, setDateValidation] = useState<{
+    isValid: boolean;
+    message: string;
+  }>({ isValid: true, message: '' });
+
   const { calculateNovedadDebounced, isLoading } = useNovedadBackendCalculation();
 
   // ✅ Calcular días automáticamente basado en las fechas
   const calculatedDays = calculateDaysBetween(formData.fecha_inicio, formData.fecha_fin);
   const isValidRange = isValidDateRange(formData.fecha_inicio, formData.fecha_fin);
 
+  // ✅ NUEVA: Validación en tiempo real de fechas contra período
+  useEffect(() => {
+    if (formData.fecha_inicio && formData.fecha_fin && periodStartDate && periodEndDate) {
+      const validation = PeriodValidationService.validateDateRangeInPeriod(
+        formData.fecha_inicio,
+        formData.fecha_fin,
+        periodStartDate,
+        periodEndDate,
+        'incapacidad',
+        `${periodStartDate} - ${periodEndDate}`
+      );
+      
+      setDateValidation({
+        isValid: validation.isValid,
+        message: validation.message
+      });
+      
+      console.log('🔍 Date validation for incapacidad:', validation);
+    } else if (formData.fecha_inicio || formData.fecha_fin) {
+      setDateValidation({
+        isValid: false,
+        message: 'Complete ambas fechas para validar'
+      });
+    } else {
+      setDateValidation({ isValid: true, message: '' });
+    }
+  }, [formData.fecha_inicio, formData.fecha_fin, periodStartDate, periodEndDate]);
+
   // ✅ CORRECCIÓN: Cálculo automático cuando cambien fechas o subtipo
   useEffect(() => {
-    if (calculatedDays > 0 && isValidRange && formData.subtipo && employeeSalary > 0) {
+    if (calculatedDays > 0 && isValidRange && dateValidation.isValid && formData.subtipo && employeeSalary > 0) {
       console.log('🔄 Triggering calculation for incapacidad:', {
         subtipo: formData.subtipo,
         dias: calculatedDays,
@@ -96,14 +134,14 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
           }
         }
       );
-    } else if (calculatedDays === 0 || !isValidRange) {
-      // ✅ Limpiar valor cuando no hay días válidos
+    } else if (calculatedDays === 0 || !isValidRange || !dateValidation.isValid) {
+      // ✅ Limpiar valor cuando no hay días válidos o fechas fuera del período
       setFormData(prev => ({ 
         ...prev, 
         valor: 0 
       }));
     }
-  }, [formData.subtipo, formData.fecha_inicio, formData.fecha_fin, calculatedDays, isValidRange, employeeSalary, calculateNovedadDebounced, periodoFecha]);
+  }, [formData.subtipo, formData.fecha_inicio, formData.fecha_fin, calculatedDays, isValidRange, dateValidation.isValid, employeeSalary, calculateNovedadDebounced, periodoFecha]);
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -122,6 +160,12 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
 
     if (!isValidRange) {
       alert('La fecha de fin debe ser igual o posterior a la fecha de inicio');
+      return;
+    }
+
+    // ✅ NUEVA: Validación de período antes del submit
+    if (!dateValidation.isValid) {
+      alert(dateValidation.message);
       return;
     }
 
@@ -164,6 +208,21 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
         </Button>
         <h3 className="text-lg font-semibold text-gray-900">Incapacidad</h3>
       </div>
+
+      {/* ✅ NUEVO: Información del período */}
+      {periodStartDate && periodEndDate && (
+        <div className="bg-blue-50 p-3 rounded border border-blue-200">
+          <div className="flex items-center gap-2">
+            <Info className="h-4 w-4 text-blue-600" />
+            <span className="text-sm font-medium text-blue-800">
+              Período de liquidación: {periodStartDate} - {periodEndDate}
+            </span>
+          </div>
+          <div className="text-xs text-blue-700 mt-1">
+            La incapacidad debe estar dentro de estas fechas
+          </div>
+        </div>
+      )}
 
       {/* Form Section */}
       <div className="bg-blue-50 p-4 rounded-lg space-y-4">
@@ -215,6 +274,7 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
               type="date"
               value={formData.fecha_inicio}
               onChange={(e) => handleInputChange('fecha_inicio', e.target.value)}
+              className={`${!dateValidation.isValid && formData.fecha_inicio ? 'border-red-300 bg-red-50' : ''}`}
             />
           </div>
 
@@ -224,6 +284,7 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
               type="date"
               value={formData.fecha_fin}
               onChange={(e) => handleInputChange('fecha_fin', e.target.value)}
+              className={`${!dateValidation.isValid && formData.fecha_fin ? 'border-red-300 bg-red-50' : ''}`}
             />
             {!isValidRange && formData.fecha_inicio && formData.fecha_fin && (
               <div className="text-xs text-red-600 mt-1">
@@ -233,19 +294,37 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
           </div>
         </div>
 
-        {/* ✅ NUEVO: Mostrar días calculados automáticamente */}
+        {/* ✅ NUEVA: Validación visual de fechas */}
+        {!dateValidation.isValid && formData.fecha_inicio && formData.fecha_fin && (
+          <div className="bg-red-50 p-3 rounded border border-red-200">
+            <div className="flex items-center gap-2">
+              <span className="text-red-600">❌</span>
+              <span className="text-sm text-red-700 font-medium">
+                Fechas fuera del período
+              </span>
+            </div>
+            <div className="text-xs text-red-600 mt-1">
+              {dateValidation.message}
+            </div>
+          </div>
+        )}
+
+        {/* ✅ ACTUALIZADO: Mostrar días calculados con validación */}
         {formData.fecha_inicio && formData.fecha_fin && (
-          <div className="bg-white p-3 rounded border border-blue-200">
+          <div className={`p-3 rounded border ${dateValidation.isValid ? 'bg-white border-blue-200' : 'bg-red-50 border-red-200'}`}>
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-blue-600" />
               <span className="text-sm font-medium text-gray-700">
                 Días calculados: 
               </span>
-              <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+              <Badge variant="secondary" className={`${dateValidation.isValid ? 'bg-blue-100 text-blue-800' : 'bg-red-100 text-red-800'}`}>
                 {isValidRange ? `${calculatedDays} días` : 'Rango inválido'}
               </Badge>
+              {dateValidation.isValid && (
+                <span className="text-green-600 text-sm">✅</span>
+              )}
             </div>
-            {isValidRange && (
+            {isValidRange && dateValidation.isValid && (
               <div className="text-xs text-gray-600 mt-1">
                 Del {formData.fecha_inicio} al {formData.fecha_fin} (ambos días incluidos)
               </div>
@@ -321,7 +400,7 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
         </Button>
         <Button 
           onClick={handleSubmit}
-          disabled={!formData.fecha_inicio || !formData.fecha_fin || !isValidRange || calculatedDays <= 0 || formData.valor <= 0 || isSubmitting}
+          disabled={!formData.fecha_inicio || !formData.fecha_fin || !isValidRange || !dateValidation.isValid || calculatedDays <= 0 || formData.valor <= 0 || isSubmitting}
           className="bg-blue-600 hover:bg-blue-700"
         >
           {isSubmitting ? 'Guardando...' : 'Guardar Incapacidad'}

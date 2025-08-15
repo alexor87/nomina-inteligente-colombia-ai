@@ -1,266 +1,349 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Clock, Plus, Trash2, Calculator } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Plus, Trash2, Calculator, Info } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import { useNovedadBackendCalculation } from '@/hooks/useNovedadBackendCalculation';
+import { PeriodValidationService } from '@/services/PeriodValidationService';
+
+interface NovedadHorasExtraConsolidatedFormProps {
+  onBack: () => void;
+  onSubmit: (formData: any[]) => void;
+  employeeSalary: number;
+  calculateSuggestedValue?: (tipoNovedad: string, subtipo: string | undefined, horas?: number) => Promise<number | null>;
+  isSubmitting: boolean;
+  periodStartDate?: string;
+  periodEndDate?: string;
+}
 
 interface HorasExtraEntry {
-  id: string;
   fecha: string;
   tipo: string;
   horas: number;
   valor: number;
-  observacion?: string;
+  observacion: string;
 }
+
+const initialEntry: HorasExtraEntry = {
+  fecha: '',
+  tipo: 'diurna',
+  horas: 0,
+  valor: 0,
+  observacion: ''
+};
 
 const tiposHorasExtra = [
-  { value: 'diurnas', label: 'Diurnas (25%)', factor: 1.25 },
-  { value: 'nocturnas', label: 'Nocturnas (75%)', factor: 1.75 },
-  { value: 'dominicales_diurnas', label: 'Dominicales Diurnas (100%)', factor: 2.0 },
-  { value: 'dominicales_nocturnas', label: 'Dominicales Nocturnas (150%)', factor: 2.5 },
-  { value: 'festivas_diurnas', label: 'Festivas Diurnas (100%)', factor: 2.0 },
-  { value: 'festivas_nocturnas', label: 'Festivas Nocturnas (150%)', factor: 2.5 }
+  { value: 'diurna', label: 'Diurna (25%)' },
+  { value: 'nocturna', label: 'Nocturna (75%)' },
+  { value: 'diurna_festivo', label: 'Diurna Festivo (100%)' },
+  { value: 'nocturna_festivo', label: 'Nocturna Festivo (150%)' }
 ];
-
-interface NovedadHorasExtraConsolidatedFormProps {
-  onBack: () => void;
-  onSubmit: (entries: HorasExtraEntry[]) => void;
-  employeeSalary: number;
-  isSubmitting?: boolean;
-  periodoFecha?: Date;
-}
 
 export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsolidatedFormProps> = ({
   onBack,
   onSubmit,
   employeeSalary,
-  isSubmitting = false,
-  periodoFecha
+  calculateSuggestedValue,
+  isSubmitting,
+  periodStartDate,
+  periodEndDate
 }) => {
   const [entries, setEntries] = useState<HorasExtraEntry[]>([]);
-  const [currentEntry, setCurrentEntry] = useState({
+  const [currentEntry, setCurrentEntry] = useState<HorasExtraEntry>({
     fecha: '',
-    tipo: '',
-    horas: '',
+    tipo: 'diurna',
+    horas: 0,
+    valor: 0,
     observacion: ''
   });
 
-  const { calculateNovedad, isLoading: isCalculating } = useNovedadBackendCalculation();
+  // ✅ NUEVO: Estado para validación de fecha actual
+  const [dateValidation, setDateValidation] = useState<{
+    isValid: boolean;
+    message: string;
+  }>({ isValid: true, message: '' });
 
-  const calculateHorasExtraValue = async (tipo: string, horas: number, fecha: string) => {
-    if (!tipo || horas <= 0 || !fecha) return 0;
-
-    try {
-      // Convert fecha string to Date object for backend calculation
-      const fechaCalculo = new Date(fecha);
-      
-      const result = await calculateNovedad({
-        tipoNovedad: 'horas_extra',
-        subtipo: tipo,
-        salarioBase: employeeSalary,
-        horas: horas,
-        fechaPeriodo: typeof fechaCalculo === 'string' ? fechaCalculo : fechaCalculo.toISOString() // Use specific entry date instead of periodoFecha
-      });
-
-      return result?.valor || 0;
-    } catch (error) {
-      console.error('Error calculating hours extra:', error);
-      return 0;
+  const calculateValue = useCallback(async () => {
+    if (currentEntry.horas > 0 && currentEntry.tipo && calculateSuggestedValue) {
+      const valorCalculado = await calculateSuggestedValue('horas_extra', currentEntry.tipo, currentEntry.horas);
+      if (valorCalculado) {
+        setCurrentEntry(prev => ({ ...prev, valor: valorCalculado }));
+      }
     }
-  };
+  }, [currentEntry.horas, currentEntry.tipo, calculateSuggestedValue]);
 
-  const handleAddEntry = async () => {
-    if (!currentEntry.fecha || !currentEntry.tipo || !currentEntry.horas || parseFloat(currentEntry.horas) <= 0) {
+  useEffect(() => {
+    calculateValue();
+  }, [calculateValue]);
+
+  // ✅ NUEVA: Validación en tiempo real de la fecha actual
+  useEffect(() => {
+    if (currentEntry.fecha && periodStartDate && periodEndDate) {
+      const validation = PeriodValidationService.validateDateInPeriod(
+        currentEntry.fecha,
+        periodStartDate,
+        periodEndDate,
+        'horas_extra',
+        `${periodStartDate} - ${periodEndDate}`
+      );
+      
+      setDateValidation({
+        isValid: validation.isValid,
+        message: validation.message
+      });
+      
+      console.log('🔍 Date validation for horas extra:', validation);
+    } else if (currentEntry.fecha) {
+      setDateValidation({
+        isValid: false,
+        message: 'No se puede validar: período no configurado'
+      });
+    } else {
+      setDateValidation({ isValid: true, message: '' });
+    }
+  }, [currentEntry.fecha, periodStartDate, periodEndDate]);
+
+  const handleAddEntry = () => {
+    if (!currentEntry.fecha) {
+      alert('Por favor seleccione una fecha');
       return;
     }
 
-    const horas = parseFloat(currentEntry.horas);
-    // Pass the specific date from the entry for calculation
-    const valor = await calculateHorasExtraValue(currentEntry.tipo, horas, currentEntry.fecha);
+    if (!currentEntry.tipo) {
+      alert('Por favor seleccione el tipo de hora extra');
+      return;
+    }
 
-    const newEntry: HorasExtraEntry = {
-      id: Date.now().toString(),
-      fecha: currentEntry.fecha,
-      tipo: currentEntry.tipo,
-      horas: horas,
-      valor: valor,
-      observacion: currentEntry.observacion
-    };
+    if (currentEntry.horas <= 0) {
+      alert('Por favor ingrese las horas');
+      return;
+    }
 
+    // ✅ NUEVA: Validar fecha antes de agregar
+    if (!dateValidation.isValid) {
+      alert(dateValidation.message);
+      return;
+    }
+
+    if (currentEntry.valor <= 0) {
+      alert('El valor debe ser mayor a 0');
+      return;
+    }
+
+    const newEntry = { ...currentEntry };
     setEntries(prev => [...prev, newEntry]);
+    
+    // Reset form
     setCurrentEntry({
       fecha: '',
-      tipo: '',
-      horas: '',
+      tipo: 'diurna',
+      horas: 0,
+      valor: 0,
       observacion: ''
+    });
+    
+    console.log('✅ Entry added:', newEntry);
+  };
+
+  const handleRemoveEntry = (index: number) => {
+    setEntries(prev => {
+      const newEntries = [...prev];
+      newEntries.splice(index, 1);
+      return newEntries;
     });
   };
 
-  const handleRemoveEntry = (id: string) => {
-    setEntries(prev => prev.filter(entry => entry.id !== id));
-  };
-
   const handleSubmit = () => {
-    if (entries.length === 0) return;
+    if (entries.length === 0) {
+      alert('Por favor agregue al menos una entrada');
+      return;
+    }
+
+    console.log('📤 Submitting horas extra:', entries);
     onSubmit(entries);
   };
 
-  const totalHoras = entries.reduce((sum, entry) => sum + entry.horas, 0);
-  const totalValor = entries.reduce((sum, entry) => sum + entry.valor, 0);
-
-  const getTipoLabel = (tipo: string) => {
-    return tiposHorasExtra.find(t => t.value === tipo)?.label || tipo;
+  const calculateTotal = () => {
+    return entries.reduce((acc, entry) => acc + entry.valor, 0);
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3 pb-4 border-b">
+      {/* Header */}
+      <div className="flex items-center gap-3 pb-4 border-b bg-white">
         <Button variant="ghost" size="sm" onClick={onBack}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <h3 className="text-lg font-semibold">Horas Extra</h3>
+        <h3 className="text-lg font-semibold text-gray-900">Horas Extra</h3>
       </div>
 
-      {/* Current Entry Form */}
-      <Card>
-        <CardContent className="p-4 space-y-4">
-          <h4 className="font-medium text-blue-800">Agregar Horas Extra</h4>
-          
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Fecha *</Label>
-              <Input
-                type="date"
-                value={currentEntry.fecha}
-                onChange={(e) => setCurrentEntry(prev => ({ ...prev, fecha: e.target.value }))}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Tipo de Horas Extra *</Label>
-              <Select value={currentEntry.tipo} onValueChange={(value) => setCurrentEntry(prev => ({ ...prev, tipo: value }))}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar tipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  {tiposHorasExtra.map((tipo) => (
-                    <SelectItem key={tipo.value} value={tipo.value}>
-                      {tipo.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+      {/* ✅ NUEVO: Información del período */}
+      {periodStartDate && periodEndDate && (
+        <div className="bg-blue-50 p-3 rounded border border-blue-200">
+          <div className="flex items-center gap-2">
+            <Info className="h-4 w-4 text-blue-600" />
+            <span className="text-sm font-medium text-blue-800">
+              Período de liquidación: {periodStartDate} - {periodEndDate}
+            </span>
           </div>
+          <div className="text-xs text-blue-700 mt-1">
+            Las horas extra deben registrarse dentro de estas fechas
+          </div>
+        </div>
+      )}
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Horas *</Label>
-              <div className="relative">
-                <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.5"
-                  value={currentEntry.horas}
-                  onChange={(e) => setCurrentEntry(prev => ({ ...prev, horas: e.target.value }))}
-                  className="pl-10"
-                  placeholder="0"
-                />
+      {/* Entry Form */}
+      <div className="bg-blue-50 p-4 rounded-lg space-y-4">
+        <h4 className="text-blue-800 font-medium">Agregar Entrada</h4>
+        
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="fecha" className="text-gray-700">Fecha *</Label>
+            <Input
+              type="date"
+              value={currentEntry.fecha}
+              onChange={(e) => setCurrentEntry(prev => ({ ...prev, fecha: e.target.value }))}
+              className={`${!dateValidation.isValid && currentEntry.fecha ? 'border-red-300 bg-red-50' : ''}`}
+            />
+            {/* ✅ NUEVA: Validación visual de fecha */}
+            {!dateValidation.isValid && currentEntry.fecha && (
+              <div className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                <span>❌</span>
+                <span>Fecha fuera del período de liquidación</span>
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Observaciones</Label>
-              <Input
-                value={currentEntry.observacion}
-                onChange={(e) => setCurrentEntry(prev => ({ ...prev, observacion: e.target.value }))}
-                placeholder="Descripción opcional"
-              />
-            </div>
+            )}
+            {dateValidation.isValid && currentEntry.fecha && (
+              <div className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                <span>✅</span>
+                <span>Fecha válida</span>
+              </div>
+            )}
           </div>
 
-          <Button 
+          <div>
+            <Label htmlFor="tipo" className="text-gray-700">Tipo *</Label>
+            <Select
+              value={currentEntry.tipo}
+              onValueChange={(value) => setCurrentEntry(prev => ({ ...prev, tipo: value }))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Seleccione un tipo" />
+              </SelectTrigger>
+              <SelectContent>
+                {tiposHorasExtra.map(tipo => (
+                  <SelectItem key={tipo.value} value={tipo.value}>
+                    {tipo.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="horas" className="text-gray-700">Horas *</Label>
+            <Input
+              type="number"
+              min="0.5"
+              step="0.5"
+              value={currentEntry.horas}
+              onChange={(e) => setCurrentEntry(prev => ({ ...prev, horas: parseFloat(e.target.value) || 0 }))}
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="valor" className="text-gray-700">Valor Estimado</Label>
+            <Input
+              type="number"
+              min="0"
+              step="1000"
+              value={currentEntry.valor}
+              readOnly
+              className="bg-gray-100"
+            />
+          </div>
+        </div>
+
+        <div>
+          <Label htmlFor="observacion" className="text-gray-700">Observación</Label>
+          <Textarea
+            value={currentEntry.observacion}
+            onChange={(e) => setCurrentEntry(prev => ({ ...prev, observacion: e.target.value }))}
+            placeholder="Detalles adicionales de la hora extra..."
+            rows={3}
+            className="resize-none"
+          />
+        </div>
+
+        <div className="flex justify-end">
+          <Button
             onClick={handleAddEntry}
-            disabled={!currentEntry.fecha || !currentEntry.tipo || !currentEntry.horas || parseFloat(currentEntry.horas) <= 0 || isCalculating}
-            className="w-full"
+            disabled={!currentEntry.fecha || !currentEntry.tipo || currentEntry.horas <= 0 || currentEntry.valor <= 0 || !dateValidation.isValid}
+            className="bg-blue-600 hover:bg-blue-700"
           >
             <Plus className="h-4 w-4 mr-2" />
-            {isCalculating ? 'Calculando...' : 'Agregar Entrada'}
+            Agregar Entrada
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Entries List */}
       {entries.length > 0 && (
-        <Card>
-          <CardContent className="p-4">
-            <h4 className="font-medium text-green-800 mb-4">Horas Extra Registradas ({entries.length})</h4>
-            
-            <div className="space-y-3">
-              {entries.map((entry) => (
-                <div key={entry.id} className="flex items-center justify-between p-3 bg-gray-50 rounded border">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Badge variant="outline" className="text-xs">
-                        {entry.fecha}
-                      </Badge>
-                      <Badge variant="secondary" className="text-xs">
-                        {getTipoLabel(entry.tipo)}
-                      </Badge>
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      {entry.horas} horas - {formatCurrency(entry.valor)}
-                      {entry.observacion && (
-                        <span className="block text-xs mt-1 italic">{entry.observacion}</span>
-                      )}
-                    </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleRemoveEntry(entry.id)}
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
+        <div className="space-y-2">
+          <h4 className="text-lg font-semibold text-gray-900">Lista de Entradas</h4>
+          <Table>
+            <TableCaption>Horas extra registradas en este período.</TableCaption>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Fecha</TableHead>
+                <TableHead>Tipo</TableHead>
+                <TableHead>Horas</TableHead>
+                <TableHead>Valor</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {entries.map((entry, index) => (
+                <TableRow key={index}>
+                  <TableCell>{entry.fecha}</TableCell>
+                  <TableCell>{tiposHorasExtra.find(t => t.value === entry.tipo)?.label || 'Desconocido'}</TableCell>
+                  <TableCell>{entry.horas}</TableCell>
+                  <TableCell>{formatCurrency(entry.valor)}</TableCell>
+                  <TableCell className="text-right">
+                    <Button variant="ghost" size="sm" onClick={() => handleRemoveEntry(index)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
               ))}
-            </div>
-
-            {/* Summary */}
-            <div className="mt-4 pt-4 border-t bg-green-50 p-3 rounded">
-              <div className="flex justify-between items-center">
-                <span className="font-medium">Total:</span>
-                <div className="text-right">
-                  <div className="font-medium">{totalHoras} horas</div>
-                  <div className="text-lg font-bold text-green-700">
-                    {formatCurrency(totalValor)}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </TableBody>
+          </Table>
+        </div>
       )}
 
-      {/* Action Buttons */}
+      {/* Total */}
+      {entries.length > 0 && (
+        <div className="bg-green-50 p-4 rounded-lg text-right">
+          <h5 className="text-sm font-medium text-gray-700">Total Horas Extra:</h5>
+          <p className="text-2xl font-bold text-green-800">{formatCurrency(calculateTotal())}</p>
+        </div>
+      )}
+
+      {/* Actions */}
       <div className="flex justify-between pt-4 border-t">
-        <Button variant="outline" onClick={onBack}>
+        <Button variant="outline" onClick={onBack} disabled={isSubmitting}>
           Cancelar
         </Button>
         <Button 
           onClick={handleSubmit}
           disabled={entries.length === 0 || isSubmitting}
-          className="bg-blue-600 hover:bg-blue-700 min-w-[140px]"
+          className="bg-blue-600 hover:bg-blue-700"
         >
-          {isSubmitting ? 'Guardando...' : `Guardar ${entries.length} Entrada${entries.length > 1 ? 's' : ''}`}
+          {isSubmitting ? 'Guardando...' : 'Guardar Horas Extra'}
         </Button>
       </div>
     </div>
