@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { CalendarDays, Clock, AlertTriangle, CheckCircle, Loader2, Zap } from 'lucide-react';
+import { useEffect } from 'react';
 
 interface Employee {
   id: string;
@@ -49,6 +50,17 @@ export const VacationFormFields = ({
   const showSubtypeField = requiresSubtype(formData.type);
   const availableSubtypes = getSubtypesForType(formData.type);
 
+  // 🎯 DEBUG: Verificar estado del dropdown
+  useEffect(() => {
+    console.log('🔍 VacationFormFields - Estado del dropdown:', {
+      employeesCount: employees.length,
+      selectedEmployeeId: formData.employee_id,
+      selectedEmployeeFound: !!selectedEmployee,
+      selectedEmployeeName: selectedEmployee ? `${selectedEmployee.nombre} ${selectedEmployee.apellido}` : 'N/A',
+      allEmployeeIds: employees.map(emp => emp.id)
+    });
+  }, [employees, formData.employee_id, selectedEmployee]);
+
   const getPeriodStatusIcon = () => {
     if (isDetectingPeriod) return <Loader2 className="h-4 w-4 animate-spin" />;
     if (!periodInfo) return <Clock className="h-4 w-4 text-gray-400" />;
@@ -73,16 +85,14 @@ export const VacationFormFields = ({
         <Label htmlFor="employee">Empleado *</Label>
         <Select 
           value={formData.employee_id} 
-          onValueChange={(value) => setFormData({ ...formData, employee_id: value })}
+          onValueChange={(value) => {
+            console.log('🎯 Empleado seleccionado:', value);
+            setFormData({ ...formData, employee_id: value });
+          }}
           disabled={isSubmitting}
         >
           <SelectTrigger>
-            <SelectValue placeholder="Seleccionar empleado">
-              {selectedEmployee 
-                ? `${selectedEmployee.nombre} ${selectedEmployee.apellido}` 
-                : "Seleccionar empleado"
-              }
-            </SelectValue>
+            <SelectValue placeholder="Seleccionar empleado" />
           </SelectTrigger>
           <SelectContent>
             {employees.map((employee) => (
