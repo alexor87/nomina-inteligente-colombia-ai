@@ -1,144 +1,221 @@
 
 /**
- * Servicio de validación de fechas contra períodos de liquidación
- * Para conceptos específicos de nómina que requieren fechas dentro del período activo
+ * Servicio de validación automática de períodos
+ * Detecta y repara problemas en cálculos de nómina
  */
 
-export interface PeriodValidationResult {
-  isValid: boolean;
-  message: string;
-  periodInfo?: {
-    startDate: string;
-    endDate: string;
-    periodName: string;
-  };
-}
+import { supabase } from '@/integrations/supabase/client';
+import { PeriodRepairService } from './PeriodRepairService';
+import { DeductionCalculationService } from './DeductionCalculationService';
 
 export class PeriodValidationService {
   /**
-   * Valida si una fecha individual está dentro del período de liquidación
+   * ✅ Detectar períodos con problemas de cálculo
    */
-  static validateDateInPeriod(
-    date: string,
-    periodStart: string,
-    periodEnd: string,
-    noveltyType: string,
-    periodName?: string
-  ): PeriodValidationResult {
-    if (!date || !periodStart || !periodEnd) {
+  static async detectProblematicPeriods(companyId?: string): Promise<{
+    periodsWithIssues: Array<{
+      id: string;
+      periodo: string;
+      issueType: string;
+      issueCount: number;
+      totalEmployees: number;
+      autoRepairable: boolean;
+    }>;
+    totalIssues: number;
+  }> {
+    try {
+      // Obtener company_id del usuario autenticado
+      if (!companyId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('Usuario no autenticado');
+
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('company_id')
+          .eq('user_id', user.id)
+          .single();
+
+        if (!profile?.company_id) throw new Error('Empresa no encontrada');
+        companyId = profile.company_id;
+      }
+
+      // Obtener períodos de la empresa
+      const { data: periods, error: periodsError } = await supabase
+        .from('payroll_periods_real')
+        .select('id, periodo, empleados_count, total_deducciones, total_neto')
+        .eq('company_id', companyId)
+        .order('fecha_inicio', { ascending: false });
+
+      if (periodsError) throw periodsError;
+
+      const periodsWithIssues = [];
+      
+      for (const period of periods || []) {
+        const validation = await DeductionCalculationService.validatePeriodDeductions(period.id);
+        
+        if (validation.hasIssues) {
+          periodsWithIssues.push({
+            id: period.id,
+            periodo: period.periodo,
+            issueType: 'deducciones_cero',
+            issueCount: validation.issueCount,
+            totalEmployees: validation.totalEmployees,
+            autoRepairable: true
+          });
+        }
+      }
+
+      console.log(`🔍 Períodos con problemas detectados: ${periodsWithIssues.length}`);
+      
       return {
-        isValid: false,
-        message: 'Fechas de período no configuradas correctamente'
+        periodsWithIssues,
+        totalIssues: periodsWithIssues.length
+      };
+    } catch (error) {
+      console.error('Error detecting problematic periods:', error);
+      return {
+        periodsWithIssues: [],
+        totalIssues: 0
       };
     }
-
-    const dateObj = new Date(date + 'T00:00:00');
-    const startObj = new Date(periodStart + 'T00:00:00');
-    const endObj = new Date(periodEnd + 'T00:00:00');
-
-    const isValid = dateObj >= startObj && dateObj <= endObj;
-
-    return {
-      isValid,
-      message: isValid 
-        ? 'Fecha válida para el período' 
-        : this.getValidationErrorMessage(noveltyType, periodName || `${periodStart} - ${periodEnd}`),
-      periodInfo: {
-        startDate: periodStart,
-        endDate: periodEnd,
-        periodName: periodName || `${periodStart} - ${periodEnd}`
-      }
-    };
   }
 
   /**
-   * Valida si un rango de fechas está completamente dentro del período de liquidación
+   * ✅ Reparar automáticamente períodos con problemas
    */
-  static validateDateRangeInPeriod(
-    startDate: string,
-    endDate: string,
-    periodStart: string,
-    periodEnd: string,
-    noveltyType: string,
-    periodName?: string
-  ): PeriodValidationResult {
-    if (!startDate || !endDate || !periodStart || !periodEnd) {
+  static async autoRepairPeriods(companyId?: string): Promise<{
+    repairedPeriods: Array<{
+      id: string;
+      periodo: string;
+      success: boolean;
+      message: string;
+    }>;
+    totalRepaired: number;
+    totalAttempted: number;
+  }> {
+    try {
+      console.log('🔧 Iniciando reparación automática...');
+      
+      const detection = await this.detectProblematicPeriods(companyId);
+      const repairResults = [];
+      
+      for (const period of detection.periodsWithIssues) {
+        if (period.autoRepairable) {
+          try {
+            console.log(`🔧 Reparando período: ${period.periodo}`);
+            
+            await PeriodRepairService.repairSpecificPeriod(period.id);
+            
+            repairResults.push({
+              id: period.id,
+              periodo: period.periodo,
+              success: true,
+              message: `Período reparado exitosamente`
+            });
+            
+            console.log(`✅ Período reparado: ${period.periodo}`);
+          } catch (error) {
+            console.error(`❌ Error reparando período ${period.periodo}:`, error);
+            
+            repairResults.push({
+              id: period.id,
+              periodo: period.periodo,
+              success: false,
+              message: `Error: ${error instanceof Error ? error.message : 'Error desconocido'}`
+            });
+          }
+        }
+      }
+
+      const totalRepaired = repairResults.filter(r => r.success).length;
+      
+      console.log(`✅ Reparación completada: ${totalRepaired}/${repairResults.length} períodos`);
+      
       return {
-        isValid: false,
-        message: 'Fechas incompletas para validación'
+        repairedPeriods: repairResults,
+        totalRepaired,
+        totalAttempted: repairResults.length
+      };
+    } catch (error) {
+      console.error('Error in auto repair:', error);
+      return {
+        repairedPeriods: [],
+        totalRepaired: 0,
+        totalAttempted: 0
       };
     }
-
-    const rangeStartObj = new Date(startDate + 'T00:00:00');
-    const rangeEndObj = new Date(endDate + 'T00:00:00');
-    const periodStartObj = new Date(periodStart + 'T00:00:00');
-    const periodEndObj = new Date(periodEnd + 'T00:00:00');
-
-    const startValid = rangeStartObj >= periodStartObj && rangeStartObj <= periodEndObj;
-    const endValid = rangeEndObj >= periodStartObj && rangeEndObj <= periodEndObj;
-    const isValid = startValid && endValid;
-
-    let message: string;
-    if (isValid) {
-      message = 'Rango de fechas válido para el período';
-    } else if (!startValid && !endValid) {
-      message = this.getValidationErrorMessage(noveltyType, periodName || `${periodStart} - ${periodEnd}`);
-    } else if (!startValid) {
-      message = `La fecha de inicio debe estar dentro del período ${periodName || `${periodStart} - ${periodEnd}`}`;
-    } else {
-      message = `La fecha de fin debe estar dentro del período ${periodName || `${periodStart} - ${periodEnd}`}`;
-    }
-
-    return {
-      isValid,
-      message,
-      periodInfo: {
-        startDate: periodStart,
-        endDate: periodEnd,
-        periodName: periodName || `${periodStart} - ${periodEnd}`
-      }
-    };
   }
 
   /**
-   * Genera mensajes de error específicos por tipo de novedad
+   * ✅ Validar período específico en tiempo real
    */
-  private static getValidationErrorMessage(noveltyType: string, periodName: string): string {
-    const messages = {
-      'horas_extra': `Las horas extra deben registrarse dentro del período de liquidación ${periodName}`,
-      'recargo_nocturno': `Los recargos deben corresponder al período en liquidación ${periodName}`,
-      'incapacidad': `La incapacidad debe estar dentro del período de liquidación ${periodName}`,
-      'licencia_remunerada': `La licencia debe corresponder al período activo ${periodName}`,
-      'default': `La fecha debe estar dentro del período de liquidación ${periodName}`
+  static async validateSpecificPeriod(periodId: string): Promise<{
+    isValid: boolean;
+    issues: Array<{
+      type: string;
+      description: string;
+      severity: 'low' | 'medium' | 'high';
+      autoRepairable: boolean;
+    }>;
+    summary: {
+      totalEmployees: number;
+      employeesWithIssues: number;
+      totalDevengado: number;
+      totalDeducciones: number;
+      totalNeto: number;
     };
-
-    return messages[noveltyType] || messages['default'];
-  }
-
-  /**
-   * Valida múltiples fechas individuales (para horas extra con múltiples entradas)
-   */
-  static validateMultipleDatesInPeriod(
-    dates: string[],
-    periodStart: string,
-    periodEnd: string,
-    noveltyType: string,
-    periodName?: string
-  ): { allValid: boolean; invalidDates: string[]; message: string } {
-    const invalidDates: string[] = [];
-    
-    for (const date of dates) {
-      const validation = this.validateDateInPeriod(date, periodStart, periodEnd, noveltyType, periodName);
-      if (!validation.isValid) {
-        invalidDates.push(date);
+  }> {
+    try {
+      const issues = [];
+      
+      // Validar deducciones
+      const deductionValidation = await DeductionCalculationService.validatePeriodDeductions(periodId);
+      
+      if (deductionValidation.hasIssues) {
+        issues.push({
+          type: 'deducciones_cero',
+          description: deductionValidation.message,
+          severity: 'high' as const,
+          autoRepairable: true
+        });
       }
+
+      // Obtener resumen del período
+      const { data: period } = await supabase
+        .from('payroll_periods_real')
+        .select('empleados_count, total_devengado, total_deducciones, total_neto')
+        .eq('id', periodId)
+        .single();
+
+      return {
+        isValid: issues.length === 0,
+        issues,
+        summary: {
+          totalEmployees: period?.empleados_count || 0,
+          employeesWithIssues: deductionValidation.issueCount,
+          totalDevengado: period?.total_devengado || 0,
+          totalDeducciones: period?.total_deducciones || 0,
+          totalNeto: period?.total_neto || 0
+        }
+      };
+    } catch (error) {
+      console.error('Error validating specific period:', error);
+      return {
+        isValid: false,
+        issues: [{
+          type: 'validation_error',
+          description: 'Error al validar período',
+          severity: 'high',
+          autoRepairable: false
+        }],
+        summary: {
+          totalEmployees: 0,
+          employeesWithIssues: 0,
+          totalDevengado: 0,
+          totalDeducciones: 0,
+          totalNeto: 0
+        }
+      };
     }
-
-    const allValid = invalidDates.length === 0;
-    const message = allValid 
-      ? 'Todas las fechas son válidas'
-      : `${invalidDates.length} fecha(s) fuera del período: ${invalidDates.join(', ')}`;
-
-    return { allValid, invalidDates, message };
   }
 }

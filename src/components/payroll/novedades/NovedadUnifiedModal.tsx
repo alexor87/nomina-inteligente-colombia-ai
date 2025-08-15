@@ -18,7 +18,6 @@ import { NovedadRecargoConsolidatedForm } from './forms/NovedadRecargoConsolidat
 import { NovedadVacacionesConsolidatedForm } from './forms/NovedadVacacionesConsolidatedForm';
 import { NovedadVacacionesForm } from './forms/NovedadVacacionesForm';
 import { useNovedadBackendCalculation } from '@/hooks/useNovedadBackendCalculation';
-import { PeriodValidationService } from '@/services/PeriodValidationService';
 
 interface NovedadUnifiedModalProps {
   open: boolean;
@@ -84,95 +83,6 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     }
     return new Date();
   }, [startDate]);
-
-  /**
-   * ✅ NUEVA: Validación de fechas antes del submit
-   */
-  const validateNovedadDates = (formData: any, novedadType: NovedadType): boolean => {
-    // Solo validar para los 4 tipos específicos
-    const validatedTypes = ['horas_extra', 'recargo_nocturno', 'incapacidad', 'licencia_remunerada'];
-    if (!validatedTypes.includes(novedadType)) {
-      return true; // No validar otros tipos
-    }
-
-    if (!startDate || !endDate) {
-      toast({
-        title: "Error de Validación",
-        description: "No se pueden determinar las fechas del período de liquidación",
-        variant: "destructive",
-      });
-      return false;
-    }
-
-    // Validación para horas extra y recargos (fecha individual)
-    if (novedadType === 'horas_extra' || novedadType === 'recargo_nocturno') {
-      if (Array.isArray(formData)) {
-        // Múltiples entradas con fechas
-        const allDates = formData.map(entry => entry.fecha).filter(Boolean);
-        if (allDates.length > 0) {
-          const validation = PeriodValidationService.validateMultipleDatesInPeriod(
-            allDates,
-            startDate,
-            endDate,
-            novedadType,
-            `${startDate} - ${endDate}`
-          );
-          
-          if (!validation.allValid) {
-            toast({
-              title: "Fechas Inválidas",
-              description: validation.message,
-              variant: "destructive",
-            });
-            return false;
-          }
-        }
-      } else if (formData.fecha) {
-        // Entrada individual con fecha
-        const validation = PeriodValidationService.validateDateInPeriod(
-          formData.fecha,
-          startDate,
-          endDate,
-          novedadType,
-          `${startDate} - ${endDate}`
-        );
-        
-        if (!validation.isValid) {
-          toast({
-            title: "Fecha Inválida",
-            description: validation.message,
-            variant: "destructive",
-          });
-          return false;
-        }
-      }
-    }
-
-    // Validación para incapacidades y licencias (rango de fechas)
-    if (novedadType === 'incapacidad' || novedadType === 'licencia_remunerada') {
-      if (formData.fecha_inicio && formData.fecha_fin) {
-        const validation = PeriodValidationService.validateDateRangeInPeriod(
-          formData.fecha_inicio,
-          formData.fecha_fin,
-          startDate,
-          endDate,
-          novedadType,
-          `${startDate} - ${endDate}`
-        );
-        
-        if (!validation.isValid) {
-          toast({
-            title: "Rango de Fechas Inválido",
-            description: validation.message,
-            variant: "destructive",
-          });
-          return false;
-        }
-      }
-    }
-
-    return true;
-  };
 
   useEffect(() => {
     if (selectedNovedadType) {
@@ -321,12 +231,6 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       const isArrayData = Array.isArray(formData);
       const dataArray = isArrayData ? formData : [formData];
       
-      // ✅ NUEVA: Validar fechas antes de procesar
-      if (!validateNovedadDates(isArrayData ? formData : formData, selectedType!)) {
-        setIsSubmitting(false);
-        return;
-      }
-      
       console.log(`🔄 Processing ${dataArray.length} novelty entries`);
       
       for (const entry of dataArray) {
@@ -380,10 +284,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       onSubmit: handleFormSubmit,
       employeeSalary: employeeSalary || 0,
       calculateSuggestedValue: calculateSuggestedValue,
-      isSubmitting,
-      // ✅ NUEVO: Pasar fechas del período para validación
-      periodStartDate: startDate,
-      periodEndDate: endDate
+      isSubmitting
     };
 
     switch (selectedType) {
@@ -429,8 +330,6 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
             employeeSalary={employeeSalary || 0}
             isSubmitting={isSubmitting}
             periodoFecha={getPeriodDate()}
-            periodStartDate={startDate}
-            periodEndDate={endDate}
           />
         );
         
@@ -442,8 +341,6 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
             employeeSalary={employeeSalary || 0}
             calculateSuggestedValue={calculateSuggestedValue}
             isSubmitting={isSubmitting}
-            periodStartDate={startDate}
-            periodEndDate={endDate}
           />
         );
 
