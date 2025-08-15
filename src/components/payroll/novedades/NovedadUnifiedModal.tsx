@@ -202,6 +202,8 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   }, [employeeSalary, getPeriodDate, calculateNovedad]);
 
   const handleFormSubmit = async (formData: any) => {
+    console.log('📥 V19.0 - Form data received:', formData);
+
     if (!employeeId || !periodId) {
       toast({
         title: "Error",
@@ -219,12 +221,13 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       for (const entry of dataArray) {
         const constitutivo = determineConstitutivo(selectedType!, entry.subtipo);
         
-        // Simple, direct data passing
-        const submitData: CreateNovedadData = {
+        // ✅ V19.0: Estructura simple y directa como el código que funciona
+        const createData: CreateNovedadData = {
           empleado_id: employeeId,
           periodo_id: periodId,
           company_id: companyId || '',
           tipo_novedad: selectedType!,
+          // ✅ V19.0: Pasar datos directamente sin conversiones defensivas
           valor: entry.valor,
           horas: entry.horas,
           dias: entry.dias,
@@ -236,7 +239,9 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
           constitutivo_salario: constitutivo
         };
         
-        await onSubmit(submitData);
+        console.log('📤 V19.0 - Submitting create data:', createData);
+        
+        await onSubmit(createData);
       }
       
       if (mode === 'ajustes') {

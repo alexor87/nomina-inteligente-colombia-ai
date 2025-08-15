@@ -48,8 +48,13 @@ export const useNovedades = (periodId: string) => {
   });
 
   const createNovedad = useCallback(async (data: CreateNovedadData) => {
+    console.log('🚀 useNovedades - Creating novedad with data:', data);
+
+    // ✅ V19.0: Estructura directa como el código que funciona
+    let createData: CreateNovedadData = { ...data };
+
     // Ensure company_id is present
-    if (!data.company_id) {
+    if (!createData.company_id) {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data: profile } = await supabase
@@ -59,36 +64,55 @@ export const useNovedades = (periodId: string) => {
           .single();
         
         if (profile?.company_id) {
-          data.company_id = profile.company_id;
+          createData.company_id = profile.company_id;
         }
       }
     }
 
-    if (!data.company_id) {
+    if (!createData.company_id) {
       throw new Error('Company ID is required');
     }
 
-    try {
-      // Ensure all required fields are present
-      const createData: CreateNovedadData = {
-        ...data,
-        valor: data.valor || 0,
-        constitutivo_salario: data.constitutivo_salario || false
-      };
+    // ✅ V19.0: Asegurar period ID correcto
+    createData.periodo_id = periodId;
 
+    console.log('📤 useNovedades - Final create data:', createData);
+
+    try {
+      // ✅ V19.0: Llamar al servicio para guardar en base de datos
       const result = await NovedadesEnhancedService.createNovedad(createData);
       
       if (result) {
+        console.log('✅ useNovedades - Novedad created successfully:', result);
+        
+        // ✅ V19.0: Toast de éxito inmediato como el código que funciona
+        toast({
+          title: "✅ Novedad creada exitosamente",
+          description: `Se ha agregado la novedad de ${result.tipo_novedad} por ${new Intl.NumberFormat('es-CO', {
+            style: 'currency',
+            currency: 'COP',
+            minimumFractionDigits: 0,
+          }).format(result.valor)}`,
+          className: "border-green-200 bg-green-50"
+        });
+        
         await refetch();
-        return { success: true, data: result };
+        
+        // ✅ V19.0: Retorno simple como el código que funciona
+        return result;
       }
       
-      return { success: false, error: 'Failed to create novedad' };
+      throw new Error('Failed to create novedad');
     } catch (error: any) {
-      console.error('Error creating novedad:', error);
-      return { success: false, error: error.message };
+      console.error('❌ useNovedades - Error creating novedad:', error);
+      toast({
+        title: "Error",
+        description: error.message || "No se pudo crear la novedad",
+        variant: "destructive",
+      });
+      throw error;
     }
-  }, [refetch]);
+  }, [periodId, toast, refetch]);
 
   const updateNovedad = useCallback(async (id: string, data: CreateNovedadData) => {
     try {
