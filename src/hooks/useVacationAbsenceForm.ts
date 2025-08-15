@@ -17,7 +17,7 @@ interface PeriodInfo {
 export const useVacationAbsenceForm = (
   editingVacation?: VacationAbsence | null,
   isOpen?: boolean,
-  preselectedEmployeeId?: string // ✅ NUEVO: Parámetro para empleado pre-seleccionado
+  preselectedEmployeeId?: string
 ) => {
   const [formData, setFormData] = useState<VacationAbsenceFormData>({
     employee_id: '',
@@ -32,9 +32,16 @@ export const useVacationAbsenceForm = (
   
   const { detectPeriodForDates, isDetecting } = usePeriodDetection();
 
-  // ✅ MODIFICADO: Load editing data o empleado pre-seleccionado
+  // ✅ MODIFICADO: Load editing data o empleado pre-seleccionado CON DEBUGGING
   useEffect(() => {
+    console.log('🎯 DEBUG useVacationAbsenceForm - Inicializando con:', {
+      editingVacation: !!editingVacation,
+      preselectedEmployeeId,
+      isOpen
+    });
+
     if (editingVacation) {
+      console.log('✅ Cargando datos de edición:', editingVacation);
       setFormData({
         employee_id: editingVacation.employee_id,
         type: editingVacation.type || 'vacaciones',
@@ -44,7 +51,7 @@ export const useVacationAbsenceForm = (
         observations: editingVacation.observations || ''
       });
     } else {
-      // ✅ NUEVO: Si no hay editingVacation pero sí empleado pre-seleccionado, usar ese empleado
+      console.log('✅ Inicializando nueva ausencia con empleado:', preselectedEmployeeId || 'ninguno');
       setFormData({
         employee_id: preselectedEmployeeId || '',
         type: 'vacaciones',
@@ -55,7 +62,7 @@ export const useVacationAbsenceForm = (
       });
       setPeriodInfo(null);
     }
-  }, [editingVacation, isOpen, preselectedEmployeeId]); // ✅ MODIFICADO: Agregar preselectedEmployeeId a dependencias
+  }, [editingVacation, isOpen, preselectedEmployeeId]);
 
   // 🎯 CORRECCIÓN: Detección automática TANTO para crear como para editar
   useEffect(() => {

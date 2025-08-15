@@ -14,7 +14,8 @@ interface VacationAbsenceFormProps {
   onSubmit: (data: VacationAbsenceFormData, periodInfo?: any) => Promise<void>;
   editingVacation?: VacationAbsence | null;
   isSubmitting?: boolean;
-  preselectedEmployeeId?: string; // ✅ NUEVO: Prop para empleado pre-seleccionado
+  preselectedEmployeeId?: string;
+  useCustomModal?: boolean; // ✅ NUEVO: Controla si usar CustomModal wrapper
 }
 
 export const VacationAbsenceForm = ({
@@ -23,7 +24,8 @@ export const VacationAbsenceForm = ({
   onSubmit,
   editingVacation,
   isSubmitting = false,
-  preselectedEmployeeId // ✅ NUEVO: Recibir empleado pre-seleccionado
+  preselectedEmployeeId,
+  useCustomModal = true // ✅ NUEVO: Por defecto true para compatibilidad
 }: VacationAbsenceFormProps) => {
   const { 
     formData, 
@@ -31,7 +33,7 @@ export const VacationAbsenceForm = ({
     calculatedDays, 
     periodInfo, 
     isDetectingPeriod 
-  } = useVacationAbsenceForm(editingVacation, isOpen, preselectedEmployeeId); // ✅ MODIFICADO: Pasar empleado pre-seleccionado
+  } = useVacationAbsenceForm(editingVacation, isOpen, preselectedEmployeeId);
   
   const { data: employees = [] } = useVacationEmployees(isOpen);
 
@@ -69,6 +71,43 @@ export const VacationAbsenceForm = ({
     }
   };
 
+  // ✅ NUEVO: Contenido del formulario separado
+  const formContent = (
+    <>
+      <div className="flex items-center gap-2 mb-6">
+        <CalendarDays className="h-5 w-5" />
+        <h3 className="text-lg font-semibold">
+          {editingVacation ? 'Editar Ausencia' : 'Nueva Ausencia'}
+        </h3>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <VacationFormFields
+          formData={formData}
+          setFormData={setFormData}
+          employees={employees}
+          calculatedDays={calculatedDays}
+          isSubmitting={isSubmitting}
+          periodInfo={periodInfo}
+          isDetectingPeriod={isDetectingPeriod}
+        />
+
+        <VacationFormActions
+          formData={formData}
+          isSubmitting={isSubmitting}
+          editingVacation={editingVacation}
+          onClose={onClose}
+        />
+      </form>
+    </>
+  );
+
+  // ✅ CONDICIONAL: Si useCustomModal es false, devolver solo el contenido
+  if (!useCustomModal) {
+    return <div className="space-y-6">{formContent}</div>;
+  }
+
+  // ✅ COMPORTAMIENTO NORMAL: Con CustomModal wrapper
   return (
     <CustomModal isOpen={isOpen} onClose={onClose} className="max-w-2xl">
       <CustomModalHeader>

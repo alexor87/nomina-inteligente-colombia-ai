@@ -490,8 +490,14 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       return renderNovedadForm();
     }
 
-    // ✅ MODIFICADO: Pasar empleado pre-seleccionado al modal de ausencias
+    // ✅ MODIFICADO: Usar VacationAbsenceForm sin CustomModal wrapper
     if (currentStep === 'absence' && selectedAbsenceType && employeeId) {
+      console.log('🎯 DEBUG: Renderizando VacationAbsenceForm con:', { 
+        employeeId, 
+        selectedAbsenceType,
+        isSubmitting 
+      });
+      
       return (
         <VacationAbsenceForm
           isOpen={true}
@@ -500,6 +506,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
           isSubmitting={isSubmitting}
           preselectedEmployeeId={employeeId}
           editingVacation={null}
+          useCustomModal={false}
         />
       );
     }
