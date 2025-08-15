@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
-import { NovedadIncapacidadForm } from './forms/NovedadIncapacidadForm';
+import { NovedadIncapacidadFormSimple } from './forms/NovedadIncapacidadFormSimple';
 import { NovedadLicenciasForm } from './forms/NovedadLicenciasForm';
 import { NovedadHorasExtraConsolidatedForm } from './forms/NovedadHorasExtraConsolidatedForm';
 import { NovedadBonificacionesConsolidatedForm } from './forms/NovedadBonificacionesConsolidatedForm';
@@ -348,12 +348,11 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
 
       case 'incapacidad':
         return (
-          <NovedadIncapacidadForm
+          <NovedadIncapacidadFormSimple
             onBack={handleBackToSelector}
             onSubmit={handleFormSubmit}
             employeeSalary={employeeSalary || 0}
             isSubmitting={isSubmitting}
-            periodoFecha={getPeriodDate()}
           />
         );
         
