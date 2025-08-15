@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { PayrollEmployee } from '@/types/payroll';
-import { PayrollLiquidationSimpleTable } from './PayrollLiquidationSimpleTable';
+import { PayrollLiquidationSimpleKISS } from './PayrollLiquidationSimpleKISS';
 
 interface PayrollLiquidationTableProps {
   employees: PayrollEmployee[];
@@ -28,22 +28,16 @@ export const PayrollLiquidationTable: React.FC<PayrollLiquidationTableProps> = (
   startDate,
   endDate,
   currentPeriodId,
-  currentPeriod,
   onRemoveEmployee,
-  onEmployeeNovedadesChange,
-  updateEmployeeCalculationsInDB,
   year
 }) => {
   return (
-    <PayrollLiquidationSimpleTable
+    <PayrollLiquidationSimpleKISS
       employees={employees}
       startDate={startDate}
       endDate={endDate}
       currentPeriodId={currentPeriodId}
-      currentPeriod={currentPeriod}
       onRemoveEmployee={onRemoveEmployee}
-      onEmployeeNovedadesChange={onEmployeeNovedadesChange}
-      updateEmployeeCalculationsInDB={updateEmployeeCalculationsInDB}
       year={year}
     />
   );
