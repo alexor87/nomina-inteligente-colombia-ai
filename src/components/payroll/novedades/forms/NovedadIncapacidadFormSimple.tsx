@@ -46,10 +46,14 @@ export const NovedadIncapacidadFormSimple: React.FC<NovedadIncapacidadFormSimple
   });
 
   const handleInputChange = (field: string, value: any) => {
+    console.log('📝 SIMPLE FORM: Input change -', field, ':', value);
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const handleSubmit = () => {
+    console.log('🔥 SIMPLE FORM: Starting validation and submit process');
+    console.log('🔥 SIMPLE FORM: Current formData:', formData);
+
     // Validaciones básicas
     if (!formData.fecha_inicio || !formData.fecha_fin) {
       toast({
@@ -60,7 +64,19 @@ export const NovedadIncapacidadFormSimple: React.FC<NovedadIncapacidadFormSimple
       return;
     }
 
-    if (!formData.dias || parseInt(formData.dias) <= 0) {
+    // ✅ V20.1: Conversión explícita y validación mejorada
+    const diasNumber = parseInt(formData.dias, 10);
+    const valorNumber = parseFloat(formData.valor);
+
+    console.log('🔢 SIMPLE FORM: Number conversions -', {
+      diasOriginal: formData.dias,
+      diasConverted: diasNumber,
+      valorOriginal: formData.valor,
+      valorConverted: valorNumber
+    });
+
+    if (!formData.dias || isNaN(diasNumber) || diasNumber <= 0) {
+      console.error('❌ SIMPLE FORM: Invalid dias:', formData.dias, 'converted to:', diasNumber);
       toast({
         title: "Días inválidos",
         description: "Por favor ingresa un número válido de días.",
@@ -69,7 +85,8 @@ export const NovedadIncapacidadFormSimple: React.FC<NovedadIncapacidadFormSimple
       return;
     }
 
-    if (!formData.valor || parseFloat(formData.valor) <= 0) {
+    if (!formData.valor || isNaN(valorNumber) || valorNumber <= 0) {
+      console.error('❌ SIMPLE FORM: Invalid valor:', formData.valor, 'converted to:', valorNumber);
       toast({
         title: "Valor inválido",
         description: "Por favor ingresa un valor mayor a 0.",
@@ -78,26 +95,39 @@ export const NovedadIncapacidadFormSimple: React.FC<NovedadIncapacidadFormSimple
       return;
     }
 
+    // ✅ V20.1: Datos con conversiones explícitas y verificadas
     const submitData = {
       tipo_novedad: 'incapacidad',
       subtipo: formData.subtipo,
-      dias: parseInt(formData.dias),
+      dias: diasNumber, // ✅ Guaranteed to be a valid number
       fecha_inicio: formData.fecha_inicio,
       fecha_fin: formData.fecha_fin,
-      valor: parseFloat(formData.valor),
+      valor: valorNumber, // ✅ Guaranteed to be a valid number
       observacion: formData.observacion || undefined
     };
 
-    console.log('🚀 SIMPLE FORM: Submitting incapacidad data:', submitData);
+    console.log('🚀 V20.1 SIMPLE FORM: Final submit data with verified conversions:', {
+      ...submitData,
+      diasType: typeof submitData.dias,
+      valorType: typeof submitData.valor,
+      timestamp: new Date().toISOString()
+    });
+
     onSubmit(submitData);
   };
 
+  // ✅ V20.1: Validación mejorada con conversión explícita
+  const diasNumber = parseInt(formData.dias, 10);
+  const valorNumber = parseFloat(formData.valor);
+  
   const isValid = formData.fecha_inicio && 
                   formData.fecha_fin && 
                   formData.dias && 
-                  parseInt(formData.dias) > 0 &&
+                  !isNaN(diasNumber) &&
+                  diasNumber > 0 &&
                   formData.valor && 
-                  parseFloat(formData.valor) > 0;
+                  !isNaN(valorNumber) &&
+                  valorNumber > 0;
 
   return (
     <div className="space-y-6">
@@ -171,6 +201,11 @@ export const NovedadIncapacidadFormSimple: React.FC<NovedadIncapacidadFormSimple
             onChange={(e) => handleInputChange('dias', e.target.value)}
             placeholder="Ejemplo: 5"
           />
+          {formData.dias && isNaN(parseInt(formData.dias, 10)) && (
+            <p className="text-xs text-red-500 mt-1">
+              Ingresa un número válido de días
+            </p>
+          )}
         </div>
 
         <div>
@@ -188,6 +223,11 @@ export const NovedadIncapacidadFormSimple: React.FC<NovedadIncapacidadFormSimple
           <p className="text-xs text-gray-500 mt-1">
             Ingresa el valor total que debe recibir el empleado
           </p>
+          {formData.valor && isNaN(parseFloat(formData.valor)) && (
+            <p className="text-xs text-red-500 mt-1">
+              Ingresa un valor numérico válido
+            </p>
+          )}
         </div>
 
         <div>
@@ -202,7 +242,7 @@ export const NovedadIncapacidadFormSimple: React.FC<NovedadIncapacidadFormSimple
         </div>
 
         {/* Preview */}
-        {formData.valor && parseFloat(formData.valor) > 0 && (
+        {formData.valor && !isNaN(parseFloat(formData.valor)) && parseFloat(formData.valor) > 0 && (
           <div className="bg-green-50 p-3 rounded text-center border border-green-200">
             <div className="flex items-center justify-center gap-2 mb-2">
               <CheckCircle className="h-4 w-4 text-green-600" />
@@ -211,7 +251,7 @@ export const NovedadIncapacidadFormSimple: React.FC<NovedadIncapacidadFormSimple
               </span>
             </div>
             <div className="text-sm text-gray-700">
-              {formData.dias ? `${formData.dias} días` : 'Días por definir'} de incapacidad {formData.subtipo === 'general' ? 'común' : 'laboral'}
+              {formData.dias && !isNaN(parseInt(formData.dias, 10)) ? `${parseInt(formData.dias, 10)} días` : 'Días por definir'} de incapacidad {formData.subtipo === 'general' ? 'común' : 'laboral'}
             </div>
           </div>
         )}
