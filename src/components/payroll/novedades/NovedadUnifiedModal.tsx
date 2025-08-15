@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
-import { NovedadIncapacidadFormSimple } from './forms/NovedadIncapacidadFormSimple';
+import { NovedadIncapacidadForm } from './forms/NovedadIncapacidadForm';
 import { NovedadLicenciasForm } from './forms/NovedadLicenciasForm';
 import { NovedadHorasExtraConsolidatedForm } from './forms/NovedadHorasExtraConsolidatedForm';
 import { NovedadBonificacionesConsolidatedForm } from './forms/NovedadBonificacionesConsolidatedForm';
@@ -12,13 +12,12 @@ import { NovedadDeduccionesConsolidatedForm } from './forms/NovedadDeduccionesCo
 import { NovedadRetefuenteForm } from './forms/NovedadRetefuenteForm';
 import { NovedadTypeSelector, NovedadCategory } from './NovedadTypeSelector';
 import { NovedadExistingList } from './NovedadExistingList';
-import { NovedadType, CreateNovedadData, NOVEDAD_CATEGORIES } from '@/types/novedades-enhanced';
+import { NovedadType, CreateNovedadData } from '@/types/novedades-enhanced';
 import { useToast } from '@/hooks/use-toast';
 import { NovedadRecargoConsolidatedForm } from './forms/NovedadRecargoConsolidatedForm';
 import { NovedadVacacionesConsolidatedForm } from './forms/NovedadVacacionesConsolidatedForm';
 import { NovedadVacacionesForm } from './forms/NovedadVacacionesForm';
 import { useNovedadBackendCalculation } from '@/hooks/useNovedadBackendCalculation';
-import { toNumber, toInteger } from '@/lib/numberUtils';
 
 interface NovedadUnifiedModalProps {
   open: boolean;
@@ -50,17 +49,6 @@ const categoryToNovedadType: Record<NovedadCategory, NovedadType> = {
   'retefuente': 'retencion_fuente'
 };
 
-const determineConstitutivo = (tipoNovedad: NovedadType, subtipo?: string): boolean => {
-  for (const category of Object.values(NOVEDAD_CATEGORIES)) {
-    const novedadConfig = category.types[tipoNovedad];
-    if (novedadConfig) {
-      return novedadConfig.constitutivo_default ?? true;
-    }
-  }
-  
-  return ['incapacidad', 'licencia_remunerada'].includes(tipoNovedad) ? false : true;
-};
-
 export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   open,
   setOpen,
@@ -82,14 +70,15 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   const [employeeFullName, setEmployeeFullName] = useState<string>('');
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [incapacidadFormMode, setIncapacidadFormMode] = useState<'simple' | 'advanced'>('simple');
   const { toast } = useToast();
   
   const { calculateNovedad } = useNovedadBackendCalculation();
 
+  // ✅ KISS: Fecha del período sin complejidad
   const getPeriodDate = useCallback(() => {
     if (startDate) {
       const date = new Date(startDate + 'T00:00:00');
+      console.log('📅 Fecha período:', date.toISOString().split('T')[0]);
       return date;
     }
     return new Date();
@@ -100,6 +89,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       setSelectedType(selectedNovedadType);
       setCurrentStep('form');
     } else {
+      // En modo ajustes, ir directamente al selector
       if (mode === 'ajustes') {
         setCurrentStep('selector');
       } else {
@@ -141,6 +131,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   }, [employeeId]);
 
   const handleClose = () => {
+    // Reset all states before closing
     setIsSubmitting(false);
     setCurrentStep('list');
     setSelectedType(null);
@@ -161,6 +152,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   };
 
   const handleBackToList = () => {
+    // En modo ajustes, cerrar el modal en lugar de ir a la lista
     if (mode === 'ajustes') {
       handleClose();
     } else {
@@ -181,12 +173,22 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     dias?: number
   ): Promise<number | null> => {
     if (!employeeSalary) {
+      console.warn('❌ Salario del empleado no definido');
       return null;
     }
 
     try {
       const fechaPeriodo = getPeriodDate().toISOString().split('T')[0];
       
+      console.log('🎯 MODAL: Calculando novedad:', {
+        tipo: tipoNovedad,
+        subtipo,
+        salario: employeeSalary,
+        horas,
+        dias,
+        fecha: fechaPeriodo
+      });
+
       const result = await calculateNovedad({
         tipoNovedad,
         subtipo,
@@ -196,16 +198,23 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
         fechaPeriodo
       });
 
-      return result?.valor || null;
+      if (result) {
+        console.log('✅ MODAL: Cálculo exitoso:', {
+          tipo: subtipo || tipoNovedad,
+          valor: result.valor,
+          detalle: result.detalleCalculo
+        });
+        return result.valor;
+      }
+
+      return null;
     } catch (error) {
-      console.error('Error en cálculo:', error);
+      console.error('❌ Error en cálculo:', error);
       return null;
     }
   }, [employeeSalary, getPeriodDate, calculateNovedad]);
 
   const handleFormSubmit = async (formData: any) => {
-    console.log('📥 V21.0 - Form data received:', formData);
-
     if (!employeeId || !periodId) {
       toast({
         title: "Error",
@@ -217,102 +226,36 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
 
     setIsSubmitting(true);
     try {
+      console.log('📤 Form data received:', formData);
+      
       const isArrayData = Array.isArray(formData);
       const dataArray = isArrayData ? formData : [formData];
       
+      console.log(`🔄 Processing ${dataArray.length} novelty entries`);
+      
       for (const entry of dataArray) {
-        // ✅ V21.0: CONVERSIÓN CON NORMALIZACIÓN DE NÚMEROS LOCALIZADOS
-        const valorConverted = toNumber(entry.valor);
-        const diasConverted = entry.dias ? toInteger(entry.dias) : undefined;
-        const horasConverted = entry.horas ? toNumber(entry.horas) : undefined;
-
-        console.log('🔢 V21.0 - NORMALIZED CONVERSION:', {
-          valorOriginal: entry.valor,
-          valorType: typeof entry.valor,
-          valorNormalized: valorConverted,
-          valorNormalizedType: typeof valorConverted,
-          diasOriginal: entry.dias,
-          diasType: typeof entry.dias,
-          diasNormalized: diasConverted,
-          diasNormalizedType: typeof diasConverted,
-          timestamp: new Date().toISOString()
-        });
-
-        // Validaciones defensivas específicas para incapacidad
-        if (selectedType === 'incapacidad') {
-          if (!entry.fecha_inicio || !entry.fecha_fin) {
-            toast({
-              title: "Fechas requeridas",
-              description: "Por favor selecciona fecha de inicio y fin para la incapacidad.",
-              variant: "destructive",
-            });
-            setIsSubmitting(false);
-            return;
-          }
-          if (!diasConverted || diasConverted <= 0) {
-            console.error('❌ V21.0 - Invalid dias after normalization:', {
-              original: entry.dias,
-              normalized: diasConverted
-            });
-            toast({
-              title: "Días inválidos",
-              description: "Los días de incapacidad deben ser mayores a 0.",
-              variant: "destructive",
-            });
-            setIsSubmitting(false);
-            return;
-          }
-          if (!valorConverted || valorConverted <= 0) {
-            console.error('❌ V21.0 - Invalid valor after normalization:', {
-              original: entry.valor,
-              normalized: valorConverted
-            });
-            toast({
-              title: "Valor inválido",
-              description: "El valor de la incapacidad debe ser mayor a 0.",
-              variant: "destructive",
-            });
-            setIsSubmitting(false);
-            return;
-          }
-        }
-
-        const constitutivo = determineConstitutivo(selectedType!, entry.subtipo);
-        
-        // ✅ V21.0: Estructura con NÚMEROS NORMALIZADOS Y GARANTIZADOS
-        const createData: CreateNovedadData = {
+        const submitData: CreateNovedadData = {
           empleado_id: employeeId,
           periodo_id: periodId,
           company_id: companyId || '',
           tipo_novedad: selectedType!,
-          // ✅ V21.0: VALORES NUMÉRICOS NORMALIZADOS
-          valor: valorConverted,
-          horas: horasConverted,
-          dias: diasConverted,
-          observacion: entry.observacion,
-          fecha_inicio: entry.fecha_inicio,
-          fecha_fin: entry.fecha_fin,
-          subtipo: entry.subtipo || entry.tipo,
-          base_calculo: entry.base_calculo,
-          constitutivo_salario: constitutivo
+          valor: entry.valor || 0,
+          horas: entry.horas || undefined,
+          dias: entry.dias || undefined,
+          observacion: entry.observacion || undefined,
+          fecha_inicio: entry.fecha_inicio || undefined,
+          fecha_fin: entry.fecha_fin || undefined,
+          subtipo: entry.subtipo || entry.tipo || undefined,
+          base_calculo: entry.base_calculo || undefined
         };
-        
-        console.log('📤 V21.0 - FINAL SUBMIT WITH NORMALIZED NUMBERS:', {
-          ...createData,
-          valorType: typeof createData.valor,
-          diasType: typeof createData.dias,
-          horasType: typeof createData.horas,
-          timestamp: new Date().toISOString()
-        });
-        
-        await onSubmit(createData);
 
-        // ✅ Notificar al padre para refrescar lista del empleado
-        if (onEmployeeNovedadesChange && employeeId) {
-          await onEmployeeNovedadesChange(employeeId);
-        }
+        console.log('💾 Saving novelty entry:', submitData);
+        await onSubmit(submitData);
       }
       
+      console.log('✅ All novelty entries processed successfully');
+      
+      // En modo ajustes, cerrar el modal directamente
       if (mode === 'ajustes') {
         handleClose();
       } else {
@@ -322,7 +265,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       }
       
     } catch (error: any) {
-      console.error('Error procesando novedades:', error);
+      console.error('❌ Error processing novelties:', error);
       toast({
         title: "Error",
         description: error.message || "No se pudieron guardar las novedades",
@@ -331,14 +274,6 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const handleSwitchToAdvanced = () => {
-    setIncapacidadFormMode('advanced');
-  };
-
-  const handleSwitchToSimple = () => {
-    setIncapacidadFormMode('simple');
   };
 
   const renderNovedadForm = () => {
@@ -388,27 +323,15 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
         return <NovedadDeduccionesConsolidatedForm {...baseProps} />;
 
       case 'incapacidad':
-        if (incapacidadFormMode === 'simple') {
-          return (
-            <NovedadIncapacidadFormSimple
-              onBack={handleBackToSelector}
-              onSubmit={handleFormSubmit}
-              employeeSalary={employeeSalary || 0}
-              isSubmitting={isSubmitting}
-              onSwitchToAdvanced={handleSwitchToAdvanced}
-            />
-          );
-        } else {
-          // Import and use the advanced form when available
-          return (
-            <div className="p-6 text-center">
-              <p className="text-gray-500 mb-4">Formulario avanzado próximamente disponible</p>
-              <Button onClick={handleSwitchToSimple} variant="outline">
-                Usar formulario manual
-              </Button>
-            </div>
-          );
-        }
+        return (
+          <NovedadIncapacidadForm
+            onBack={handleBackToSelector}
+            onSubmit={handleFormSubmit}
+            employeeSalary={employeeSalary || 0}
+            isSubmitting={isSubmitting}
+            periodoFecha={getPeriodDate()}
+          />
+        );
         
       case 'licencia_remunerada':
         return (

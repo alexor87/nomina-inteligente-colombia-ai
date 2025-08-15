@@ -1,16 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Calculator, Info, Calendar, AlertTriangle, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Calculator, Info, Calendar } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { useNovedadBackendCalculation } from '@/hooks/useNovedadBackendCalculation';
 import { NovedadType } from '@/types/novedades-enhanced';
 import { calculateDaysBetween, isValidDateRange } from '@/utils/dateUtils';
-import { useToast } from '@/hooks/use-toast';
 
 interface NovedadIncapacidadFormProps {
   onBack: () => void;
@@ -44,7 +43,6 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
   isSubmitting,
   periodoFecha
 }) => {
-  const { toast } = useToast();
   const [formData, setFormData] = useState({
     subtipo: 'general',
     fecha_inicio: '',
@@ -53,135 +51,109 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
     observacion: ''
   });
 
-  // ✅ V18.0: Estado separado para manejar valores manuales
-  const [isManualValue, setIsManualValue] = useState(false);
-
   const { calculateNovedadDebounced, isLoading } = useNovedadBackendCalculation();
 
-  const calculatedDays = React.useMemo(() => {
-    return calculateDaysBetween(formData.fecha_inicio, formData.fecha_fin);
-  }, [formData.fecha_inicio, formData.fecha_fin]);
-
+  // ✅ Calcular días automáticamente basado en las fechas
+  const calculatedDays = calculateDaysBetween(formData.fecha_inicio, formData.fecha_fin);
   const isValidRange = isValidDateRange(formData.fecha_inicio, formData.fecha_fin);
 
+  // ✅ CORRECCIÓN: Cálculo automático cuando cambien fechas o subtipo
   useEffect(() => {
-    if (!formData.fecha_inicio || !formData.fecha_fin || !isValidRange || calculatedDays < 0 || !employeeSalary) {
-      return;
-    }
-
-    const fechaPeriodoISO = periodoFecha ? periodoFecha.toISOString() : new Date().toISOString();
-
-    // Normalizar subtipo solo para cálculo backend (mantener la UI igual)
-    const normalizedSubtipo = formData.subtipo === 'general' ? 'comun' : formData.subtipo;
-    
-    calculateNovedadDebounced(
-      {
-        tipoNovedad: 'incapacidad' as NovedadType,
-        subtipo: normalizedSubtipo,
-        salarioBase: employeeSalary,
+    if (calculatedDays > 0 && isValidRange && formData.subtipo && employeeSalary > 0) {
+      console.log('🔄 Triggering calculation for incapacidad:', {
+        subtipo: formData.subtipo,
         dias: calculatedDays,
-        fechaPeriodo: fechaPeriodoISO
-      },
-      (result) => {
-        // ✅ V18.0: Solo actualizar si NO es un valor manual
-        if (result && typeof result.valor === 'number' && !isManualValue) {
-          console.log('🔄 V18.0: Actualizando valor automático:', result.valor);
-          setFormData(prev => ({ ...prev, valor: result.valor }));
-        } else if (isManualValue) {
-          console.log('🔒 V18.0: Preservando valor manual, no sobrescribiendo');
+        salario: employeeSalary,
+        fechaInicio: formData.fecha_inicio,
+        fechaFin: formData.fecha_fin,
+        periodo: periodoFecha
+      });
+      
+      // ✅ KISS: Callback directo que actualiza el estado inmediatamente
+      calculateNovedadDebounced(
+        {
+          tipoNovedad: 'incapacidad' as NovedadType,
+          subtipo: formData.subtipo,
+          salarioBase: employeeSalary,
+          dias: calculatedDays,
+          fechaPeriodo: (periodoFecha || new Date()).toISOString()
+        },
+        (result) => {
+          if (result && result.valor > 0) {
+            console.log('💰 Updating calculated value for', calculatedDays, 'days:', result.valor);
+            
+            // ✅ CORRECCIÓN CRÍTICA: Actualizar inmediatamente sin condiciones
+            setFormData(prev => ({ 
+              ...prev, 
+              valor: result.valor 
+            }));
+          } else if (result && result.valor === 0) {
+            console.log('⚠️ Calculation returned zero value');
+            setFormData(prev => ({ 
+              ...prev, 
+              valor: 0 
+            }));
+          }
         }
-      },
-      0
-    );
-  }, [formData.subtipo, formData.fecha_inicio, formData.fecha_fin, calculatedDays, isValidRange, employeeSalary, calculateNovedadDebounced, periodoFecha, isManualValue]);
+      );
+    } else if (calculatedDays === 0 || !isValidRange) {
+      // ✅ Limpiar valor cuando no hay días válidos
+      setFormData(prev => ({ 
+        ...prev, 
+        valor: 0 
+      }));
+    }
+  }, [formData.subtipo, formData.fecha_inicio, formData.fecha_fin, calculatedDays, isValidRange, employeeSalary, calculateNovedadDebounced, periodoFecha]);
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  // ✅ V18.0: Manejo específico para valor manual
-  const handleValorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const rawValue = e.target.value;
-    
-    // Si el usuario está editando, marcar como manual
-    if (rawValue !== '') {
-      setIsManualValue(true);
-      console.log('✏️ V18.0: Valor marcado como manual:', rawValue);
-    }
-    
-    // ✅ V18.0: Mejorar validación de parseFloat
-    let parsedValue = 0;
-    if (rawValue && rawValue.trim() !== '') {
-      const parsed = parseFloat(rawValue);
-      if (!isNaN(parsed) && parsed >= 0) {
-        parsedValue = parsed;
-      } else {
-        // Si el valor no es válido, mantener el anterior
-        return;
-      }
-    } else {
-      // Si está vacío, resetear a manual false
-      setIsManualValue(false);
-    }
-    
-    setFormData(prev => ({ ...prev, valor: parsedValue }));
-  };
-
   const handleSubmit = () => {
-    if (!formData.fecha_inicio || !formData.fecha_fin || !isValidRange || calculatedDays < 0) {
-      // Validación suave con toast
-      toast({
-        title: "Fechas inválidas",
-        description: "La fecha de fin debe ser igual o posterior a la fecha de inicio.",
-        variant: "destructive",
-      });
+    if (!formData.fecha_inicio) {
+      alert('Por favor seleccione la fecha de inicio');
       return;
     }
 
-    // Validar días > 0
-    if (!calculatedDays || calculatedDays <= 0) {
-      toast({
-        title: "Días inválidos",
-        description: "Por favor ingresa un rango de fechas que resulte en al menos 1 día de incapacidad.",
-        variant: "destructive",
-      });
+    if (!formData.fecha_fin) {
+      alert('Por favor seleccione la fecha de fin');
       return;
     }
 
-    // Validar valor > 0
-    if (!formData.valor || formData.valor <= 0) {
-      toast({
-        title: "Valor inválido",
-        description: "El valor de la incapacidad debe ser mayor a 0.",
-        variant: "destructive",
-      });
+    if (!isValidRange) {
+      alert('La fecha de fin debe ser igual o posterior a la fecha de inicio');
+      return;
+    }
+
+    if (calculatedDays <= 0) {
+      alert('El rango de fechas debe ser válido');
+      return;
+    }
+
+    if (formData.valor <= 0) {
+      alert('El valor debe ser mayor a 0');
       return;
     }
 
     const submitData = {
       tipo_novedad: 'incapacidad',
       subtipo: formData.subtipo,
-      dias: calculatedDays,
+      dias: calculatedDays, // ✅ Usar días calculados automáticamente
       fecha_inicio: formData.fecha_inicio,
       fecha_fin: formData.fecha_fin,
-      valor: formData.valor, // ✅ Preservar valor (manual o automático)
+      valor: formData.valor,
       observacion: formData.observacion || undefined
     };
 
-    console.log('📤 V20.0 DIAGNOSIS - NovedadIncapacidadForm submitting data:', {
-      ...submitData,
-      isManual: isManualValue,
-      timestamp: new Date().toISOString()
-    });
-
+    console.log('📤 Submitting incapacidad:', submitData);
     onSubmit(submitData);
   };
 
-  const getCurrentSubtipoInfo = () => {
-    return INCAPACIDAD_SUBTIPOS.find(s => s.value === formData.subtipo);
+  const getSubtipoInfo = (subtipo: string) => {
+    return INCAPACIDAD_SUBTIPOS.find(s => s.value === subtipo);
   };
 
-  const currentSubtipoInfo = getCurrentSubtipoInfo();
+  const currentSubtipoInfo = getSubtipoInfo(formData.subtipo);
 
   return (
     <div className="space-y-6">
@@ -201,11 +173,7 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
           <Label htmlFor="subtipo" className="text-gray-700">Tipo de Incapacidad</Label>
           <Select
             value={formData.subtipo}
-            onValueChange={(value) => {
-              handleInputChange('subtipo', value);
-              // Reset manual flag when changing subtipo
-              setIsManualValue(false);
-            }}
+            onValueChange={(value) => handleInputChange('subtipo', value)}
           >
             <SelectTrigger>
               <SelectValue />
@@ -222,6 +190,7 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
             </SelectContent>
           </Select>
           
+          {/* ✅ MEJORA UX: Información normativa clara */}
           {currentSubtipoInfo && (
             <div className="mt-2 p-2 bg-blue-100 rounded text-xs">
               <div className="flex items-start gap-2">
@@ -245,11 +214,7 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
             <Input
               type="date"
               value={formData.fecha_inicio}
-              onChange={(e) => {
-                handleInputChange('fecha_inicio', e.target.value);
-                // Reset manual flag when changing dates
-                setIsManualValue(false);
-              }}
+              onChange={(e) => handleInputChange('fecha_inicio', e.target.value)}
             />
           </div>
 
@@ -258,11 +223,7 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
             <Input
               type="date"
               value={formData.fecha_fin}
-              onChange={(e) => {
-                handleInputChange('fecha_fin', e.target.value);
-                // Reset manual flag when changing dates
-                setIsManualValue(false);
-              }}
+              onChange={(e) => handleInputChange('fecha_fin', e.target.value)}
             />
             {!isValidRange && formData.fecha_inicio && formData.fecha_fin && (
               <div className="text-xs text-red-600 mt-1">
@@ -272,7 +233,7 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
           </div>
         </div>
 
-        {/* Días calculados */}
+        {/* ✅ NUEVO: Mostrar días calculados automáticamente */}
         {formData.fecha_inicio && formData.fecha_fin && (
           <div className="bg-white p-3 rounded border border-blue-200">
             <div className="flex items-center gap-2">
@@ -280,17 +241,9 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
               <span className="text-sm font-medium text-gray-700">
                 Días calculados: 
               </span>
-              {isValidRange ? (
-                <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                  <CheckCircle className="h-3 w-3 mr-1" />
-                  {calculatedDays} días
-                </Badge>
-              ) : (
-                <Badge variant="destructive">
-                  <AlertTriangle className="h-3 w-3 mr-1" />
-                  Rango inválido
-                </Badge>
-              )}
+              <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                {isValidRange ? `${calculatedDays} días` : 'Rango inválido'}
+              </Badge>
             </div>
             {isValidRange && (
               <div className="text-xs text-gray-600 mt-1">
@@ -300,17 +253,14 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
           </div>
         )}
 
-        {/* Estado del cálculo */}
-        {isLoading && calculatedDays >= 0 && !isManualValue && (
+        {/* ✅ MEJORA UX: Feedback de cálculo más claro */}
+        {isLoading && calculatedDays > 0 && (
           <div className="bg-blue-50 p-3 rounded border border-blue-200">
             <div className="flex items-center gap-2">
               <Calculator className="h-4 w-4 text-blue-600 animate-spin" />
               <span className="text-sm text-blue-700">
-                Calculando incapacidad {formData.subtipo} para {calculatedDays} días...
+                Calculando valor para {calculatedDays} días según normativa colombiana...
               </span>
-            </div>
-            <div className="text-xs text-blue-600 mt-1">
-              Salario base: {formatCurrency(employeeSalary)} | Tipo: {currentSubtipoInfo?.label}
             </div>
           </div>
         )}
@@ -318,15 +268,9 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
         <div>
           <Label htmlFor="valor" className="text-gray-700">
             Valor Calculado *
-            {formData.valor >= 0 && currentSubtipoInfo && (
+            {formData.valor > 0 && currentSubtipoInfo && (
               <span className="text-xs text-green-600 ml-2">
-                ({currentSubtipoInfo.porcentaje}% según normativa colombiana)
-              </span>
-            )}
-            {/* ✅ Indicador de valor manual */}
-            {isManualValue && (
-              <span className="text-xs text-orange-600 ml-2">
-                (Editado manualmente)
+                ({currentSubtipoInfo.porcentaje}% del salario proporcional)
               </span>
             )}
           </Label>
@@ -335,7 +279,7 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
             min="0"
             step="1000"
             value={formData.valor}
-            onChange={handleValorChange}
+            onChange={(e) => handleInputChange('valor', parseFloat(e.target.value) || 0)}
             placeholder="0"
             className="text-lg font-medium"
           />
@@ -352,24 +296,20 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
           />
         </div>
 
-        {/* Preview */}
-        {formData.valor >= 0 && calculatedDays >= 0 && (
+        {/* ✅ Preview mejorado */}
+        {formData.valor > 0 && calculatedDays > 0 && (
           <div className="bg-green-50 p-3 rounded text-center border border-green-200">
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <CheckCircle className="h-4 w-4 text-green-600" />
-              <Badge variant="secondary" className="bg-green-100 text-green-800 text-base px-4 py-2">
-                {formData.valor > 0 ? `+${formatCurrency(formData.valor)}` : '$0'}
-              </Badge>
-            </div>
+            <Badge variant="secondary" className="bg-green-100 text-green-800 text-base px-4 py-2">
+              +{formatCurrency(formData.valor)}
+            </Badge>
             <div className="text-sm text-gray-700 mt-2">
               {calculatedDays} días de incapacidad {currentSubtipoInfo?.label.toLowerCase()}
-              {/* ✅ Mostrar estado del valor */}
-              {isManualValue && (
-                <div className="text-xs text-orange-600 mt-1">
-                  Valor editado manualmente
-                </div>
-              )}
             </div>
+            {currentSubtipoInfo && (
+              <div className="text-xs text-gray-600 mt-1">
+                Calculado al {currentSubtipoInfo.porcentaje}% según normativa colombiana
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -381,7 +321,7 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
         </Button>
         <Button 
           onClick={handleSubmit}
-          disabled={!formData.fecha_inicio || !formData.fecha_fin || !isValidRange || calculatedDays < 0 || isSubmitting}
+          disabled={!formData.fecha_inicio || !formData.fecha_fin || !isValidRange || calculatedDays <= 0 || formData.valor <= 0 || isSubmitting}
           className="bg-blue-600 hover:bg-blue-700"
         >
           {isSubmitting ? 'Guardando...' : 'Guardar Incapacidad'}

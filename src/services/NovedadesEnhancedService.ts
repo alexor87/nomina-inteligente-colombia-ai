@@ -1,6 +1,8 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { Database, Tables } from '@/integrations/supabase/types';
 
+// ✅ USAR TIPO DIRECTO DE LA BASE DE DATOS
 type DatabaseNovedadType = Database['public']['Enums']['novedad_type'] | 'deduccion_especial';
 type PayrollNovedad = Tables<'payroll_novedades'>;
 
@@ -16,14 +18,21 @@ export interface CreateNovedadData {
   fecha_fin?: string; 
   base_calculo?: any;
   subtipo?: string;
-  company_id: string;
+  company_id: string; // ✅ Required field
   constitutivo_salario?: boolean;
 }
 
+/**
+ * ✅ SERVICIO DE NOVEDADES REPARADO - FASE 3 CRÍTICA
+ * Implementación real para conectar con base de datos
+ */
 export class NovedadesEnhancedService {
   
+  // ✅ NUEVO: Método para obtener novedades por empresa y período
   static async getNovedades(companyId: string, periodId: string): Promise<PayrollNovedad[]> {
     try {
+      console.log(`🔍 Obteniendo novedades para empresa ${companyId} en período ${periodId}`);
+      
       const { data: novedades, error } = await supabase
         .from('payroll_novedades')
         .select('*')
@@ -31,26 +40,23 @@ export class NovedadesEnhancedService {
         .eq('periodo_id', periodId);
 
       if (error) {
-        console.error('Error obteniendo novedades:', error);
+        console.error('❌ Error obteniendo novedades:', error);
         return [];
       }
 
+      console.log(`✅ Novedades encontradas: ${novedades?.length || 0}`);
       return (novedades || []);
       
     } catch (error) {
-      console.error('Error crítico en getNovedades:', error);
+      console.error('💥 Error crítico en getNovedades:', error);
       return [];
     }
   }
   
   static async getNovedadesByEmployee(employeeId: string, periodId: string): Promise<PayrollNovedad[]> {
     try {
-      console.log('🔍 V20.0 DIAGNOSIS - getNovedadesByEmployee called with:', {
-        employeeId,
-        periodId,
-        timestamp: new Date().toISOString()
-      });
-
+      console.log(`🔍 Obteniendo novedades para empleado ${employeeId} en período ${periodId}`);
+      
       const { data: novedades, error } = await supabase
         .from('payroll_novedades')
         .select('*')
@@ -58,39 +64,24 @@ export class NovedadesEnhancedService {
         .eq('periodo_id', periodId);
 
       if (error) {
-        console.error('❌ V20.0 DIAGNOSIS - Error obteniendo novedades:', error);
+        console.error('❌ Error obteniendo novedades:', error);
         return [];
       }
 
-      console.log('✅ V20.0 DIAGNOSIS - Raw data from database:', {
-        totalRecords: novedades?.length || 0,
-        records: novedades?.map(n => ({
-          id: n.id,
-          tipo_novedad: n.tipo_novedad,
-          subtipo: n.subtipo,
-          valor: n.valor,
-          dias: n.dias,
-          fecha_inicio: n.fecha_inicio,
-          fecha_fin: n.fecha_fin
-        })) || []
-      });
-
+      console.log(`✅ Novedades encontradas: ${novedades?.length || 0}`);
       return (novedades || []) as PayrollNovedad[];
       
     } catch (error) {
-      console.error('❌ V20.0 DIAGNOSIS - Error crítico en getNovedadesByEmployee:', error);
+      console.error('💥 Error crítico en getNovedadesByEmployee:', error);
       return [];
     }
   }
 
   static async createNovedad(novedadData: CreateNovedadData): Promise<PayrollNovedad | null> {
     try {
-      console.log('🚀 V20.0 DIAGNOSIS - createNovedad called with original data:', {
-        ...novedadData,
-        timestamp: new Date().toISOString()
-      });
-
-      // Get company_id if not provided
+      console.log('➕ Creando nueva novedad:', novedadData);
+      
+      // ✅ CORRECCIÓN: Usar el tipo correcto y obtener company_id si no viene
       let companyId = novedadData.company_id;
       
       if (!companyId) {
@@ -109,7 +100,6 @@ export class NovedadesEnhancedService {
         throw new Error('No se pudo determinar la empresa');
       }
 
-      // Simple, direct data insertion
       const insertData = {
         empleado_id: novedadData.empleado_id,
         periodo_id: novedadData.periodo_id,
@@ -124,13 +114,8 @@ export class NovedadesEnhancedService {
         fecha_fin: novedadData.fecha_fin,
         base_calculo: novedadData.base_calculo,
         subtipo: novedadData.subtipo,
-        constitutivo_salario: Boolean(novedadData.constitutivo_salario)
+        constitutivo_salario: novedadData.constitutivo_salario || false
       };
-
-      console.log('📤 V20.0 DIAGNOSIS - Final insert data before Supabase call:', {
-        ...insertData,
-        timestamp: new Date().toISOString()
-      });
 
       const { data: novedad, error } = await supabase
         .from('payroll_novedades')
@@ -139,22 +124,11 @@ export class NovedadesEnhancedService {
         .single();
 
       if (error) {
-        console.error('❌ V20.0 DIAGNOSIS - Supabase insert error:', error);
+        console.error('❌ Error creando novedad:', error);
         throw error;
       }
 
-      console.log('✅ V20.0 DIAGNOSIS - Novedad created successfully, response from DB:', {
-        id: novedad.id,
-        tipo_novedad: novedad.tipo_novedad,
-        subtipo: novedad.subtipo,
-        valor: novedad.valor,
-        dias: novedad.dias,
-        fecha_inicio: novedad.fecha_inicio,
-        fecha_fin: novedad.fecha_fin,
-        timestamp: new Date().toISOString()
-      });
-
-      // Log audit action
+      // Log manual audit action for business context
       try {
         const { PayrollAuditEnhancedService } = await import('@/services/PayrollAuditEnhancedService');
         await PayrollAuditEnhancedService.logManualAction(novedad.id, 'ADJUSTMENT', {
@@ -167,19 +141,22 @@ export class NovedadesEnhancedService {
           }
         });
       } catch (auditError) {
-        console.warn('No se pudo registrar acción de auditoría:', auditError);
+        console.warn('⚠️ No se pudo registrar acción de auditoría:', auditError);
       }
 
+      console.log('✅ Novedad creada exitosamente');
       return novedad as PayrollNovedad;
       
     } catch (error) {
-      console.error('❌ V20.0 DIAGNOSIS - Error crítico creando novedad:', error);
+      console.error('💥 Error crítico creando novedad:', error);
       throw error;
     }
   }
 
   static async updateNovedad(novedadId: string, updates: Partial<CreateNovedadData>): Promise<PayrollNovedad | null> {
     try {
+      console.log(`🔄 Actualizando novedad ${novedadId}:`, updates);
+      
       const { data: novedad, error } = await supabase
         .from('payroll_novedades')
         .update(updates as any)
@@ -188,32 +165,37 @@ export class NovedadesEnhancedService {
         .single();
 
       if (error) {
-        console.error('Error actualizando novedad:', error);
+        console.error('❌ Error actualizando novedad:', error);
         throw error;
       }
 
+      console.log('✅ Novedad actualizada exitosamente');
       return novedad as PayrollNovedad;
       
     } catch (error) {
-      console.error('Error crítico actualizando novedad:', error);
+      console.error('💥 Error crítico actualizando novedad:', error);
       throw error;
     }
   }
 
   static async deleteNovedad(novedadId: string): Promise<void> {
     try {
+      console.log(`🗑️ Eliminando novedad ${novedadId}`);
+      
       const { error } = await supabase
         .from('payroll_novedades')
         .delete()
         .eq('id', novedadId);
 
       if (error) {
-        console.error('Error eliminando novedad:', error);
+        console.error('❌ Error eliminando novedad:', error);
         throw error;
       }
+
+      console.log('✅ Novedad eliminada exitosamente');
       
     } catch (error) {
-      console.error('Error crítico eliminando novedad:', error);
+      console.error('💥 Error crítico eliminando novedad:', error);
       throw error;
     }
   }

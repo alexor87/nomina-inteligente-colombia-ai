@@ -1,373 +1,1007 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+interface NovedadForIBC {
+  valor: number;
+  constitutivo_salario: boolean;
+  tipo_novedad: string;
 }
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
+interface PayrollCalculationInput {
+  baseSalary: number;
+  workedDays: number;
+  extraHours: number;
+  disabilities: number;
+  bonuses: number;
+  absences: number;
+  periodType: 'quincenal' | 'mensual' | 'semanal';
+  periodDate?: string;
+  novedades?: NovedadForIBC[];
+  year?: string; // ✅ NUEVO: Año para configuración dinámica
+}
 
+interface NovedadCalculationInput {
+  tipoNovedad: string;
+  subtipo?: string;
+  salarioBase: number;
+  horas?: number;
+  dias?: number;
+  fechaPeriodo?: string;
+  valorManual?: number;
+  cuotas?: number;
+}
+
+interface JornadaLegalInfo {
+  horasSemanales: number;
+  horasMensuales: number;
+  fechaVigencia: Date;
+  descripcion: string;
+  ley: string;
+}
+
+interface PayrollConfiguration {
+  salarioMinimo: number;
+  auxilioTransporte: number;
+  uvt: number;
+  porcentajes: {
+    saludEmpleado: number;
+    pensionEmpleado: number;
+    saludEmpleador: number;
+    pensionEmpleador: number;
+    arl: number;
+    cajaCompensacion: number;
+    icbf: number;
+    sena: number;
+    cesantias: number;
+    interesesCesantias: number;
+    prima: number;
+    vacaciones: number;
+  };
+}
+
+// Helper function to get company configuration from database
+async function getCompanyConfiguration(companyId: string, year: string = '2025'): Promise<PayrollConfiguration> {
   try {
-    const { action, data } = await req.json()
-    
-    console.log('🚀 [EDGE v7.0 - BUG FIX] Request received:', { action })
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    if (action === 'calculate-novedad') {
-      // ✅ LOGGING DEFENSIVO MEJORADO
-      console.log('🔍 [NOVEDAD CALC] Input received:', {
-        tipoNovedad: data.tipoNovedad,
-        subtipo: data.subtipo,
-        salarioBase: data.salarioBase,
-        dias: data.dias,
-        horas: data.horas,
-        fechaPeriodo: data.fechaPeriodo
-      })
+    const { data, error } = await supabase
+      .from('company_payroll_configurations')
+      .select('*')
+      .eq('company_id', companyId)
+      .eq('year', year)
+      .single();
 
-      // ✅ DETECCIÓN ESPECÍFICA DE BUG DE INCAPACIDADES
-      if (data.tipoNovedad === 'incapacidad') {
-        console.log('🏥 [INCAPACIDAD DEBUG] Análisis detallado:', {
-          dias_received: data.dias,
-          dias_type: typeof data.dias,
-          is_undefined: data.dias === undefined,
-          is_null: data.dias === null,
-          is_zero: data.dias === 0,
-          subtipo: data.subtipo,
-          salarioBase: data.salarioBase
-        });
-
-        if (data.dias === undefined || data.dias === null) {
-          console.log('🚨 [INCAPACIDAD BUG] DÍAS UNDEFINED/NULL DETECTADO - posible bug en frontend')
-          return new Response(
-            JSON.stringify({
-              success: false,
-              error: 'CRITICAL BUG: Incapacidad recibida con días undefined/null. Frontend no está enviando días calculados.',
-              debug: {
-                receivedData: data,
-                expectedDias: 'number >= 0',
-                actualDias: data.dias,
-                bugLocation: 'NovedadUnifiedModal.tsx - revisar conversión entry.dias || undefined'
-              }
-            }),
-            { 
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 400 
-            }
-          )
-        }
-
-        if (data.dias < 0) {
-          console.log('🚨 [INCAPACIDAD BUG] DÍAS NEGATIVOS DETECTADOS')
-          return new Response(
-            JSON.stringify({
-              success: false,
-              error: 'CRITICAL: Incapacidad con días negativos.',
-              debug: {
-                receivedData: data,
-                actualDias: data.dias
-              }
-            }),
-            { 
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 400 
-            }
-          )
-        }
-      }
-
-      const result = await calculateNovedad(data)
-      
-      // ✅ LOGGING DE RESULTADO MEJORADO
-      console.log('📊 [NOVEDAD CALC] Resultado:', {
-        tipo: data.tipoNovedad,
-        subtipo: data.subtipo,
-        dias_enviados: data.dias,
-        valor_calculado: result?.valor || 0,
-        success: !!result
-      })
-
-      if (!result) {
-        return new Response(
-          JSON.stringify({ success: false, error: 'Error en cálculo de novedad' }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
-
-      return new Response(
-        JSON.stringify({ success: true, data: result }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+    if (error && error.code !== 'PGRST116') {
+      console.error('Error loading configuration:', error);
+      throw new Error('Error cargando configuración');
     }
 
-    if (action === 'calculate') {
-      const result = await calculatePayroll(data)
-      return new Response(
-        JSON.stringify({ success: true, data: result }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+    if (data) {
+      return {
+        salarioMinimo: data.salary_min,
+        auxilioTransporte: data.transport_allowance,
+        uvt: data.uvt,
+        porcentajes: data.percentages
+      };
     }
 
-    if (action === 'validate') {
-      const result = await validateEmployee(data)
-      return new Response(
-        JSON.stringify({ success: true, data: result }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-    
-    return new Response(
-      JSON.stringify({ success: false, error: 'Acción no reconocida' }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
-
+    // Return fallback defaults if no configuration found
+    return getFallbackConfiguration(year);
   } catch (error) {
-    console.error('❌ [EDGE ERROR]:', error)
-    return new Response(
-      JSON.stringify({ success: false, error: error.message }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    console.error('Error in getCompanyConfiguration:', error);
+    return getFallbackConfiguration(year);
   }
-})
+}
 
-async function calculateNovedad(data: any) {
-  const { tipoNovedad, subtipo, salarioBase, horas, dias, fechaPeriodo } = data
+function getFallbackConfiguration(year: string): PayrollConfiguration {
+  const is2024 = year === '2024';
+  return {
+    salarioMinimo: is2024 ? 1300000 : 1423500,
+    auxilioTransporte: is2024 ? 162000 : 200000,
+    uvt: is2024 ? 47065 : 49799,
+    porcentajes: {
+      saludEmpleado: 0.04,
+      pensionEmpleado: 0.04,
+      saludEmpleador: 0.085,
+      pensionEmpleador: 0.12,
+      arl: 0.00522,
+      cajaCompensacion: 0.04,
+      icbf: 0.03,
+      sena: 0.02,
+      cesantias: 0.0833,
+      interesesCesantias: 0.12,
+      prima: 0.0833,
+      vacaciones: 0.0417,
+    }
+  };
+}
 
-  console.log('🔍 [CALC NOVEDAD V2.0] ===== INICIANDO CÁLCULO =====')
-  console.log('🔍 [CALC NOVEDAD V2.0] Datos completos recibidos:', JSON.stringify(data, null, 2))
-  console.log('🔍 [CALC NOVEDAD V2.0] Análisis específico:', {
-    tipo: tipoNovedad,
-    subtipo,
-    salarioBase,
-    horas,
-    dias,
-    'typeof dias': typeof dias,
-    'dias === 0': dias === 0,
-    'dias === undefined': dias === undefined,
-    'dias === null': dias === null,
-    timestamp: new Date().toISOString()
-  })
-
-  // Validaciones básicas
-  if (!salarioBase || salarioBase <= 0) {
-    console.log('❌ [CALC V2.0] Salario inválido:', salarioBase)
-    return null
+// ✅ FUNCIÓN PARA OBTENER CONFIGURACIÓN POR AÑO Y EMPRESA
+async function getConfigurationByYear(year: string = '2025', companyId?: string): Promise<PayrollConfiguration> {
+  if (companyId) {
+    const config = await getCompanyConfiguration(companyId, year);
+    console.log(`📅 [CONFIG] Usando configuración de empresa ${companyId} para año ${year}:`, {
+      salarioMinimo: config.salarioMinimo,
+      auxilioTransporte: config.auxilioTransporte,
+      uvt: config.uvt
+    });
+    return config;
   }
+  
+  // Fallback to default configuration
+  const config = getFallbackConfiguration(year);
+  console.warn(`⚠️ Sin companyId, usando configuración por defecto para año ${year}`);
+  return config;
+}
 
-  // ✅ CORRECCIÓN ESPECÍFICA PARA INCAPACIDADES V2.0
-  if (tipoNovedad === 'incapacidad') {
-    console.log('🏥 [INCAPACIDAD V2.0] ===== PROCESANDO CÁLCULO =====')
-    console.log('🏥 [INCAPACIDAD V2.0] Datos de entrada:', {
-      subtipo: subtipo || 'general',
-      dias,
-      salarioBase,
-      fechaPeriodo,
-      timestamp: new Date().toISOString()
-    })
+// Mantener compatibilidad con código existente  
+const DEFAULT_CONFIG_2025 = getFallbackConfiguration('2025');
 
-    // ✅ VALIDACIÓN DEFENSIVA V2.0: Recalcular días si es necesario
-    let diasFinales = dias;
+// ✅ NUEVA TABLA DE RETENCIÓN EN LA FUENTE 2025 (actualizada)
+const RETENCION_FUENTE_2025 = [
+  { min: 0, max: 95, rate: 0, base: 0, description: 'Exento' },
+  { min: 96, max: 150, rate: 19, base: 95, description: '19% sobre exceso de 95 UVT' },
+  { min: 151, max: 360, rate: 28, base: 150, description: '28% sobre exceso de 150 UVT' },
+  { min: 361, max: 640, rate: 33, base: 360, description: '33% sobre exceso de 360 UVT' },
+  { min: 641, max: 945, rate: 35, base: 640, description: '35% sobre exceso de 640 UVT' },
+  { min: 946, max: 2300, rate: 37, base: 945, description: '37% sobre exceso de 945 UVT' },
+  { min: 2301, max: Infinity, rate: 39, base: 2300, description: '39% sobre exceso de 2300 UVT' }
+];
+
+// ✅ LÍMITES LEGALES PARA PRÉSTAMOS Y LIBRANZAS
+const PRESTAMO_LIMITS = {
+  libranza: { maxPercent: 30, description: 'Libranza - Máximo 30% del salario' },
+  cooperativa: { maxPercent: 30, description: 'Cooperativa - Máximo 30% del salario' },
+  empresa: { maxPercent: 50, description: 'Empresa - Máximo 50% del salario' },
+  banco: { maxPercent: 30, description: 'Banco - Máximo 30% del salario' }
+};
+
+const JORNADAS_LEGALES = [
+  {
+    fechaString: '2026-07-15',
+    horasSemanales: 42,
+    descripcion: 'Jornada final según Ley 2101 de 2021'
+  },
+  {
+    fechaString: '2025-07-15',
+    horasSemanales: 44,
+    descripcion: 'Cuarta fase de reducción - Ley 2101 de 2021'
+  },
+  {
+    fechaString: '2024-07-15',
+    horasSemanales: 46,
+    descripcion: 'Tercera fase de reducción - Ley 2101 de 2021'
+  },
+  {
+    fechaString: '2023-07-15',
+    horasSemanales: 47,
+    descripcion: 'Segunda fase de reducción - Ley 2101 de 2021'
+  },
+  {
+    fechaString: '1950-01-01',
+    horasSemanales: 48,
+    descripcion: 'Jornada máxima tradicional - Código Sustantivo del Trabajo'
+  }
+];
+
+const HORAS_MENSUALES_POR_JORNADA: Record<number, number> = {
+  48: 240,
+  47: 235,
+  46: 230,
+  44: 220,
+  42: 210
+};
+
+function getHorasParaRecargos(fechaStr?: string): number {
+  const fechaComparar = fechaStr ? fechaStr.split('T')[0] : new Date().toISOString().split('T')[0];
+  
+  if (fechaComparar >= '2025-07-01') {
+    return 220;
+  }
+  
+  const jornadaInfo = getJornadaLegal(fechaStr);
+  return jornadaInfo.horasMensuales;
+}
+
+function getJornadaLegal(fechaStr?: string) {
+  const fechaComparar = fechaStr ? fechaStr.split('T')[0] : new Date().toISOString().split('T')[0];
+  
+  let jornadaVigente = null;
+  
+  for (const jornada of JORNADAS_LEGALES) {
+    const esVigente = fechaComparar >= jornada.fechaString;
     
-    if (dias === undefined || dias === null || dias < 0) {
-      console.log('⚠️ [INCAPACIDAD V2.0] Días inválidos detectados, intentando validación defensiva...')
+    if (esVigente) {
+      jornadaVigente = jornada;
+      break;
+    }
+  }
+
+  if (!jornadaVigente) {
+    const jornadaTradicional = JORNADAS_LEGALES[JORNADAS_LEGALES.length - 1];
+    const horasMensuales = HORAS_MENSUALES_POR_JORNADA[jornadaTradicional.horasSemanales];
+    
+    return {
+      horasSemanales: jornadaTradicional.horasSemanales,
+      horasMensuales: horasMensuales,
+      fechaVigencia: new Date(jornadaTradicional.fechaString),
+      descripcion: jornadaTradicional.descripcion,
+      ley: 'Código Sustantivo del Trabajo'
+    };
+  }
+
+  const horasMensuales = HORAS_MENSUALES_POR_JORNADA[jornadaVigente.horasSemanales];
+
+  return {
+    horasSemanales: jornadaVigente.horasSemanales,
+    horasMensuales: horasMensuales,
+    fechaVigencia: new Date(jornadaVigente.fechaString),
+    descripcion: jornadaVigente.descripcion,
+    ley: 'Ley 2101 de 2021'
+  };
+}
+
+function getHorasMensuales(fechaStr?: string): number {
+  const jornadaInfo = getJornadaLegal(fechaStr);
+  return jornadaInfo.horasMensuales;
+}
+
+function getHorasSemanales(fechaStr?: string): number {
+  const jornadaInfo = getJornadaLegal(fechaStr);
+  return jornadaInfo.horasSemanales;
+}
+
+function getFactorRecargoTotal(tipoRecargo: string, fechaPeriodo: Date): {
+  factorTotal: number;
+  porcentaje: string;
+  normativa: string;
+} {
+  const fecha = fechaPeriodo || new Date();
+  
+  console.log(`🔍 [EDGE v2.0] DEBUG NOCTURNO DOMINICAL: tipoRecargo="${tipoRecargo}", fecha=${fecha.toISOString().split('T')[0]}`);
+  
+  switch (tipoRecargo) {
+    case 'nocturno':
+      return {
+        factorTotal: 0.35,
+        porcentaje: '35%',
+        normativa: 'CST Art. 168 - Recargo nocturno ordinario (35% total)'
+      };
       
-      // ✅ VALIDACIÓN DEFENSIVA: Si tenemos fechas, recalcular días
-      if (data.fecha_inicio && data.fecha_fin) {
-        console.log('🔧 [INCAPACIDAD V2.0] Recalculando días desde fechas:', {
-          fecha_inicio: data.fecha_inicio,
-          fecha_fin: data.fecha_fin
-        })
-        
-        try {
-          const fechaInicio = new Date(data.fecha_inicio + 'T00:00:00');
-          const fechaFin = new Date(data.fecha_fin + 'T00:00:00');
-          const diffTime = fechaFin.getTime() - fechaInicio.getTime();
-          const recalculatedDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-          
-          if (recalculatedDays > 0) {
-            diasFinales = recalculatedDays;
-            console.log('✅ [INCAPACIDAD V2.0] Días recalculados exitosamente:', {
-              dias_originales: dias,
-              dias_recalculados: diasFinales,
-              fechas: `${data.fecha_inicio} a ${data.fecha_fin}`
-            });
-          } else {
-            console.error('❌ [INCAPACIDAD V2.0] Recálculo resultó en días <= 0:', recalculatedDays);
-            return {
-              valor: 0,
-              factorCalculo: 0,
-              detalleCalculo: `Error: Recálculo de días resultó en ${recalculatedDays}. Verificar fechas.`,
-              jornadaInfo: getJornadaInfo(salarioBase)
-            };
-          }
-        } catch (error) {
-          console.error('❌ [INCAPACIDAD V2.0] Error en recálculo de días:', error);
-          return {
-            valor: 0,
-            factorCalculo: 0,
-            detalleCalculo: `Error: No se pudieron recalcular días. Días recibidos: ${dias}`,
-            jornadaInfo: getJornadaInfo(salarioBase)
-          };
-        }
-      } else {
-        console.error('❌ [INCAPACIDAD V2.0] No hay fechas para recalcular días');
+    case 'dominical':
+      if (fecha < new Date('2025-07-01')) {
         return {
-          valor: 0,
-          factorCalculo: 0,
-          detalleCalculo: `Error: Incapacidad con días inválidos (${dias}) y sin fechas para recalcular.`,
-          jornadaInfo: getJornadaInfo(salarioBase)
+          factorTotal: 0.75,
+          porcentaje: '75%',
+          normativa: 'Ley 789/2002 Art. 3 - Vigente hasta 30-jun-2025 (75% total)'
+        };
+      } else if (fecha < new Date('2026-07-01')) {
+        return {
+          factorTotal: 0.80,
+          porcentaje: '80%',
+          normativa: 'Ley 2466/2025 - Vigente 01-jul-2025 a 30-jun-2026 (80% total)'
+        };
+      } else if (fecha < new Date('2027-07-01')) {
+        return {
+          factorTotal: 0.90,
+          porcentaje: '90%',
+          normativa: 'Ley 2466/2025 - Vigente 01-jul-2026 a 30-jun-2027 (90% total)'
+        };
+      } else {
+        return {
+          factorTotal: 1.00,
+          porcentaje: '100%',
+          normativa: 'Ley 2466/2025 - Vigente desde 01-jul-2027 (100% total)'
         };
       }
-    }
-
-    console.log('🏥 [INCAPACIDAD V2.0] Días finales para cálculo:', {
-      dias_originales: dias,
-      dias_finales: diasFinales,
-      subtipo: subtipo || 'general'
-    });
-
-    const valorHoraDiaria = salarioBase / 30
-    let valor = 0
-    let factorCalculo = 0
-    let detalleCalculo = ''
-
-    // Cálculo según normativa colombiana actualizada
-    if (subtipo === 'laboral') {
-      // ARL paga 100% desde día 1
-      valor = valorHoraDiaria * diasFinales
-      factorCalculo = 1.0
-      detalleCalculo = `Incapacidad laboral: ${diasFinales} días × $${valorHoraDiaria.toFixed(0)} × 100% = $${valor.toFixed(0)}`
-    } else {
-      // EPS: empleador paga 66.67% desde día 4 (días 1-3 los paga empleador directamente)
-      if (diasFinales <= 3) {
-        valor = 0 // ✅ CORRECTO: Empleador paga directamente, no se registra en nómina
-        factorCalculo = 0
-        detalleCalculo = `Incapacidad general: ${diasFinales} días - Empleador paga directamente los primeros 3 días (Ley 100/1993)`
-      } else {
-        const diasEps = diasFinales - 3
-        valor = valorHoraDiaria * diasEps * 0.6667
-        factorCalculo = 0.6667
-        detalleCalculo = `Incapacidad general: ${diasEps} días EPS (desde día 4) × $${valorHoraDiaria.toFixed(0)} × 66.67% = $${valor.toFixed(0)}`
-      }
-    }
-
-    console.log('✅ [INCAPACIDAD V2.0] ===== CÁLCULO COMPLETADO =====')
-    console.log('✅ [INCAPACIDAD V2.0] Resultado final:', {
-      dias_procesados: diasFinales,
-      valor_final: Math.round(valor),
-      factorCalculo,
-      es_valor_cero_correcto: valor === 0 && diasFinales <= 3 && subtipo === 'general',
-      detalleCalculo,
-      timestamp: new Date().toISOString()
-    })
-
-    return {
-      valor: Math.round(valor),
-      factorCalculo,
-      detalleCalculo,
-      jornadaInfo: getJornadaInfo(salarioBase)
-    }
-  }
-
-  if (tipoNovedad === 'vacaciones') {
-    console.log('🏖️ [VACACIONES] Procesando cálculo:', {
-      dias,
-      salarioBase
-    })
-
-    if (!dias || dias <= 0) {
-      console.log('❌ [VACACIONES] Días inválidos para vacaciones:', dias)
+      
+    case 'nocturno_dominical':
+      console.log(`✅ [EDGE v2.0] NOCTURNO DOMINICAL DETECTADO: Aplicando factor 1.15`);
       return {
-        valor: 0,
-        factorCalculo: 0,
-        detalleCalculo: `Error: Vacaciones con ${dias} días. Debe ser > 0.`,
-        jornadaInfo: getJornadaInfo(salarioBase)
-      }
-    }
-
-    const valorHoraDiaria = salarioBase / 30
-    let valor = valorHoraDiaria * dias
-    let factorCalculo = 1.0
-    let detalleCalculo = `Vacaciones: ${dias} días × $${valorHoraDiaria.toFixed(0)} = $${valor.toFixed(0)}`
-
-    console.log('✅ [VACACIONES] Cálculo completado:', {
-      valor,
-      factorCalculo,
-      detalleCalculo
-    })
-
-    return {
-      valor: Math.round(valor),
-      factorCalculo,
-      detalleCalculo,
-      jornadaInfo: getJornadaInfo(salarioBase)
-    }
+        factorTotal: 1.15,
+        porcentaje: '115%',
+        normativa: 'Recargo nocturno dominical - Factor total según CST (Actualizado 2025)'
+      };
+      
+    default:
+      console.error(`❌ [EDGE v2.0] Backend: Tipo de recargo no válido: ${tipoRecargo}`);
+      return {
+        factorTotal: 0.0,
+        porcentaje: '0%',
+        normativa: 'Tipo no válido'
+      };
   }
-
-  return null
 }
 
-async function calculatePayroll(data: any) {
-  console.log('⚙️ [CALC PAYROLL] Iniciando cálculo de nómina:', data)
+function getFactorHoraExtra(subtipo: string, fechaPeriodo?: string): number {
+  const fechaObj = fechaPeriodo ? new Date(fechaPeriodo) : new Date();
   
-  const { baseSalary, workedDays, extraHours, disabilities, bonuses, absences, periodType, novedades } = data
-
-  // Validaciones básicas
-  if (!baseSalary || baseSalary <= 0) {
-    console.log('❌ [PAYROLL] Salario base inválido:', baseSalary)
-    return null
+  switch (subtipo) {
+    case 'diurnas':
+      return 1.25;
+      
+    case 'nocturnas':
+      return 1.75;
+      
+    case 'dominicales_diurnas':
+    case 'festivas_diurnas':
+      const factorDominicalDiurno = getFactorRecargoTotal('dominical', fechaObj);
+      return 1 + 0.25 + factorDominicalDiurno.factorTotal;
+      
+    case 'dominicales_nocturnas':
+    case 'festivas_nocturnas':
+      const factorDominicalNocturno = getFactorRecargoTotal('dominical', fechaObj);
+      return 1 + 0.75 + factorDominicalNocturno.factorTotal;
+      
+    default:
+      console.error(`❌ Subtipo de horas extra no válido: ${subtipo}`);
+      return 1.0;
   }
+}
 
-  const salarioMinimo = 1160000
-  const auxilioTransporte = 140606
-
-  let regularPay = (baseSalary / 30) * workedDays
-  let extraPay = extraHours * (baseSalary / 240) // Asumiendo 240 horas mensuales
-
-  let transportAllowance = 0
-  if (baseSalary <= (salarioMinimo * 2) && regularPay > 0) {
-    transportAllowance = auxilioTransporte / 30 * workedDays
-  }
-
-  let grossPay = regularPay + extraPay + transportAllowance + bonuses
-
-  // Deducciones
-  let healthDeduction = (grossPay * 0.04)
-  let pensionDeduction = (grossPay * 0.04)
-  let totalDeductions = healthDeduction + pensionDeduction
-  let netPay = grossPay - totalDeductions
-
-  // Contribuciones del empleador
-  let employerHealth = grossPay * 0.085
-  let employerPension = grossPay * 0.12
-  let employerArl = grossPay * 0.00522 // Promedio ARL
-  let employerCaja = grossPay * 0.04
-  let employerIcbf = grossPay * 0.03
-  let employerSena = grossPay * 0.02
-  let employerContributions = employerHealth + employerPension + employerArl + employerCaja + employerIcbf + employerSena
-  let totalPayrollCost = netPay + employerContributions
-
-  // Cálculo del IBC (Ingreso Base de Cotización)
-  let ibc = grossPay // Por defecto, el IBC es igual al salario bruto
+// ✅ FUNCIÓN ACTUALIZADA: Calcular retención en la fuente por año
+async function calculateRetencionFuente(salarioMensual: number, year: string = '2025'): Promise<{ 
+  valor: number; 
+  detalle: string; 
+  baseEnUvt: number;
+  rangoAplicado: any;
+}> {
+  const config = await getConfigurationByYear(year);
+  const baseEnUvt = salarioMensual / config.uvt;
   
-  // Ajustar IBC si es necesario (e.g., aplicar topes)
-  if (ibc < salarioMinimo) {
-    ibc = salarioMinimo
+  console.log(`🏦 Calculando Retención en la Fuente ${year}:`, {
+    salarioMensual,
+    uvt: config.uvt,
+    baseEnUvt: baseEnUvt.toFixed(2)
+  });
+  
+  // Encontrar el rango correspondiente
+  const rango = RETENCION_FUENTE_2025.find(r => 
+    baseEnUvt >= r.min && baseEnUvt <= r.max
+  );
+  
+  if (!rango || rango.rate === 0) {
+    return {
+      valor: 0,
+      detalle: 'Salario no sujeto a retención en la fuente (menor a 95 UVT)',
+      baseEnUvt,
+      rangoAplicado: rango
+    };
+  }
+  
+  // Calcular retención
+  const baseGravable = baseEnUvt - rango.base;
+  const retencionEnUvt = baseGravable * (rango.rate / 100);
+  const retencionEnPesos = Math.round(retencionEnUvt * config.uvt);
+  
+  console.log('💰 Retención calculada:', {
+    rango: `${rango.min}-${rango.max} UVT`,
+    porcentaje: `${rango.rate}%`,
+    baseGravable: baseGravable.toFixed(2),
+    retencionEnUvt: retencionEnUvt.toFixed(2),
+    retencionEnPesos
+  });
+  
+  return {
+    valor: retencionEnPesos,
+    detalle: `${rango.description}. Base: ${baseGravable.toFixed(2)} UVT × ${rango.rate}% = ${retencionEnPesos.toLocaleString()}`,
+    baseEnUvt,
+    rangoAplicado: rango
+  };
+}
+
+// ✅ NUEVA FUNCIÓN: Validar límites de préstamos
+function validatePrestamoLimits(valorCuota: number, salarioBase: number, tipoPrestamo: string): {
+  isValid: boolean;
+  maxAllowed: number;
+  percentage: number;
+  warning?: string;
+} {
+  const limit = PRESTAMO_LIMITS[tipoPrestamo as keyof typeof PRESTAMO_LIMITS];
+  
+  if (!limit) {
+    return {
+      isValid: false,
+      maxAllowed: 0,
+      percentage: 0,
+      warning: 'Tipo de préstamo no válido'
+    };
+  }
+  
+  const maxAllowed = Math.round(salarioBase * (limit.maxPercent / 100));
+  const percentage = (valorCuota / salarioBase) * 100;
+  const isValid = valorCuota <= maxAllowed;
+  
+  return {
+    isValid,
+    maxAllowed,
+    percentage,
+    warning: !isValid ? `Excede el límite legal del ${limit.maxPercent}% (${limit.description})` : undefined
+  };
+}
+
+// ✅ NUEVA FUNCIÓN: Calcular IBC incluyendo novedades constitutivas
+function calculateIBC(baseSalary: number, novedades: NovedadForIBC[] = [], config: PayrollConfiguration): {
+  ibcSalud: number;
+  ibcPension: number;
+  detalleCalculo: string;
+} {
+  console.log('🔍 [IBC v2.0] Calculando IBC:', {
+    baseSalary,
+    novedadesCount: novedades.length,
+    novedades: novedades.map(n => ({ tipo: n.tipo_novedad, valor: n.valor, constitutivo: n.constitutivo_salario }))
+  });
+
+  // 1. Calcular ingresos constitutivos de salario
+  const novedadesConstitutivas = novedades
+    .filter(n => n.constitutivo_salario === true)
+    .reduce((sum, n) => sum + Number(n.valor || 0), 0);
+
+  const ingresosConstitutivos = baseSalary + novedadesConstitutivas;
+  
+  console.log('📊 [IBC v2.0] Ingresos constitutivos:', {
+    salarioBase: baseSalary,
+    novedadesConstitutivas,
+    totalConstitutivo: ingresosConstitutivos
+  });
+
+  // 2. Aplicar límites legales (SIN FORZAR MÍNIMO PARA PERÍODOS PROPORCIONALES)
+  const topeIbcPension = config.salarioMinimo * 25; // 25 SMMLV para pensión
+  
+  // ✅ CORRECCIÓN NORMATIVA: No aplicar mínimo cuando es cálculo proporcional
+  // El mínimo solo aplica para salarios reales, no para fracciones de período
+  const ibcSalud = ingresosConstitutivos; // Sin mínimo forzado
+  
+  // Para pensión: solo aplicar tope superior, no mínimo
+  const ibcPension = Math.min(ingresosConstitutivos, topeIbcPension);
+  
+  console.log('✅ [IBC v2.0] IBC calculados:', {
+    ibcSalud,
+    ibcPension,
+    topeAplicado: ibcPension < ingresosConstitutivos,
+    diferencia: ingresosConstitutivos - ibcPension
+  });
+
+  const detalleCalculo = `IBC Salud: $${ibcSalud.toLocaleString()} - IBC Pensión: $${ibcPension.toLocaleString()}${
+    novedadesConstitutivas > 0 ? ` (incluye $${novedadesConstitutivas.toLocaleString()} en novedades constitutivas)` : ''
+  }${
+    ibcPension === topeIbcPension && ingresosConstitutivos > topeIbcPension ? 
+    ` - Tope pensión aplicado (máx. 25 SMMLV)` : ''
+  }`;
+
+  return {
+    ibcSalud,
+    ibcPension,
+    detalleCalculo
+  };
+}
+
+// ✅ FUNCIÓN MEJORADA: Cálculo de novedades con nuevos tipos
+async function calculateNovedadUltraKiss(input: NovedadCalculationInput) {
+  const { tipoNovedad, subtipo, salarioBase, horas, dias, fechaPeriodo, valorManual, cuotas } = input;
+  
+  let valor = 0;
+  let factorCalculo = 0;
+  let detalleCalculo = '';
+  let validationResult: any = null;
+
+  switch (tipoNovedad) {
+    case 'horas_extra':
+      if (horas && horas > 0 && subtipo) {
+        const horasMensuales = getHorasMensuales(fechaPeriodo);
+        const valorHoraOrdinaria = salarioBase / horasMensuales;
+        const factor = getFactorHoraExtra(subtipo, fechaPeriodo);
+        
+        if (factor && factor > 0) {
+          valor = Math.round(valorHoraOrdinaria * factor * horas);
+          factorCalculo = factor;
+          
+          let detalleNormativo = '';
+          if (subtipo === 'dominicales_diurnas' || subtipo === 'festivas_diurnas') {
+            const fechaObj = fechaPeriodo ? new Date(fechaPeriodo) : new Date();
+            const factorDominical = getFactorRecargoTotal('dominical', fechaObj);
+            detalleNormativo = ` (1.00 + 0.25 + ${factorDominical.factorTotal} dominical = ${factor})`;
+          } else if (subtipo === 'dominicales_nocturnas' || subtipo === 'festivas_nocturnas') {
+            const fechaObj = fechaPeriodo ? new Date(fechaPeriodo) : new Date();
+            const factorDominical = getFactorRecargoTotal('dominical', fechaObj);
+            detalleNormativo = ` (1.00 + 0.75 + ${factorDominical.factorTotal} dominical = ${factor})`;
+          }
+          
+          detalleCalculo = `Horas extra ${subtipo}: (${salarioBase.toLocaleString()} ÷ ${horasMensuales}) × ${factor}${detalleNormativo} × ${horas} horas = ${valor.toLocaleString()}`;
+        } else {
+          detalleCalculo = 'Error: Factor de horas extra inválido para el subtipo especificado';
+        }
+      } else {
+        detalleCalculo = 'Ingrese horas y seleccione subtipo';
+      }
+      break;
+
+    case 'recargo_nocturno':
+      if (horas && horas > 0) {
+        console.log(`🔍 [EDGE v2.0] SUBTIPO RECIBIDO: "${subtipo}"`);
+        
+        let tipoRecargoAleluya = 'nocturno';
+        
+        if (subtipo === 'dominical') {
+          tipoRecargoAleluya = 'dominical';
+          console.log(`🔄 [EDGE v2.0] MAPEO: subtipo "dominical" → tipoRecargoAleluya "dominical"`);
+        } else if (subtipo === 'nocturno_dominical') {
+          tipoRecargoAleluya = 'nocturno_dominical';
+          console.log(`🔄 [EDGE v2.0] MAPEO CRÍTICO: subtipo "nocturno_dominical" → tipoRecargoAleluya "nocturno_dominical"`);
+        } else if (subtipo === 'nocturno' || subtipo === undefined) {
+          tipoRecargoAleluya = 'nocturno';
+          console.log(`🔄 [EDGE v2.0] MAPEO: subtipo "${subtipo}" → tipoRecargoAleluya "nocturno"`);
+        }
+        
+        console.log(`🎯 [EDGE v2.0] TIPO RECARGO FINAL: "${tipoRecargoAleluya}"`);
+        
+        const fechaObj = fechaPeriodo ? new Date(fechaPeriodo) : new Date();
+        const factorInfo = getFactorRecargoTotal(tipoRecargoAleluya, fechaObj);
+        
+        console.log(`📊 [EDGE v2.0] FACTOR INFO: factorTotal=${factorInfo.factorTotal}, porcentaje=${factorInfo.porcentaje}`);
+        
+        if (factorInfo.factorTotal <= 0) {
+          console.error(`❌ [EDGE v2.0] Factor inválido para ${tipoRecargoAleluya}:`, factorInfo);
+          detalleCalculo = `Error: Factor inválido para ${tipoRecargoAleluya}`;
+          break;
+        }
+        
+        const divisorAleluya = 30 * 7.333;
+        const calculoDetallado = (salarioBase * factorInfo.factorTotal * horas) / divisorAleluya;
+        valor = Math.round(calculoDetallado);
+        factorCalculo = factorInfo.factorTotal;
+        
+        console.log(`🧮 [EDGE v2.0] CÁLCULO DETALLADO: (${salarioBase} × ${factorInfo.factorTotal} × ${horas}) ÷ ${divisorAleluya} = ${calculoDetallado} → ${valor}`);
+        
+        detalleCalculo = `${tipoRecargoAleluya} (fórmula Aleluya v2.0): (${salarioBase.toLocaleString()} × ${factorInfo.factorTotal} × ${horas}h) ÷ (30 × 7.333) = ${valor.toLocaleString()}`;
+      } else {
+        detalleCalculo = 'Ingrese las horas de recargo';
+      }
+      break;
+
+    case 'vacaciones':
+      if (dias && dias > 0) {
+        const salarioDiario = salarioBase / 30;
+        valor = Math.round(salarioDiario * dias);
+        factorCalculo = 1;
+        detalleCalculo = `Vacaciones: (${salarioBase.toLocaleString()} / 30) × ${dias} días = ${valor.toLocaleString()}`;
+      } else {
+        detalleCalculo = 'Ingrese los días de vacaciones';
+      }
+      break;
+
+    case 'incapacidad':
+      if (dias && dias > 0 && subtipo) {
+        const salarioDiario = salarioBase / 30;
+        
+        if (subtipo === 'general' || subtipo === 'comun') {
+          console.log(`🏥 [INCAPACIDAD v3.0] Calculando incapacidad general: ${dias} días, salario base: ${salarioBase}`);
+          
+          const valorDiarioCalculado = salarioDiario * 0.6667;
+          const config = await getConfigurationByYear('2025'); // Usar configuración dinámica
+          const smldv = config.salarioMinimo / 30;
+          const valorDiarioFinal = Math.max(valorDiarioCalculado, smldv);
+          
+          valor = Math.round(valorDiarioFinal * dias);
+          factorCalculo = valorDiarioFinal / salarioDiario;
+          
+          console.log(`🧮 [INCAPACIDAD v3.0] CÁLCULO DETALLADO:`);
+          console.log(`  - Salario diario: $${salarioDiario.toFixed(2)}`);
+          console.log(`  - Valor al 66.67%: $${valorDiarioCalculado.toFixed(2)}`);
+          console.log(`  - SMLDV: $${smldv.toFixed(2)}`);
+          console.log(`  - Valor diario final: $${valorDiarioFinal.toFixed(2)}`);
+          console.log(`  - Total ${dias} días: $${valor}`);
+          
+          const tipoTope = valorDiarioFinal === smldv ? '(aplicando SMLDV como tope mínimo)' : '(66.67% del salario)';
+          detalleCalculo = `Incapacidad general: ${dias} días × $${Math.round(valorDiarioFinal).toLocaleString()} ${tipoTope} = $${valor.toLocaleString()}`;
+          
+        } else if (subtipo === 'laboral') {
+          valor = Math.round(salarioDiario * dias);
+          factorCalculo = 1;
+          detalleCalculo = `Incapacidad laboral: (${salarioBase.toLocaleString()} / 30) × 100% × ${dias} días = ${valor.toLocaleString()}`;
+        }
+      } else {
+        detalleCalculo = 'Ingrese días y seleccione tipo de incapacidad';
+      }
+      break;
+
+    case 'licencia_remunerada':
+      if (dias && dias > 0) {
+        const salarioDiario = salarioBase / 30;
+        valor = Math.round(salarioDiario * dias);
+        factorCalculo = 1;
+        
+        if (subtipo === 'maternidad') {
+          detalleCalculo = `Licencia de maternidad: (${salarioBase.toLocaleString()} / 30) × ${dias} días = ${valor.toLocaleString()} (Ley 1822/2017 - Pago EPS)`;
+          console.log('✅ [MATERNIDAD] Calculada como licencia remunerada:', { dias, valor });
+        } else {
+          detalleCalculo = `Licencia remunerada: (${salarioBase.toLocaleString()} / 30) × ${dias} días = ${valor.toLocaleString()}`;
+        }
+      } else {
+        detalleCalculo = 'Ingrese los días de licencia';
+      }
+      break;
+
+    case 'licencia_no_remunerada':
+      valor = 0;
+      factorCalculo = 0;
+      if (dias && dias > 0) {
+        detalleCalculo = `Licencia no remunerada: ${dias} días sin remuneración (Art. 51 CST). Suspende acumulación de prestaciones sociales.`;
+      } else {
+        detalleCalculo = 'Licencia no remunerada: Sin remuneración por definición legal';
+      }
+      break;
+
+    case 'ausencia':
+      if (dias && dias > 0) {
+        const salarioDiario = salarioBase / 30;
+        valor = Math.round(salarioDiario * dias);
+        factorCalculo = 1;
+        
+        let tipoAusencia = '';
+        switch (subtipo) {
+          case 'injustificada':
+            tipoAusencia = 'Ausencia injustificada';
+            break;
+          case 'abandono_puesto':
+            tipoAusencia = 'Abandono del puesto';
+            break;
+          case 'suspension_disciplinaria':
+            tipoAusencia = 'Suspensión disciplinaria';
+            break;
+          case 'tardanza_excesiva':
+            tipoAusencia = 'Tardanza excesiva';
+            break;
+          default:
+            tipoAusencia = 'Ausencia';
+        }
+        
+        detalleCalculo = `${tipoAusencia}: Descuento de (${salarioBase.toLocaleString()} / 30) × ${dias} días = ${valor.toLocaleString()} (Art. 57 CST)`;
+      } else {
+        detalleCalculo = 'Ingrese los días de ausencia injustificada';
+      }
+      break;
+
+    // ✅ NUEVOS CASOS: Préstamos y deducciones
+    case 'libranza':
+      if (valorManual && valorManual > 0) {
+        valor = valorManual;
+        factorCalculo = valor / salarioBase;
+        
+        // Validar límites legales
+        const validation = validatePrestamoLimits(valor, salarioBase, subtipo || 'libranza');
+        validationResult = validation;
+        
+        let descripcionTipo = '';
+        switch (subtipo) {
+          case 'cooperativa':
+            descripcionTipo = 'Cooperativa (máx. 30%)';
+            break;
+          case 'empresa':
+            descripcionTipo = 'Empresa (máx. 50%)';
+            break;
+          case 'banco':
+            descripcionTipo = 'Banco (máx. 30%)';
+            break;
+          default:
+            descripcionTipo = 'Libranza (máx. 30%)';
+        }
+        
+        const porcentaje = validation.percentage.toFixed(1);
+        const estado = validation.isValid ? '✅' : '⚠️';
+        
+        detalleCalculo = `${estado} ${descripcionTipo}: $${valor.toLocaleString()} (${porcentaje}% del salario)`;
+        
+        if (cuotas && cuotas > 0) {
+          detalleCalculo += ` - ${cuotas} cuotas restantes`;
+        }
+        
+        if (!validation.isValid) {
+          detalleCalculo += ` - ${validation.warning}`;
+        }
+      } else {
+        detalleCalculo = 'Ingrese el valor de la cuota del préstamo';
+      }
+      break;
+
+    case 'retencion_fuente':
+      if (valorManual && valorManual > 0) {
+        // Valor manual ingresado
+        valor = valorManual;
+        factorCalculo = valor / salarioBase;
+        detalleCalculo = `Retención manual: $${valor.toLocaleString()} (${(factorCalculo * 100).toFixed(2)}% del salario)`;
+      } else {
+        // Cálculo automático usando tabla por año
+        const retencionResult = await calculateRetencionFuente(salarioBase, '2025');
+        valor = retencionResult.valor;
+        factorCalculo = valor > 0 ? valor / salarioBase : 0;
+        
+        detalleCalculo = `Retención automática: ${retencionResult.detalle}`;
+        
+        // Información adicional para debug
+        const configForUvt = await getConfigurationByYear('2025');
+        validationResult = {
+          baseEnUvt: retencionResult.baseEnUvt,
+          rangoAplicado: retencionResult.rangoAplicado,
+          uvt: configForUvt.uvt
+        };
+      }
+      break;
+
+    case 'deduccion_especial':
+      if (valorManual && valorManual > 0) {
+        valor = valorManual;
+        factorCalculo = valor / salarioBase;
+        
+        let tipoDeduccion = 'Deducción especial';
+        switch (subtipo) {
+          case 'multa':
+            tipoDeduccion = 'Multa disciplinaria';
+            break;
+          case 'descuento_nomina':
+            tipoDeduccion = 'Descuento de nómina';
+            break;
+          case 'otros':
+            tipoDeduccion = 'Otra deducción';
+            break;
+        }
+        
+        detalleCalculo = `${tipoDeduccion}: $${valor.toLocaleString()} (${(factorCalculo * 100).toFixed(2)}% del salario)`;
+      } else {
+        detalleCalculo = 'Ingrese el valor de la deducción especial';
+      }
+      break;
+
+    case 'bonificacion':
+    case 'comision':
+    case 'prima':
+    case 'otros_ingresos':
+      if (valorManual && valorManual > 0) {
+        valor = valorManual;
+        factorCalculo = valor / salarioBase;
+        detalleCalculo = `${tipoNovedad}: $${valor.toLocaleString()} (${(factorCalculo * 100).toFixed(2)}% del salario)`;
+      } else {
+        detalleCalculo = 'Ingrese el valor manualmente para este tipo de novedad';
+      }
+      break;
+
+    case 'fondo_solidaridad':
+      const configSolidaridad = await getConfigurationByYear('2025'); // Usar configuración dinámica
+      if (salarioBase >= (configSolidaridad.salarioMinimo * 4)) {
+        valor = Math.round(salarioBase * 0.01);
+        factorCalculo = 0.01;
+        detalleCalculo = `Fondo de solidaridad: ${salarioBase.toLocaleString()} × 1% = ${valor.toLocaleString()}`;
+      } else {
+        detalleCalculo = 'Fondo de solidaridad aplica para salarios >= 4 SMMLV';
+      }
+      break;
+
+    default:
+      detalleCalculo = 'Tipo de novedad no reconocido';
   }
 
-  console.log('✅ [PAYROLL] Cálculo completado:', {
+  const horasMensualesJornada = getHorasMensuales(fechaPeriodo);
+  const horasSemanalesJornada = getHorasSemanales(fechaPeriodo);
+  const horasRecargos = getHorasParaRecargos(fechaPeriodo);
+
+  const result = {
+    valor,
+    factorCalculo,
+    detalleCalculo,
+    validationResult,
+    jornadaInfo: {
+      horasSemanales: horasSemanalesJornada,
+      horasMensuales: horasMensualesJornada,
+      divisorHorario: tipoNovedad === 'recargo_nocturno' ? horasRecargos : horasMensualesJornada,
+      valorHoraOrdinaria: Math.round(salarioBase / (tipoNovedad === 'recargo_nocturno' ? horasRecargos : horasMensualesJornada)),
+      ley: horasMensualesJornada === 230 ? 'Ley 2101 de 2021 (Tercera fase)' : 'Ley 2101 de 2021 (Cuarta fase)',
+      descripcion: horasMensualesJornada === 230 ? 'Tercera fase de reducción (46h semanales)' : 'Cuarta fase de reducción (44h semanales)'
+    }
+  };
+  
+  if (tipoNovedad === 'incapacidad' && subtipo === 'general') {
+    console.log(`🏁 [INCAPACIDAD v3.0] RESULTADO FINAL: valor=$${result.valor}, días=${dias}, base=$${salarioBase}`);
+  }
+  
+  return result;
+}
+
+async function validateEmployee(input: PayrollCalculationInput, eps?: string, afp?: string) {
+  const config = await getConfigurationByYear(input.year || '2025');
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  if (!eps) errors.push('Falta afiliación a EPS');
+  if (!afp) errors.push('Falta afiliación a AFP');
+
+  let maxDays: number;
+  switch (input.periodType) {
+    case 'semanal':
+      maxDays = 7;
+      break;
+    case 'quincenal':
+      maxDays = 15;
+      break;
+    case 'mensual':
+      maxDays = 30;
+      break;
+    default:
+      maxDays = 30;
+  }
+
+  if (input.workedDays > maxDays) {
+    errors.push(`Días trabajados (${input.workedDays}) exceden el período ${input.periodType} (máximo ${maxDays})`);
+  }
+  if (input.workedDays < 0) {
+    errors.push('Los días trabajados no pueden ser negativos');
+  }
+
+  const horasSemanales = getHorasSemanales(input.periodDate);
+  const maxHorasExtraSemanales = horasSemanales * 0.25;
+  let horasExtraSemanalesEstimadas: number;
+  
+  switch (input.periodType) {
+    case 'semanal':
+      horasExtraSemanalesEstimadas = input.extraHours;
+      break;
+    case 'quincenal':
+      horasExtraSemanalesEstimadas = input.extraHours / 2;
+      break;
+    case 'mensual':
+      horasExtraSemanalesEstimadas = input.extraHours / 4;
+      break;
+    default:
+      horasExtraSemanalesEstimadas = input.extraHours / 4;
+  }
+  
+  if (horasExtraSemanalesEstimadas > maxHorasExtraSemanales) {
+    warnings.push(`Horas extra excesivas para jornada de ${horasSemanales}h semanales (máximo recomendado: ${maxHorasExtraSemanales}h/semana)`);
+  }
+  if (input.extraHours < 0) {
+    errors.push('Las horas extra no pueden ser negativos');
+  }
+
+  if (input.disabilities > input.workedDays) {
+    errors.push('Los días de incapacidad no pueden ser mayores a los días trabajados');
+  }
+  if (input.disabilities < 0) {
+    errors.push('Los días de incapacidad no pueden ser negativos');
+  }
+
+  if (input.baseSalary < config.salarioMinimo) {
+    errors.push(`El salario base es menor al SMMLV`);
+  }
+
+  if (input.baseSalary >= config.salarioMinimo * 10) {
+    warnings.push('Salario alto - verificar cálculo de aportes');
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+    warnings,
+    jornadaInfo: {
+      horasSemanales,
+      ley: 'Ley 2101 de 2021',
+      descripcion: `Jornada de ${getHorasSemanales(input.periodDate)} horas semanales`
+    }
+  };
+}
+
+// ✅ FUNCIÓN PRINCIPAL ACTUALIZADA: Ahora incluye TODAS las novedades en liquidación
+async function calculatePayroll(input: PayrollCalculationInput) {
+  const config = await getConfigurationByYear(input.year || '2025');
+  console.log(`🎯 [PAYROLL v4.0] Usando configuración para año ${input.year || '2025'}:`, {
+    salarioMinimo: config.salarioMinimo,
+    auxilioTransporte: config.auxilioTransporte,
+    uvt: config.uvt
+  });
+  const horasMensuales = getHorasMensuales(input.periodDate);
+  const horasSemanales = getHorasSemanales(input.periodDate);
+  
+  console.log('🚀 [PAYROLL v3.0] Iniciando cálculo con IBC correcto:', {
+    baseSalary: input.baseSalary,
+    novedadesCount: input.novedades?.length || 0
+  });
+
+  const dailySalary = input.baseSalary / 30;
+  const effectiveWorkedDays = Math.max(0, input.workedDays - input.disabilities - input.absences);
+  const regularPay = Math.round(dailySalary * effectiveWorkedDays);
+
+  const hourlyRate = input.baseSalary / horasMensuales;
+  const extraPay = Math.round(input.extraHours * hourlyRate * 1.25);
+
+  let transportAllowance = 0;
+  if (input.baseSalary <= (config.salarioMinimo * 2)) {
+    const dailyTransportAllowance = config.auxilioTransporte / 30;
+    transportAllowance = Math.round(dailyTransportAllowance * input.workedDays);
+  }
+
+  // ✅ NUEVA LÓGICA: Procesar TODAS las novedades para incluirlas en el total final
+  let totalDevengosNovedades = 0;
+  let totalDeduccionesNovedades = 0;
+  
+  if (input.novedades && input.novedades.length > 0) {
+    console.log('📊 [PAYROLL v3.0] Procesando novedades para liquidación:', {
+      cantidad: input.novedades.length,
+      novedades: input.novedades.map(n => ({ tipo: n.tipo_novedad, valor: n.valor }))
+    });
+    
+    input.novedades.forEach(novedad => {
+      const valor = Number(novedad.valor || 0);
+      
+      // Categorizar novedades por tipo para devengos vs deducciones
+      const tiposDevengo = [
+        'horas_extra', 'bonificacion', 'comision', 'prima', 'otros_ingresos',
+        'recargo_nocturno', 'recargo_dominical', 'recargo_festivo'
+      ];
+      
+      const tiposDeduccion = [
+        'incapacidad', 'ausencia', 'libranza', 'retencion_fuente', 
+        'deduccion_especial', 'fondo_solidaridad', 'descuento_nomina'
+      ];
+      
+      if (tiposDevengo.includes(novedad.tipo_novedad)) {
+        totalDevengosNovedades += valor;
+        console.log(`💰 [PAYROLL v3.0] Devengo agregado: ${novedad.tipo_novedad} = $${valor.toLocaleString()}`);
+      } else if (tiposDeduccion.includes(novedad.tipo_novedad)) {
+        totalDeduccionesNovedades += valor;
+        console.log(`📉 [PAYROLL v3.0] Deducción agregada: ${novedad.tipo_novedad} = $${valor.toLocaleString()}`);
+      }
+    });
+  }
+
+  const grossSalary = regularPay + extraPay + input.bonuses + totalDevengosNovedades;
+  const grossPay = grossSalary + transportAllowance;
+  
+  // ✅ CORRECCIÓN CRÍTICA: Para períodos quincenales, usar salario proporcional para IBC
+  const salarioBaseParaIBC = input.periodType === 'quincenal' ? 
+    input.baseSalary / 2 : // Para quincenal, usar la mitad del salario
+    input.baseSalary; // Para mensual, usar salario completo
+    
+  console.log(`🎯 [PAYROLL v3.0] Iniciando cálculo con IBC correcto: { baseSalary: ${input.baseSalary}, salarioBaseParaIBC: ${salarioBaseParaIBC}, periodType: ${input.periodType}, novedadesCount: ${(input.novedades || []).length} }`);
+  
+  // Calcular IBC con salario proporcional para períodos quincenales
+  const ibcCalculation = calculateIBC(salarioBaseParaIBC, input.novedades || [], config);
+  
+  // ✅ CORREGIDO: Usar IBC para calcular deducciones de seguridad social
+  const healthDeduction = Math.round(ibcCalculation.ibcSalud * config.porcentajes.saludEmpleado);
+  const pensionDeduction = Math.round(ibcCalculation.ibcPension * config.porcentajes.pensionEmpleado);
+  const totalDeductions = healthDeduction + pensionDeduction + totalDeduccionesNovedades;
+
+  // ✅ NUEVA FÓRMULA COMPLETA: Incluye TODAS las novedades en el cálculo final
+  const netPay = grossPay - healthDeduction - pensionDeduction - totalDeduccionesNovedades;
+  
+  console.log('💼 [PAYROLL v3.0] Cálculo final completo:', {
     grossPay,
     healthDeduction,
     pensionDeduction,
+    totalDeduccionesNovedades,
     netPay,
-    employerContributions,
-    totalPayrollCost,
-    ibc
-  })
+    totalDevengosNovedades
+  });
 
-  return {
+  // ✅ CORREGIDO: Aportes patronales también se calculan sobre IBC
+  const employerHealth = Math.round(ibcCalculation.ibcSalud * config.porcentajes.saludEmpleador);
+  const employerPension = Math.round(ibcCalculation.ibcPension * config.porcentajes.pensionEmpleador);
+  const employerArl = Math.round(ibcCalculation.ibcSalud * config.porcentajes.arl);
+  const employerCaja = Math.round(ibcCalculation.ibcSalud * config.porcentajes.cajaCompensacion);
+  const employerIcbf = Math.round(ibcCalculation.ibcSalud * config.porcentajes.icbf);
+  const employerSena = Math.round(ibcCalculation.ibcSalud * config.porcentajes.sena);
+
+  const employerContributions = employerHealth + employerPension + employerArl + 
+                                employerCaja + employerIcbf + employerSena;
+
+  const totalPayrollCost = netPay + employerContributions;
+
+  const result = {
     regularPay,
     extraPay,
     transportAllowance,
@@ -384,56 +1018,113 @@ async function calculatePayroll(data: any) {
     employerSena,
     employerContributions,
     totalPayrollCost,
-    ibc // Incluir el IBC en el resultado
-  }
+    // ✅ NUEVO: Incluir IBC en el resultado
+    ibc: ibcCalculation.ibcSalud,
+    jornadaInfo: {
+      horasSemanales,
+      horasMensuales,
+      divisorHorario: horasMensuales,
+      valorHoraOrdinaria: Math.round(input.baseSalary / horasMensuales),
+      ley: 'Ley 2101 de 2021',
+      descripcion: `Jornada de ${horasSemanales} horas semanales`
+    }
+  };
+
+  console.log('✅ [PAYROLL v3.0] Cálculo completado con IBC:', {
+    ibc: result.ibc,
+    healthDeduction: result.healthDeduction,
+    pensionDeduction: result.pensionDeduction,
+    detalleIBC: ibcCalculation.detalleCalculo
+  });
+
+  return result;
 }
 
-async function validateEmployee(data: any) {
-  console.log('✅ [VALIDATE EMPLOYEE] Validando empleado:', data)
-  
-  const { eps, afp, baseSalary } = data
-  let errors: string[] = []
-  let warnings: string[] = []
-  let isValid = true
-
-  if (!eps) {
-    errors.push('EPS es requerida')
-    isValid = false
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
   }
 
-  if (!afp) {
-    errors.push('AFP es requerida')
-    isValid = false
-  }
+  try {
+    const { action, data } = await req.json();
 
-  if (baseSalary < 1160000) {
-    warnings.push('Salario por debajo del mínimo')
-  }
+    console.log(`🚀 [EDGE v5.0] Request received: action="${action}"`);
+    if (action === 'calculate' && data.novedades) {
+      console.log(`📊 [EDGE v5.0] Novedades incluidas: ${data.novedades.length} items`);
+    }
 
-  console.log('✅ [VALIDATE EMPLOYEE] Resultado de validación:', {
-    isValid,
-    errors,
-    warnings
-  })
+    switch (action) {
+      case 'calculate':
+        const calculation = await calculatePayroll(data);
+        return new Response(JSON.stringify({ success: true, data: calculation }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
 
-  return {
-    isValid,
-    errors,
-    warnings
-  }
-}
+      case 'validate':
+        const validation = await validateEmployee(data, data.eps, data.afp);
+        return new Response(JSON.stringify({ success: true, data: validation }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
 
-function getJornadaInfo(salarioBase: number) {
-  const horasSemanales = 48
-  const horasMensuales = 208 // 48 * 52 / 12
-  const valorHoraOrdinaria = salarioBase / horasMensuales
-  
-  return {
-    horasSemanales,
-    horasMensuales,
-    divisorHorario: horasMensuales,
-    valorHoraOrdinaria,
-    ley: "Código Sustantivo del Trabajo - Art. 161",
-    descripcion: "Jornada ordinaria 48 horas semanales"
+      case 'batch-calculate':
+        const batchResults = await Promise.all(data.inputs.map((input: PayrollCalculationInput) => calculatePayroll(input)));
+        return new Response(JSON.stringify({ success: true, data: batchResults }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+
+      case 'calculate-novedad':
+        console.log(`🎯 [EDGE v4.0] Calculating novedad: ${data.tipoNovedad} - ${data.subtipo}`);
+        const novedadResult = await calculateNovedadUltraKiss(data);
+        console.log(`🎯 [EDGE v4.0] Novedad result: valor=${novedadResult.valor}, validation=${JSON.stringify(novedadResult.validationResult)}`);
+        return new Response(JSON.stringify({ success: true, data: novedadResult }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+
+      case 'get-jornada-legal':
+        const jornadaInfo = getJornadaLegal(data.fecha);
+        return new Response(JSON.stringify({ 
+          success: true, 
+          data: {
+            horasSemanales: jornadaInfo.horasSemanales,
+            horasMensuales: jornadaInfo.horasMensuales,
+            divisorHorario: jornadaInfo.horasMensuales,
+            ley: jornadaInfo.ley,
+            descripcion: jornadaInfo.descripcion
+          }
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+
+      // ✅ NUEVA ACCIÓN: Calcular solo retención en la fuente
+      case 'calculate-retencion-fuente':
+        console.log(`🏦 [EDGE v4.0] Calculating retención fuente for salary: ${data.salarioBase}`);
+        const retencionResult = await calculateRetencionFuente(data.salarioBase, data.year || '2025');
+        return new Response(JSON.stringify({ success: true, data: retencionResult }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+
+      // ✅ NUEVA ACCIÓN: Validar límites de préstamos
+      case 'validate-prestamo':
+        console.log(`💳 [EDGE v4.0] Validating prestamo: ${data.valorCuota} for salary: ${data.salarioBase}`);
+        const validationPrestamo = validatePrestamoLimits(data.valorCuota, data.salarioBase, data.tipoPrestamo);
+        return new Response(JSON.stringify({ success: true, data: validationPrestamo }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+
+      default:
+        return new Response(JSON.stringify({ success: false, error: 'Invalid action' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+    }
+  } catch (error) {
+    console.error('Error in payroll calculations function:', error);
+    return new Response(JSON.stringify({ 
+      success: false, 
+      error: error.message || 'Internal server error'
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
-}
+});

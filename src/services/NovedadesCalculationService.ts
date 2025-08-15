@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollNovedad } from '@/types/novedades-enhanced';
 
@@ -35,35 +36,14 @@ class NovedadesCalculationServiceClass {
     }
 
     try {
-      console.log(`🧮 V21.0 DIAGNOSIS - Calculating novedades totals for employee ${employeeId} in period ${periodId}`);
+      console.log(`🧮 Calculating novedades totals for employee ${employeeId} in period ${periodId}`);
       const novedades = await this.getEmployeeNovedades(employeeId, periodId);
-
-      console.log('🔍 V21.0 DIAGNOSIS - Novedades raw data for calculation:', {
-        totalNovedades: novedades.length,
-        incapacidadesForCalculation: novedades.filter(n => n.tipo_novedad === 'incapacidad').map(n => ({
-          id: n.id,
-          valor: n.valor,
-          valorType: typeof n.valor,
-          dias: n.dias,
-          diasType: typeof n.dias
-        }))
-      });
 
       let totalDevengos = 0;
       let totalDeducciones = 0;
 
       novedades.forEach(novedad => {
         const valor = Number(novedad.valor);
-        console.log('🔍 V21.0 DIAGNOSIS - Processing novedad for calculation:', {
-          id: novedad.id,
-          tipo: novedad.tipo_novedad,
-          valorOriginal: novedad.valor,
-          valorOriginalType: typeof novedad.valor,
-          valorConverted: valor,
-          valorConvertedType: typeof valor,
-          isNaN: isNaN(valor)
-        });
-
         if (isNaN(valor)) return;
 
         switch (novedad.tipo_novedad) {
@@ -78,7 +58,6 @@ class NovedadesCalculationServiceClass {
           case 'prima':
           case 'otros_ingresos':
             totalDevengos += valor;
-            console.log('🔍 V21.0 DIAGNOSIS - Added to devengos:', { valor, newTotal: totalDevengos });
             break;
           case 'salud':
           case 'pension':
@@ -89,7 +68,6 @@ class NovedadesCalculationServiceClass {
           case 'multa':
           case 'descuento_voluntario':
             totalDeducciones += valor;
-            console.log('🔍 V21.0 DIAGNOSIS - Added to deducciones:', { valor, newTotal: totalDeducciones });
             break;
           default:
             console.warn(`⚠️ Unknown novedad type: ${novedad.tipo_novedad}`);
@@ -100,19 +78,10 @@ class NovedadesCalculationServiceClass {
       const hasNovedades = novedades.length > 0;
       const totals: NovedadesTotals = { totalDevengos, totalDeducciones, totalNeto, hasNovedades };
 
-      console.log('✅ V21.0 DIAGNOSIS - Final calculation totals:', {
-        employeeId,
-        periodId,
-        totals,
-        incapacidadContributions: novedades
-          .filter(n => n.tipo_novedad === 'incapacidad')
-          .map(n => ({ id: n.id, valor: Number(n.valor) }))
-      });
-
       cache.set(cacheKey, totals);
       return totals;
     } catch (error) {
-      console.error('❌ V21.0 DIAGNOSIS - Error calculating employee novedades totals:', error);
+      console.error('❌ Error calculating employee novedades totals:', error);
       return {
         totalDevengos: 0,
         totalDeducciones: 0,
@@ -157,7 +126,7 @@ class NovedadesCalculationServiceClass {
     }
 
     try {
-      console.log(`📋 V21.0 DIAGNOSIS - Fetching novedades for employee ${employeeId} in period ${periodId}`);
+      console.log(`📋 Fetching novedades for employee ${employeeId} in period ${periodId}`);
       
       // ✅ FIXED: Use correct table name 'payroll_novedades'
       const { data, error } = await supabase
@@ -168,56 +137,22 @@ class NovedadesCalculationServiceClass {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('❌ V21.0 DIAGNOSIS - Error fetching employee novedades:', error);
+        console.error('❌ Error fetching employee novedades:', error);
         throw error;
       }
 
-      console.log('🔍 V21.0 DIAGNOSIS - Raw data from getEmployeeNovedades:', {
-        totalRecords: data?.length || 0,
-        rawIncapacidades: data?.filter(item => item.tipo_novedad === 'incapacidad').map(item => ({
-          id: item.id,
-          valor_raw: item.valor,
-          valor_type: typeof item.valor,
-          dias_raw: item.dias,
-          dias_type: typeof item.dias,
-          base_calculo_raw: item.base_calculo
-        }))
-      });
-
       // ✅ Transform the data to match PayrollNovedad interface
-      const transformedData: PayrollNovedad[] = (data || []).map(item => {
-        const transformed = {
-          ...item,
-          base_calculo: typeof item.base_calculo === 'string' 
-            ? JSON.parse(item.base_calculo || '{}') 
-            : item.base_calculo || undefined
-        };
+      const transformedData: PayrollNovedad[] = (data || []).map(item => ({
+        ...item,
+        base_calculo: typeof item.base_calculo === 'string' 
+          ? JSON.parse(item.base_calculo || '{}') 
+          : item.base_calculo || undefined
+      }));
 
-        console.log('🔍 V21.0 DIAGNOSIS - Transforming item:', {
-          id: item.id,
-          tipo_novedad: item.tipo_novedad,
-          valor_before: item.valor,
-          valor_after: transformed.valor,
-          dias_before: item.dias,
-          dias_after: transformed.dias
-        });
-
-        return transformed;
-      });
-
-      console.log(`✅ V21.0 DIAGNOSIS - Found ${transformedData.length} novedades for employee, incapacidades transformed:`, 
-        transformedData.filter(n => n.tipo_novedad === 'incapacidad').map(n => ({
-          id: n.id,
-          valor_final: n.valor,
-          valor_final_type: typeof n.valor,
-          dias_final: n.dias,
-          dias_final_type: typeof n.dias
-        }))
-      );
-      
+      console.log(`✅ Found ${transformedData.length} novedades for employee`);
       return transformedData;
     } catch (error) {
-      console.error('❌ V21.0 DIAGNOSIS - Error in getEmployeeNovedades:', error);
+      console.error('❌ Error in getEmployeeNovedades:', error);
       return [];
     }
   }

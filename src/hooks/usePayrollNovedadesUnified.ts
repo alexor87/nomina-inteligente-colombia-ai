@@ -1,9 +1,9 @@
+
 import { useState, useCallback, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { NovedadesCalculationService, NovedadesTotals } from '@/services/NovedadesCalculationService';
 import { NovedadesEnhancedService } from '@/services/NovedadesEnhancedService';
 import { CreateNovedadData } from '@/types/novedades-enhanced';
-import { toNumber, toInteger } from '@/lib/numberUtils';
 import type { Tables } from '@/integrations/supabase/types';
 
 type PayrollNovedad = Tables<'payroll_novedades'>;
@@ -67,7 +67,7 @@ export const usePayrollNovedadesUnified = (periodId: string) => {
     const createdNovedades: PayrollNovedad[] = [];
     
     try {
-      console.log(`🚀 V21.0 Creating ${novedadesArray.length} novelties with normalization`);
+      console.log(`🚀 Creating ${novedadesArray.length} novelties`);
       
       // Get company_id if not provided
       let companyId = novedadesArray[0]?.company_id;
@@ -89,41 +89,22 @@ export const usePayrollNovedadesUnified = (periodId: string) => {
       
       // Crear cada novedad
       for (const novedadData of novedadesArray) {
-        // ✅ V21.0: NORMALIZACIÓN FINAL DE DATOS ANTES DEL ENVÍO
         const createData: CreateNovedadData = {
           ...novedadData,
           periodo_id: periodId,
-          company_id: companyId,
-          // ✅ V21.0: Aplicar normalización robusta aquí también como última defensa
-          valor: toNumber(novedadData.valor),
-          horas: novedadData.horas ? toNumber(novedadData.horas) : undefined,
-          dias: novedadData.dias ? toInteger(novedadData.dias) : undefined,
+          company_id: companyId, // ✅ Ensure company_id is always present
+          valor: Number(novedadData.valor) || 0, // ✅ Ensure valor is always a number
+          horas: novedadData.horas ? Number(novedadData.horas) : undefined,
+          dias: novedadData.dias ? Number(novedadData.dias) : undefined,
           constitutivo_salario: novedadData.constitutivo_salario || false
         };
 
-        console.log('💾 V21.0 Creating novelty with final normalization:', {
-          original: {
-            valor: novedadData.valor,
-            dias: novedadData.dias,
-            horas: novedadData.horas
-          },
-          normalized: {
-            valor: createData.valor,
-            dias: createData.dias,
-            horas: createData.horas
-          },
-          types: {
-            valor: typeof createData.valor,
-            dias: typeof createData.dias,
-            horas: typeof createData.horas
-          }
-        });
-
+        console.log('💾 Creating novelty:', createData);
         const result = await NovedadesEnhancedService.createNovedad(createData);
         
         if (result) {
           createdNovedades.push(result);
-          console.log('✅ V21.0 Novelty created successfully:', result);
+          console.log('✅ Novelty created:', result);
         }
       }
 
@@ -146,7 +127,7 @@ export const usePayrollNovedadesUnified = (periodId: string) => {
       
       return createdNovedades;
     } catch (error) {
-      console.error('❌ V21.0 Error creating novelties:', error);
+      console.error('❌ Error creating novelties:', error);
       
       let errorMessage = 'No se pudieron crear las novedades';
       if (error instanceof Error) {
