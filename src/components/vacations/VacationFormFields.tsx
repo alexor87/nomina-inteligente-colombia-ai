@@ -77,7 +77,12 @@ export const VacationFormFields = ({
           disabled={isSubmitting}
         >
           <SelectTrigger>
-            <SelectValue placeholder="Seleccionar empleado" />
+            <SelectValue placeholder="Seleccionar empleado">
+              {selectedEmployee 
+                ? `${selectedEmployee.nombre} ${selectedEmployee.apellido}` 
+                : "Seleccionar empleado"
+              }
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {employees.map((employee) => (
