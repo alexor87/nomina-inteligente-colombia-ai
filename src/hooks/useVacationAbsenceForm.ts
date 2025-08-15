@@ -16,7 +16,8 @@ interface PeriodInfo {
 
 export const useVacationAbsenceForm = (
   editingVacation?: VacationAbsence | null,
-  isOpen?: boolean
+  isOpen?: boolean,
+  preselectedEmployeeId?: string // ✅ NUEVO: Parámetro para empleado pre-seleccionado
 ) => {
   const [formData, setFormData] = useState<VacationAbsenceFormData>({
     employee_id: '',
@@ -31,7 +32,7 @@ export const useVacationAbsenceForm = (
   
   const { detectPeriodForDates, isDetecting } = usePeriodDetection();
 
-  // Load editing data
+  // ✅ MODIFICADO: Load editing data o empleado pre-seleccionado
   useEffect(() => {
     if (editingVacation) {
       setFormData({
@@ -43,8 +44,9 @@ export const useVacationAbsenceForm = (
         observations: editingVacation.observations || ''
       });
     } else {
+      // ✅ NUEVO: Si no hay editingVacation pero sí empleado pre-seleccionado, usar ese empleado
       setFormData({
-        employee_id: '',
+        employee_id: preselectedEmployeeId || '',
         type: 'vacaciones',
         subtipo: undefined,
         start_date: '',
@@ -53,7 +55,7 @@ export const useVacationAbsenceForm = (
       });
       setPeriodInfo(null);
     }
-  }, [editingVacation, isOpen]);
+  }, [editingVacation, isOpen, preselectedEmployeeId]); // ✅ MODIFICADO: Agregar preselectedEmployeeId a dependencias
 
   // 🎯 CORRECCIÓN: Detección automática TANTO para crear como para editar
   useEffect(() => {

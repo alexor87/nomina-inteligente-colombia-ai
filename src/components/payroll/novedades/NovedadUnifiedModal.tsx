@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -491,7 +490,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       return renderNovedadForm();
     }
 
-    // ✅ NUEVO: Renderizar el modal de ausencias
+    // ✅ MODIFICADO: Pasar empleado pre-seleccionado al modal de ausencias
     if (currentStep === 'absence' && selectedAbsenceType && employeeId) {
       return (
         <VacationAbsenceForm
@@ -499,18 +498,8 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
           onClose={handleBackToSelector}
           onSubmit={handleAbsenceSubmit}
           isSubmitting={isSubmitting}
-          editingVacation={{
-            id: '',
-            employee_id: employeeId,
-            company_id: companyId || '',
-            type: selectedAbsenceType,
-            start_date: '',
-            end_date: '',
-            days_count: 0,
-            status: 'pendiente',
-            created_at: '',
-            updated_at: ''
-          }}
+          preselectedEmployeeId={employeeId}
+          editingVacation={null}
         />
       );
     }

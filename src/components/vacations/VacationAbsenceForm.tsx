@@ -14,6 +14,7 @@ interface VacationAbsenceFormProps {
   onSubmit: (data: VacationAbsenceFormData, periodInfo?: any) => Promise<void>;
   editingVacation?: VacationAbsence | null;
   isSubmitting?: boolean;
+  preselectedEmployeeId?: string; // ✅ NUEVO: Prop para empleado pre-seleccionado
 }
 
 export const VacationAbsenceForm = ({
@@ -21,7 +22,8 @@ export const VacationAbsenceForm = ({
   onClose,
   onSubmit,
   editingVacation,
-  isSubmitting = false
+  isSubmitting = false,
+  preselectedEmployeeId // ✅ NUEVO: Recibir empleado pre-seleccionado
 }: VacationAbsenceFormProps) => {
   const { 
     formData, 
@@ -29,7 +31,7 @@ export const VacationAbsenceForm = ({
     calculatedDays, 
     periodInfo, 
     isDetectingPeriod 
-  } = useVacationAbsenceForm(editingVacation, isOpen);
+  } = useVacationAbsenceForm(editingVacation, isOpen, preselectedEmployeeId); // ✅ MODIFICADO: Pasar empleado pre-seleccionado
   
   const { data: employees = [] } = useVacationEmployees(isOpen);
 
