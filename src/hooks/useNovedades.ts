@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { NovedadesEnhancedService } from '@/services/NovedadesEnhancedService';
 import { PayrollIntegratedDataService } from '@/services/PayrollIntegratedDataService';
@@ -48,7 +47,10 @@ export const useNovedades = (periodId: string) => {
   });
 
   const createNovedad = useCallback(async (data: CreateNovedadData) => {
-    console.log('🚀 useNovedades - Creating novedad with data:', data);
+    console.log('🚀 V20.0 DIAGNOSIS - useNovedades createNovedad called with:', {
+      ...data,
+      timestamp: new Date().toISOString()
+    });
 
     // ✅ V19.0: Estructura directa como el código que funciona
     let createData: CreateNovedadData = { ...data };
@@ -76,14 +78,24 @@ export const useNovedades = (periodId: string) => {
     // ✅ V19.0: Asegurar period ID correcto
     createData.periodo_id = periodId;
 
-    console.log('📤 useNovedades - Final create data:', createData);
+    console.log('📤 V20.0 DIAGNOSIS - useNovedades final createData before service call:', {
+      ...createData,
+      timestamp: new Date().toISOString()
+    });
 
     try {
       // ✅ V19.0: Llamar al servicio para guardar en base de datos
       const result = await NovedadesEnhancedService.createNovedad(createData);
       
       if (result) {
-        console.log('✅ useNovedades - Novedad created successfully:', result);
+        console.log('✅ V20.0 DIAGNOSIS - useNovedades received result from service:', {
+          id: result.id,
+          tipo_novedad: result.tipo_novedad,
+          subtipo: result.subtipo,
+          valor: result.valor,
+          dias: result.dias,
+          timestamp: new Date().toISOString()
+        });
         
         // ✅ V19.0: Toast de éxito inmediato como el código que funciona
         toast({
@@ -104,7 +116,7 @@ export const useNovedades = (periodId: string) => {
       
       throw new Error('Failed to create novedad');
     } catch (error: any) {
-      console.error('❌ useNovedades - Error creating novedad:', error);
+      console.error('❌ V20.0 DIAGNOSIS - useNovedades error creating novedad:', error);
       toast({
         title: "Error",
         description: error.message || "No se pudo crear la novedad",
@@ -144,9 +156,10 @@ export const useNovedades = (periodId: string) => {
     try {
       if (!periodId) return [];
       
-      console.log('🔄 useNovedades - Cargando datos unificados (sin duplicados):', {
+      console.log('🔄 V20.0 DIAGNOSIS - useNovedades loadIntegratedNovedades called:', {
         employeeId,
-        periodId
+        periodId,
+        timestamp: new Date().toISOString()
       });
 
       // Usar el servicio simplificado que solo consulta payroll_novedades
@@ -155,15 +168,22 @@ export const useNovedades = (periodId: string) => {
         periodId
       );
 
-      console.log('✅ useNovedades - Datos unificados cargados sin duplicados:', {
+      console.log('✅ V20.0 DIAGNOSIS - useNovedades received unified data:', {
         totalElementos: unifiedData.length,
         novedades: unifiedData.filter(item => item.origen === 'novedades').length,
-        ausenciasFragmentadas: unifiedData.filter(item => item.origen === 'vacaciones').length
+        ausenciasFragmentadas: unifiedData.filter(item => item.origen === 'vacaciones').length,
+        incapacidades: unifiedData.filter(item => item.tipo === 'incapacidad').map(item => ({
+          id: item.id,
+          valor: item.valor,
+          dias: item.dias,
+          subtipo: item.subtipo
+        })),
+        timestamp: new Date().toISOString()
       });
 
       return unifiedData;
     } catch (error) {
-      console.error('❌ useNovedades - Error loading unified data:', error);
+      console.error('❌ V20.0 DIAGNOSIS - useNovedades error loading unified data:', error);
       return [];
     }
   }, [periodId]);

@@ -168,10 +168,10 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
       observacion: formData.observacion || undefined
     };
 
-    console.log('📤 V18.0: Enviando datos con valor:', {
-      valor: submitData.valor,
+    console.log('📤 V20.0 DIAGNOSIS - NovedadIncapacidadForm submitting data:', {
+      ...submitData,
       isManual: isManualValue,
-      dias: calculatedDays
+      timestamp: new Date().toISOString()
     });
 
     onSubmit(submitData);

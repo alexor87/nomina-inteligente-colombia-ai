@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { DisplayNovedad, convertNovedadToDisplay } from '@/types/vacation-integration';
 import { NovedadesEnhancedService } from './NovedadesEnhancedService';
@@ -14,9 +13,10 @@ export class PayrollIntegratedDataService {
     periodId: string
   ): Promise<DisplayNovedad[]> {
     try {
-      console.log('🔍 PayrollIntegratedDataService - Obteniendo datos unificados (solo novedades):', {
+      console.log('🔍 V20.0 DIAGNOSIS - PayrollIntegratedDataService called:', {
         employeeId,
-        periodId
+        periodId,
+        timestamp: new Date().toISOString()
       });
 
       // Obtener información del período
@@ -27,7 +27,7 @@ export class PayrollIntegratedDataService {
         .single();
 
       if (!period) {
-        console.error('❌ Período no encontrado:', periodId);
+        console.error('❌ V20.0 DIAGNOSIS - Período no encontrado:', periodId);
         return [];
       }
 
@@ -47,10 +47,34 @@ export class PayrollIntegratedDataService {
         periodId
       );
 
+      console.log('📊 V20.0 DIAGNOSIS - PayrollIntegratedDataService raw novedades data:', {
+        totalRecords: novedadesData.length,
+        incapacidades: novedadesData.filter(n => n.tipo_novedad === 'incapacidad').map(n => ({
+          id: n.id,
+          valor: n.valor,
+          dias: n.dias,
+          subtipo: n.subtipo,
+          fecha_inicio: n.fecha_inicio,
+          fecha_fin: n.fecha_fin
+        })),
+        timestamp: new Date().toISOString()
+      });
+
       // Convertir todas las novedades a formato display
       const displayData: DisplayNovedad[] = novedadesData.map(novedad => {
         // Para ausencias sincronizadas, usar la fragmentación ya aplicada por los triggers
-        return convertNovedadToDisplay(novedad);
+        const converted = convertNovedadToDisplay(novedad);
+        
+        console.log('🔄 V20.0 DIAGNOSIS - Converting novedad to display:', {
+          originalId: novedad.id,
+          originalValor: novedad.valor,
+          originalDias: novedad.dias,
+          convertedValor: converted.valor,
+          convertedDias: converted.dias,
+          tipo: converted.tipo
+        });
+        
+        return converted;
       });
 
       // Ordenar por fecha de creación (más recientes primero)
@@ -58,16 +82,23 @@ export class PayrollIntegratedDataService {
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
 
-      console.log('✅ PayrollIntegratedDataService - Datos unificados obtenidos:', {
+      console.log('✅ V20.0 DIAGNOSIS - PayrollIntegratedDataService final display data:', {
         totalElementos: sortedData.length,
         novedades: sortedData.filter(item => item.origen === 'novedades').length,
-        ausenciasFragmentadas: sortedData.filter(item => item.origen === 'vacaciones').length
+        ausenciasFragmentadas: sortedData.filter(item => item.origen === 'vacaciones').length,
+        incapacidades: sortedData.filter(item => item.tipo === 'incapacidad').map(item => ({
+          id: item.id,
+          valor: item.valor,
+          dias: item.dias,
+          subtipo: item.subtipo
+        })),
+        timestamp: new Date().toISOString()
       });
 
       return sortedData;
 
     } catch (error) {
-      console.error('❌ PayrollIntegratedDataService - Error obteniendo datos unificados:', error);
+      console.error('❌ V20.0 DIAGNOSIS - PayrollIntegratedDataService error:', error);
       return [];
     }
   }

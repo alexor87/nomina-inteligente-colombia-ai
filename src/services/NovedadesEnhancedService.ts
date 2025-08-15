@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Database, Tables } from '@/integrations/supabase/types';
 
@@ -46,6 +45,12 @@ export class NovedadesEnhancedService {
   
   static async getNovedadesByEmployee(employeeId: string, periodId: string): Promise<PayrollNovedad[]> {
     try {
+      console.log('🔍 V20.0 DIAGNOSIS - getNovedadesByEmployee called with:', {
+        employeeId,
+        periodId,
+        timestamp: new Date().toISOString()
+      });
+
       const { data: novedades, error } = await supabase
         .from('payroll_novedades')
         .select('*')
@@ -53,20 +58,38 @@ export class NovedadesEnhancedService {
         .eq('periodo_id', periodId);
 
       if (error) {
-        console.error('Error obteniendo novedades:', error);
+        console.error('❌ V20.0 DIAGNOSIS - Error obteniendo novedades:', error);
         return [];
       }
+
+      console.log('✅ V20.0 DIAGNOSIS - Raw data from database:', {
+        totalRecords: novedades?.length || 0,
+        records: novedades?.map(n => ({
+          id: n.id,
+          tipo_novedad: n.tipo_novedad,
+          subtipo: n.subtipo,
+          valor: n.valor,
+          dias: n.dias,
+          fecha_inicio: n.fecha_inicio,
+          fecha_fin: n.fecha_fin
+        })) || []
+      });
 
       return (novedades || []) as PayrollNovedad[];
       
     } catch (error) {
-      console.error('Error crítico en getNovedadesByEmployee:', error);
+      console.error('❌ V20.0 DIAGNOSIS - Error crítico en getNovedadesByEmployee:', error);
       return [];
     }
   }
 
   static async createNovedad(novedadData: CreateNovedadData): Promise<PayrollNovedad | null> {
     try {
+      console.log('🚀 V20.0 DIAGNOSIS - createNovedad called with original data:', {
+        ...novedadData,
+        timestamp: new Date().toISOString()
+      });
+
       // Get company_id if not provided
       let companyId = novedadData.company_id;
       
@@ -104,6 +127,11 @@ export class NovedadesEnhancedService {
         constitutivo_salario: Boolean(novedadData.constitutivo_salario)
       };
 
+      console.log('📤 V20.0 DIAGNOSIS - Final insert data before Supabase call:', {
+        ...insertData,
+        timestamp: new Date().toISOString()
+      });
+
       const { data: novedad, error } = await supabase
         .from('payroll_novedades')
         .insert(insertData as any)
@@ -111,9 +139,20 @@ export class NovedadesEnhancedService {
         .single();
 
       if (error) {
-        console.error('Error insertando novedad:', error);
+        console.error('❌ V20.0 DIAGNOSIS - Supabase insert error:', error);
         throw error;
       }
+
+      console.log('✅ V20.0 DIAGNOSIS - Novedad created successfully, response from DB:', {
+        id: novedad.id,
+        tipo_novedad: novedad.tipo_novedad,
+        subtipo: novedad.subtipo,
+        valor: novedad.valor,
+        dias: novedad.dias,
+        fecha_inicio: novedad.fecha_inicio,
+        fecha_fin: novedad.fecha_fin,
+        timestamp: new Date().toISOString()
+      });
 
       // Log audit action
       try {
@@ -134,7 +173,7 @@ export class NovedadesEnhancedService {
       return novedad as PayrollNovedad;
       
     } catch (error) {
-      console.error('Error crítico creando novedad:', error);
+      console.error('❌ V20.0 DIAGNOSIS - Error crítico creando novedad:', error);
       throw error;
     }
   }
