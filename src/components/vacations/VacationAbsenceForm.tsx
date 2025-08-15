@@ -15,7 +15,8 @@ interface VacationAbsenceFormProps {
   editingVacation?: VacationAbsence | null;
   isSubmitting?: boolean;
   preselectedEmployeeId?: string;
-  useCustomModal?: boolean; // ✅ NUEVO: Controla si usar CustomModal wrapper
+  useCustomModal?: boolean;
+  hideEmployeeSelection?: boolean; // ✅ NUEVO: Prop para ocultar dropdown del empleado
 }
 
 export const VacationAbsenceForm = ({
@@ -25,7 +26,8 @@ export const VacationAbsenceForm = ({
   editingVacation,
   isSubmitting = false,
   preselectedEmployeeId,
-  useCustomModal = true // ✅ NUEVO: Por defecto true para compatibilidad
+  useCustomModal = true,
+  hideEmployeeSelection = false // ✅ NUEVO: Por defecto false para compatibilidad
 }: VacationAbsenceFormProps) => {
   const { 
     formData, 
@@ -63,7 +65,6 @@ export const VacationAbsenceForm = ({
     }
 
     try {
-      // 🎯 CORRECCIÓN KISS: Pasar periodInfo como segundo parámetro
       await onSubmit(formData, periodInfo);
       onClose();
     } catch (error) {
@@ -71,7 +72,7 @@ export const VacationAbsenceForm = ({
     }
   };
 
-  // ✅ NUEVO: Contenido del formulario separado
+  // ✅ CONTENIDO DEL FORMULARIO: Pasar hideEmployeeSelection a VacationFormFields
   const formContent = (
     <>
       <div className="flex items-center gap-2 mb-6">
@@ -90,6 +91,7 @@ export const VacationAbsenceForm = ({
           isSubmitting={isSubmitting}
           periodInfo={periodInfo}
           isDetectingPeriod={isDetectingPeriod}
+          hideEmployeeSelection={hideEmployeeSelection} // ✅ NUEVO: Pasar prop
         />
 
         <VacationFormActions
@@ -126,6 +128,7 @@ export const VacationAbsenceForm = ({
           isSubmitting={isSubmitting}
           periodInfo={periodInfo}
           isDetectingPeriod={isDetectingPeriod}
+          hideEmployeeSelection={hideEmployeeSelection} // ✅ NUEVO: Pasar prop
         />
 
         <VacationFormActions

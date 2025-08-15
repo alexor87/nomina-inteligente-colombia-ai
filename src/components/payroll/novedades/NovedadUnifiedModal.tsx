@@ -490,12 +490,13 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       return renderNovedadForm();
     }
 
-    // ✅ MODIFICADO: Usar VacationAbsenceForm sin CustomModal wrapper
+    // ✅ MODIFICADO: Pasar hideEmployeeSelection={true} para ocultar dropdown
     if (currentStep === 'absence' && selectedAbsenceType && employeeId) {
       console.log('🎯 DEBUG: Renderizando VacationAbsenceForm con:', { 
         employeeId, 
         selectedAbsenceType,
-        isSubmitting 
+        isSubmitting,
+        hideEmployeeSelection: true 
       });
       
       return (
@@ -507,6 +508,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
           preselectedEmployeeId={employeeId}
           editingVacation={null}
           useCustomModal={false}
+          hideEmployeeSelection={true}
         />
       );
     }

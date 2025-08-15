@@ -1,4 +1,3 @@
-
 import { VacationAbsenceFormData, requiresSubtype, getSubtypesForType } from '@/types/vacations';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,6 +34,7 @@ interface VacationFormFieldsProps {
   isSubmitting: boolean;
   periodInfo: PeriodInfo | null;
   isDetectingPeriod: boolean;
+  hideEmployeeSelection?: boolean;
 }
 
 export const VacationFormFields = ({
@@ -44,7 +44,8 @@ export const VacationFormFields = ({
   calculatedDays,
   isSubmitting,
   periodInfo,
-  isDetectingPeriod
+  isDetectingPeriod,
+  hideEmployeeSelection = false
 }: VacationFormFieldsProps) => {
   const selectedEmployee = employees.find(emp => emp.id === formData.employee_id);
   const showSubtypeField = requiresSubtype(formData.type);
@@ -57,9 +58,10 @@ export const VacationFormFields = ({
       selectedEmployeeId: formData.employee_id,
       selectedEmployeeFound: !!selectedEmployee,
       selectedEmployeeName: selectedEmployee ? `${selectedEmployee.nombre} ${selectedEmployee.apellido}` : 'N/A',
-      allEmployeeIds: employees.map(emp => emp.id)
+      allEmployeeIds: employees.map(emp => emp.id),
+      hideEmployeeSelection
     });
-  }, [employees, formData.employee_id, selectedEmployee]);
+  }, [employees, formData.employee_id, selectedEmployee, hideEmployeeSelection]);
 
   const getPeriodStatusIcon = () => {
     if (isDetectingPeriod) return <Loader2 className="h-4 w-4 animate-spin" />;
@@ -80,34 +82,49 @@ export const VacationFormFields = ({
 
   return (
     <div className="space-y-6">
-      {/* Employee Selection */}
-      <div className="space-y-2">
-        <Label htmlFor="employee">Empleado *</Label>
-        <Select 
-          value={formData.employee_id} 
-          onValueChange={(value) => {
-            console.log('🎯 Empleado seleccionado:', value);
-            setFormData({ ...formData, employee_id: value });
-          }}
-          disabled={isSubmitting}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Seleccionar empleado" />
-          </SelectTrigger>
-          <SelectContent>
-            {employees.map((employee) => (
-              <SelectItem key={employee.id} value={employee.id}>
-                {employee.nombre} {employee.apellido} - {employee.cedula}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {selectedEmployee && (
-          <p className="text-sm text-muted-foreground">
-            {selectedEmployee.nombre} {selectedEmployee.apellido}
-          </p>
-        )}
-      </div>
+      {/* Employee Selection - Solo mostrar si hideEmployeeSelection es false */}
+      {!hideEmployeeSelection && (
+        <div className="space-y-2">
+          <Label htmlFor="employee">Empleado *</Label>
+          <Select 
+            value={formData.employee_id} 
+            onValueChange={(value) => {
+              console.log('🎯 Empleado seleccionado:', value);
+              setFormData({ ...formData, employee_id: value });
+            }}
+            disabled={isSubmitting}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Seleccionar empleado" />
+            </SelectTrigger>
+            <SelectContent>
+              {employees.map((employee) => (
+                <SelectItem key={employee.id} value={employee.id}>
+                  {employee.nombre} {employee.apellido} - {employee.cedula}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {selectedEmployee && (
+            <p className="text-sm text-muted-foreground">
+              {selectedEmployee.nombre} {selectedEmployee.apellido}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Mostrar empleado seleccionado cuando el dropdown está oculto */}
+      {hideEmployeeSelection && selectedEmployee && (
+        <div className="space-y-2">
+          <Label>Empleado Seleccionado</Label>
+          <div className="bg-muted px-3 py-2 rounded-md text-sm">
+            <span className="font-medium">
+              {selectedEmployee.nombre} {selectedEmployee.apellido}
+            </span>
+            <span className="text-muted-foreground"> - {selectedEmployee.cedula}</span>
+          </div>
+        </div>
+      )}
 
       {/* Absence Type */}
       <div className="space-y-2">
