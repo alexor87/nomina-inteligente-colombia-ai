@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -202,7 +203,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   }, [employeeSalary, getPeriodDate, calculateNovedad]);
 
   const handleFormSubmit = async (formData: any) => {
-    console.log('📥 V19.0 - Form data received:', formData);
+    console.log('📥 V20.2 - Form data received:', formData);
 
     if (!employeeId || !periodId) {
       toast({
@@ -219,6 +220,23 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       const dataArray = isArrayData ? formData : [formData];
       
       for (const entry of dataArray) {
+        // ✅ V20.2: CONVERSIÓN EXPLÍCITA Y DEFINITIVA DE STRINGS A NÚMEROS
+        const valorConverted = typeof entry.valor === 'string' ? parseFloat(entry.valor) : entry.valor;
+        const diasConverted = entry.dias ? (typeof entry.dias === 'string' ? parseInt(entry.dias, 10) : entry.dias) : undefined;
+        const horasConverted = entry.horas ? (typeof entry.horas === 'string' ? parseFloat(entry.horas) : entry.horas) : undefined;
+
+        console.log('🔢 V20.2 - EXPLICIT CONVERSION:', {
+          valorOriginal: entry.valor,
+          valorType: typeof entry.valor,
+          valorConverted,
+          valorConvertedType: typeof valorConverted,
+          diasOriginal: entry.dias,
+          diasType: typeof entry.dias,
+          diasConverted,
+          diasConvertedType: typeof diasConverted,
+          timestamp: new Date().toISOString()
+        });
+
         // Validaciones defensivas específicas para incapacidad (sin cambiar la UI)
         if (selectedType === 'incapacidad') {
           if (!entry.fecha_inicio || !entry.fecha_fin) {
@@ -230,7 +248,8 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
             setIsSubmitting(false);
             return;
           }
-          if (!entry.dias || entry.dias <= 0) {
+          if (!diasConverted || diasConverted <= 0 || isNaN(diasConverted)) {
+            console.error('❌ V20.2 - Invalid dias after conversion:', diasConverted);
             toast({
               title: "Días inválidos",
               description: "Los días de incapacidad deben ser mayores a 0.",
@@ -239,7 +258,8 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
             setIsSubmitting(false);
             return;
           }
-          if (!entry.valor || entry.valor <= 0) {
+          if (!valorConverted || valorConverted <= 0 || isNaN(valorConverted)) {
+            console.error('❌ V20.2 - Invalid valor after conversion:', valorConverted);
             toast({
               title: "Valor inválido",
               description: "El valor de la incapacidad debe ser mayor a 0.",
@@ -252,16 +272,16 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
 
         const constitutivo = determineConstitutivo(selectedType!, entry.subtipo);
         
-        // ✅ V19.0: Estructura simple y directa como el código que funciona
+        // ✅ V20.2: Estructura con NÚMEROS GARANTIZADOS
         const createData: CreateNovedadData = {
           empleado_id: employeeId,
           periodo_id: periodId,
           company_id: companyId || '',
           tipo_novedad: selectedType!,
-          // ✅ V19.0: Pasar datos directamente sin conversiones defensivas
-          valor: entry.valor,
-          horas: entry.horas,
-          dias: entry.dias,
+          // ✅ V20.2: VALORES NUMÉRICOS EXPLÍCITAMENTE CONVERTIDOS
+          valor: valorConverted,
+          horas: horasConverted,
+          dias: diasConverted,
           observacion: entry.observacion,
           fecha_inicio: entry.fecha_inicio,
           fecha_fin: entry.fecha_fin,
@@ -270,7 +290,13 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
           constitutivo_salario: constitutivo
         };
         
-        console.log('📤 V19.0 - Submitting create data:', createData);
+        console.log('📤 V20.2 - FINAL SUBMIT DATA WITH GUARANTEED NUMBERS:', {
+          ...createData,
+          valorType: typeof createData.valor,
+          diasType: typeof createData.dias,
+          horasType: typeof createData.horas,
+          timestamp: new Date().toISOString()
+        });
         
         await onSubmit(createData);
 
