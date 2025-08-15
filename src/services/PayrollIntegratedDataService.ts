@@ -1,4 +1,5 @@
 
+
 import { supabase } from '@/integrations/supabase/client';
 import { DisplayNovedad, convertNovedadToDisplay } from '@/types/vacation-integration';
 import { NovedadesEnhancedService } from './NovedadesEnhancedService';
@@ -14,7 +15,7 @@ export class PayrollIntegratedDataService {
     periodId: string
   ): Promise<DisplayNovedad[]> {
     try {
-      console.log('🔍 V20.0 DIAGNOSIS - PayrollIntegratedDataService called:', {
+      console.log('🔍 V21.0 DIAGNOSIS - PayrollIntegratedDataService called:', {
         employeeId,
         periodId,
         timestamp: new Date().toISOString()
@@ -28,7 +29,7 @@ export class PayrollIntegratedDataService {
         .single();
 
       if (!period) {
-        console.error('❌ V20.0 DIAGNOSIS - Período no encontrado:', periodId);
+        console.error('❌ V21.0 DIAGNOSIS - Período no encontrado:', periodId);
         return [];
       }
 
@@ -41,19 +42,44 @@ export class PayrollIntegratedDataService {
 
       const employeeSalary = employee?.salario_base || 0;
 
-      // SOLUCIÓN KISS: Solo obtener datos de payroll_novedades
-      // Los triggers ya fragmentan correctamente las ausencias multi-período
+      // 🔍 DIAGNÓSTICO ESPECÍFICO: Consulta directa a la BD para ver datos RAW
+      console.log('🔍 V21.0 DIAGNOSIS - Consultando datos RAW de payroll_novedades...');
+      const { data: rawNovedades, error: rawError } = await supabase
+        .from('payroll_novedades')
+        .select('*')
+        .eq('empleado_id', employeeId)
+        .eq('periodo_id', periodId);
+
+      console.log('🔍 V21.0 DIAGNOSIS - Datos RAW de BD:', {
+        rawNovedades,
+        rawError,
+        totalRecords: rawNovedades?.length || 0,
+        incapacidadesRaw: rawNovedades?.filter(n => n.tipo_novedad === 'incapacidad').map(n => ({
+          id: n.id,
+          valor_raw: n.valor,
+          valor_type: typeof n.valor,
+          dias_raw: n.dias,
+          dias_type: typeof n.dias,
+          subtipo: n.subtipo,
+          fecha_inicio: n.fecha_inicio,
+          fecha_fin: n.fecha_fin
+        }))
+      });
+
+      // SOLUCIÓN KISS: Solo obtener datos de payroll_novedades usando el servicio existente
       const novedadesData = await NovedadesEnhancedService.getNovedadesByEmployee(
         employeeId,
         periodId
       );
 
-      console.log('📊 V20.0 DIAGNOSIS - PayrollIntegratedDataService raw novedades data:', {
+      console.log('🔍 V21.0 DIAGNOSIS - Datos después del NovedadesEnhancedService:', {
         totalRecords: novedadesData.length,
-        incapacidades: novedadesData.filter(n => n.tipo_novedad === 'incapacidad').map(n => ({
+        incapacidadesProcessed: novedadesData.filter(n => n.tipo_novedad === 'incapacidad').map(n => ({
           id: n.id,
-          valor: n.valor,
-          dias: n.dias,
+          valor_processed: n.valor,
+          valor_type: typeof n.valor,
+          dias_processed: n.dias,
+          dias_type: typeof n.dias,
           subtipo: n.subtipo,
           fecha_inicio: n.fecha_inicio,
           fecha_fin: n.fecha_fin
@@ -66,12 +92,16 @@ export class PayrollIntegratedDataService {
         // Para ausencias sincronizadas, usar la fragmentación ya aplicada por los triggers
         const converted = convertNovedadToDisplay(novedad);
         
-        console.log('🔄 V20.0 DIAGNOSIS - Converting novedad to display:', {
+        console.log('🔍 V21.0 DIAGNOSIS - Converting novedad to display:', {
           originalId: novedad.id,
           originalValor: novedad.valor,
+          originalValorType: typeof novedad.valor,
           originalDias: novedad.dias,
+          originalDiasType: typeof novedad.dias,
           convertedValor: converted.valor,
+          convertedValorType: typeof converted.valor,
           convertedDias: converted.dias,
+          convertedDiasType: typeof converted.dias,
           tipo_novedad: converted.tipo_novedad
         });
         
@@ -83,14 +113,16 @@ export class PayrollIntegratedDataService {
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
 
-      console.log('✅ V20.0 DIAGNOSIS - PayrollIntegratedDataService final display data:', {
+      console.log('✅ V21.0 DIAGNOSIS - PayrollIntegratedDataService final display data:', {
         totalElementos: sortedData.length,
         novedades: sortedData.filter(item => item.origen === 'novedades').length,
         ausenciasFragmentadas: sortedData.filter(item => item.origen === 'vacaciones').length,
-        incapacidades: sortedData.filter(item => item.tipo_novedad === 'incapacidad').map(item => ({
+        incapacidadesFinalDisplay: sortedData.filter(item => item.tipo_novedad === 'incapacidad').map(item => ({
           id: item.id,
-          valor: item.valor,
-          dias: item.dias,
+          valor_final: item.valor,
+          valor_final_type: typeof item.valor,
+          dias_final: item.dias,
+          dias_final_type: typeof item.dias,
           subtipo: item.subtipo
         })),
         timestamp: new Date().toISOString()
@@ -99,7 +131,7 @@ export class PayrollIntegratedDataService {
       return sortedData;
 
     } catch (error) {
-      console.error('❌ V20.0 DIAGNOSIS - PayrollIntegratedDataService error:', error);
+      console.error('❌ V21.0 DIAGNOSIS - PayrollIntegratedDataService error:', error);
       return [];
     }
   }
@@ -135,3 +167,4 @@ export class PayrollIntegratedDataService {
     return Math.max(0, diffDays);
   }
 }
+
