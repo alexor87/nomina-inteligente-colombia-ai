@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -18,6 +19,9 @@ import { NovedadRecargoConsolidatedForm } from './forms/NovedadRecargoConsolidat
 import { NovedadVacacionesConsolidatedForm } from './forms/NovedadVacacionesConsolidatedForm';
 import { NovedadVacacionesForm } from './forms/NovedadVacacionesForm';
 import { useNovedadBackendCalculation } from '@/hooks/useNovedadBackendCalculation';
+import { VacationAbsenceForm } from '@/components/vacations/VacationAbsenceForm';
+import { VacationAbsenceFormData, VacationAbsenceType } from '@/types/vacations';
+import { useVacationEmployees } from '@/hooks/useVacationEmployees';
 
 interface NovedadUnifiedModalProps {
   open: boolean;
@@ -49,6 +53,15 @@ const categoryToNovedadType: Record<NovedadCategory, NovedadType> = {
   'retefuente': 'retencion_fuente'
 };
 
+// ✅ NUEVO: Mapeo de categorías que abren el modal de ausencias
+const categoryToAbsenceType: Record<string, VacationAbsenceType> = {
+  'vacaciones': 'vacaciones',
+  'incapacidades': 'incapacidad',
+  'licencias': 'licencia_remunerada'
+};
+
+const ABSENCE_CATEGORIES = ['vacaciones', 'incapacidades', 'licencias'];
+
 export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   open,
   setOpen,
@@ -64,8 +77,9 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   mode = 'liquidacion',
   companyId
 }) => {
-  const [currentStep, setCurrentStep] = useState<'list' | 'selector' | 'form'>('list');
+  const [currentStep, setCurrentStep] = useState<'list' | 'selector' | 'form' | 'absence'>('list');
   const [selectedType, setSelectedType] = useState<NovedadType | null>(selectedNovedadType);
+  const [selectedAbsenceType, setSelectedAbsenceType] = useState<VacationAbsenceType | null>(null);
   const [employeeName, setEmployeeName] = useState<string>('');
   const [employeeFullName, setEmployeeFullName] = useState<string>('');
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
@@ -161,12 +175,23 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     setIsSubmitting(false);
     setCurrentStep('list');
     setSelectedType(null);
+    setSelectedAbsenceType(null);
     setRefreshTrigger(0);
     setOpen(false);
     onClose?.();
   };
 
   const handleCategorySelect = (category: NovedadCategory) => {
+    // ✅ NUEVO: Verificar si es una categoría que abre el modal de ausencias
+    if (ABSENCE_CATEGORIES.includes(category)) {
+      const absenceType = categoryToAbsenceType[category];
+      setSelectedAbsenceType(absenceType);
+      setCurrentStep('absence');
+      console.log('🎯 Abriendo modal de ausencias para:', { category, absenceType });
+      return;
+    }
+
+    // ✅ Comportamiento normal para otras categorías
     const novedadType = categoryToNovedadType[category];
     setSelectedType(novedadType);
     setCurrentStep('form');
@@ -175,6 +200,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   const handleBackToSelector = () => {
     setCurrentStep('selector');
     setSelectedType(null);
+    setSelectedAbsenceType(null);
   };
 
   const handleBackToList = () => {
@@ -184,6 +210,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     } else {
       setCurrentStep('list');
       setSelectedType(null);
+      setSelectedAbsenceType(null);
       setRefreshTrigger(Date.now());
     }
   };
@@ -239,6 +266,73 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       return null;
     }
   }, [employeeSalary, getPeriodDate, calculateNovedad]);
+
+  // ✅ NUEVO: Handler para envío de ausencias
+  const handleAbsenceSubmit = async (formData: VacationAbsenceFormData, periodInfo?: any) => {
+    if (!employeeId || !periodId || !companyId) {
+      toast({
+        title: "Error",
+        description: "Faltan datos del empleado, período o empresa",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      console.log('🎯 Procesando ausencia desde módulo de novedades:', {
+        formData,
+        periodInfo,
+        employeeId,
+        periodId,
+        companyId
+      });
+
+      // ✅ Convertir datos de ausencia al formato de novedad
+      const novedadData: CreateNovedadData = {
+        empleado_id: employeeId,
+        periodo_id: periodId,
+        company_id: companyId,
+        tipo_novedad: formData.type as NovedadType,
+        subtipo: formData.subtipo,
+        valor: 0, // Se calculará automáticamente en el backend
+        dias: formData.start_date && formData.end_date 
+          ? Math.ceil((new Date(formData.end_date).getTime() - new Date(formData.start_date).getTime()) / (1000 * 60 * 60 * 24)) + 1
+          : undefined,
+        fecha_inicio: formData.start_date,
+        fecha_fin: formData.end_date,
+        observacion: formData.observations
+      };
+
+      console.log('💾 Creando novedad desde ausencia:', novedadData);
+      await onSubmit(novedadData);
+
+      // ✅ Volver al módulo de novedades después de crear
+      if (mode === 'ajustes') {
+        handleClose();
+      } else {
+        setCurrentStep('list');
+        setSelectedAbsenceType(null);
+        setRefreshTrigger(Date.now());
+      }
+
+      toast({
+        title: "✅ Éxito",
+        description: "Ausencia registrada correctamente en el módulo de novedades",
+        className: "border-green-200 bg-green-50"
+      });
+
+    } catch (error: any) {
+      console.error('❌ Error procesando ausencia:', error);
+      toast({
+        title: "Error",
+        description: error.message || "No se pudo procesar la ausencia",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleFormSubmit = async (formData: any) => {
     if (!employeeId || !periodId) {
@@ -333,16 +427,6 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
           />
         );
         
-      case 'vacaciones':
-        return (
-          <NovedadVacacionesForm
-            onBack={handleBackToSelector}
-            onSubmit={handleFormSubmit}
-            employeeSalary={employeeSalary || 0}
-            periodoFecha={getPeriodDate()}
-          />
-        );
-        
       case 'bonificacion':
         return <NovedadBonificacionesConsolidatedForm {...baseProps} />;
         
@@ -355,32 +439,6 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       case 'descuento_voluntario':
       case 'multa':
         return <NovedadDeduccionesConsolidatedForm {...baseProps} />;
-
-      case 'incapacidad':
-        return (
-          <NovedadIncapacidadForm
-            onBack={handleBackToSelector}
-            onSubmit={handleFormSubmit}
-            employeeSalary={employeeSalary || 0}
-            isSubmitting={isSubmitting}
-            periodoFecha={getPeriodDate()}
-            periodStartDate={periodStartDate}
-            periodEndDate={periodEndDate}
-          />
-        );
-        
-      case 'licencia_remunerada':
-        return (
-          <NovedadLicenciasForm
-            onBack={handleBackToSelector}
-            onSubmit={handleFormSubmit}
-            employeeSalary={employeeSalary || 0}
-            calculateSuggestedValue={calculateSuggestedValue}
-            isSubmitting={isSubmitting}
-            periodStartDate={periodStartDate}
-            periodEndDate={periodEndDate}
-          />
-        );
 
       case 'retencion_fuente':
         return (
@@ -433,6 +491,30 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       return renderNovedadForm();
     }
 
+    // ✅ NUEVO: Renderizar el modal de ausencias
+    if (currentStep === 'absence' && selectedAbsenceType && employeeId) {
+      return (
+        <VacationAbsenceForm
+          isOpen={true}
+          onClose={handleBackToSelector}
+          onSubmit={handleAbsenceSubmit}
+          isSubmitting={isSubmitting}
+          editingVacation={{
+            id: '',
+            employee_id: employeeId,
+            company_id: companyId || '',
+            type: selectedAbsenceType,
+            start_date: '',
+            end_date: '',
+            days_count: 0,
+            status: 'pendiente',
+            created_at: '',
+            updated_at: ''
+          }}
+        />
+      );
+    }
+
     return (
       <div className="p-6 text-center">
         <p className="text-gray-500">Cargando...</p>
@@ -443,7 +525,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
-        {currentStep === 'form' && (
+        {(currentStep === 'form' || currentStep === 'absence') && (
           <>
             <DialogHeader>
               <DialogTitle>
@@ -469,7 +551,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
 
         {renderContent()}
 
-        {currentStep === 'form' && (
+        {(currentStep === 'form' || currentStep === 'absence') && (
           <DialogFooter>
             <Button 
               type="button" 
