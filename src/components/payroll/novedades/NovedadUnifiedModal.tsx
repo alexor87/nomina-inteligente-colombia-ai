@@ -328,6 +328,8 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
           <NovedadRecargoConsolidatedForm 
             {...baseProps} 
             periodoFecha={getPeriodDate()}
+            periodStartDate={periodStartDate}
+            periodEndDate={periodEndDate}
           />
         );
         
@@ -362,6 +364,8 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
             employeeSalary={employeeSalary || 0}
             isSubmitting={isSubmitting}
             periodoFecha={getPeriodDate()}
+            periodStartDate={periodStartDate}
+            periodEndDate={periodEndDate}
           />
         );
         
@@ -373,6 +377,8 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
             employeeSalary={employeeSalary || 0}
             calculateSuggestedValue={calculateSuggestedValue}
             isSubmitting={isSubmitting}
+            periodStartDate={periodStartDate}
+            periodEndDate={periodEndDate}
           />
         );
 

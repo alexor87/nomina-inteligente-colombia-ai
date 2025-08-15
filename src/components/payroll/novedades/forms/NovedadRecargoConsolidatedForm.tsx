@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,6 +24,8 @@ interface NovedadRecargoConsolidatedFormProps {
   employeeSalary: number;
   isSubmitting?: boolean;
   periodoFecha?: Date;
+  periodStartDate?: string;
+  periodEndDate?: string;
 }
 
 // ✅ KISS: Tipos de recargo isolados por componente (sin cache compartido)
@@ -68,7 +69,9 @@ export const NovedadRecargoConsolidatedForm: React.FC<NovedadRecargoConsolidated
   onSubmit,
   employeeSalary,
   isSubmitting = false,
-  periodoFecha
+  periodoFecha,
+  periodStartDate,
+  periodEndDate
 }) => {
   const [entries, setEntries] = useState<RecargoEntry[]>([]);
   const [currentEntry, setCurrentEntry] = useState({
@@ -81,6 +84,18 @@ export const NovedadRecargoConsolidatedForm: React.FC<NovedadRecargoConsolidated
   // ✅ KISS: Tipos locales sin dependencias externas
   const [tiposRecargo] = useState(() => getTiposRecargoLocal(periodoFecha));
   const [isCalculating, setIsCalculating] = useState(false);
+  const [dateError, setDateError] = useState<string>('');
+
+  // ✅ KISS: Validación simple de fecha
+  const isDateInPeriod = (fecha: string): boolean => {
+    if (!fecha || !periodStartDate || !periodEndDate) return true; // Si no hay período definido, permitir
+    
+    const selectedDate = new Date(fecha + 'T00:00:00');
+    const startDate = new Date(periodStartDate + 'T00:00:00');
+    const endDate = new Date(periodEndDate + 'T00:00:00');
+    
+    return selectedDate >= startDate && selectedDate <= endDate;
+  };
 
   // ✅ KISS: Cálculo directo sin hooks complejos
   const calculateRecargoValue = async (tipo: string, horas: number, fechaEspecifica: string) => {
@@ -141,6 +156,17 @@ export const NovedadRecargoConsolidatedForm: React.FC<NovedadRecargoConsolidated
     if (!currentEntry.fecha || !currentEntry.tipo || !currentEntry.horas || parseFloat(currentEntry.horas) <= 0) {
       return;
     }
+
+    // ✅ KISS: Validación de fecha del período
+    if (!isDateInPeriod(currentEntry.fecha)) {
+      const startFormatted = periodStartDate ? new Date(periodStartDate).toLocaleDateString('es-CO') : '';
+      const endFormatted = periodEndDate ? new Date(periodEndDate).toLocaleDateString('es-CO') : '';
+      setDateError(`La fecha del recargo debe estar dentro del período de liquidación (${startFormatted} - ${endFormatted})`);
+      return;
+    }
+
+    // Limpiar error si la fecha es válida
+    setDateError('');
 
     const horas = parseFloat(currentEntry.horas);
     const valor = await calculateRecargoValue(currentEntry.tipo, horas, currentEntry.fecha);
@@ -224,8 +250,17 @@ export const NovedadRecargoConsolidatedForm: React.FC<NovedadRecargoConsolidated
               <Input
                 type="date"
                 value={currentEntry.fecha}
-                onChange={(e) => setCurrentEntry(prev => ({ ...prev, fecha: e.target.value }))}
+                onChange={(e) => {
+                  setCurrentEntry(prev => ({ ...prev, fecha: e.target.value }));
+                  setDateError(''); // Limpiar error al cambiar fecha
+                }}
+                className={dateError ? 'border-red-500' : ''}
               />
+              {dateError && (
+                <div className="text-xs text-red-600 mt-1">
+                  {dateError}
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -281,7 +316,7 @@ export const NovedadRecargoConsolidatedForm: React.FC<NovedadRecargoConsolidated
 
           <Button 
             onClick={handleAddEntry}
-            disabled={!currentEntry.fecha || !currentEntry.tipo || !currentEntry.horas || parseFloat(currentEntry.horas) <= 0 || isCalculating}
+            disabled={!currentEntry.fecha || !currentEntry.tipo || !currentEntry.horas || parseFloat(currentEntry.horas) <= 0 || isCalculating || !!dateError}
             className="w-full"
           >
             <Plus className="h-4 w-4 mr-2" />

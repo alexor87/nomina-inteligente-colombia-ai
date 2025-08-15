@@ -15,6 +15,8 @@ interface NovedadLicenciasFormProps {
   employeeSalary: number;
   calculateSuggestedValue?: (tipo: string, subtipo: string | undefined, horas?: number, dias?: number) => Promise<number | null>;
   isSubmitting: boolean;
+  periodStartDate?: string;
+  periodEndDate?: string;
 }
 
 // ✅ NUEVA ESTRUCTURA: Diferenciación legal clara con maternidad incluida
@@ -55,7 +57,9 @@ export const NovedadLicenciasForm: React.FC<NovedadLicenciasFormProps> = ({
   onSubmit,
   employeeSalary,
   calculateSuggestedValue,
-  isSubmitting
+  isSubmitting,
+  periodStartDate,
+  periodEndDate
 }) => {
   const [tipoLicencia, setTipoLicencia] = useState<string>('');
   const [subtipo, setSubtipo] = useState<string>('');
@@ -65,16 +69,42 @@ export const NovedadLicenciasForm: React.FC<NovedadLicenciasFormProps> = ({
   const [valorCalculado, setValorCalculado] = useState<number>(0);
   const [observacion, setObservacion] = useState<string>('');
   const [isCalculating, setIsCalculating] = useState(false);
+  const [dateRangeError, setDateRangeError] = useState<string>('');
+
+  // ✅ KISS: Validación simple de rango de fechas
+  const isDateRangeInPeriod = (licenseStart: string, licenseEnd: string): boolean => {
+    if (!licenseStart || !licenseEnd || !periodStartDate || !periodEndDate) return true;
+    
+    const licenseStartDate = new Date(licenseStart + 'T00:00:00');
+    const licenseEndDate = new Date(licenseEnd + 'T00:00:00');
+    const periodStart = new Date(periodStartDate + 'T00:00:00');
+    const periodEnd = new Date(periodEndDate + 'T00:00:00');
+    
+    return licenseStartDate >= periodStart && licenseEndDate <= periodEnd;
+  };
 
   const handleDateRangeChange = (start: string, end: string, calculatedDays: number) => {
     setStartDate(start);
     setEndDate(end);
     setDias(calculatedDays);
+
+    // ✅ KISS: Validar rango contra período
+    if (start && end && calculatedDays > 0) {
+      if (!isDateRangeInPeriod(start, end)) {
+        const startFormatted = periodStartDate ? new Date(periodStartDate).toLocaleDateString('es-CO') : '';
+        const endFormatted = periodEndDate ? new Date(periodEndDate).toLocaleDateString('es-CO') : '';
+        setDateRangeError(`La licencia debe estar completamente dentro del período de liquidación (${startFormatted} - ${endFormatted})`);
+      } else {
+        setDateRangeError('');
+      }
+    } else {
+      setDateRangeError('');
+    }
   };
 
   useEffect(() => {
     const calculateValue = async () => {
-      if (tipoLicencia && dias > 0 && calculateSuggestedValue) {
+      if (tipoLicencia && dias > 0 && calculateSuggestedValue && !dateRangeError) {
         setIsCalculating(true);
         
         try {
@@ -108,13 +138,18 @@ export const NovedadLicenciasForm: React.FC<NovedadLicenciasFormProps> = ({
     };
 
     calculateValue();
-  }, [tipoLicencia, subtipo, dias, calculateSuggestedValue, employeeSalary]);
+  }, [tipoLicencia, subtipo, dias, calculateSuggestedValue, employeeSalary, dateRangeError]);
 
   const handleSubmit = () => {
     if (!tipoLicencia || !startDate || !endDate || dias <= 0) return;
 
     if (!isValidDateRange(startDate, endDate)) {
       alert('El rango de fechas seleccionado no es válido');
+      return;
+    }
+
+    if (dateRangeError) {
+      alert(dateRangeError);
       return;
     }
 
@@ -140,7 +175,7 @@ export const NovedadLicenciasForm: React.FC<NovedadLicenciasFormProps> = ({
 
   const selectedType = licenciaTypes.find(t => t.value === tipoLicencia);
   const selectedSubtipo = selectedType?.subtipos.find(s => s.value === subtipo);
-  const isValid = tipoLicencia && startDate && endDate && dias > 0;
+  const isValid = tipoLicencia && startDate && endDate && dias > 0 && !dateRangeError;
 
   return (
     <div className="space-y-6">
@@ -232,7 +267,13 @@ export const NovedadLicenciasForm: React.FC<NovedadLicenciasFormProps> = ({
             onDateRangeChange={handleDateRangeChange}
             disabled={isSubmitting}
             placeholder="Seleccionar fechas de inicio y fin"
+            className={dateRangeError ? 'border-red-500' : ''}
           />
+          {dateRangeError && (
+            <div className="text-xs text-red-600 mt-1">
+              {dateRangeError}
+            </div>
+          )}
         </div>
 
         {/* Información Legal Específica */}

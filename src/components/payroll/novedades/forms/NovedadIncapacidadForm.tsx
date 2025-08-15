@@ -17,6 +17,8 @@ interface NovedadIncapacidadFormProps {
   employeeSalary: number;
   isSubmitting: boolean;
   periodoFecha?: Date;
+  periodStartDate?: string;
+  periodEndDate?: string;
 }
 
 const INCAPACIDAD_SUBTIPOS = [
@@ -41,7 +43,9 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
   onSubmit,
   employeeSalary,
   isSubmitting,
-  periodoFecha
+  periodoFecha,
+  periodStartDate,
+  periodEndDate
 }) => {
   const [formData, setFormData] = useState({
     subtipo: 'general',
@@ -52,6 +56,19 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
   });
 
   const { calculateNovedadDebounced, isLoading } = useNovedadBackendCalculation();
+  const [dateRangeError, setDateRangeError] = useState<string>('');
+
+  // ✅ KISS: Validación simple de rango de fechas
+  const isDateRangeInPeriod = (startDate: string, endDate: string): boolean => {
+    if (!startDate || !endDate || !periodStartDate || !periodEndDate) return true;
+    
+    const incapacityStart = new Date(startDate + 'T00:00:00');
+    const incapacityEnd = new Date(endDate + 'T00:00:00');
+    const periodStart = new Date(periodStartDate + 'T00:00:00');
+    const periodEnd = new Date(periodEndDate + 'T00:00:00');
+    
+    return incapacityStart >= periodStart && incapacityEnd <= periodEnd;
+  };
 
   // ✅ Calcular días automáticamente basado en las fechas
   const calculatedDays = calculateDaysBetween(formData.fecha_inicio, formData.fecha_fin);
@@ -59,7 +76,20 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
 
   // ✅ CORRECCIÓN: Cálculo automático cuando cambien fechas o subtipo
   useEffect(() => {
-    if (calculatedDays > 0 && isValidRange && formData.subtipo && employeeSalary > 0) {
+    // Validar rango de fechas contra período
+    if (formData.fecha_inicio && formData.fecha_fin && isValidRange) {
+      if (!isDateRangeInPeriod(formData.fecha_inicio, formData.fecha_fin)) {
+        const startFormatted = periodStartDate ? new Date(periodStartDate).toLocaleDateString('es-CO') : '';
+        const endFormatted = periodEndDate ? new Date(periodEndDate).toLocaleDateString('es-CO') : '';
+        setDateRangeError(`La incapacidad debe estar completamente dentro del período de liquidación (${startFormatted} - ${endFormatted})`);
+      } else {
+        setDateRangeError('');
+      }
+    } else {
+      setDateRangeError('');
+    }
+
+    if (calculatedDays > 0 && isValidRange && formData.subtipo && employeeSalary > 0 && !dateRangeError) {
       console.log('🔄 Triggering calculation for incapacidad:', {
         subtipo: formData.subtipo,
         dias: calculatedDays,
@@ -96,14 +126,14 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
           }
         }
       );
-    } else if (calculatedDays === 0 || !isValidRange) {
-      // ✅ Limpiar valor cuando no hay días válidos
+    } else if (calculatedDays === 0 || !isValidRange || dateRangeError) {
+      // ✅ Limpiar valor cuando no hay días válidos o hay error de rango
       setFormData(prev => ({ 
         ...prev, 
         valor: 0 
       }));
     }
-  }, [formData.subtipo, formData.fecha_inicio, formData.fecha_fin, calculatedDays, isValidRange, employeeSalary, calculateNovedadDebounced, periodoFecha]);
+  }, [formData.subtipo, formData.fecha_inicio, formData.fecha_fin, calculatedDays, isValidRange, employeeSalary, calculateNovedadDebounced, periodoFecha, dateRangeError, periodStartDate, periodEndDate]);
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -122,6 +152,11 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
 
     if (!isValidRange) {
       alert('La fecha de fin debe ser igual o posterior a la fecha de inicio');
+      return;
+    }
+
+    if (dateRangeError) {
+      alert(dateRangeError);
       return;
     }
 
@@ -215,6 +250,7 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
               type="date"
               value={formData.fecha_inicio}
               onChange={(e) => handleInputChange('fecha_inicio', e.target.value)}
+              className={dateRangeError ? 'border-red-500' : ''}
             />
           </div>
 
@@ -224,10 +260,16 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
               type="date"
               value={formData.fecha_fin}
               onChange={(e) => handleInputChange('fecha_fin', e.target.value)}
+              className={dateRangeError ? 'border-red-500' : ''}
             />
             {!isValidRange && formData.fecha_inicio && formData.fecha_fin && (
               <div className="text-xs text-red-600 mt-1">
                 La fecha de fin debe ser igual o posterior a la fecha de inicio
+              </div>
+            )}
+            {dateRangeError && (
+              <div className="text-xs text-red-600 mt-1">
+                {dateRangeError}
               </div>
             )}
           </div>
@@ -321,7 +363,7 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
         </Button>
         <Button 
           onClick={handleSubmit}
-          disabled={!formData.fecha_inicio || !formData.fecha_fin || !isValidRange || calculatedDays <= 0 || formData.valor <= 0 || isSubmitting}
+          disabled={!formData.fecha_inicio || !formData.fecha_fin || !isValidRange || calculatedDays <= 0 || formData.valor <= 0 || isSubmitting || !!dateRangeError}
           className="bg-blue-600 hover:bg-blue-700"
         >
           {isSubmitting ? 'Guardando...' : 'Guardar Incapacidad'}
