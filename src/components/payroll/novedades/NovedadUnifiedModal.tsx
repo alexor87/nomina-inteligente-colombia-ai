@@ -522,7 +522,13 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
+      <DialogContent 
+        className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto"
+        onInteractOutside={(event) => {
+          // Prevenir cierre al hacer clic fuera del modal
+          event.preventDefault();
+        }}
+      >
         {(currentStep === 'form' || currentStep === 'absence') && (
           <>
             <DialogHeader>
