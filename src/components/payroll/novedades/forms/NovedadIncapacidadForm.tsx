@@ -52,6 +52,9 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
     observacion: ''
   });
 
+  // ✅ V18.0: Estado separado para manejar valores manuales
+  const [isManualValue, setIsManualValue] = useState(false);
+
   const { calculateNovedadDebounced, isLoading } = useNovedadBackendCalculation();
 
   const calculatedDays = React.useMemo(() => {
@@ -76,16 +79,48 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
         fechaPeriodo: fechaPeriodoISO
       },
       (result) => {
-        if (result && typeof result.valor === 'number') {
+        // ✅ V18.0: Solo actualizar si NO es un valor manual
+        if (result && typeof result.valor === 'number' && !isManualValue) {
+          console.log('🔄 V18.0: Actualizando valor automático:', result.valor);
           setFormData(prev => ({ ...prev, valor: result.valor }));
+        } else if (isManualValue) {
+          console.log('🔒 V18.0: Preservando valor manual, no sobrescribiendo');
         }
       },
       0
     );
-  }, [formData.subtipo, formData.fecha_inicio, formData.fecha_fin, calculatedDays, isValidRange, employeeSalary, calculateNovedadDebounced, periodoFecha]);
+  }, [formData.subtipo, formData.fecha_inicio, formData.fecha_fin, calculatedDays, isValidRange, employeeSalary, calculateNovedadDebounced, periodoFecha, isManualValue]);
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  // ✅ V18.0: Manejo específico para valor manual
+  const handleValorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawValue = e.target.value;
+    
+    // Si el usuario está editando, marcar como manual
+    if (rawValue !== '') {
+      setIsManualValue(true);
+      console.log('✏️ V18.0: Valor marcado como manual:', rawValue);
+    }
+    
+    // ✅ V18.0: Mejorar validación de parseFloat
+    let parsedValue = 0;
+    if (rawValue && rawValue.trim() !== '') {
+      const parsed = parseFloat(rawValue);
+      if (!isNaN(parsed) && parsed >= 0) {
+        parsedValue = parsed;
+      } else {
+        // Si el valor no es válido, mantener el anterior
+        return;
+      }
+    } else {
+      // Si está vacío, resetear a manual false
+      setIsManualValue(false);
+    }
+    
+    setFormData(prev => ({ ...prev, valor: parsedValue }));
   };
 
   const handleSubmit = () => {
@@ -93,16 +128,21 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
       return;
     }
 
-    // Simple, direct data submission
     const submitData = {
       tipo_novedad: 'incapacidad',
       subtipo: formData.subtipo,
       dias: calculatedDays,
       fecha_inicio: formData.fecha_inicio,
       fecha_fin: formData.fecha_fin,
-      valor: formData.valor,
+      valor: formData.valor, // ✅ V18.0: Enviar valor preservado (manual o automático)
       observacion: formData.observacion || undefined
     };
+
+    console.log('📤 V18.0: Enviando datos con valor:', {
+      valor: submitData.valor,
+      isManual: isManualValue,
+      dias: calculatedDays
+    });
 
     onSubmit(submitData);
   };
@@ -131,7 +171,11 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
           <Label htmlFor="subtipo" className="text-gray-700">Tipo de Incapacidad</Label>
           <Select
             value={formData.subtipo}
-            onValueChange={(value) => handleInputChange('subtipo', value)}
+            onValueChange={(value) => {
+              handleInputChange('subtipo', value);
+              // Reset manual flag when changing subtipo
+              setIsManualValue(false);
+            }}
           >
             <SelectTrigger>
               <SelectValue />
@@ -171,7 +215,11 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
             <Input
               type="date"
               value={formData.fecha_inicio}
-              onChange={(e) => handleInputChange('fecha_inicio', e.target.value)}
+              onChange={(e) => {
+                handleInputChange('fecha_inicio', e.target.value);
+                // Reset manual flag when changing dates
+                setIsManualValue(false);
+              }}
             />
           </div>
 
@@ -180,7 +228,11 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
             <Input
               type="date"
               value={formData.fecha_fin}
-              onChange={(e) => handleInputChange('fecha_fin', e.target.value)}
+              onChange={(e) => {
+                handleInputChange('fecha_fin', e.target.value);
+                // Reset manual flag when changing dates
+                setIsManualValue(false);
+              }}
             />
             {!isValidRange && formData.fecha_inicio && formData.fecha_fin && (
               <div className="text-xs text-red-600 mt-1">
@@ -219,7 +271,7 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
         )}
 
         {/* Estado del cálculo */}
-        {isLoading && calculatedDays >= 0 && (
+        {isLoading && calculatedDays >= 0 && !isManualValue && (
           <div className="bg-blue-50 p-3 rounded border border-blue-200">
             <div className="flex items-center gap-2">
               <Calculator className="h-4 w-4 text-blue-600 animate-spin" />
@@ -241,13 +293,19 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
                 ({currentSubtipoInfo.porcentaje}% según normativa colombiana)
               </span>
             )}
+            {/* ✅ V18.0: Indicador de valor manual */}
+            {isManualValue && (
+              <span className="text-xs text-orange-600 ml-2">
+                (Editado manualmente)
+              </span>
+            )}
           </Label>
           <Input
             type="number"
             min="0"
             step="1000"
             value={formData.valor}
-            onChange={(e) => handleInputChange('valor', parseFloat(e.target.value) || 0)}
+            onChange={handleValorChange} // ✅ V18.0: Usar manejador específico
             placeholder="0"
             className="text-lg font-medium"
           />
@@ -275,6 +333,12 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
             </div>
             <div className="text-sm text-gray-700 mt-2">
               {calculatedDays} días de incapacidad {currentSubtipoInfo?.label.toLowerCase()}
+              {/* ✅ V18.0: Mostrar estado del valor */}
+              {isManualValue && (
+                <div className="text-xs text-orange-600 mt-1">
+                  Valor editado manualmente
+                </div>
+              )}
             </div>
           </div>
         )}
