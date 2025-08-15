@@ -18,10 +18,47 @@ export interface DisplayNovedad {
   created_at: string;
   origen: 'novedades' | 'vacaciones';
   constitutivo_salario?: boolean;
+  // Missing properties for display components
+  status?: string;
+  isConfirmed?: boolean;
+  badgeColor?: string;
+  badgeIcon?: string;
+  badgeLabel?: string;
+  statusColor?: string;
+}
+
+export interface SeparatedTotals {
+  confirmed: {
+    devengos: number;
+    deducciones: number;
+    neto: number;
+    count: number;
+  };
+  estimated: {
+    devengos: number;
+    deducciones: number;
+    neto: number;
+    count: number;
+  };
+}
+
+export interface VacationIntegrationResult {
+  processedVacations: number;
+  createdNovedades: number;
+  conflicts: any[];
+  success: boolean;
+  message: string;
+}
+
+export interface VacationProcessingOptions {
+  companyId: string;
+  periodId: string;
+  startDate: string;
+  endDate: string;
 }
 
 export function convertNovedadToDisplay(novedad: PayrollNovedad): DisplayNovedad {
-  console.log('🔍 V21.0 DIAGNOSIS - convertNovedadToDisplay input:', {
+  console.log('🔍 V21.1 DIAGNOSIS - convertNovedadToDisplay input:', {
     id: novedad.id,
     valor_input: novedad.valor,
     valor_input_type: typeof novedad.valor,
@@ -44,10 +81,17 @@ export function convertNovedadToDisplay(novedad: PayrollNovedad): DisplayNovedad
     observacion: novedad.observacion || undefined,
     created_at: novedad.created_at,
     origen: 'novedades',
-    constitutivo_salario: novedad.constitutivo_salario || false
+    constitutivo_salario: novedad.constitutivo_salario || false,
+    // Set default display properties
+    status: 'registrada',
+    isConfirmed: true,
+    badgeColor: 'bg-blue-100 text-blue-800',
+    badgeIcon: '📄',
+    badgeLabel: 'Novedad',
+    statusColor: 'text-green-600'
   };
 
-  console.log('🔍 V21.0 DIAGNOSIS - convertNovedadToDisplay output:', {
+  console.log('🔍 V21.1 DIAGNOSIS - convertNovedadToDisplay output:', {
     id: converted.id,
     valor_output: converted.valor,
     valor_output_type: typeof converted.valor,
