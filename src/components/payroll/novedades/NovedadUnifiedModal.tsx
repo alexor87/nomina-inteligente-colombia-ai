@@ -219,6 +219,37 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       const dataArray = isArrayData ? formData : [formData];
       
       for (const entry of dataArray) {
+        // Validaciones defensivas específicas para incapacidad (sin cambiar la UI)
+        if (selectedType === 'incapacidad') {
+          if (!entry.fecha_inicio || !entry.fecha_fin) {
+            toast({
+              title: "Fechas requeridas",
+              description: "Por favor selecciona fecha de inicio y fin para la incapacidad.",
+              variant: "destructive",
+            });
+            setIsSubmitting(false);
+            return;
+          }
+          if (!entry.dias || entry.dias <= 0) {
+            toast({
+              title: "Días inválidos",
+              description: "Los días de incapacidad deben ser mayores a 0.",
+              variant: "destructive",
+            });
+            setIsSubmitting(false);
+            return;
+          }
+          if (!entry.valor || entry.valor <= 0) {
+            toast({
+              title: "Valor inválido",
+              description: "El valor de la incapacidad debe ser mayor a 0.",
+              variant: "destructive",
+            });
+            setIsSubmitting(false);
+            return;
+          }
+        }
+
         const constitutivo = determineConstitutivo(selectedType!, entry.subtipo);
         
         // ✅ V19.0: Estructura simple y directa como el código que funciona
@@ -242,6 +273,11 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
         console.log('📤 V19.0 - Submitting create data:', createData);
         
         await onSubmit(createData);
+
+        // ✅ Notificar al padre para refrescar lista del empleado
+        if (onEmployeeNovedadesChange && employeeId) {
+          await onEmployeeNovedadesChange(employeeId);
+        }
       }
       
       if (mode === 'ajustes') {

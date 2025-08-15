@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +10,7 @@ import { formatCurrency } from '@/lib/utils';
 import { useNovedadBackendCalculation } from '@/hooks/useNovedadBackendCalculation';
 import { NovedadType } from '@/types/novedades-enhanced';
 import { calculateDaysBetween, isValidDateRange } from '@/utils/dateUtils';
+import { useToast } from '@/hooks/use-toast';
 
 interface NovedadIncapacidadFormProps {
   onBack: () => void;
@@ -44,6 +44,7 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
   isSubmitting,
   periodoFecha
 }) => {
+  const { toast } = useToast();
   const [formData, setFormData] = useState({
     subtipo: 'general',
     fecha_inicio: '',
@@ -69,11 +70,14 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
     }
 
     const fechaPeriodoISO = periodoFecha ? periodoFecha.toISOString() : new Date().toISOString();
+
+    // Normalizar subtipo solo para cálculo backend (mantener la UI igual)
+    const normalizedSubtipo = formData.subtipo === 'general' ? 'comun' : formData.subtipo;
     
     calculateNovedadDebounced(
       {
         tipoNovedad: 'incapacidad' as NovedadType,
-        subtipo: formData.subtipo,
+        subtipo: normalizedSubtipo,
         salarioBase: employeeSalary,
         dias: calculatedDays,
         fechaPeriodo: fechaPeriodoISO
@@ -125,6 +129,32 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
 
   const handleSubmit = () => {
     if (!formData.fecha_inicio || !formData.fecha_fin || !isValidRange || calculatedDays < 0) {
+      // Validación suave con toast
+      toast({
+        title: "Fechas inválidas",
+        description: "La fecha de fin debe ser igual o posterior a la fecha de inicio.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validar días > 0
+    if (!calculatedDays || calculatedDays <= 0) {
+      toast({
+        title: "Días inválidos",
+        description: "Por favor ingresa un rango de fechas que resulte en al menos 1 día de incapacidad.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validar valor > 0
+    if (!formData.valor || formData.valor <= 0) {
+      toast({
+        title: "Valor inválido",
+        description: "El valor de la incapacidad debe ser mayor a 0.",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -134,7 +164,7 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
       dias: calculatedDays,
       fecha_inicio: formData.fecha_inicio,
       fecha_fin: formData.fecha_fin,
-      valor: formData.valor, // ✅ V18.0: Enviar valor preservado (manual o automático)
+      valor: formData.valor, // ✅ Preservar valor (manual o automático)
       observacion: formData.observacion || undefined
     };
 
@@ -293,7 +323,7 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
                 ({currentSubtipoInfo.porcentaje}% según normativa colombiana)
               </span>
             )}
-            {/* ✅ V18.0: Indicador de valor manual */}
+            {/* ✅ Indicador de valor manual */}
             {isManualValue && (
               <span className="text-xs text-orange-600 ml-2">
                 (Editado manualmente)
@@ -305,7 +335,7 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
             min="0"
             step="1000"
             value={formData.valor}
-            onChange={handleValorChange} // ✅ V18.0: Usar manejador específico
+            onChange={handleValorChange}
             placeholder="0"
             className="text-lg font-medium"
           />
@@ -333,7 +363,7 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
             </div>
             <div className="text-sm text-gray-700 mt-2">
               {calculatedDays} días de incapacidad {currentSubtipoInfo?.label.toLowerCase()}
-              {/* ✅ V18.0: Mostrar estado del valor */}
+              {/* ✅ Mostrar estado del valor */}
               {isManualValue && (
                 <div className="text-xs text-orange-600 mt-1">
                   Valor editado manualmente
