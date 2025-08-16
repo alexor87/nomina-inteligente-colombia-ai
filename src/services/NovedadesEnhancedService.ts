@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Database, Tables } from '@/integrations/supabase/types';
 import { NOVEDAD_CATEGORIES } from '@/types/novedades-enhanced';
@@ -75,7 +74,6 @@ export class NovedadesEnhancedService {
           // Reflejar el cambio en memoria
           (novedades || []).forEach(n => {
             if (toFixIds.includes(n.id as unknown as string)) {
-              // @ts-expect-error: propiedad tipada como boolean en tipos generados
               n.constitutivo_salario = true;
             }
           });
@@ -129,7 +127,6 @@ export class NovedadesEnhancedService {
         } else {
           (novedades || []).forEach(n => {
             if (toFixIds.includes(n.id as unknown as string)) {
-              // @ts-expect-error: propiedad tipada como boolean en tipos generados
               n.constitutivo_salario = true;
             }
           });
@@ -275,4 +272,3 @@ export class NovedadesEnhancedService {
     }
   }
 }
-
