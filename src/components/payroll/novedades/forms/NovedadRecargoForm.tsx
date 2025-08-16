@@ -5,13 +5,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Clock, Calculator, AlertCircle, Info } from 'lucide-react';
+import { Clock, Calculator, Info } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Switch } from '@/components/ui/switch';
 import { formatCurrency } from '@/lib/utils';
 import { useNovedadBackendCalculation } from '@/hooks/useNovedadBackendCalculation';
 
-interface NovedadHorasExtraFormProps {
+interface NovedadRecargoFormProps {
   onSubmit: (data: any) => void;
   onCancel: () => void;
   employeeSalary: number;
@@ -19,16 +19,13 @@ interface NovedadHorasExtraFormProps {
   periodoFecha?: Date;
 }
 
-const tiposHorasExtra = [
-  { value: 'diurnas', label: 'Diurnas (25%)', factor: 1.25 },
-  { value: 'nocturnas', label: 'Nocturnas (75%)', factor: 1.75 },
-  { value: 'dominicales_diurnas', label: 'Dominicales Diurnas (100%)', factor: 2.0 },
-  { value: 'dominicales_nocturnas', label: 'Dominicales Nocturnas (150%)', factor: 2.5 },
-  { value: 'festivas_diurnas', label: 'Festivas Diurnas (100%)', factor: 2.0 },
-  { value: 'festivas_nocturnas', label: 'Festivas Nocturnas (150%)', factor: 2.5 }
+const tiposRecargo = [
+  { value: 'nocturno', label: 'Recargo Nocturno (35%)', factor: 0.35 },
+  { value: 'dominical', label: 'Recargo Dominical (75%)', factor: 0.75 },
+  { value: 'nocturno_dominical', label: 'Nocturno Dominical (115%)', factor: 1.15 }
 ];
 
-export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
+export const NovedadRecargoForm: React.FC<NovedadRecargoFormProps> = ({
   onSubmit,
   onCancel,
   employeeSalary,
@@ -39,7 +36,7 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
     subtipo: '',
     horas: '',
     observacion: '',
-    constitutivo_salario: true // ✅ CORREGIDO: Default TRUE para horas extra
+    constitutivo_salario: true // ✅ CORREGIDO: Default TRUE para recargos
   });
 
   const [calculatedValue, setCalculatedValue] = useState<number | null>(null);
@@ -53,7 +50,7 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
 
     try {
       const result = await calculateNovedad({
-        tipoNovedad: 'horas_extra',
+        tipoNovedad: 'recargo_nocturno',
         subtipo: formData.subtipo,
         salarioBase: employeeSalary,
         horas: parseFloat(formData.horas),
@@ -64,7 +61,7 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
         setCalculatedValue(result.valor);
       }
     } catch (error) {
-      console.error('Error calculating hours extra:', error);
+      console.error('Error calculating surcharge:', error);
       setCalculatedValue(null);
     }
   };
@@ -81,7 +78,7 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
     }
 
     onSubmit({
-      tipo_novedad: 'horas_extra',
+      tipo_novedad: 'recargo_nocturno',
       subtipo: formData.subtipo,
       horas: parseFloat(formData.horas),
       valor: calculatedValue,
@@ -91,26 +88,26 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
   };
 
   const getTipoInfo = (subtipo: string) => {
-    return tiposHorasExtra.find(t => t.value === subtipo);
+    return tiposRecargo.find(t => t.value === subtipo);
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-gray-900">Horas Extra</h3>
+        <h3 className="text-lg font-semibold text-gray-900">Recargo Nocturno</h3>
 
         {/* ✅ NUEVO: Información normativa sobre constitutividad */}
         <Alert className="border-blue-200 bg-blue-50">
           <Info className="h-4 w-4 text-blue-600" />
           <AlertDescription className="text-blue-800">
-            <strong>Normativa IBC:</strong> Las horas extra son constitutivas de IBC según Art. 127 CST. 
+            <strong>Normativa IBC:</strong> Los recargos nocturnos son constitutivos de IBC según Art. 127 CST. 
             Afectan el cálculo de aportes a salud y pensión.
           </AlertDescription>
         </Alert>
 
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label>Tipo de Horas Extra *</Label>
+            <Label>Tipo de Recargo *</Label>
             <Select 
               value={formData.subtipo} 
               onValueChange={(value) => setFormData(prev => ({ ...prev, subtipo: value }))}
@@ -119,7 +116,7 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
                 <SelectValue placeholder="Seleccionar tipo" />
               </SelectTrigger>
               <SelectContent>
-                {tiposHorasExtra.map((tipo) => (
+                {tiposRecargo.map((tipo) => (
                   <SelectItem key={tipo.value} value={tipo.value}>
                     {tipo.label}
                   </SelectItem>
@@ -165,7 +162,7 @@ export const NovedadHorasExtraForm: React.FC<NovedadHorasExtraFormProps> = ({
           <p className="text-sm text-green-700">
             {formData.constitutivo_salario ? 
               '✅ Esta novedad SÍ afectará el IBC y los aportes a salud/pensión' : 
-              '⚠️ Esta novedad NO afectará el IBC (no recomendado para horas extra)'
+              '⚠️ Esta novedad NO afectará el IBC (no recomendado para recargos)'
             }
           </p>
         </div>

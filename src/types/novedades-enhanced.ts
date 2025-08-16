@@ -1,3 +1,4 @@
+
 export interface PayrollNovedad {
   id: string;
   company_id: string;
@@ -112,7 +113,7 @@ export const NOVEDAD_CATEGORIES = {
         requiere_horas: true,
         requiere_dias: false,
         auto_calculo: true,
-        constitutivo_default: false, // ✅ Horas extra NO son constitutivas de salario
+        constitutivo_default: true, // ✅ CORREGIDO: Horas extra SÍ son constitutivas de IBC
         subtipos: ['diurnas', 'nocturnas', 'dominicales_diurnas', 'dominicales_nocturnas', 'festivas_diurnas', 'festivas_nocturnas']
       },
       recargo_nocturno: {
@@ -120,7 +121,7 @@ export const NOVEDAD_CATEGORIES = {
         requiere_horas: true,
         requiere_dias: false,
         auto_calculo: true,
-        constitutivo_default: false, // ✅ Recargos NO son constitutivos de salario
+        constitutivo_default: true, // ✅ CORREGIDO: Recargos SÍ son constitutivos de IBC
         subtipos: ['nocturno', 'nocturno_dominical', 'nocturno_festivo']
       },
       bonificacion: {

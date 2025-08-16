@@ -1,4 +1,3 @@
-
 import { PayrollCalculationBackendService, PayrollCalculationInput } from '@/services/PayrollCalculationBackendService';
 import { PayrollEmployee, BaseEmployeeData, PayrollSummary, NovedadForIBC } from '@/types/payroll';
 import { NOVEDAD_CATEGORIES } from '@/types/novedades-enhanced';
@@ -109,36 +108,43 @@ export const convertToBaseEmployeeData = (employee: PayrollEmployee): BaseEmploy
   };
 };
 
-// ✅ FUNCIÓN NORMATIVA: Determinar si una novedad es constitutiva según normas laborales
+// ✅ FUNCIÓN NORMATIVA CORREGIDA: Determinar si una novedad es constitutiva según normas laborales
 export const isNovedadConstitutiva = (tipoNovedad: string, valorExplícito?: boolean): boolean => {
   // Si hay valor explícito, usarlo (usuario ha decidido conscientemente)
   if (valorExplícito !== null && valorExplícito !== undefined) {
     return Boolean(valorExplícito);
   }
 
-  // Buscar en categorías de devengados
+  // ✅ CORREGIDO: Buscar en categorías de devengados con nuevos defaults
   const categoria = Object.entries(NOVEDAD_CATEGORIES.devengados.types).find(
     ([key]) => key === tipoNovedad
   );
 
   if (categoria) {
-    return categoria[1].constitutivo_default ?? false;
+    const constitutivo = categoria[1].constitutivo_default ?? false;
+    
+    // ✅ LOG para verificar la corrección
+    if (tipoNovedad === 'horas_extra' || tipoNovedad === 'recargo_nocturno') {
+      console.log(`🔧 CONSTITUTIVIDAD CORREGIDA: ${tipoNovedad} = ${constitutivo} (antes era false)`);
+    }
+    
+    return constitutivo;
   }
 
   // Por defecto, no constitutivo (conservador)
   return false;
 };
 
-// ✅ FUNCIÓN NORMATIVA: Convertir novedades aplicando reglas constitutivas
+// ✅ FUNCIÓN NORMATIVA: Convertir novedades aplicando reglas constitutivas CORREGIDAS
 export const convertNovedadesToIBC = (novedades: any[]): NovedadForIBC[] => {
   return novedades.map(novedad => {
-    // ✅ USAR FUNCIÓN NORMATIVA CENTRALIZADA
+    // ✅ USAR FUNCIÓN NORMATIVA CENTRALIZADA CORREGIDA
     const constitutivo = isNovedadConstitutiva(
       novedad.tipo_novedad, 
       novedad.constitutivo_salario
     );
 
-    console.log('🔍 Aplicando constitutividad normativa:', {
+    console.log('🔍 Aplicando constitutividad normativa CORREGIDA:', {
       tipo: novedad.tipo_novedad,
       valorOriginal: novedad.constitutivo_salario,
       constitutivo,
