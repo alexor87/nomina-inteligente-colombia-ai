@@ -37,23 +37,45 @@ export const useSocialBenefitProvisions = () => {
     }
   }, [loadingPeriods, periods, filters.periodId]);
 
-  // Load provisions
+  // Load provisions with better error handling
   const {
     data: provisions,
     isLoading: loadingProvisions,
     refetch,
+    error: provisionsError,
   } = useQuery({
     queryKey: ['provisions', filters],
-    queryFn: () => {
+    queryFn: async () => {
       if (!filters.periodId) return [] as ProvisionRecord[];
-      return ProvisionsService.fetchProvisions(
-        filters.periodId,
-        filters.benefitType,
-        filters.search
-      );
+      
+      try {
+        const result = await ProvisionsService.fetchProvisions(
+          filters.periodId,
+          filters.benefitType,
+          filters.search
+        );
+        console.log('🔍 Provisions query result:', result.length, 'records');
+        return result;
+      } catch (error) {
+        console.error('❌ Error fetching provisions:', error);
+        throw error;
+      }
     },
     enabled: !!filters.periodId,
+    retry: 1,
   });
+
+  // Show error message if provisions query fails
+  useEffect(() => {
+    if (provisionsError) {
+      console.error('❌ Provisions query error:', provisionsError);
+      toast({
+        title: 'Error al cargar provisiones',
+        description: 'No se pudieron cargar las provisiones. Verifique que el período tenga datos.',
+        variant: 'destructive',
+      });
+    }
+  }, [provisionsError, toast]);
 
   // Subscribe to realtime changes
   useEffect(() => {
@@ -115,7 +137,7 @@ export const useSocialBenefitProvisions = () => {
       console.log('✅ provision-social-benefits result:', data);
       toast({
         title: 'Provisiones recalculadas',
-        description: 'Se registraron las provisiones del período seleccionado.',
+        description: `Se registraron ${data.count || 0} provisiones del período seleccionado.`,
       });
       refetch();
     } catch (e: any) {
@@ -133,7 +155,14 @@ export const useSocialBenefitProvisions = () => {
   // Export CSV
   const exportCSV = useCallback(() => {
     const list = provisions || [];
-    if (list.length === 0) return;
+    if (list.length === 0) {
+      toast({
+        title: 'Sin datos para exportar',
+        description: 'No hay registros de provisiones para exportar.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     const headers = [
       'period_name',
@@ -180,7 +209,7 @@ export const useSocialBenefitProvisions = () => {
     a.download = `provisiones_${filters.periodId}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [provisions, filters.periodId]);
+  }, [provisions, filters.periodId, toast]);
 
   const setPeriodId = (periodId: string) => setFilters((prev) => ({ ...prev, periodId }));
   const setBenefitType = (benefitType: BenefitType | 'all') => setFilters((prev) => ({ ...prev, benefitType }));

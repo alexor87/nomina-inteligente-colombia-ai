@@ -51,6 +51,8 @@ export class ProvisionsService {
     benefitType: BenefitType | 'all',
     search: string
   ): Promise<ProvisionRecord[]> {
+    console.log('🔍 Fetching provisions for period:', periodId);
+    
     // Get period info
     const { data: periodData, error: periodError } = await sb
       .from('payroll_periods_real')
@@ -58,28 +60,68 @@ export class ProvisionsService {
       .eq('id', periodId)
       .maybeSingle();
 
-    if (periodError) throw periodError;
+    if (periodError) {
+      console.error('❌ Error fetching period:', periodError);
+      throw periodError;
+    }
 
-    // Get calculations
-    const { data: calculations, error: calcError } = await sb
+    if (!periodData) {
+      console.warn('⚠️ Period not found:', periodId);
+      return [];
+    }
+
+    console.log('📅 Period data:', periodData);
+
+    // Get calculations using multiple approaches to find data
+    let calculations: any[] = [];
+
+    // First, try to find by period_id
+    const { data: calcsByPeriodId, error: calcError1 } = await sb
       .from('social_benefit_calculations')
       .select('*')
       .eq('period_id', periodId);
 
-    if (calcError) throw calcError;
+    if (calcError1) {
+      console.error('❌ Error fetching calculations by period_id:', calcError1);
+    } else if (calcsByPeriodId && calcsByPeriodId.length > 0) {
+      calculations = calcsByPeriodId;
+      console.log('✅ Found calculations by period_id:', calculations.length);
+    }
 
-    if (!calculations || calculations.length === 0) {
+    // If no results, try by period dates
+    if (calculations.length === 0) {
+      const { data: calcsByDates, error: calcError2 } = await sb
+        .from('social_benefit_calculations')
+        .select('*')
+        .eq('period_start', periodData.fecha_inicio)
+        .eq('period_end', periodData.fecha_fin);
+
+      if (calcError2) {
+        console.error('❌ Error fetching calculations by dates:', calcError2);
+      } else if (calcsByDates && calcsByDates.length > 0) {
+        calculations = calcsByDates;
+        console.log('✅ Found calculations by dates:', calculations.length);
+      }
+    }
+
+    if (calculations.length === 0) {
+      console.log('📋 No social benefit calculations found for this period');
       return [];
     }
 
     // Get employees
-    const employeeIds = calculations.map((calc: any) => calc.employee_id);
+    const employeeIds = [...new Set(calculations.map((calc: any) => calc.employee_id))];
+    console.log('👥 Fetching employee data for:', employeeIds.length, 'employees');
+    
     const { data: employees, error: empError } = await sb
       .from('employees')
       .select('id, nombre, apellido, cedula')
       .in('id', employeeIds);
 
-    if (empError) throw empError;
+    if (empError) {
+      console.error('❌ Error fetching employees:', empError);
+      throw empError;
+    }
 
     // Create employee map
     const employeesMap = new Map();
@@ -130,16 +172,24 @@ export class ProvisionsService {
       );
     }
 
+    console.log('📊 Final transformed data:', transformedData.length, 'records');
     return transformedData;
   }
 
   static async recalculateProvisions(periodId: string): Promise<any> {
+    console.log('🔄 Recalculating provisions for period:', periodId);
+    
     // This call is lightweight in terms of types; we can keep the typed client here
     const { data, error } = await supabase.functions.invoke('provision-social-benefits', {
       body: { period_id: periodId },
     });
     
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Error recalculating provisions:', error);
+      throw error;
+    }
+    
+    console.log('✅ Provisions recalculated:', data);
     return data;
   }
 }

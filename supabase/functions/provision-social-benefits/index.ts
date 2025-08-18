@@ -8,21 +8,21 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-type ProvisionRow = {
+type BenefitType = 'cesantias' | 'intereses_cesantias' | 'prima';
+
+type CalculationRow = {
   company_id: string;
-  period_id: string;
   employee_id: string;
-  benefit_type: 'cesantias' | 'prima' | 'intereses_cesantias';
-  base_salary: number;
-  variable_average: number;
-  transport_allowance: number;
-  other_included: number;
-  calculation_breakdown: any;
-  days_count: number;
-  provision_amount: number;
-  calculation_method: string;
-  source: string;
-  calculated_by: string | null;
+  benefit_type: BenefitType;
+  period_start: string;
+  period_end: string;
+  period_id: string;
+  calculation_basis: any;
+  calculated_values: any;
+  amount: number;
+  estado: string;
+  notes: string;
+  created_by: string;
 };
 
 Deno.serve(async (req) => {
@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get payrolls for the period (employee_id, base, days, aux transporte)
+    // Get payrolls for the period
     const { data: payrolls, error: payrollsErr } = await supabase
       .from('payrolls')
       .select('employee_id, salario_base, dias_trabajados, auxilio_transporte')
@@ -89,7 +89,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const items: ProvisionRow[] = [];
+    const items: CalculationRow[] = [];
 
     for (const p of payrolls || []) {
       const employeeId = p.employee_id as string;
@@ -99,7 +99,7 @@ Deno.serve(async (req) => {
 
       if (!employeeId || workedDays <= 0) continue;
 
-      // Base constitutiva simple (extensible): salario + auxilio transporte
+      // Base constitutiva simple: salario + auxilio transporte
       const variableAverage = 0;
       const otherIncluded = 0;
       const baseTotal = baseSalary + auxTrans + variableAverage + otherIncluded;
@@ -107,22 +107,18 @@ Deno.serve(async (req) => {
       // Fórmulas de provisión (período -> días/360)
       const fraction = workedDays / 360;
 
-      const cesantiasAmount = baseTotal * fraction; // ~ 8.33% mensual si 30 días
+      const cesantiasAmount = baseTotal * fraction;
       const interesesAmount = baseTotal * fraction * 0.12; // 12% anual sobre cesantías
-      const primaAmount = baseTotal * fraction; // ~ 8.33% mensual si 30 días
+      const primaAmount = baseTotal * fraction;
 
-      const breakdown = {
+      const calculation_basis = {
         base_salary: baseSalary,
         variable_average: variableAverage,
         transport_allowance: auxTrans,
         other_included: otherIncluded,
         base_total: baseTotal,
         worked_days: workedDays,
-        formulas: {
-          cesantias: 'base_total * (dias/360)',
-          intereses_cesantias: 'base_total * (dias/360) * 0.12',
-          prima: 'base_total * (dias/360)',
-        },
+        method: 'days_over_360',
         period: {
           id: period.id,
           periodo: period.periodo,
@@ -132,25 +128,33 @@ Deno.serve(async (req) => {
         },
       };
 
-      const common: Omit<ProvisionRow, 'benefit_type' | 'provision_amount'> = {
-        company_id: period.company_id,
-        period_id: period.id,
-        employee_id: employeeId,
-        base_salary: baseSalary,
-        variable_average: variableAverage,
-        transport_allowance: auxTrans,
-        other_included: otherIncluded,
-        calculation_breakdown: breakdown,
+      const calculated_values = {
         days_count: workedDays,
-        calculation_method: 'days_over_360',
-        source: 'payroll_closure',
-        calculated_by: user.id,
+        formulas: {
+          cesantias: 'base_total * (dias/360)',
+          intereses_cesantias: 'base_total * (dias/360) * 0.12',
+          prima: 'base_total * (dias/360)',
+        },
+        calculated_at: new Date().toISOString(),
+      };
+
+      const common: Omit<CalculationRow, 'benefit_type' | 'amount'> = {
+        company_id: period.company_id,
+        employee_id: employeeId,
+        period_start: period.fecha_inicio,
+        period_end: period.fecha_fin,
+        period_id: period.id,
+        calculation_basis,
+        calculated_values,
+        estado: 'calculado',
+        notes: 'Provisión generada automáticamente desde cierre de nómina',
+        created_by: user.id,
       };
 
       items.push(
-        { ...common, benefit_type: 'cesantias', provision_amount: Math.round(cesantiasAmount) },
-        { ...common, benefit_type: 'intereses_cesantias', provision_amount: Math.round(interesesAmount) },
-        { ...common, benefit_type: 'prima', provision_amount: Math.round(primaAmount) },
+        { ...common, benefit_type: 'cesantias', amount: Math.round(cesantiasAmount) },
+        { ...common, benefit_type: 'intereses_cesantias', amount: Math.round(interesesAmount) },
+        { ...common, benefit_type: 'prima', amount: Math.round(primaAmount) },
       );
     }
 
@@ -161,18 +165,18 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Upsert avoiding duplicates (unique: company_id, period_id, employee_id, benefit_type)
+    // Upsert avoiding duplicates (unique: company_id, employee_id, benefit_type, period_start, period_end)
     const { data: upserted, error: upsertErr } = await supabase
-      .from('social_benefit_provisions')
+      .from('social_benefit_calculations')
       .upsert(items, {
-        onConflict: 'company_id,period_id,employee_id,benefit_type',
+        onConflict: 'company_id,employee_id,benefit_type,period_start,period_end',
         ignoreDuplicates: false,
       })
       .select('id');
 
     if (upsertErr) {
       return new Response(
-        JSON.stringify({ success: false, error: 'provisions_upsert_error', details: upsertErr.message }),
+        JSON.stringify({ success: false, error: 'calculations_upsert_error', details: upsertErr.message }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
       );
     }
