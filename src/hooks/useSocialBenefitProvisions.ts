@@ -73,7 +73,7 @@ export const useSocialBenefitProvisions = () => {
     }
   }, [loadingPeriods, periods, filters.periodId]);
 
-  // Load provisions with filters
+  // Load provisions with filters using direct table queries
   const {
     data: provisions,
     isLoading: loadingProvisions,
@@ -83,23 +83,59 @@ export const useSocialBenefitProvisions = () => {
     queryFn: async () => {
       if (!filters.periodId) return [] as ProvisionRecord[];
 
-      let query = supabase
-        .from('social_benefit_provisions_summary')
-        .select('*')
+      // Query provisions with employee and period data
+      const { data: provisionsData, error: provisionsError } = await supabase
+        .from('social_benefit_provisions')
+        .select(`
+          *,
+          employees!inner(nombre, apellido, cedula),
+          payroll_periods_real!inner(periodo, fecha_inicio, fecha_fin, tipo_periodo)
+        `)
         .eq('period_id', filters.periodId);
 
+      if (provisionsError) throw provisionsError;
+
+      if (!provisionsData) return [] as ProvisionRecord[];
+
+      // Transform the data to match our ProvisionRecord type
+      let transformedData = provisionsData.map((item: any) => ({
+        company_id: item.company_id,
+        period_id: item.period_id,
+        employee_id: item.employee_id,
+        employee_name: `${item.employees.nombre} ${item.employees.apellido}`,
+        employee_cedula: item.employees.cedula,
+        period_name: item.payroll_periods_real.periodo,
+        period_start: item.payroll_periods_real.fecha_inicio,
+        period_end: item.payroll_periods_real.fecha_fin,
+        period_type: item.payroll_periods_real.tipo_periodo,
+        benefit_type: item.benefit_type as BenefitType,
+        base_salary: item.base_salary || 0,
+        variable_average: item.variable_average || 0,
+        transport_allowance: item.transport_allowance || 0,
+        other_included: item.other_included || 0,
+        days_count: item.days_count || 0,
+        provision_amount: item.provision_amount || 0,
+        calculation_method: item.calculation_method,
+        source: item.source,
+        created_at: item.created_at,
+        updated_at: item.updated_at,
+      })) as ProvisionRecord[];
+
+      // Apply benefit type filter
       if (filters.benefitType !== 'all') {
-        query = query.eq('benefit_type', filters.benefitType);
+        transformedData = transformedData.filter(item => item.benefit_type === filters.benefitType);
       }
 
+      // Apply search filter
       if (filters.search && filters.search.trim().length > 0) {
-        const s = filters.search.trim();
-        query = query.or(`employee_name.ilike.%${s}%,employee_cedula.ilike.%${s}%`);
+        const searchTerm = filters.search.trim().toLowerCase();
+        transformedData = transformedData.filter(item => 
+          item.employee_name.toLowerCase().includes(searchTerm) ||
+          (item.employee_cedula && item.employee_cedula.toLowerCase().includes(searchTerm))
+        );
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
-      return (data || []) as ProvisionRecord[];
+      return transformedData;
     },
     enabled: !!filters.periodId,
   });
