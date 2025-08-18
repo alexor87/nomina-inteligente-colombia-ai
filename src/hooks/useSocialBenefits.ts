@@ -32,7 +32,7 @@ export const useSocialBenefits = () => {
       if (!result.success) {
         toast({
           title: "Error en el cálculo",
-          description: result.error || "No se pudo calcular la prestación",
+          description: 'error' in result ? result.error : "No se pudo calcular la prestación",
           variant: "destructive"
         });
       }
@@ -82,7 +82,7 @@ export const useSocialBenefits = () => {
       } else {
         toast({
           title: "Error al guardar",
-          description: result.error || "No se pudo guardar el cálculo",
+          description: 'error' in result ? result.error : "No se pudo guardar el cálculo",
           variant: "destructive"
         });
       }
