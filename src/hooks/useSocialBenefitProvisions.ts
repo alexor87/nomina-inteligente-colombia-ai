@@ -1,4 +1,3 @@
-
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -83,67 +82,69 @@ export const useSocialBenefitProvisions = () => {
     queryFn: async () => {
       if (!filters.periodId) return [] as ProvisionRecord[];
 
-      // Get period info first
-      const { data: periodData, error: periodError } = await supabase
-        .from('payroll_periods_real')
-        .select('periodo, fecha_inicio, fecha_fin, tipo_periodo')
-        .eq('id', filters.periodId)
-        .single();
+      try {
+        // Get period info first
+        const { data: periodData, error: periodError } = await supabase
+          .from('payroll_periods_real')
+          .select('periodo, fecha_inicio, fecha_fin, tipo_periodo')
+          .eq('id', filters.periodId)
+          .single();
 
-      if (periodError) throw periodError;
+        if (periodError) throw periodError;
 
-      // Query calculations with employee data
-      const { data: calculationsData, error: calculationsError } = await supabase
-        .from('social_benefit_calculations')
-        .select(`
-          *,
-          employees!inner(nombre, apellido, cedula)
-        `)
-        .eq('period_id', filters.periodId);
+        // Query calculations with employee data - using explicit any to avoid deep type issues
+        const { data: calculationsData, error: calculationsError } = await supabase
+          .from('social_benefit_calculations')
+          .select('*, employees!inner(nombre, apellido, cedula)')
+          .eq('period_id', filters.periodId) as { data: any[] | null; error: any };
 
-      if (calculationsError) throw calculationsError;
+        if (calculationsError) throw calculationsError;
 
-      if (!calculationsData) return [] as ProvisionRecord[];
+        if (!calculationsData) return [] as ProvisionRecord[];
 
-      // Transform the data to match our ProvisionRecord type
-      let transformedData = calculationsData.map((item: any) => ({
-        company_id: item.company_id,
-        period_id: item.period_id,
-        employee_id: item.employee_id,
-        employee_name: `${item.employees.nombre} ${item.employees.apellido}`,
-        employee_cedula: item.employees.cedula,
-        period_name: periodData.periodo,
-        period_start: periodData.fecha_inicio,
-        period_end: periodData.fecha_fin,
-        period_type: periodData.tipo_periodo,
-        benefit_type: item.benefit_type as BenefitType,
-        base_salary: item.base_salary || 0,
-        variable_average: item.variable_average || 0,
-        transport_allowance: item.transport_allowance || 0,
-        other_included: item.other_included || 0,
-        days_count: item.days_count || 0,
-        provision_amount: item.provision_amount || 0,
-        calculation_method: item.calculation_method,
-        source: 'calculation',
-        created_at: item.created_at,
-        updated_at: item.updated_at,
-      })) as ProvisionRecord[];
+        // Transform the data to match our ProvisionRecord type
+        let transformedData = calculationsData.map((item: any) => ({
+          company_id: item.company_id,
+          period_id: item.period_id,
+          employee_id: item.employee_id,
+          employee_name: `${item.employees.nombre} ${item.employees.apellido}`,
+          employee_cedula: item.employees.cedula,
+          period_name: periodData.periodo,
+          period_start: periodData.fecha_inicio,
+          period_end: periodData.fecha_fin,
+          period_type: periodData.tipo_periodo,
+          benefit_type: item.benefit_type as BenefitType,
+          base_salary: item.base_salary || 0,
+          variable_average: item.variable_average || 0,
+          transport_allowance: item.transport_allowance || 0,
+          other_included: item.other_included || 0,
+          days_count: item.days_count || 0,
+          provision_amount: item.provision_amount || 0,
+          calculation_method: item.calculation_method,
+          source: 'calculation',
+          created_at: item.created_at,
+          updated_at: item.updated_at,
+        })) as ProvisionRecord[];
 
-      // Apply benefit type filter
-      if (filters.benefitType !== 'all') {
-        transformedData = transformedData.filter(item => item.benefit_type === filters.benefitType);
+        // Apply benefit type filter
+        if (filters.benefitType !== 'all') {
+          transformedData = transformedData.filter(item => item.benefit_type === filters.benefitType);
+        }
+
+        // Apply search filter
+        if (filters.search && filters.search.trim().length > 0) {
+          const searchTerm = filters.search.trim().toLowerCase();
+          transformedData = transformedData.filter(item => 
+            item.employee_name.toLowerCase().includes(searchTerm) ||
+            (item.employee_cedula && item.employee_cedula.toLowerCase().includes(searchTerm))
+          );
+        }
+
+        return transformedData;
+      } catch (error: any) {
+        console.error('Error loading provisions:', error);
+        throw error;
       }
-
-      // Apply search filter
-      if (filters.search && filters.search.trim().length > 0) {
-        const searchTerm = filters.search.trim().toLowerCase();
-        transformedData = transformedData.filter(item => 
-          item.employee_name.toLowerCase().includes(searchTerm) ||
-          (item.employee_cedula && item.employee_cedula.toLowerCase().includes(searchTerm))
-        );
-      }
-
-      return transformedData;
     },
     enabled: !!filters.periodId,
   });
