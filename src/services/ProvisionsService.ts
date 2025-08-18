@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import type { BenefitType } from '@/types/social-benefits';
 
@@ -33,9 +32,12 @@ export type PeriodOption = {
   tipo_periodo: string;
 };
 
+// Workaround to avoid TS2589 due to very deep generated types from Supabase
+const sb: any = supabase;
+
 export class ProvisionsService {
   static async fetchPeriods(): Promise<PeriodOption[]> {
-    const { data, error } = await supabase
+    const { data, error } = await sb
       .from('payroll_periods_real')
       .select('id, periodo, fecha_inicio, fecha_fin, tipo_periodo')
       .order('fecha_inicio', { ascending: false });
@@ -50,16 +52,16 @@ export class ProvisionsService {
     search: string
   ): Promise<ProvisionRecord[]> {
     // Get period info
-    const { data: periodData, error: periodError } = await supabase
+    const { data: periodData, error: periodError } = await sb
       .from('payroll_periods_real')
       .select('periodo, fecha_inicio, fecha_fin, tipo_periodo')
       .eq('id', periodId)
-      .single();
+      .maybeSingle();
 
     if (periodError) throw periodError;
 
     // Get calculations
-    const { data: calculations, error: calcError } = await supabase
+    const { data: calculations, error: calcError } = await sb
       .from('social_benefit_calculations')
       .select('*')
       .eq('period_id', periodId);
@@ -72,7 +74,7 @@ export class ProvisionsService {
 
     // Get employees
     const employeeIds = calculations.map((calc: any) => calc.employee_id);
-    const { data: employees, error: empError } = await supabase
+    const { data: employees, error: empError } = await sb
       .from('employees')
       .select('id, nombre, apellido, cedula')
       .in('id', employeeIds);
@@ -132,6 +134,7 @@ export class ProvisionsService {
   }
 
   static async recalculateProvisions(periodId: string): Promise<any> {
+    // This call is lightweight in terms of types; we can keep the typed client here
     const { data, error } = await supabase.functions.invoke('provision-social-benefits', {
       body: { period_id: periodId },
     });
