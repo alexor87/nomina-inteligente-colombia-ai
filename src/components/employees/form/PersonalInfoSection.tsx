@@ -204,6 +204,9 @@ export const PersonalInfoSection: React.FC<PersonalInfoSectionProps> = ({
                 />
               )}
             />
+            {errors.segundoNombre && (
+              <p className="text-red-500 text-sm">{errors.segundoNombre.message}</p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -253,6 +256,9 @@ export const PersonalInfoSection: React.FC<PersonalInfoSectionProps> = ({
                 />
               )}
             />
+            {errors.telefono && (
+              <p className="text-red-500 text-sm">{errors.telefono.message}</p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -286,6 +292,9 @@ export const PersonalInfoSection: React.FC<PersonalInfoSectionProps> = ({
                 />
               )}
             />
+            {errors.fechaNacimiento && (
+              <p className="text-red-500 text-sm">{errors.fechaNacimiento.message}</p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -300,6 +309,9 @@ export const PersonalInfoSection: React.FC<PersonalInfoSectionProps> = ({
                 />
               )}
             />
+            {errors.direccion && (
+              <p className="text-red-500 text-sm">{errors.direccion.message}</p>
+            )}
           </div>
 
           <div className="space-y-2">
