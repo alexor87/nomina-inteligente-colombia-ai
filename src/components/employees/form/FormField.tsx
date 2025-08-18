@@ -54,6 +54,9 @@ export const FormField = ({
         }}
         render={({ field }) => {
           if (type === 'select' && options) {
+            // Filter out empty values from options
+            const validOptions = options.filter(option => option.value && option.value.trim() !== '');
+            
             return (
               <Select 
                 onValueChange={(value) => {
@@ -68,7 +71,7 @@ export const FormField = ({
                   <SelectValue placeholder={placeholder || `Seleccionar ${label.toLowerCase()}`} />
                 </SelectTrigger>
                 <SelectContent className="bg-white border-gray-200 shadow-lg z-50">
-                  {options.map((option) => (
+                  {validOptions.map((option) => (
                     <SelectItem 
                       key={option.value} 
                       value={option.value}
