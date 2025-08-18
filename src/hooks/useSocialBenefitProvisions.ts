@@ -1,42 +1,12 @@
 
-
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { RealtimeService } from '@/services/RealtimeService';
 import { useToast } from '@/hooks/use-toast';
+import { ProvisionsService } from '@/services/ProvisionsService';
 import type { BenefitType } from '@/types/social-benefits';
-
-export type ProvisionRecord = {
-  company_id: string;
-  period_id: string;
-  employee_id: string;
-  employee_name: string;
-  employee_cedula: string | null;
-  period_name: string;
-  period_start: string;
-  period_end: string;
-  period_type: string;
-  benefit_type: BenefitType;
-  base_salary: number;
-  variable_average: number;
-  transport_allowance: number;
-  other_included: number;
-  days_count: number;
-  provision_amount: number;
-  calculation_method: string | null;
-  source: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
-export type PeriodOption = {
-  id: string;
-  periodo: string;
-  fecha_inicio: string;
-  fecha_fin: string;
-  tipo_periodo: string;
-};
+import type { ProvisionRecord, PeriodOption } from '@/services/ProvisionsService';
 
 type Filters = {
   periodId: string | null;
@@ -54,17 +24,10 @@ export const useSocialBenefitProvisions = () => {
     search: '',
   });
 
-  // Load available periods (company-scoped via RLS)
+  // Load available periods
   const { data: periods, isLoading: loadingPeriods } = useQuery({
     queryKey: ['provisions-periods'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('payroll_periods_real')
-        .select('id, periodo, fecha_inicio, fecha_fin, tipo_periodo')
-        .order('fecha_inicio', { ascending: false });
-      if (error) throw error;
-      return (data || []) as PeriodOption[];
-    },
+    queryFn: ProvisionsService.fetchPeriods,
   });
 
   // Auto-select latest period if not set
@@ -74,100 +37,25 @@ export const useSocialBenefitProvisions = () => {
     }
   }, [loadingPeriods, periods, filters.periodId]);
 
-  // Load provisions from social_benefit_calculations (existing table)
+  // Load provisions
   const {
     data: provisions,
     isLoading: loadingProvisions,
     refetch,
   } = useQuery({
     queryKey: ['provisions', filters],
-    queryFn: async () => {
+    queryFn: () => {
       if (!filters.periodId) return [] as ProvisionRecord[];
-
-      try {
-        // Get period info first - split queries to avoid deep type issues
-        const periodResult = await supabase
-          .from('payroll_periods_real')
-          .select('periodo, fecha_inicio, fecha_fin, tipo_periodo')
-          .eq('id', filters.periodId)
-          .single();
-
-        if (periodResult.error) throw periodResult.error;
-        const periodData = periodResult.data;
-
-        // Query calculations separately to avoid deep type instantiation
-        const calculationsResult = await supabase
-          .from('social_benefit_calculations')
-          .select('*')
-          .eq('period_id', filters.periodId);
-
-        if (calculationsResult.error) throw calculationsResult.error;
-        
-        // Query employees separately
-        const employeeIds = calculationsResult.data?.map((calc: any) => calc.employee_id) || [];
-        const employeesResult = await supabase
-          .from('employees')
-          .select('id, nombre, apellido, cedula')
-          .in('id', employeeIds);
-
-        if (employeesResult.error) throw employeesResult.error;
-
-        const employeesMap = new Map();
-        employeesResult.data?.forEach((emp: any) => {
-          employeesMap.set(emp.id, emp);
-        });
-
-        // Transform the data to match our ProvisionRecord type
-        let transformedData = calculationsResult.data?.map((item: any) => {
-          const employee = employeesMap.get(item.employee_id);
-          return {
-            company_id: item.company_id,
-            period_id: item.period_id || filters.periodId,
-            employee_id: item.employee_id,
-            employee_name: employee ? `${employee.nombre} ${employee.apellido}` : 'Unknown',
-            employee_cedula: employee?.cedula || null,
-            period_name: periodData.periodo,
-            period_start: periodData.fecha_inicio,
-            period_end: periodData.fecha_fin,
-            period_type: periodData.tipo_periodo,
-            benefit_type: item.benefit_type as BenefitType,
-            base_salary: item.calculation_basis?.base_salary || 0,
-            variable_average: item.calculation_basis?.variable_average || 0,
-            transport_allowance: item.calculation_basis?.transport_allowance || 0,
-            other_included: item.calculation_basis?.other_included || 0,
-            days_count: item.calculated_values?.days_count || 0,
-            provision_amount: item.amount || 0,
-            calculation_method: item.calculation_basis?.method || null,
-            source: 'calculation',
-            created_at: item.created_at,
-            updated_at: item.updated_at,
-          };
-        }) || [];
-
-        // Apply benefit type filter
-        if (filters.benefitType !== 'all') {
-          transformedData = transformedData.filter(item => item.benefit_type === filters.benefitType);
-        }
-
-        // Apply search filter
-        if (filters.search && filters.search.trim().length > 0) {
-          const searchTerm = filters.search.trim().toLowerCase();
-          transformedData = transformedData.filter(item => 
-            item.employee_name.toLowerCase().includes(searchTerm) ||
-            (item.employee_cedula && item.employee_cedula.toLowerCase().includes(searchTerm))
-          );
-        }
-
-        return transformedData as ProvisionRecord[];
-      } catch (error: any) {
-        console.error('Error loading provisions:', error);
-        throw error;
-      }
+      return ProvisionsService.fetchProvisions(
+        filters.periodId,
+        filters.benefitType,
+        filters.search
+      );
     },
     enabled: !!filters.periodId,
   });
 
-  // Subscribe to realtime changes and refetch on events
+  // Subscribe to realtime changes
   useEffect(() => {
     const channel = RealtimeService.subscribeToTable(
       'social_benefit_calculations',
@@ -217,16 +105,13 @@ export const useSocialBenefitProvisions = () => {
     return Math.max(1, Math.ceil(list.length / pageSize));
   }, [provisions, pageSize]);
 
-  // Recalculate provisions for the selected period via Edge Function
+  // Recalculate provisions
   const [recalculating, setRecalculating] = useState(false);
   const recalculateCurrentPeriod = useCallback(async () => {
     if (!filters.periodId) return;
     setRecalculating(true);
     try {
-      const { data, error } = await supabase.functions.invoke('provision-social-benefits', {
-        body: { period_id: filters.periodId },
-      });
-      if (error) throw error;
+      const data = await ProvisionsService.recalculateProvisions(filters.periodId);
       console.log('✅ provision-social-benefits result:', data);
       toast({
         title: 'Provisiones recalculadas',
@@ -245,7 +130,7 @@ export const useSocialBenefitProvisions = () => {
     }
   }, [filters.periodId, refetch, toast]);
 
-  // Export CSV of current (filtered) list
+  // Export CSV
   const exportCSV = useCallback(() => {
     const list = provisions || [];
     if (list.length === 0) return;
@@ -284,7 +169,6 @@ export const useSocialBenefitProvisions = () => {
       headers.join(','),
       ...rows.map((row) => row.map((v) => {
         const s = String(v ?? '');
-        // Basic CSV escaping
         return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
       }).join(',')),
     ].join('\n');
@@ -325,3 +209,5 @@ export const useSocialBenefitProvisions = () => {
   };
 };
 
+// Export types for use in components
+export type { ProvisionRecord, PeriodOption };
