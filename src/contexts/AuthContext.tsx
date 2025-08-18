@@ -47,12 +47,12 @@ export const useAuth = () => {
   return context;
 };
 
-// Enhanced role permissions matrix
+// Enhanced role permissions matrix - SINCRONIZADO CON src/types/roles.ts
 const ROLE_PERMISSIONS: Record<AppRole, string[]> = {
-  administrador: ['dashboard', 'employees', 'payroll', 'payroll-history', 'vouchers', 'payments', 'reports', 'settings', 'vacations-absences'],
-  rrhh: ['dashboard', 'employees', 'payroll-history', 'vouchers', 'reports', 'vacations-absences'],
-  contador: ['dashboard', 'payroll-history', 'vouchers', 'reports', 'vacations-absences'],
-  visualizador: ['dashboard', 'payroll-history', 'vouchers', 'reports', 'vacations-absences'],
+  administrador: ['dashboard', 'employees', 'payroll', 'payroll-history', 'prestaciones-sociales', 'vouchers', 'payments', 'reports', 'settings', 'vacations-absences'],
+  rrhh: ['dashboard', 'employees', 'payroll-history', 'prestaciones-sociales', 'vouchers', 'reports', 'vacations-absences'],
+  contador: ['dashboard', 'payroll-history', 'prestaciones-sociales', 'vouchers', 'reports', 'vacations-absences'],
+  visualizador: ['dashboard', 'payroll-history', 'prestaciones-sociales', 'vouchers', 'reports', 'vacations-absences'],
   soporte: ['dashboard', 'reports', 'employees', 'payroll-history']
 };
 
@@ -82,13 +82,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [roles]);
 
   const hasModuleAccess = useCallback((module: string): boolean => {
+    console.log('🔍 [AUTH] hasModuleAccess check:', { module, rolesCount: roles.length, roles: roles.map(r => r.role) });
+    
     if (roles.length === 0) {
+      console.log('❌ [AUTH] No roles found, denying access to:', module);
       return false;
     }
     
-    return roles.some(userRole => {
-      return ROLE_PERMISSIONS[userRole.role]?.includes(module);
+    const hasAccess = roles.some(userRole => {
+      const permissions = ROLE_PERMISSIONS[userRole.role];
+      const access = permissions?.includes(module) || false;
+      console.log(`🔑 [AUTH] Role ${userRole.role} access to ${module}:`, access, 'permissions:', permissions);
+      return access;
     });
+    
+    console.log('✅ [AUTH] Final access decision for', module, ':', hasAccess);
+    return hasAccess;
   }, [roles]);
 
   const refreshUserData = useCallback(async () => {
