@@ -73,7 +73,7 @@ export const useSocialBenefitProvisions = () => {
     }
   }, [loadingPeriods, periods, filters.periodId]);
 
-  // Load provisions with filters using direct table queries
+  // Load provisions from social_benefit_calculations (existing table)
   const {
     data: provisions,
     isLoading: loadingProvisions,
@@ -83,31 +83,39 @@ export const useSocialBenefitProvisions = () => {
     queryFn: async () => {
       if (!filters.periodId) return [] as ProvisionRecord[];
 
-      // Query provisions with employee and period data
-      const { data: provisionsData, error: provisionsError } = await supabase
-        .from('social_benefit_provisions')
+      // Get period info first
+      const { data: periodData, error: periodError } = await supabase
+        .from('payroll_periods_real')
+        .select('periodo, fecha_inicio, fecha_fin, tipo_periodo')
+        .eq('id', filters.periodId)
+        .single();
+
+      if (periodError) throw periodError;
+
+      // Query calculations with employee data
+      const { data: calculationsData, error: calculationsError } = await supabase
+        .from('social_benefit_calculations')
         .select(`
           *,
-          employees!inner(nombre, apellido, cedula),
-          payroll_periods_real!inner(periodo, fecha_inicio, fecha_fin, tipo_periodo)
+          employees!inner(nombre, apellido, cedula)
         `)
         .eq('period_id', filters.periodId);
 
-      if (provisionsError) throw provisionsError;
+      if (calculationsError) throw calculationsError;
 
-      if (!provisionsData) return [] as ProvisionRecord[];
+      if (!calculationsData) return [] as ProvisionRecord[];
 
       // Transform the data to match our ProvisionRecord type
-      let transformedData = provisionsData.map((item: any) => ({
+      let transformedData = calculationsData.map((item: any) => ({
         company_id: item.company_id,
         period_id: item.period_id,
         employee_id: item.employee_id,
         employee_name: `${item.employees.nombre} ${item.employees.apellido}`,
         employee_cedula: item.employees.cedula,
-        period_name: item.payroll_periods_real.periodo,
-        period_start: item.payroll_periods_real.fecha_inicio,
-        period_end: item.payroll_periods_real.fecha_fin,
-        period_type: item.payroll_periods_real.tipo_periodo,
+        period_name: periodData.periodo,
+        period_start: periodData.fecha_inicio,
+        period_end: periodData.fecha_fin,
+        period_type: periodData.tipo_periodo,
         benefit_type: item.benefit_type as BenefitType,
         base_salary: item.base_salary || 0,
         variable_average: item.variable_average || 0,
@@ -116,7 +124,7 @@ export const useSocialBenefitProvisions = () => {
         days_count: item.days_count || 0,
         provision_amount: item.provision_amount || 0,
         calculation_method: item.calculation_method,
-        source: item.source,
+        source: 'calculation',
         created_at: item.created_at,
         updated_at: item.updated_at,
       })) as ProvisionRecord[];
@@ -143,7 +151,7 @@ export const useSocialBenefitProvisions = () => {
   // Subscribe to realtime changes and refetch on events
   useEffect(() => {
     const channel = RealtimeService.subscribeToTable(
-      'social_benefit_provisions',
+      'social_benefit_calculations',
       () => {
         console.log('🔄 Realtime provisions event -> refetch');
         queryClient.invalidateQueries({ queryKey: ['provisions'] });
