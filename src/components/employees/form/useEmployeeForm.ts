@@ -1,7 +1,8 @@
 
 import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { EmployeeUnified } from '@/types/employee-unified';
-import { EmployeeFormData } from './types';
+import { EmployeeFormData, employeeFormSchema } from './types';
 import { getEmployeeFormDefaults } from './useEmployeeFormDefaults';
 import { useEmployeeFormState } from './useEmployeeFormState';
 import { useARLRiskLevels } from './useARLRiskLevels';
@@ -25,31 +26,32 @@ export const useEmployeeForm = (employee?: EmployeeUnified) => {
     scrollToSection
   } = useEmployeeFormState();
 
-  // Initialize form with defaults or employee data - REMOVED STRICT VALIDATION
+  // Initialize form with Zod validation and defaults
   const formMethods = useForm<EmployeeFormData>({
+    resolver: zodResolver(employeeFormSchema),
     defaultValues: getEmployeeFormDefaults(),
-    mode: 'onChange',
-    // Remover validación estricta para testing
+    mode: 'onChange', // Immediate validation feedback
     reValidateMode: 'onChange',
-    shouldFocusError: false
+    shouldFocusError: true // Focus on first error for better UX
   });
 
   const { register, handleSubmit, formState, setValue, watch, trigger, reset, control } = formMethods;
   const { errors, isValid, isDirty, isSubmitting } = formState;
 
-  // Log form state for debugging - MÁS DETALLADO
-  console.log('📋 Form state DETAILED:', {
+  // Enhanced logging for validation debugging
+  console.log('📋 Form validation state:', {
     isValid,
     isDirty,
     isSubmitting,
     errorsCount: Object.keys(errors).length,
-    specificErrors: Object.keys(errors).map(key => ({
-      field: key,
-      error: errors[key as keyof typeof errors]?.message,
-      value: watch(key as keyof EmployeeFormData)
-    })),
-    bancoValue: watch('banco'),
-    bancoError: errors.banco
+    validationErrors: Object.keys(errors).reduce((acc, key) => {
+      acc[key] = {
+        message: errors[key as keyof typeof errors]?.message,
+        type: errors[key as keyof typeof errors]?.type,
+        value: watch(key as keyof EmployeeFormData)
+      };
+      return acc;
+    }, {} as Record<string, any>)
   });
 
   const watchedValues = watch();
@@ -66,20 +68,18 @@ export const useEmployeeForm = (employee?: EmployeeUnified) => {
   // Handle form effects (auto-fill, completion calculation)
   useEmployeeFormEffects(watchedValues, setValue, setCompletionPercentage);
 
-  // Enhanced handleSubmit with MORE DETAILED debugging
+  // Enhanced handleSubmit with comprehensive validation logging
   const enhancedHandleSubmit = (onSubmit: (data: EmployeeFormData) => void | Promise<void>) => {
-    console.log('🚀 Creating enhanced handleSubmit wrapper');
+    console.log('🚀 Creating enhanced handleSubmit wrapper with Zod validation');
     
     return handleSubmit(async (data, event) => {
-      console.log('🔥🔥🔥 ENHANCED HANDLE SUBMIT EXECUTED 🔥🔥🔥');
-      console.log('📊 Form data received:', data);
-      console.log('📊 Form validation state:', { 
+      console.log('✅ Form validation passed - executing submission');
+      console.log('📊 Validated form data:', data);
+      console.log('📊 Validation state:', { 
         isValid, 
         isDirty, 
-        errorsCount: Object.keys(errors).length,
-        errors: errors 
+        errorsCount: Object.keys(errors).length
       });
-      console.log('📊 Event details:', event);
       
       try {
         console.log('✅ Calling onSubmit function...');
@@ -90,21 +90,24 @@ export const useEmployeeForm = (employee?: EmployeeUnified) => {
         throw error;
       }
     }, (validationErrors, event) => {
-      console.error('❌ FORM VALIDATION FAILED:', validationErrors);
-      console.error('❌ Validation event:', event);
+      console.error('❌ FORM VALIDATION FAILED - Zod schema validation errors:');
+      console.error('❌ Validation errors:', validationErrors);
       console.error('❌ Current form values:', watchedValues);
       
-      // Mostrar errores específicos para debugging
+      // Log specific field validation errors for debugging
       Object.keys(validationErrors).forEach(fieldName => {
-        console.error(`❌ Field ${fieldName}:`, {
-          error: validationErrors[fieldName as keyof typeof validationErrors],
-          currentValue: watchedValues[fieldName as keyof typeof watchedValues]
+        const error = validationErrors[fieldName as keyof typeof validationErrors];
+        console.error(`❌ Field "${fieldName}":`, {
+          message: error?.message,
+          type: error?.type,
+          currentValue: watchedValues[fieldName as keyof typeof watchedValues],
+          ref: error?.ref
         });
       });
     });
   };
 
-  console.log('✅ useEmployeeForm: Hook completed, returning form methods');
+  console.log('✅ useEmployeeForm: Hook completed with Zod validation, returning form methods');
 
   return {
     // Form methods
@@ -118,7 +121,7 @@ export const useEmployeeForm = (employee?: EmployeeUnified) => {
     control,
     watchedValues,
     
-    // Form state
+    // Form state (includes validation state from Zod)
     formState,
     isValid,
     isDirty,
