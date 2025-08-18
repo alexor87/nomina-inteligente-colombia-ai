@@ -5,10 +5,25 @@ import { CesantiasCalculator } from './CesantiasCalculator';
 import { PrimaCalculator } from './PrimaCalculator';
 import { InteresesCalculator } from './InteresesCalculator';
 import { SocialBenefitsHistory } from './SocialBenefitsHistory';
+import { SocialBenefitsError } from './SocialBenefitsError';
+import { useEmployeeData } from '@/hooks/useEmployeeData';
 import { Calculator, History, TrendingUp, Percent } from 'lucide-react';
 
 export const SocialBenefitsDashboard = () => {
   const [activeTab, setActiveTab] = useState('cesantias');
+  const { error, isLoading } = useEmployeeData();
+
+  console.log('🏢 SocialBenefitsDashboard - Estado:', {
+    activeTab,
+    hasError: !!error,
+    isLoading,
+    errorMessage: error
+  });
+
+  // Si hay error crítico en la carga inicial, mostrar error
+  if (error && !isLoading) {
+    return <SocialBenefitsError error={error} />;
+  }
 
   return (
     <div className="space-y-6">

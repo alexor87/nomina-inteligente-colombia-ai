@@ -5,13 +5,13 @@ import { EmployeeDataService } from '@/services/EmployeeDataService';
 
 /**
  * ✅ HOOK SEGURO PARA CARGA DE EMPLEADOS
- * Con validación de acceso para modo soporte
+ * Con validación de acceso para modo soporte y mejor manejo de errores
  */
 export const useEmployeeLoader = (supportCompanyId?: string) => {
   return useQuery({
     queryKey: ['employees', supportCompanyId],
     queryFn: async () => {
-      console.log('📋 useEmployeeLoader - Cargando empleados...');
+      console.log('📋 useEmployeeLoader - Iniciando carga de empleados...');
       
       let targetCompanyId: string;
       
@@ -21,6 +21,7 @@ export const useEmployeeLoader = (supportCompanyId?: string) => {
         // SEGURIDAD: Validar que el usuario tiene acceso a la empresa
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
+          console.error('❌ Usuario no autenticado');
           throw new Error('Usuario no autenticado');
         }
         
@@ -59,20 +60,49 @@ export const useEmployeeLoader = (supportCompanyId?: string) => {
         console.log('✅ Acceso autorizado a empresa:', targetCompanyId);
       } else {
         // Obtener empresa del usuario actual
-        targetCompanyId = await EmployeeDataService.getCurrentUserCompanyId();
-        if (!targetCompanyId) {
-          throw new Error('No se pudo obtener la empresa del usuario');
+        try {
+          targetCompanyId = await EmployeeDataService.getCurrentUserCompanyId();
+          if (!targetCompanyId) {
+            console.error('❌ No se pudo obtener company_id del usuario');
+            throw new Error('Tu perfil de usuario no está asociado a ninguna empresa. Contacta al administrador del sistema.');
+          }
+          console.log('🏢 Company ID del usuario actual:', targetCompanyId);
+        } catch (error) {
+          console.error('❌ Error obteniendo company_id:', error);
+          throw new Error('No se pudo obtener la empresa del usuario. Verifica que tu perfil esté correctamente configurado.');
         }
       }
       
       // Cargar empleados de la empresa validada
-      const employees = await EmployeeDataService.getEmployees(targetCompanyId);
-      
-      console.log('✅ Empleados cargados:', employees.length);
-      return employees;
+      try {
+        const employees = await EmployeeDataService.getEmployees(targetCompanyId);
+        
+        console.log('✅ Empleados cargados exitosamente:', {
+          count: employees.length,
+          companyId: targetCompanyId
+        });
+        
+        return employees;
+      } catch (error) {
+        console.error('❌ Error cargando empleados:', error);
+        throw new Error('Error al cargar los empleados de la empresa');
+      }
     },
     enabled: true,
     staleTime: 5 * 60 * 1000, // 5 minutos
-    retry: 2
+    retry: (failureCount, error) => {
+      console.log(`🔄 Retry attempt ${failureCount} for employees query:`, error.message);
+      
+      // No reintentar para errores de configuración/permisos
+      if (error.message.includes('empresa') || 
+          error.message.includes('perfil') || 
+          error.message.includes('autorizado')) {
+        return false;
+      }
+      
+      // Reintentar hasta 2 veces para otros errores
+      return failureCount < 2;
+    },
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000)
   });
 };
