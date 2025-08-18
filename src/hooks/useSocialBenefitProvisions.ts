@@ -1,4 +1,5 @@
 
+
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -84,8 +85,8 @@ export const useSocialBenefitProvisions = () => {
       if (!filters.periodId) return [] as ProvisionRecord[];
 
       try {
-        // Get period info first
-        const periodQuery = await supabase
+        // Get period info first - using explicit any to avoid type issues
+        const periodQuery: any = await supabase
           .from('payroll_periods_real')
           .select('periodo, fecha_inicio, fecha_fin, tipo_periodo')
           .eq('id', filters.periodId)
@@ -94,8 +95,8 @@ export const useSocialBenefitProvisions = () => {
         if (periodQuery.error) throw periodQuery.error;
         const periodData = periodQuery.data;
 
-        // Query calculations with employee data - using raw query to avoid type issues
-        const calculationsQuery = await supabase
+        // Query calculations with employee data - using explicit any to avoid type issues
+        const calculationsQuery: any = await supabase
           .from('social_benefit_calculations')
           .select(`
             *,
@@ -109,24 +110,26 @@ export const useSocialBenefitProvisions = () => {
         if (!calculationsData) return [] as ProvisionRecord[];
 
         // Transform the data to match our ProvisionRecord type
-        let transformedData = calculationsData.map((item) => ({
+        // Map the actual fields from social_benefit_calculations
+        let transformedData = calculationsData.map((item: any) => ({
           company_id: item.company_id,
-          period_id: item.period_id,
+          period_id: item.period_id || filters.periodId, // Use filters.periodId as fallback
           employee_id: item.employee_id,
-          employee_name: `${(item.employees as any).nombre} ${(item.employees as any).apellido}`,
-          employee_cedula: (item.employees as any).cedula,
+          employee_name: `${item.employees.nombre} ${item.employees.apellido}`,
+          employee_cedula: item.employees.cedula,
           period_name: periodData.periodo,
           period_start: periodData.fecha_inicio,
           period_end: periodData.fecha_fin,
           period_type: periodData.tipo_periodo,
           benefit_type: item.benefit_type as BenefitType,
-          base_salary: item.base_salary || 0,
-          variable_average: item.variable_average || 0,
-          transport_allowance: item.transport_allowance || 0,
-          other_included: item.other_included || 0,
-          days_count: item.days_count || 0,
-          provision_amount: item.provision_amount || 0,
-          calculation_method: item.calculation_method,
+          // Map to the actual fields available in social_benefit_calculations
+          base_salary: item.calculation_basis?.base_salary || 0,
+          variable_average: item.calculation_basis?.variable_average || 0,
+          transport_allowance: item.calculation_basis?.transport_allowance || 0,
+          other_included: item.calculation_basis?.other_included || 0,
+          days_count: item.calculated_values?.days_count || 0,
+          provision_amount: item.amount || 0, // Use 'amount' field
+          calculation_method: item.calculation_basis?.method || null,
           source: 'calculation',
           created_at: item.created_at,
           updated_at: item.updated_at,
@@ -312,3 +315,4 @@ export const useSocialBenefitProvisions = () => {
     refetch,
   };
 };
+
