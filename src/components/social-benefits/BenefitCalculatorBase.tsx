@@ -200,7 +200,9 @@ export const BenefitCalculatorBase: React.FC<BenefitCalculatorBaseProps> = ({
           </CardHeader>
           <CardContent>
             <div className="bg-red-50 p-4 rounded-lg border border-red-200">
-              <div className="text-red-700">{previewResult.error}</div>
+              <div className="text-red-700">
+                {!previewResult.success ? previewResult.error : 'Error desconocido'}
+              </div>
             </div>
           </CardContent>
         </Card>
