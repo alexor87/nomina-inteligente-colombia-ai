@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -201,7 +200,7 @@ export const BenefitCalculatorBase: React.FC<BenefitCalculatorBaseProps> = ({
           <CardContent>
             <div className="bg-red-50 p-4 rounded-lg border border-red-200">
               <div className="text-red-700">
-                {!previewResult.success ? previewResult.error : 'Error desconocido'}
+                {'error' in previewResult ? previewResult.error : 'Error desconocido'}
               </div>
             </div>
           </CardContent>
