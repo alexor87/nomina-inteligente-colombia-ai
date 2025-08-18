@@ -13,7 +13,8 @@ import {
   History,
   ChevronLeft,
   Menu,
-  Calendar
+  Calendar,
+  PiggyBank
 } from 'lucide-react';
 
 const navigation = [
@@ -21,6 +22,7 @@ const navigation = [
   { name: 'Empleados', href: '/app/employees', icon: Users, module: 'employees' },
   { name: 'Liquidar Nómina', href: '/app/payroll', icon: Calculator, module: 'payroll' },
   { name: 'Historial de Nómina', href: '/app/payroll-history', icon: History, module: 'payroll-history' },
+  { name: 'Prestaciones Sociales', href: '/app/prestaciones-sociales', icon: PiggyBank, module: 'prestaciones-sociales' },
   { name: 'Vacaciones y Ausencias', href: '/app/vacations-absences', icon: Calendar, module: 'vacations-absences' },
   { name: 'Reportes', href: '/app/reports', icon: BarChart3, module: 'reports' },
   { name: 'Configuración', href: '/app/settings', icon: Settings, module: 'settings' },

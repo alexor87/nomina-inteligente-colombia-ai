@@ -14,28 +14,28 @@ export interface RolePermissions {
   canExport?: boolean;
 }
 
-// Matriz de permisos por rol - SIN HISTORIAL
+// Matriz de permisos por rol - CON PRESTACIONES SOCIALES
 export const ROLE_PERMISSIONS: Record<AppRole, RolePermissions> = {
   administrador: {
-    modules: ['dashboard', 'employees', 'payroll', 'vouchers', 'payments', 'reports', 'settings'],
+    modules: ['dashboard', 'employees', 'payroll', 'prestaciones-sociales', 'vouchers', 'payments', 'reports', 'settings'],
     canEdit: true,
     canDelete: true,
     canExport: true
   },
   rrhh: {
-    modules: ['dashboard', 'employees', 'vouchers', 'reports'],
+    modules: ['dashboard', 'employees', 'prestaciones-sociales', 'vouchers', 'reports'],
     canEdit: true,
     canDelete: false,
     canExport: true
   },
   contador: {
-    modules: ['dashboard', 'vouchers', 'reports'],
+    modules: ['dashboard', 'prestaciones-sociales', 'vouchers', 'reports'],
     canEdit: false,
     canDelete: false,
     canExport: true
   },
   visualizador: {
-    modules: ['dashboard', 'vouchers', 'reports'],
+    modules: ['dashboard', 'prestaciones-sociales', 'vouchers', 'reports'],
     canEdit: false,
     canDelete: false,
     canExport: false
