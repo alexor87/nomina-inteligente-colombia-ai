@@ -12,6 +12,23 @@ interface EconomicIdentificationSectionProps {
 }
 
 export const EconomicIdentificationSection = ({ companyData, onInputChange }: EconomicIdentificationSectionProps) => {
+  // Define risk class options with guaranteed non-empty values
+  const riskClassOptions = [
+    { value: 'I', label: 'Clase I - Riesgo Mínimo' },
+    { value: 'II', label: 'Clase II - Riesgo Bajo' },
+    { value: 'III', label: 'Clase III - Riesgo Medio' },
+    { value: 'IV', label: 'Clase IV - Riesgo Alto' },
+    { value: 'V', label: 'Clase V - Riesgo Máximo' }
+  ];
+
+  // Define company size options with guaranteed non-empty values
+  const companySizeOptions = [
+    { value: 'micro', label: 'Microempresa (1-10 empleados)' },
+    { value: 'pequena', label: 'Pequeña empresa (11-50 empleados)' },
+    { value: 'mediana', label: 'Mediana empresa (51-200 empleados)' },
+    { value: 'grande', label: 'Gran empresa (200+ empleados)' }
+  ];
+
   return (
     <Card className="p-6">
       <h3 className="text-lg font-medium mb-4 flex items-center gap-2">
@@ -55,11 +72,11 @@ export const EconomicIdentificationSection = ({ companyData, onInputChange }: Ec
               <SelectValue placeholder="Seleccione clase" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="I">Clase I - Riesgo Mínimo</SelectItem>
-              <SelectItem value="II">Clase II - Riesgo Bajo</SelectItem>
-              <SelectItem value="III">Clase III - Riesgo Medio</SelectItem>
-              <SelectItem value="IV">Clase IV - Riesgo Alto</SelectItem>
-              <SelectItem value="V">Clase V - Riesgo Máximo</SelectItem>
+              {riskClassOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -71,10 +88,11 @@ export const EconomicIdentificationSection = ({ companyData, onInputChange }: Ec
               <SelectValue placeholder="Seleccione tamaño" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="micro">Microempresa (1-10 empleados)</SelectItem>
-              <SelectItem value="pequena">Pequeña empresa (11-50 empleados)</SelectItem>
-              <SelectItem value="mediana">Mediana empresa (51-200 empleados)</SelectItem>
-              <SelectItem value="grande">Gran empresa (200+ empleados)</SelectItem>
+              {companySizeOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>

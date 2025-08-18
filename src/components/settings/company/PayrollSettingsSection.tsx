@@ -1,4 +1,3 @@
-
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,6 +12,19 @@ interface PayrollSettingsSectionProps {
 }
 
 export const PayrollSettingsSection = ({ companyData, onInputChange }: PayrollSettingsSectionProps) => {
+  // Define payroll frequency options with guaranteed non-empty values
+  const frequencyOptions = [
+    { value: 'semanal', label: 'Semanal' },
+    { value: 'quincenal', label: 'Quincenal' },
+    { value: 'mensual', label: 'Mensual' }
+  ];
+
+  // Define overtime calculation options with guaranteed non-empty values
+  const overtimeCalculationOptions = [
+    { value: 'manual', label: 'Manual' },
+    { value: 'automatico', label: 'Automático' }
+  ];
+
   return (
     <Card className="p-6">
       <h3 className="text-lg font-medium mb-4 flex items-center gap-2">
@@ -26,9 +38,11 @@ export const PayrollSettingsSection = ({ companyData, onInputChange }: PayrollSe
               <SelectValue placeholder="Seleccione periodicidad" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="semanal">Semanal</SelectItem>
-              <SelectItem value="quincenal">Quincenal</SelectItem>
-              <SelectItem value="mensual">Mensual</SelectItem>
+              {frequencyOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -62,8 +76,11 @@ export const PayrollSettingsSection = ({ companyData, onInputChange }: PayrollSe
               <SelectValue placeholder="Seleccione tipo" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="manual">Manual</SelectItem>
-              <SelectItem value="automatico">Automático</SelectItem>
+              {overtimeCalculationOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>

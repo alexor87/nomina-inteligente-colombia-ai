@@ -39,6 +39,10 @@ export const AddressSection = ({ companyData, onInputChange }: AddressSectionPro
     onInputChange('ciudad', value);
   };
 
+  // Filter out empty values from departments and municipalities
+  const validDepartments = departments.filter(dept => dept.value && dept.value.trim() !== '');
+  const validMunicipalities = municipalities.filter(muni => muni.value && muni.value.trim() !== '');
+
   return (
     <Card className="p-6">
       <h3 className="text-lg font-medium mb-4 flex items-center gap-2">
@@ -63,7 +67,7 @@ export const AddressSection = ({ companyData, onInputChange }: AddressSectionPro
               <SelectValue placeholder="Seleccione departamento" />
             </SelectTrigger>
             <SelectContent className="bg-white border border-gray-300 z-50 max-h-60 overflow-y-auto">
-              {departments.map((departamento) => (
+              {validDepartments.map((departamento) => (
                 <SelectItem key={departamento.value} value={departamento.value}>
                   {departamento.label}
                 </SelectItem>
@@ -77,7 +81,7 @@ export const AddressSection = ({ companyData, onInputChange }: AddressSectionPro
           <Select 
             value={companyData.ciudad} 
             onValueChange={handleCityChange}
-            disabled={!selectedDepartment || municipalities.length === 0}
+            disabled={!selectedDepartment || validMunicipalities.length === 0}
           >
             <SelectTrigger className="bg-white border border-gray-300 z-40">
               <SelectValue placeholder={
@@ -87,7 +91,7 @@ export const AddressSection = ({ companyData, onInputChange }: AddressSectionPro
               } />
             </SelectTrigger>
             <SelectContent className="bg-white border border-gray-300 z-40 max-h-60 overflow-y-auto">
-              {municipalities.map((ciudad) => (
+              {validMunicipalities.map((ciudad) => (
                 <SelectItem key={ciudad.value} value={ciudad.value}>
                   {ciudad.label}
                 </SelectItem>

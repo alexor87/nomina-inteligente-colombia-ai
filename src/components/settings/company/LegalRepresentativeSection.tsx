@@ -10,6 +10,13 @@ interface LegalRepresentativeSectionProps {
 }
 
 export const LegalRepresentativeSection = ({ companyData, onInputChange }: LegalRepresentativeSectionProps) => {
+  // Define document type options with guaranteed non-empty values
+  const documentTypeOptions = [
+    { value: 'CC', label: 'Cédula de Ciudadanía' },
+    { value: 'CE', label: 'Cédula de Extranjería' },
+    { value: 'PA', label: 'Pasaporte' }
+  ];
+
   return (
     <Card className="p-6">
       <h3 className="text-lg font-medium mb-4 flex items-center gap-2">
@@ -33,9 +40,11 @@ export const LegalRepresentativeSection = ({ companyData, onInputChange }: Legal
               <SelectValue placeholder="Seleccione tipo" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="CC">Cédula de Ciudadanía</SelectItem>
-              <SelectItem value="CE">Cédula de Extranjería</SelectItem>
-              <SelectItem value="PA">Pasaporte</SelectItem>
+              {documentTypeOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
