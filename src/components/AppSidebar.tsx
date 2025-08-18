@@ -8,7 +8,8 @@ import {
   Settings,
   Building2,
   Calculator,
-  Calendar
+  Calendar,
+  PiggyBank
 } from "lucide-react";
 
 import {
@@ -39,6 +40,11 @@ const navigationItems = [
     title: "Liquidación",
     url: "/app/payroll",
     icon: Calculator,
+  },
+  {
+    title: "Prestaciones Sociales",
+    url: "/app/prestaciones-sociales",
+    icon: PiggyBank,
   },
   {
     title: "Vacaciones y Ausencias",

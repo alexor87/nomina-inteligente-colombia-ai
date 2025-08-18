@@ -1,0 +1,115 @@
+
+import { useState, useCallback } from 'react';
+import { useToast } from '@/hooks/use-toast';
+import { SocialBenefitsService } from '@/services/SocialBenefitsService';
+import type { BenefitType, BenefitCalculationResponse } from '@/types/social-benefits';
+
+export const useSocialBenefits = () => {
+  const [isCalculating, setIsCalculating] = useState(false);
+  const [previewResult, setPreviewResult] = useState<BenefitCalculationResponse | null>(null);
+  const { toast } = useToast();
+
+  const calculatePreview = useCallback(async (
+    employeeId: string,
+    benefitType: BenefitType,
+    periodStart: string,
+    periodEnd: string
+  ) => {
+    console.log('🔍 Calculating preview for:', { employeeId, benefitType, periodStart, periodEnd });
+    
+    setIsCalculating(true);
+    try {
+      const result = await SocialBenefitsService.calculatePreview({
+        employeeId,
+        benefitType,
+        periodStart,
+        periodEnd
+      });
+
+      console.log('📊 Preview result:', result);
+      setPreviewResult(result);
+
+      if (!result.success) {
+        toast({
+          title: "Error en el cálculo",
+          description: result.error || "No se pudo calcular la prestación",
+          variant: "destructive"
+        });
+      }
+
+      return result;
+    } catch (error) {
+      console.error('❌ Error calculating preview:', error);
+      toast({
+        title: "Error inesperado",
+        description: "No se pudo realizar el cálculo",
+        variant: "destructive"
+      });
+      return { success: false, error: 'calculation_error' };
+    } finally {
+      setIsCalculating(false);
+    }
+  }, [toast]);
+
+  const calculateAndSave = useCallback(async (
+    employeeId: string,
+    benefitType: BenefitType,
+    periodStart: string,
+    periodEnd: string,
+    notes?: string
+  ) => {
+    console.log('💾 Calculating and saving:', { employeeId, benefitType, periodStart, periodEnd, notes });
+    
+    setIsCalculating(true);
+    try {
+      const result = await SocialBenefitsService.calculateAndSave({
+        employeeId,
+        benefitType,
+        periodStart,
+        periodEnd,
+        notes
+      });
+
+      console.log('✅ Save result:', result);
+
+      if (result.success) {
+        toast({
+          title: "Prestación calculada y guardada",
+          description: `Se ha registrado el cálculo de ${benefitType} correctamente`,
+          className: "border-green-200 bg-green-50"
+        });
+        setPreviewResult(null); // Limpiar preview después de guardar
+      } else {
+        toast({
+          title: "Error al guardar",
+          description: result.error || "No se pudo guardar el cálculo",
+          variant: "destructive"
+        });
+      }
+
+      return result;
+    } catch (error) {
+      console.error('❌ Error saving calculation:', error);
+      toast({
+        title: "Error inesperado",
+        description: "No se pudo guardar el cálculo",
+        variant: "destructive"
+      });
+      return { success: false, error: 'save_error' };
+    } finally {
+      setIsCalculating(false);
+    }
+  }, [toast]);
+
+  const clearPreview = useCallback(() => {
+    setPreviewResult(null);
+  }, []);
+
+  return {
+    isCalculating,
+    previewResult,
+    calculatePreview,
+    calculateAndSave,
+    clearPreview
+  };
+};
