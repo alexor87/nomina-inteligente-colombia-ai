@@ -7,10 +7,11 @@ import { InteresesCalculator } from './InteresesCalculator';
 import { SocialBenefitsHistory } from './SocialBenefitsHistory';
 import { SocialBenefitsError } from './SocialBenefitsError';
 import { useEmployeeData } from '@/hooks/useEmployeeData';
-import { Calculator, History, TrendingUp, Percent } from 'lucide-react';
+import { Calculator, History, TrendingUp, Percent, PiggyBank } from 'lucide-react';
+import { ProvisionsExplorer } from './ProvisionsExplorer';
 
 export const SocialBenefitsDashboard = () => {
-  const [activeTab, setActiveTab] = useState('cesantias');
+  const [activeTab, setActiveTab] = useState('provisiones');
   const { error, isLoading } = useEmployeeData();
 
   console.log('🏢 SocialBenefitsDashboard - Estado:', {
@@ -28,7 +29,11 @@ export const SocialBenefitsDashboard = () => {
   return (
     <div className="space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="provisiones" className="flex items-center gap-2">
+            <PiggyBank className="h-4 w-4" />
+            Provisiones
+          </TabsTrigger>
           <TabsTrigger value="cesantias" className="flex items-center gap-2">
             <Calculator className="h-4 w-4" />
             Cesantías
@@ -46,6 +51,10 @@ export const SocialBenefitsDashboard = () => {
             Historial
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="provisiones" className="mt-6">
+          <ProvisionsExplorer />
+        </TabsContent>
 
         <TabsContent value="cesantias" className="mt-6">
           <CesantiasCalculator />
