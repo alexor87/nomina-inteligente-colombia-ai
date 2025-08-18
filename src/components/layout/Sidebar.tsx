@@ -70,7 +70,7 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
 
     // Por defecto, mostrar módulos esenciales (incluye rol optimista)
     return navigation.filter(item => 
-      ['dashboard', 'employees', 'payroll-history', 'reports'].includes(item.module)
+      ['dashboard', 'employees', 'payroll-history', 'prestaciones-sociales', 'reports'].includes(item.module)
     );
   };
 

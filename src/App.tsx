@@ -28,6 +28,7 @@ import { PayrollHistoryPage } from "./pages/PayrollHistoryPage";
 import { PayrollHistoryDetailPage } from "./pages/PayrollHistoryDetailPage";
 import CompanyRegistrationPage from "./pages/CompanyRegistrationPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
+import SocialBenefitsPage from "./pages/SocialBenefitsPage";
 
 const queryClient = new QueryClient();
 
@@ -58,6 +59,7 @@ function AppContent() {
           <Route path="payroll" element={<PayrollLiquidationPageSimplified />} />
           <Route path="payroll-history" element={<PayrollHistoryPage />} />
           <Route path="payroll-history/:periodId" element={<PayrollHistoryDetailPage />} />
+          <Route path="prestaciones-sociales" element={<SocialBenefitsPage />} />
           <Route path="vacations-absences" element={<VacationsAbsencesPage />} />
           <Route path="reports" element={<ReportsPage />} />
           <Route path="settings" element={<SettingsPage />} />
