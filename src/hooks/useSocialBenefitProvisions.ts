@@ -1,3 +1,4 @@
+
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -84,31 +85,36 @@ export const useSocialBenefitProvisions = () => {
 
       try {
         // Get period info first
-        const { data: periodData, error: periodError } = await supabase
+        const periodQuery = await supabase
           .from('payroll_periods_real')
           .select('periodo, fecha_inicio, fecha_fin, tipo_periodo')
           .eq('id', filters.periodId)
           .single();
 
-        if (periodError) throw periodError;
+        if (periodQuery.error) throw periodQuery.error;
+        const periodData = periodQuery.data;
 
-        // Query calculations with employee data - using explicit any to avoid deep type issues
-        const { data: calculationsData, error: calculationsError } = await supabase
+        // Query calculations with employee data - using raw query to avoid type issues
+        const calculationsQuery = await supabase
           .from('social_benefit_calculations')
-          .select('*, employees!inner(nombre, apellido, cedula)')
-          .eq('period_id', filters.periodId) as { data: any[] | null; error: any };
+          .select(`
+            *,
+            employees!inner(nombre, apellido, cedula)
+          `)
+          .eq('period_id', filters.periodId);
 
-        if (calculationsError) throw calculationsError;
+        if (calculationsQuery.error) throw calculationsQuery.error;
+        const calculationsData = calculationsQuery.data;
 
         if (!calculationsData) return [] as ProvisionRecord[];
 
         // Transform the data to match our ProvisionRecord type
-        let transformedData = calculationsData.map((item: any) => ({
+        let transformedData = calculationsData.map((item) => ({
           company_id: item.company_id,
           period_id: item.period_id,
           employee_id: item.employee_id,
-          employee_name: `${item.employees.nombre} ${item.employees.apellido}`,
-          employee_cedula: item.employees.cedula,
+          employee_name: `${(item.employees as any).nombre} ${(item.employees as any).apellido}`,
+          employee_cedula: (item.employees as any).cedula,
           period_name: periodData.periodo,
           period_start: periodData.fecha_inicio,
           period_end: periodData.fecha_fin,
