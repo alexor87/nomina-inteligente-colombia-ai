@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
@@ -127,6 +127,7 @@ export type Database = {
           ciudad: string | null
           created_at: string
           created_by: string | null
+          departamento: string | null
           direccion: string | null
           email: string
           estado: string | null
@@ -144,6 +145,7 @@ export type Database = {
           ciudad?: string | null
           created_at?: string
           created_by?: string | null
+          departamento?: string | null
           direccion?: string | null
           email: string
           estado?: string | null
@@ -161,6 +163,7 @@ export type Database = {
           ciudad?: string | null
           created_at?: string
           created_by?: string | null
+          departamento?: string | null
           direccion?: string | null
           email?: string
           estado?: string | null
@@ -684,6 +687,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "employee_notes_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees_limited"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "employee_notes_period_id_fkey"
             columns: ["period_id"]
             isOneToOne: false
@@ -736,6 +746,13 @@ export type Database = {
             columns: ["employee_id"]
             isOneToOne: false
             referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_vacation_balances_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees_limited"
             referencedColumns: ["id"]
           },
         ]
@@ -805,6 +822,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "employee_vacation_periods_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees_limited"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "employee_vacation_periods_processed_in_period_id_fkey"
             columns: ["processed_in_period_id"]
             isOneToOne: false
@@ -859,6 +883,7 @@ export type Database = {
           tipo_cuenta: string | null
           tipo_documento: string | null
           tipo_jornada: string | null
+          tipo_salario: string | null
           titular_cuenta: string | null
           updated_at: string
         }
@@ -907,6 +932,7 @@ export type Database = {
           tipo_cuenta?: string | null
           tipo_documento?: string | null
           tipo_jornada?: string | null
+          tipo_salario?: string | null
           titular_cuenta?: string | null
           updated_at?: string
         }
@@ -955,6 +981,7 @@ export type Database = {
           tipo_cuenta?: string | null
           tipo_documento?: string | null
           tipo_jornada?: string | null
+          tipo_salario?: string | null
           titular_cuenta?: string | null
           updated_at?: string
         }
@@ -978,6 +1005,13 @@ export type Database = {
             columns: ["tipo_cotizante_id"]
             isOneToOne: false
             referencedRelation: "tipos_cotizante"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_employees_company"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -1119,6 +1153,13 @@ export type Database = {
             columns: ["empleado_id"]
             isOneToOne: false
             referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_novedades_empleado_id_fkey"
+            columns: ["empleado_id"]
+            isOneToOne: false
+            referencedRelation: "employees_limited"
             referencedColumns: ["id"]
           },
           {
@@ -1487,6 +1528,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "payroll_vouchers_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees_limited"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "payroll_vouchers_payroll_id_fkey"
             columns: ["payroll_id"]
             isOneToOne: false
@@ -1644,6 +1692,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "payrolls_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees_limited"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "payrolls_period_id_fkey"
             columns: ["period_id"]
             isOneToOne: false
@@ -1737,6 +1792,72 @@ export type Database = {
           violation_type?: string
         }
         Relationships: []
+      }
+      social_benefit_calculations: {
+        Row: {
+          amount: number
+          benefit_type: Database["public"]["Enums"]["social_benefit_type"]
+          calculated_values: Json
+          calculation_basis: Json
+          company_id: string
+          created_at: string
+          created_by: string | null
+          employee_id: string
+          estado: string
+          id: string
+          notes: string | null
+          period_end: string
+          period_start: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          benefit_type: Database["public"]["Enums"]["social_benefit_type"]
+          calculated_values?: Json
+          calculation_basis?: Json
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          employee_id: string
+          estado?: string
+          id?: string
+          notes?: string | null
+          period_end: string
+          period_start: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          benefit_type?: Database["public"]["Enums"]["social_benefit_type"]
+          calculated_values?: Json
+          calculation_basis?: Json
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          employee_id?: string
+          estado?: string
+          id?: string
+          notes?: string | null
+          period_end?: string
+          period_start?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_benefit_calculations_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "social_benefit_calculations_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees_limited"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       subtipos_cotizante: {
         Row: {
@@ -1953,28 +2074,72 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      employees_limited: {
+        Row: {
+          apellido: string | null
+          cargo: string | null
+          company_id: string | null
+          estado: string | null
+          fecha_ingreso: string | null
+          id: string | null
+          nombre: string | null
+        }
+        Insert: {
+          apellido?: string | null
+          cargo?: string | null
+          company_id?: string | null
+          estado?: string | null
+          fecha_ingreso?: string | null
+          id?: string | null
+          nombre?: string | null
+        }
+        Update: {
+          apellido?: string | null
+          cargo?: string | null
+          company_id?: string | null
+          estado?: string | null
+          fecha_ingreso?: string | null
+          id?: string | null
+          nombre?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employees_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_employees_company"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       calculate_period_intersection_days: {
         Args: {
-          absence_start: string
           absence_end: string
-          period_start: string
+          absence_start: string
           period_end: string
+          period_start: string
         }
         Returns: number
       }
       calculate_worked_days_for_period: {
         Args: {
-          p_tipo_periodo: string
-          p_fecha_inicio: string
           p_fecha_fin: string
+          p_fecha_inicio: string
+          p_tipo_periodo: string
         }
         Returns: number
       }
       can_manage_company_users: {
-        Args: { _user_id: string; _company_id: string }
+        Args: { _company_id: string; _user_id: string }
         Returns: boolean
       }
       clean_abandoned_draft_periods: {
@@ -1990,32 +2155,32 @@ export type Database = {
         Returns: Json
       }
       complete_incomplete_registration: {
-        Args: { p_user_email: string; p_company_name?: string; p_nit?: string }
+        Args: { p_company_name?: string; p_nit?: string; p_user_email: string }
         Returns: Json
       }
       create_company_with_setup: {
         Args: {
-          p_nit: string
-          p_razon_social: string
-          p_email: string
-          p_telefono?: string
           p_ciudad?: string
-          p_plan?: string
-          p_user_email?: string
-          p_user_password?: string
+          p_email: string
           p_first_name?: string
           p_last_name?: string
+          p_nit: string
+          p_plan?: string
+          p_razon_social: string
+          p_telefono?: string
+          p_user_email?: string
+          p_user_password?: string
         }
         Returns: string
       }
       create_payroll_adjustment: {
         Args: {
-          p_period_id: string
-          p_employee_id: string
-          p_concept: string
           p_amount: number
-          p_observations: string
+          p_concept: string
           p_created_by: string
+          p_employee_id: string
+          p_observations: string
+          p_period_id: string
         }
         Returns: undefined
       }
@@ -2058,13 +2223,13 @@ export type Database = {
       get_company_active_field_definitions: {
         Args: { p_company_id: string }
         Returns: {
-          id: string
+          default_value: Json
           field_key: string
           field_label: string
-          field_type: string
           field_options: Json
+          field_type: string
+          id: string
           is_required: boolean
-          default_value: Json
           sort_order: number
         }[]
       }
@@ -2072,14 +2237,40 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      get_employee_sensitive_data: {
+        Args: { employee_id: string }
+        Returns: {
+          apellido: string
+          banco: string
+          cedula: string
+          email: string
+          id: string
+          nombre: string
+          numero_cuenta: string
+          salario_base: number
+          telefono: string
+        }[]
+      }
+      get_employees_limited: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          apellido: string
+          cargo: string
+          company_id: string
+          estado: string
+          fecha_ingreso: string
+          id: string
+          nombre: string
+        }[]
+      }
       get_novedad_audit_history: {
         Args: { p_novedad_id: string }
         Returns: {
           action: string
-          old_values: Json
-          new_values: Json
-          user_email: string
           created_at: string
+          new_values: Json
+          old_values: Json
+          user_email: string
         }[]
       }
       get_payroll_history_periods: {
@@ -2089,25 +2280,25 @@ export type Database = {
       get_period_adjustments: {
         Args: { p_period_id: string }
         Returns: {
-          id: string
-          employee_name: string
-          concept: string
           amount: number
-          observations: string
-          novedad_type: string
-          created_by_email: string
+          concept: string
           created_at: string
+          created_by_email: string
+          employee_name: string
+          id: string
+          novedad_type: string
+          observations: string
         }[]
       }
       get_period_audit_summary: {
         Args: { p_period_id: string }
         Returns: {
+          action: string
+          created_at: string
           employee_name: string
           novedad_type: string
-          action: string
-          value_change: number
           user_email: string
-          created_at: string
+          value_change: number
         }[]
       }
       get_user_companies_simple: {
@@ -2118,7 +2309,7 @@ export type Database = {
         }[]
       }
       get_user_role_in_company: {
-        Args: { _user_id: string; _company_id: string }
+        Args: { _company_id: string; _user_id: string }
         Returns: string
       }
       has_company_access: {
@@ -2127,17 +2318,17 @@ export type Database = {
       }
       has_role: {
         Args: {
-          _user_id: string
-          _role: Database["public"]["Enums"]["app_role"]
           _company_id?: string
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
         }
         Returns: boolean
       }
       has_role_in_company: {
         Args: {
-          _user_id: string
-          _role: Database["public"]["Enums"]["app_role"]
           _company_id: string
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
         }
         Returns: boolean
       }
@@ -2147,11 +2338,11 @@ export type Database = {
       }
       log_security_violation: {
         Args: {
-          p_table_name: string
           p_action: string
-          p_violation_type: string
-          p_query_attempted?: string
           p_additional_data?: Json
+          p_query_attempted?: string
+          p_table_name: string
+          p_violation_type: string
         }
         Returns: undefined
       }
@@ -2164,7 +2355,7 @@ export type Database = {
         Returns: string
       }
       sync_historical_payroll_data: {
-        Args: { p_period_id: string; p_company_id?: string }
+        Args: { p_company_id?: string; p_period_id: string }
         Returns: Json
       }
       sync_payroll_periods: {
@@ -2172,7 +2363,11 @@ export type Database = {
         Returns: undefined
       }
       user_has_access_to_company: {
-        Args: { p_user_id: string; p_company_id: string }
+        Args: { p_company_id: string; p_user_id: string }
+        Returns: boolean
+      }
+      validate_employee_company_access: {
+        Args: { p_employee_id: string }
         Returns: boolean
       }
       verify_demo_data_cleanup: {
@@ -2206,6 +2401,7 @@ export type Database = {
         | "multa"
         | "descuento_voluntario"
         | "licencia_no_remunerada"
+      social_benefit_type: "cesantias" | "intereses_cesantias" | "prima"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2360,6 +2556,7 @@ export const Constants = {
         "descuento_voluntario",
         "licencia_no_remunerada",
       ],
+      social_benefit_type: ["cesantias", "intereses_cesantias", "prima"],
     },
   },
 } as const
