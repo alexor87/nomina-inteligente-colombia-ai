@@ -16,7 +16,6 @@ type CalculationRow = {
   benefit_type: BenefitType;
   period_start: string;
   period_end: string;
-  period_id: string;
   calculation_basis: any;
   calculated_values: any;
   amount: number;
@@ -74,6 +73,15 @@ Deno.serve(async (req) => {
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 }
       );
     }
+
+    console.log('📅 Provisioning social benefits for period:', {
+      id: period.id,
+      periodo: period.periodo,
+      start: period.fecha_inicio,
+      end: period.fecha_fin,
+      tipo: period.tipo_periodo,
+      company_id: period.company_id,
+    });
 
     // Get payrolls for the period
     const { data: payrolls, error: payrollsErr } = await supabase
@@ -138,18 +146,17 @@ Deno.serve(async (req) => {
         calculated_at: new Date().toISOString(),
       };
 
-      const common: Omit<CalculationRow, 'benefit_type' | 'amount'> = {
+      const common = {
         company_id: period.company_id,
         employee_id: employeeId,
         period_start: period.fecha_inicio,
         period_end: period.fecha_fin,
-        period_id: period.id,
         calculation_basis,
         calculated_values,
         estado: 'calculado',
         notes: 'Provisión generada automáticamente desde cierre de nómina',
         created_by: user.id,
-      };
+      } as Omit<CalculationRow, 'benefit_type' | 'amount'>;
 
       items.push(
         { ...common, benefit_type: 'cesantias', amount: Math.round(cesantiasAmount) },
@@ -157,6 +164,8 @@ Deno.serve(async (req) => {
         { ...common, benefit_type: 'prima', amount: Math.round(primaAmount) },
       );
     }
+
+    console.log('🧾 Calculated provision items:', { count: items.length });
 
     if (items.length === 0) {
       return new Response(
@@ -175,11 +184,14 @@ Deno.serve(async (req) => {
       .select('id');
 
     if (upsertErr) {
+      console.error('❌ calculations_upsert_error:', upsertErr);
       return new Response(
         JSON.stringify({ success: false, error: 'calculations_upsert_error', details: upsertErr.message }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
       );
     }
+
+    console.log('✅ Provisions upserted:', upserted?.length || 0);
 
     return new Response(
       JSON.stringify({

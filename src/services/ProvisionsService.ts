@@ -72,39 +72,20 @@ export class ProvisionsService {
 
     console.log('📅 Period data:', periodData);
 
-    // Get calculations using multiple approaches to find data
+    // Get calculations by period dates only (table may not have period_id)
     let calculations: any[] = [];
-
-    // First, try to find by period_id
-    const { data: calcsByPeriodId, error: calcError1 } = await sb
+    const { data: calcsByDates, error: calcError2 } = await sb
       .from('social_benefit_calculations')
       .select('*')
-      .eq('period_id', periodId);
+      .eq('period_start', periodData.fecha_inicio)
+      .eq('period_end', periodData.fecha_fin);
 
-    if (calcError1) {
-      console.error('❌ Error fetching calculations by period_id:', calcError1);
-    } else if (calcsByPeriodId && calcsByPeriodId.length > 0) {
-      calculations = calcsByPeriodId;
-      console.log('✅ Found calculations by period_id:', calculations.length);
-    }
-
-    // If no results, try by period dates
-    if (calculations.length === 0) {
-      const { data: calcsByDates, error: calcError2 } = await sb
-        .from('social_benefit_calculations')
-        .select('*')
-        .eq('period_start', periodData.fecha_inicio)
-        .eq('period_end', periodData.fecha_fin);
-
-      if (calcError2) {
-        console.error('❌ Error fetching calculations by dates:', calcError2);
-      } else if (calcsByDates && calcsByDates.length > 0) {
-        calculations = calcsByDates;
-        console.log('✅ Found calculations by dates:', calculations.length);
-      }
-    }
-
-    if (calculations.length === 0) {
+    if (calcError2) {
+      console.error('❌ Error fetching calculations by dates:', calcError2);
+    } else if (calcsByDates && calcsByDates.length > 0) {
+      calculations = calcsByDates;
+      console.log('✅ Found calculations by dates:', calculations.length);
+    } else {
       console.log('📋 No social benefit calculations found for this period');
       return [];
     }
@@ -137,7 +118,7 @@ export class ProvisionsService {
 
       return {
         company_id: item.company_id,
-        period_id: periodId,
+        period_id: periodId, // seguimos devolviendo el periodId solicitado
         employee_id: item.employee_id,
         employee_name: employee ? `${employee.nombre} ${employee.apellido}` : 'Unknown',
         employee_cedula: employee?.cedula || null,
@@ -179,7 +160,6 @@ export class ProvisionsService {
   static async recalculateProvisions(periodId: string): Promise<any> {
     console.log('🔄 Recalculating provisions for period:', periodId);
     
-    // This call is lightweight in terms of types; we can keep the typed client here
     const { data, error } = await supabase.functions.invoke('provision-social-benefits', {
       body: { period_id: periodId },
     });
