@@ -154,7 +154,9 @@ export const employeeFormSchema = z.object({
     .max(20, 'El número de cuenta no puede exceder 20 caracteres')
     .regex(noSpacesRegex, 'El número de cuenta no puede contener espacios')
     .optional(),
-  titularCuenta: z.string().optional(),
+  titularCuenta: z.string()
+    .max(50, 'El titular de la cuenta no puede exceder 50 caracteres')
+    .optional(),
   formaPago: z.enum(['dispersion', 'manual']).optional(),
   
   // Affiliations
