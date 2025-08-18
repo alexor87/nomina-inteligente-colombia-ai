@@ -332,6 +332,21 @@ export const usePayrollLiquidation = () => {
           tipo: typeof result.summary.totalNetPay,
           isFinite: Number.isFinite(result.summary.totalNetPay)
         });
+
+        // ✅ NUEVO: Registrar provisiones del período (no bloqueante)
+        try {
+          console.log('🧮 Registrando provisiones de prestaciones sociales para el período:', currentPeriodId);
+          const { data: provisionResp, error: provisionErr } = await supabase.functions.invoke('provision-social-benefits', {
+            body: { period_id: currentPeriodId }
+          });
+          if (provisionErr) {
+            console.warn('⚠️ Error invocando provisiones:', provisionErr);
+          } else {
+            console.log('✅ Provisiones registradas:', provisionResp);
+          }
+        } catch (provError) {
+          console.warn('⚠️ No se pudieron registrar provisiones (continuando):', provError);
+        }
         
         // Usar el resumen calculado directamente del servicio de liquidación
         const periodType = detectPeriodType(startDate, endDate);

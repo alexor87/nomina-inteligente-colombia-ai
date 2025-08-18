@@ -1,1 +1,17 @@
+
 project_id = "xrmorlkakwujyozgmilf"
+
+[functions.calculate-social-benefits]
+verify_jwt = true
+
+[functions.payroll-calculations]
+verify_jwt = true
+
+[functions.payroll-liquidation-atomic]
+verify_jwt = true
+
+[functions.generate-voucher-pdf]
+verify_jwt = true
+
+[functions.provision-social-benefits]
+verify_jwt = true
