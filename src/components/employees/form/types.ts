@@ -25,7 +25,7 @@ export const personalInfoSchema = z.object({
   segundoNombre: z.string()
     .max(30, 'El segundo nombre no puede exceder 30 caracteres')
     .regex(noNumbersRegex, 'El segundo nombre no puede contener números')
-    .optional(),
+    .or(z.literal('')),
   apellido: z.string()
     .min(1, 'El apellido es requerido')
     .max(30, 'El apellido no puede exceder 30 caracteres')
@@ -37,7 +37,7 @@ export const personalInfoSchema = z.object({
   telefono: z.string()
     .max(20, 'El teléfono no puede exceder 20 caracteres')
     .regex(numbersOnlyRegex, 'El teléfono solo puede contener números')
-    .optional(),
+    .or(z.literal('')),
   fechaNacimiento: z.string()
     .refine((date) => notFutureDate(date), 'La fecha de nacimiento no puede ser futura')
     .optional(),
@@ -97,7 +97,7 @@ export const employeeFormSchema = z.object({
   segundoNombre: z.string()
     .max(30, 'El segundo nombre no puede exceder 30 caracteres')
     .regex(noNumbersRegex, 'El segundo nombre no puede contener números')
-    .optional(),
+    .or(z.literal('')),
   apellido: z.string()
     .min(1, 'El apellido es requerido')
     .max(30, 'El apellido no puede exceder 30 caracteres')
@@ -109,7 +109,7 @@ export const employeeFormSchema = z.object({
   telefono: z.string()
     .max(20, 'El teléfono no puede exceder 20 caracteres')
     .regex(numbersOnlyRegex, 'El teléfono solo puede contener números')
-    .optional(),
+    .or(z.literal('')),
   sexo: z.enum(['M', 'F']).optional(),
   fechaNacimiento: z.string()
     .refine((date) => !date || notFutureDate(date), 'La fecha de nacimiento no puede ser futura')
