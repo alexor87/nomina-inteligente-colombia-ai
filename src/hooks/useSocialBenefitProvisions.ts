@@ -171,9 +171,9 @@ export const useSocialBenefitProvisions = () => {
     }
   }, [filters.periodId, refetch, toast]);
 
-  // Export Excel instead of CSV
+  // Export Excel - NOW EXPORTS ONLY FILTERED DATA
   const exportExcel = useCallback(() => {
-    const list = provisions || [];
+    const list = provisions || []; // This already contains filtered data
     if (list.length === 0) {
       toast({
         title: 'Sin datos para exportar',
@@ -205,9 +205,22 @@ export const useSocialBenefitProvisions = () => {
         'Provisiones'
       );
       
+      // Improved success message showing filtered count
+      const filterDescription = [];
+      if (filters.benefitType !== 'all') {
+        filterDescription.push(`tipo: ${filters.benefitType}`);
+      }
+      if (filters.search.trim()) {
+        filterDescription.push(`búsqueda: "${filters.search}"`);
+      }
+      
+      const filterInfo = filterDescription.length > 0 
+        ? ` (filtrados por ${filterDescription.join(', ')})` 
+        : '';
+      
       toast({
         title: 'Exportación exitosa',
-        description: 'Las provisiones han sido exportadas a Excel.',
+        description: `Se exportaron ${list.length} registros de provisiones${filterInfo}.`,
       });
     } catch (error) {
       console.error('Error exportando a Excel:', error);
@@ -217,7 +230,7 @@ export const useSocialBenefitProvisions = () => {
         variant: 'destructive',
       });
     }
-  }, [provisions, filters.periodId, toast]);
+  }, [provisions, filters, toast]);
 
   const setPeriodId = (periodId: string) => setFilters((prev) => ({ ...prev, periodId }));
   const setBenefitType = (benefitType: BenefitType | 'all') => setFilters((prev) => ({ ...prev, benefitType }));
