@@ -1,239 +1,286 @@
-
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { RealtimeService } from '@/services/RealtimeService';
+import { useCurrentCompany } from '@/hooks/useCurrentCompany';
 import { useToast } from '@/hooks/use-toast';
 import { ProvisionsService } from '@/services/ProvisionsService';
-import type { BenefitType } from '@/types/social-benefits';
-import type { ProvisionRecord, PeriodOption } from '@/services/ProvisionsService';
 
-type Filters = {
-  periodId: string | null;
-  benefitType: BenefitType | 'all';
-  search: string;
-};
+interface Period {
+  id: string;
+  periodo: string;
+  fecha_inicio: string;
+  fecha_fin: string;
+  estado: string;
+}
+
+interface Provision {
+  id: string;
+  employee_id: string;
+  benefit_type: string;
+  amount: number;
+  period_start: string;
+  period_end: string;
+  estado: string;
+  employee?: {
+    nombre: string;
+    apellido: string;
+  };
+}
 
 export const useSocialBenefitProvisions = () => {
+  const { companyId } = useCurrentCompany();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-
-  const [filters, setFilters] = useState<Filters>({
-    periodId: null,
-    benefitType: 'all',
-    search: '',
+  
+  const [filters, setFilters] = useState({
+    periodId: '',
+    benefitType: '',
+    search: ''
   });
+  
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [recalculating, setRecalculating] = useState(false);
+  
+  // ✅ NUEVO: Guard para auto-healing (evitar loops)
+  const [autoHealingAttempted, setAutoHealingAttempted] = useState<Set<string>>(new Set());
 
-  // Load available periods (only closed ones)
-  const { data: periods, isLoading: loadingPeriods } = useQuery({
-    queryKey: ['provisions-periods'],
-    queryFn: ProvisionsService.fetchPeriods,
-  });
-
-  // Show message if no closed periods are available
-  useEffect(() => {
-    if (!loadingPeriods && periods && periods.length === 0) {
-      toast({
-        title: 'No hay períodos cerrados',
-        description: 'Las provisiones solo se pueden calcular para períodos cerrados/liquidados.',
-        variant: 'default',
-      });
-    }
-  }, [loadingPeriods, periods, toast]);
-
-  // Auto-select latest period if not set
-  useEffect(() => {
-    if (!loadingPeriods && periods && periods.length > 0 && !filters.periodId) {
-      setFilters((prev) => ({ ...prev, periodId: periods[0].id }));
-    }
-  }, [loadingPeriods, periods, filters.periodId]);
-
-  // Load provisions with better error handling
-  const {
-    data: provisions,
-    isLoading: loadingProvisions,
-    refetch,
-    error: provisionsError,
-  } = useQuery({
-    queryKey: ['provisions', filters],
+  // Load periods
+  const { data: periods = [], isLoading: loadingPeriods } = useQuery({
+    queryKey: ['payroll-periods', companyId],
     queryFn: async () => {
-      if (!filters.periodId) return [] as ProvisionRecord[];
+      if (!companyId) return [];
       
-      try {
-        const result = await ProvisionsService.fetchProvisions(
-          filters.periodId,
-          filters.benefitType,
-          filters.search
-        );
-        console.log('🔍 Provisions query result:', result.length, 'records');
-        return result;
-      } catch (error) {
-        console.error('❌ Error fetching provisions:', error);
-        throw error;
-      }
+      const { data, error } = await supabase
+        .from('payroll_periods_real')
+        .select('id, periodo, fecha_inicio, fecha_fin, estado')
+        .eq('company_id', companyId)
+        .order('fecha_inicio', { ascending: false });
+        
+      if (error) throw error;
+      return data as Period[];
     },
-    enabled: !!filters.periodId,
-    retry: 1,
+    enabled: !!companyId
   });
 
-  // Show error message if provisions query fails
-  useEffect(() => {
-    if (provisionsError) {
-      console.error('❌ Provisions query error:', provisionsError);
-      toast({
-        title: 'Error al cargar provisiones',
-        description: 'No se pudieron cargar las provisiones. Verifique que el período esté cerrado y tenga datos.',
-        variant: 'destructive',
-      });
-    }
-  }, [provisionsError, toast]);
+  // Load provisions
+  const { data: provisions = [], isLoading: loadingProvisions, refetch } = useQuery({
+    queryKey: ['social-benefit-provisions', companyId, filters.periodId, filters.benefitType, filters.search],
+    queryFn: async () => {
+      if (!companyId) return [];
+      
+      let query = supabase
+        .from('social_benefit_calculations')
+        .select(`
+          id,
+          employee_id,
+          benefit_type,
+          amount,
+          period_start,
+          period_end,
+          estado,
+          employee:employees(nombre, apellido)
+        `)
+        .eq('company_id', companyId);
 
-  // Subscribe to realtime changes
-  useEffect(() => {
-    const channel = RealtimeService.subscribeToTable(
-      'social_benefit_calculations',
-      () => {
-        console.log('🔄 Realtime provisions event -> refetch');
-        queryClient.invalidateQueries({ queryKey: ['provisions'] });
-        refetch();
+      if (filters.periodId) {
+        const selectedPeriod = periods.find(p => p.id === filters.periodId);
+        if (selectedPeriod) {
+          query = query
+            .eq('period_start', selectedPeriod.fecha_inicio)
+            .eq('period_end', selectedPeriod.fecha_fin);
+        }
       }
-    );
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [queryClient, refetch]);
 
-  // Totals and breakdowns
+      if (filters.benefitType) {
+        query = query.eq('benefit_type', filters.benefitType);
+      }
+
+      if (filters.search) {
+        // Assuming we can search by employee name - this might need adjustment based on your RLS policies
+        query = query.or(`employee.nombre.ilike.%${filters.search}%,employee.apellido.ilike.%${filters.search}%`);
+      }
+
+      const { data, error } = await query.order('period_start', { ascending: false });
+      
+      if (error) throw error;
+      return data as Provision[];
+    },
+    enabled: !!companyId
+  });
+
+  // ✅ NUEVO: Auto-healing effect - detectar períodos cerrados sin provisiones
+  useEffect(() => {
+    if (!companyId || !periods.length || loadingProvisions) return;
+
+    const performAutoHealing = async () => {
+      for (const period of periods) {
+        // Solo procesar períodos cerrados que no hayan sido intentados
+        if (period.estado !== 'cerrado' || autoHealingAttempted.has(period.id)) {
+          continue;
+        }
+
+        // Verificar si este período tiene provisiones
+        const periodProvisions = provisions.filter(p => 
+          p.period_start === period.fecha_inicio && 
+          p.period_end === period.fecha_fin
+        );
+
+        if (periodProvisions.length > 0) {
+          continue; // Ya tiene provisiones
+        }
+
+        // Verificar si tiene payrolls procesados
+        const { data: payrolls, error: payrollError } = await supabase
+          .from('payrolls')
+          .select('id')
+          .eq('company_id', companyId)
+          .eq('period_id', period.id);
+
+        if (payrollError) {
+          console.error('❌ Error verificando payrolls para auto-healing:', payrollError);
+          continue;
+        }
+
+        if (!payrolls || payrolls.length === 0) {
+          continue; // No hay payrolls, no es problema
+        }
+
+        // Período cerrado + con payrolls + sin provisiones = necesita auto-healing
+        console.log('🔧 Auto-healing detectado para período:', period.periodo);
+        
+        // Marcar como intentado para evitar loops
+        setAutoHealingAttempted(prev => new Set(prev).add(period.id));
+
+        try {
+          const { data: provisionResp, error: provisionErr } = await supabase.functions.invoke('provision-social-benefits', {
+            body: { period_id: period.id }
+          });
+
+          if (provisionErr) {
+            console.error('❌ Error en auto-healing:', provisionErr);
+            continue;
+          }
+
+          console.log('✅ Auto-healing exitoso para período:', period.periodo, provisionResp);
+          
+          // Refetch silencioso
+          queryClient.invalidateQueries({ queryKey: ['social-benefit-provisions'] });
+          
+          // Toast discreto
+          const count = provisionResp?.count || 0;
+          if (count > 0) {
+            toast({
+              title: "Provisiones restauradas",
+              description: `Se registraron automáticamente ${count} provisiones para el período ${period.periodo}.`,
+              className: "border-green-200 bg-green-50"
+            });
+          }
+        } catch (error) {
+          console.error('❌ Error inesperado en auto-healing:', error);
+        }
+      }
+    };
+
+    // Ejecutar auto-healing después de un pequeño delay para evitar múltiples ejecuciones
+    const timer = setTimeout(performAutoHealing, 1000);
+    return () => clearTimeout(timer);
+  }, [companyId, periods, provisions, loadingProvisions, autoHealingAttempted, toast, queryClient]);
+
   const totals = useMemo(() => {
-    const list = provisions || [];
-    const sum = (arr: ProvisionRecord[]) => arr.reduce((acc, r) => acc + (r.provision_amount || 0), 0);
-    const byType = {
-      cesantias: sum(list.filter((r) => r.benefit_type === 'cesantias')),
-      intereses_cesantias: sum(list.filter((r) => r.benefit_type === 'intereses_cesantias')),
-      prima: sum(list.filter((r) => r.benefit_type === 'prima')),
-      vacaciones: sum(list.filter((r) => r.benefit_type === 'vacaciones')),
+    if (!provisions.length) return {
+      cesantias: 0,
+      intereses_cesantias: 0,
+      prima: 0,
+      vacaciones: 0,
+      total: 0
     };
-    return {
-      count: list.length,
-      total: sum(list),
-      byType,
-    };
+
+    return provisions.reduce((acc, provision) => {
+      const amount = Number(provision.amount) || 0;
+      acc[provision.benefit_type as keyof typeof acc] = (acc[provision.benefit_type as keyof typeof acc] || 0) + amount;
+      acc.total += amount;
+      return acc;
+    }, {
+      cesantias: 0,
+      intereses_cesantias: 0,
+      prima: 0,
+      vacaciones: 0,
+      total: 0
+    });
   }, [provisions]);
 
-  // Simple client-side pagination
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
+  const totalPages = Math.ceil(provisions.length / pageSize);
+  const paginated = provisions.slice((page - 1) * pageSize, page * pageSize);
 
-  useEffect(() => {
-    setPage(1); // reset page on filters change
-  }, [filters]);
+  const setPeriodId = useCallback((periodId: string) => {
+    setFilters(prev => ({ ...prev, periodId }));
+    setPage(1);
+  }, []);
 
-  const paginated = useMemo(() => {
-    const list = provisions || [];
-    const start = (page - 1) * pageSize;
-    return list.slice(start, start + pageSize);
-  }, [provisions, page, pageSize]);
+  const setBenefitType = useCallback((benefitType: string) => {
+    setFilters(prev => ({ ...prev, benefitType }));
+    setPage(1);
+  }, []);
 
-  const totalPages = useMemo(() => {
-    const list = provisions || [];
-    return Math.max(1, Math.ceil(list.length / pageSize));
-  }, [provisions, pageSize]);
+  const setSearch = useCallback((search: string) => {
+    setFilters(prev => ({ ...prev, search }));
+    setPage(1);
+  }, []);
 
-  // Recalculate provisions
-  const [recalculating, setRecalculating] = useState(false);
   const recalculateCurrentPeriod = useCallback(async () => {
-    if (!filters.periodId) return;
-    setRecalculating(true);
+    if (!filters.periodId || recalculating) return;
+
     try {
-      const data = await ProvisionsService.recalculateProvisions(filters.periodId);
-      console.log('✅ provision-social-benefits result:', data);
+      setRecalculating(true);
+      await ProvisionsService.recalculateProvisions(filters.periodId);
+      await refetch();
       toast({
-        title: 'Provisiones recalculadas',
-        description: `Se registraron ${data.count || 0} provisiones del período cerrado seleccionado.`,
+        title: "Provisiones recalculadas",
+        description: "Las provisiones han sido recalculadas exitosamente."
       });
-      refetch();
-    } catch (e: any) {
-      console.error('❌ Error recalculando provisiones:', e);
-      const errorMessage = e?.message || 'No fue posible recalcular las provisiones';
+    } catch (error) {
+      console.error('Error recalculando provisiones:', error);
       toast({
-        title: 'Error al recalcular',
-        description: errorMessage.includes('period_not_closed') 
-          ? 'Solo se pueden calcular provisiones para períodos cerrados'
-          : errorMessage,
-        variant: 'destructive',
+        title: "Error",
+        description: "No se pudieron recalcular las provisiones.",
+        variant: "destructive"
       });
     } finally {
       setRecalculating(false);
     }
-  }, [filters.periodId, refetch, toast]);
+  }, [filters.periodId, recalculating, refetch, toast]);
 
-  // Export CSV
   const exportCSV = useCallback(() => {
-    const list = provisions || [];
-    if (list.length === 0) {
-      toast({
-        title: 'Sin datos para exportar',
-        description: 'No hay registros de provisiones para exportar.',
-        variant: 'destructive',
-      });
-      return;
-    }
+    if (!provisions.length) return;
 
-    const headers = [
-      'period_name',
-      'employee_name',
-      'employee_cedula',
-      'benefit_type',
-      'days_count',
-      'base_salary',
-      'variable_average',
-      'transport_allowance',
-      'other_included',
-      'provision_amount',
-      'calculation_method',
-      'source',
-    ];
-
-    const rows = list.map((r) => ([
-      r.period_name,
-      r.employee_name,
-      r.employee_cedula ?? '',
-      r.benefit_type,
-      r.days_count,
-      r.base_salary,
-      r.variable_average,
-      r.transport_allowance,
-      r.other_included,
-      r.provision_amount,
-      r.calculation_method ?? '',
-      r.source ?? '',
-    ]));
+    const csvData = provisions.map(provision => ({
+      Empleado: `${provision.employee?.nombre} ${provision.employee?.apellido}`,
+      'Tipo de Prestación': provision.benefit_type,
+      Valor: provision.amount,
+      'Período Inicio': provision.period_start,
+      'Período Fin': provision.period_end,
+      Estado: provision.estado
+    }));
 
     const csv = [
-      headers.join(','),
-      ...rows.map((row) => row.map((v) => {
-        const s = String(v ?? '');
-        return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-      }).join(',')),
+      Object.keys(csvData[0]).join(','),
+      ...csvData.map(row => Object.values(row).join(','))
     ].join('\n');
 
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `provisiones_${filters.periodId}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [provisions, filters.periodId, toast]);
-
-  const setPeriodId = (periodId: string) => setFilters((prev) => ({ ...prev, periodId }));
-  const setBenefitType = (benefitType: BenefitType | 'all') => setFilters((prev) => ({ ...prev, benefitType }));
-  const setSearch = (search: string) => setFilters((prev) => ({ ...prev, search }));
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `provisiones-${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    window.URL.revokeObjectURL(url);
+  }, [provisions]);
 
   return {
-    periods: periods || [],
+    periods,
     loadingPeriods,
-    provisions: provisions || [],
+    provisions,
     loadingProvisions,
     filters,
     setPeriodId,
@@ -249,9 +296,6 @@ export const useSocialBenefitProvisions = () => {
     recalculateCurrentPeriod,
     recalculating,
     exportCSV,
-    refetch,
+    refetch
   };
 };
-
-// Export types for use in components
-export type { ProvisionRecord, PeriodOption };

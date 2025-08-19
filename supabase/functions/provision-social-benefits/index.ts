@@ -1,5 +1,4 @@
 
-
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 
@@ -40,7 +39,7 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const { period_id } = await req.json().catch(() => ({}));
+    const { period_id, preview_mode = false, notes } = await req.json().catch(() => ({}));
     if (!period_id) {
       console.error('❌ Missing period_id in request');
       return new Response(
@@ -49,7 +48,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log('📅 Processing provisions for period_id:', period_id);
+    console.log(`📅 Processing provisions for period_id: ${period_id} (preview: ${preview_mode})`);
 
     // Identify user (for auditing)
     const {
@@ -80,8 +79,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Validate period is closed
-    if (period.estado !== 'cerrado') {
+    // Validate period is closed (unless preview mode)
+    if (!preview_mode && period.estado !== 'cerrado') {
       console.log('❌ Period is not closed:', period.estado);
       return new Response(
         JSON.stringify({ 
@@ -93,7 +92,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log('📅 Provisioning social benefits for closed period:', {
+    console.log('📅 Provisioning social benefits for period:', {
       id: period.id,
       periodo: period.periodo,
       start: period.fecha_inicio,
@@ -101,6 +100,7 @@ Deno.serve(async (req) => {
       tipo: period.tipo_periodo,
       company_id: period.company_id,
       estado: period.estado,
+      preview_mode
     });
 
     // Get payrolls for the period
@@ -236,7 +236,7 @@ Deno.serve(async (req) => {
         calculation_basis,
         calculated_values,
         estado: 'calculado',
-        notes: 'Provisión automática tras liquidación (Ley 50/1990 Art. 99)',
+        notes: notes || 'Provisión automática tras liquidación (Ley 50/1990 Art. 99)',
         created_by: user.id,
       } as Omit<CalculationRow, 'benefit_type' | 'amount'>;
 
@@ -253,7 +253,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log('🧾 Calculated provision items:', { count: items.length, employees: employeeIds.length });
+    console.log('🧾 Calculated provision items:', { count: items.length, employees: employeeIds.length, preview_mode });
 
     if (items.length === 0) {
       return new Response(
@@ -262,7 +262,22 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Upsert avoiding duplicates
+    // ✅ NUEVO: Si es modo preview, solo retornar los cálculos sin guardar
+    if (preview_mode) {
+      console.log('👀 Preview mode - returning calculations without saving');
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: 'preview_calculation_completed',
+          count: items.length,
+          details: 'Cálculo de provisiones completado (modo preview)',
+          items: items // Retornar los items calculados para preview
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Upsert avoiding duplicates (solo si no es preview)
     const { data: upserted, error: upsertErr } = await supabase
       .from('social_benefit_calculations')
       .upsert(items, {
