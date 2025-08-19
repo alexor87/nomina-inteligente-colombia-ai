@@ -107,7 +107,9 @@ export class PayrollAutomationService {
         return dailySalary * days; // Pagado al 100%
       
       case 'incapacidad':
-        return dailySalary * days * 0.67; // 67% pagado por EPS (después de 3 días)
+        // ✅ CORRECCIÓN NORMATIVA: Enfermedad general se reconoce al 66.67% todos los días.
+        // Días 1 y 2: paga empleador. Día 3 en adelante: EPS. (Clasificación como devengo no salarial)
+        return dailySalary * days * 0.6667;
       
       case 'ausencia':
       default:
@@ -154,3 +156,4 @@ export class PayrollAutomationService {
     }
   }
 }
+

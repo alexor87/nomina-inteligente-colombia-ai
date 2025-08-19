@@ -188,9 +188,8 @@ export class MultiPeriodAbsenceService {
         return dailySalary * days;
       
       case 'incapacidad':
-        // Incapacidad: primeros 2 días sin pago, resto al 66.67%
-        const payableDays = Math.max(0, days - 2);
-        return dailySalary * payableDays * 0.6667;
+        // ✅ CORRECCIÓN NORMATIVA: 66.67% todos los días (1-2 empleador, 3+ EPS)
+        return dailySalary * days * 0.6667;
       
       case 'ausencia':
       case 'licencia_no_remunerada':
@@ -224,3 +223,4 @@ export class MultiPeriodAbsenceService {
     return analysis.crossesMultiplePeriods;
   }
 }
+

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,9 +26,9 @@ const INCAPACIDAD_SUBTIPOS = [
   { 
     value: 'general', 
     label: 'Común - EPS (66.7%)', 
-    description: 'EPS paga desde el día 4 al 66.7%',
-    porcentaje: 66.7,
-    normativa: 'Ley 100/1993 Art. 227 - Empleador paga los primeros 3 días'
+    description: 'Días 1 y 2 paga empleador al 66.67%, desde el día 3 EPS al 66.67%',
+    porcentaje: 66.67,
+    normativa: 'Ley 100/1993 Art. 227 - Empleador paga días 1 y 2 al 66.67%'
   },
   { 
     value: 'laboral', 
@@ -58,7 +59,7 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
   const { calculateNovedadDebounced, isLoading } = useNovedadBackendCalculation();
   const [dateRangeError, setDateRangeError] = useState<string>('');
 
-  // ✅ KISS: Validación simple de rango de fechas
+  // ✅ KISS: Validación simple de rango de fechas (ahora solo advertencia, no bloquea)
   const isDateRangeInPeriod = (startDate: string, endDate: string): boolean => {
     if (!startDate || !endDate || !periodStartDate || !periodEndDate) return true;
     
@@ -76,12 +77,12 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
 
   // ✅ CORRECCIÓN: Cálculo automático cuando cambien fechas o subtipo
   useEffect(() => {
-    // Validar rango de fechas contra período
+    // Advertir si el rango se sale del período, pero no bloquear
     if (formData.fecha_inicio && formData.fecha_fin && isValidRange) {
       if (!isDateRangeInPeriod(formData.fecha_inicio, formData.fecha_fin)) {
         const startFormatted = periodStartDate ? new Date(periodStartDate).toLocaleDateString('es-CO') : '';
         const endFormatted = periodEndDate ? new Date(periodEndDate).toLocaleDateString('es-CO') : '';
-        setDateRangeError(`La incapacidad debe estar completamente dentro del período de liquidación (${startFormatted} - ${endFormatted})`);
+        setDateRangeError(`La incapacidad cruza el período de liquidación (${startFormatted} - ${endFormatted}). Se fraccionará en la liquidación.`);
       } else {
         setDateRangeError('');
       }
@@ -89,7 +90,7 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
       setDateRangeError('');
     }
 
-    if (calculatedDays > 0 && isValidRange && formData.subtipo && employeeSalary > 0 && !dateRangeError) {
+    if (calculatedDays > 0 && isValidRange && formData.subtipo && employeeSalary > 0) {
       console.log('🔄 Triggering calculation for incapacidad:', {
         subtipo: formData.subtipo,
         dias: calculatedDays,
@@ -109,16 +110,14 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
           fechaPeriodo: (periodoFecha || new Date()).toISOString()
         },
         (result) => {
-          if (result && result.valor > 0) {
+          if (result && typeof result.valor === 'number') {
             console.log('💰 Updating calculated value for', calculatedDays, 'days:', result.valor);
-            
-            // ✅ CORRECCIÓN CRÍTICA: Actualizar inmediatamente sin condiciones
             setFormData(prev => ({ 
               ...prev, 
               valor: result.valor 
             }));
-          } else if (result && result.valor === 0) {
-            console.log('⚠️ Calculation returned zero value');
+          } else {
+            console.log('⚠️ Calculation returned no value');
             setFormData(prev => ({ 
               ...prev, 
               valor: 0 
@@ -126,14 +125,14 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
           }
         }
       );
-    } else if (calculatedDays === 0 || !isValidRange || dateRangeError) {
-      // ✅ Limpiar valor cuando no hay días válidos o hay error de rango
+    } else if (calculatedDays === 0 || !isValidRange) {
+      // ✅ Limpiar valor cuando no hay días válidos
       setFormData(prev => ({ 
         ...prev, 
         valor: 0 
       }));
     }
-  }, [formData.subtipo, formData.fecha_inicio, formData.fecha_fin, calculatedDays, isValidRange, employeeSalary, calculateNovedadDebounced, periodoFecha, dateRangeError, periodStartDate, periodEndDate]);
+  }, [formData.subtipo, formData.fecha_inicio, formData.fecha_fin, calculatedDays, isValidRange, employeeSalary, calculateNovedadDebounced, periodoFecha, periodStartDate, periodEndDate]);
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -155,10 +154,7 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
       return;
     }
 
-    if (dateRangeError) {
-      alert(dateRangeError);
-      return;
-    }
+    // ⚠️ Ya no bloquea por cruce de período: la incapacidad se fraccionará en la liquidación
 
     if (calculatedDays <= 0) {
       alert('El rango de fechas debe ser válido');
@@ -363,7 +359,7 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
         </Button>
         <Button 
           onClick={handleSubmit}
-          disabled={!formData.fecha_inicio || !formData.fecha_fin || !isValidRange || calculatedDays <= 0 || formData.valor <= 0 || isSubmitting || !!dateRangeError}
+          disabled={!formData.fecha_inicio || !formData.fecha_fin || !isValidRange || calculatedDays <= 0 || formData.valor <= 0 || isSubmitting}
           className="bg-blue-600 hover:bg-blue-700"
         >
           {isSubmitting ? 'Guardando...' : 'Guardar Incapacidad'}
