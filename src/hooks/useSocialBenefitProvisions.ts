@@ -24,11 +24,22 @@ export const useSocialBenefitProvisions = () => {
     search: '',
   });
 
-  // Load available periods
+  // Load available periods (only closed ones)
   const { data: periods, isLoading: loadingPeriods } = useQuery({
     queryKey: ['provisions-periods'],
     queryFn: ProvisionsService.fetchPeriods,
   });
+
+  // Show message if no closed periods are available
+  useEffect(() => {
+    if (!loadingPeriods && periods && periods.length === 0) {
+      toast({
+        title: 'No hay períodos cerrados',
+        description: 'Las provisiones solo se pueden calcular para períodos cerrados/liquidados.',
+        variant: 'default',
+      });
+    }
+  }, [loadingPeriods, periods, toast]);
 
   // Auto-select latest period if not set
   useEffect(() => {
@@ -71,7 +82,7 @@ export const useSocialBenefitProvisions = () => {
       console.error('❌ Provisions query error:', provisionsError);
       toast({
         title: 'Error al cargar provisiones',
-        description: 'No se pudieron cargar las provisiones. Verifique que el período tenga datos.',
+        description: 'No se pudieron cargar las provisiones. Verifique que el período esté cerrado y tenga datos.',
         variant: 'destructive',
       });
     }
@@ -138,14 +149,17 @@ export const useSocialBenefitProvisions = () => {
       console.log('✅ provision-social-benefits result:', data);
       toast({
         title: 'Provisiones recalculadas',
-        description: `Se registraron ${data.count || 0} provisiones del período seleccionado.`,
+        description: `Se registraron ${data.count || 0} provisiones del período cerrado seleccionado.`,
       });
       refetch();
     } catch (e: any) {
       console.error('❌ Error recalculando provisiones:', e);
+      const errorMessage = e?.message || 'No fue posible recalcular las provisiones';
       toast({
         title: 'Error al recalcular',
-        description: e?.message || 'No fue posible recalcular las provisiones',
+        description: errorMessage.includes('period_not_closed') 
+          ? 'Solo se pueden calcular provisiones para períodos cerrados'
+          : errorMessage,
         variant: 'destructive',
       });
     } finally {

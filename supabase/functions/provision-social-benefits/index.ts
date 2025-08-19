@@ -60,10 +60,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get period
+    // Get period and validate it's closed
     const { data: period, error: periodErr } = await supabase
       .from('payroll_periods_real')
-      .select('id, company_id, fecha_inicio, fecha_fin, tipo_periodo, periodo')
+      .select('id, company_id, fecha_inicio, fecha_fin, tipo_periodo, periodo, estado')
       .eq('id', period_id)
       .single();
 
@@ -74,13 +74,27 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log('📅 Provisioning social benefits for period:', {
+    // Validate period is closed
+    if (period.estado !== 'cerrado') {
+      console.log('❌ Period is not closed:', period.estado);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'period_not_closed',
+          message: `El período debe estar cerrado para calcular provisiones. Estado actual: ${period.estado}`
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
+    }
+
+    console.log('📅 Provisioning social benefits for closed period:', {
       id: period.id,
       periodo: period.periodo,
       start: period.fecha_inicio,
       end: period.fecha_fin,
       tipo: period.tipo_periodo,
       company_id: period.company_id,
+      estado: period.estado,
     });
 
     // Get payrolls for the period
@@ -158,7 +172,7 @@ Deno.serve(async (req) => {
         calculation_basis,
         calculated_values,
         estado: 'calculado',
-        notes: 'Provisión generada automáticamente desde cierre de nómina',
+        notes: 'Provisión generada automáticamente desde período cerrado',
         created_by: user.id,
       } as Omit<CalculationRow, 'benefit_type' | 'amount'>;
 

@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import type { BenefitType } from '@/types/social-benefits';
 
@@ -40,6 +41,7 @@ export class ProvisionsService {
     const { data, error } = await sb
       .from('payroll_periods_real')
       .select('id, periodo, fecha_inicio, fecha_fin, tipo_periodo')
+      .eq('estado', 'cerrado') // Solo períodos cerrados
       .order('fecha_inicio', { ascending: false });
     
     if (error) throw error;
@@ -53,10 +55,10 @@ export class ProvisionsService {
   ): Promise<ProvisionRecord[]> {
     console.log('🔍 Fetching provisions for period:', periodId);
     
-    // Get period info
+    // Get period info and validate it's closed
     const { data: periodData, error: periodError } = await sb
       .from('payroll_periods_real')
-      .select('periodo, fecha_inicio, fecha_fin, tipo_periodo')
+      .select('periodo, fecha_inicio, fecha_fin, tipo_periodo, estado')
       .eq('id', periodId)
       .maybeSingle();
 
@@ -67,6 +69,11 @@ export class ProvisionsService {
 
     if (!periodData) {
       console.warn('⚠️ Period not found:', periodId);
+      return [];
+    }
+
+    if (periodData.estado !== 'cerrado') {
+      console.warn('⚠️ Period is not closed:', periodId, 'Estado:', periodData.estado);
       return [];
     }
 
