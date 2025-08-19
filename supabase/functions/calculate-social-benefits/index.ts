@@ -3,10 +3,9 @@
  * Edge Function: calculate-social-benefits
  * - Autenticada (usa JWT del usuario)
  * - Calcula cesantías, intereses de cesantías, prima y vacaciones
- * - 🔧 CORREGIDO: Usa base mensual completa para cálculos consistentes
- * - 🔧 NEW: Intereses de cesantías calculados como % de cesantías existentes
- * - Opcionalmente guarda/actualiza el registro (upsert) en social_benefit_calculations
- * - ✅ REHABILITADO: Se permiten simulaciones (save=false) para preview
+ * - ✅ CORREGIDO: Intereses = 12% de cesantías del período (Ley 50/1990 Art. 99)
+ * - ✅ CORREGIDO: Auxilio de transporte 2025 = $200,000 fijo
+ * - Opcionalmente guarda/actualizar el registro (upsert) en social_benefit_calculations
  */
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -18,9 +17,9 @@ interface CalculatePayload {
   benefitType: BenefitType;
   periodStart: string; // YYYY-MM-DD
   periodEnd: string;   // YYYY-MM-DD
-  periodId?: string;   // Opcional: para obtener tipo_periodo
+  periodId?: string;   // Opcional: para metadatos
   notes?: string;
-  save?: boolean;      // ✅ REHABILITADO: ahora sí se permiten previews
+  save?: boolean;
 }
 
 const corsHeaders: Record<string, string> = {
@@ -38,34 +37,6 @@ function parseDate(value: string): Date | null {
 function diffDaysInclusive(start: Date, end: Date): number {
   const ms = end.getTime() - start.getTime();
   return Math.floor(ms / (1000 * 60 * 60 * 24)) + 1;
-}
-
-// 🔧 NEW: Function to infer periodicity from days or get from period
-function inferPeriodicity(days: number, tipoPeriodo?: string): string {
-  if (tipoPeriodo) {
-    return tipoPeriodo; // Use explicit period type if available
-  }
-  
-  // Infer from days
-  if (days >= 28 && days <= 31) return 'mensual';
-  if (days >= 13 && days <= 17) return 'quincenal';
-  if (days === 7) return 'semanal';
-  
-  return 'custom'; // Fallback
-}
-
-// 🔧 NEW: Function to get interest rate based on periodicity
-function getInterestRate(periodicidad: string): number | null {
-  switch (periodicidad) {
-    case 'mensual':
-      return 0.01; // 1% mensual
-    case 'quincenal':
-      return 0.005; // 0.5% quincenal
-    case 'semanal':
-      return 0.12 / 52; // ~0.230769% semanal (12% anual / 52 semanas)
-    default:
-      return null; // Periodicidad no soportada
-  }
 }
 
 serve(async (req) => {
@@ -129,22 +100,6 @@ serve(async (req) => {
 
     const days = diffDaysInclusive(startDate, endDate);
 
-    // 🔧 NEW: Get period data if periodId is provided
-    let period = null;
-    if (body.periodId) {
-      const { data: periodData, error: periodError } = await supabase
-        .from('payroll_periods_real')
-        .select('id, company_id, fecha_inicio, fecha_fin, tipo_periodo, estado')
-        .eq('id', body.periodId)
-        .maybeSingle();
-
-      if (periodError) {
-        console.error("Period fetch error:", periodError);
-      } else {
-        period = periodData;
-      }
-    }
-
     // Cargar empleado (sujeto a RLS)
     const { data: employee, error: empError } = await supabase
       .from("employees")
@@ -166,132 +121,90 @@ serve(async (req) => {
       });
     }
 
-    // Coherencia de empresa entre empleado y período
-    if (period && employee.company_id !== period.company_id) {
-      return new Response(JSON.stringify({ success: false, error: "COMPANY_MISMATCH" }), {
-        status: 400,
-        headers: corsHeaders
-      });
-    }
-
-    // 🔧 FIX: Use full monthly salary consistently
-    const fullMonthlySalary = Number(employee.salario_base) || 0;
+    // ✅ CORREGIDO: Usar salario mensual completo y auxilio fijo 2025
+    const salarioMensual = Number(employee.salario_base) || 0;
     
-    // 🔧 FIX: Calculate full monthly auxilio (Colombian legal standards 2025)
-    const SMMLV_2025 = 1300000; // Salario mínimo 2025
-    const AUXILIO_TRANSPORTE_2025 = Math.round(SMMLV_2025 * 0.15); // 15% del SMMLV
-    const fullMonthlyAuxilio = fullMonthlySalary <= (2 * SMMLV_2025) ? AUXILIO_TRANSPORTE_2025 : 0;
+    // ✅ AUXILIO DE TRANSPORTE 2025: $200,000 fijo según normativa
+    const SMMLV_2025 = 1300000;
+    const AUXILIO_TRANSPORTE_2025 = 200000; // Valor fijo legal 2025
+    const auxilioMensual = salarioMensual <= (2 * SMMLV_2025) ? AUXILIO_TRANSPORTE_2025 : 0;
     
-    // 🔧 FIX: Base constitutiva uses full monthly amounts
-    const baseConstitutivaTotal = fullMonthlySalary + fullMonthlyAuxilio;
+    // ✅ Base constitutiva: salario + auxilio (para cesantías, prima e intereses)
+    const basePrestaciones = salarioMensual + auxilioMensual;
 
     let amount = 0;
     let formula = "";
+    let cesantiaDelPeriodo = 0;
 
-    // 🔧 NEW: Special handling for intereses_cesantias
+    console.log(`📊 Calculando ${body.benefitType} para ${days} días:`, {
+      salarioMensual,
+      auxilioMensual,
+      basePrestaciones,
+      benefitType: body.benefitType
+    });
+
     if (body.benefitType === "intereses_cesantias") {
-      // Infer periodicity
-      const periodicidad = inferPeriodicity(days, period?.tipo_periodo);
-      const interestRate = getInterestRate(periodicidad);
+      // ✅ CORREGIDO: Intereses = 12% de la cesantía del período
+      // Según Ley 50/1990 Art. 99 y Gerencie.com
+      cesantiaDelPeriodo = (basePrestaciones * days) / 360.0;
+      amount = cesantiaDelPeriodo * 0.12;
+      formula = "intereses = cesantia_periodo * 0.12 = ((salario_mensual + auxilio_mensual) * dias / 360) * 0.12";
       
-      if (interestRate === null) {
-        return new Response(JSON.stringify({ 
-          success: false, 
-          error: "UNSUPPORTED_PERIODICITY",
-          details: `Periodicidad "${periodicidad}" no soportada para cálculo de intereses`
-        }), {
-          status: 400,
-          headers: corsHeaders
-        });
-      }
-
-      // Look for existing cesantías for the same employee and period
-      const { data: cesantiasRecord, error: cesantiasError } = await supabase
-        .from("social_benefit_calculations")
-        .select("amount, calculation_basis, calculated_values")
-        .eq("company_id", employee.company_id)
-        .eq("employee_id", body.employeeId)
-        .eq("benefit_type", "cesantias")
-        .eq("period_start", body.periodStart)
-        .eq("period_end", body.periodEnd)
-        .maybeSingle();
-
-      if (cesantiasError) {
-        console.error("Cesantías fetch error:", cesantiasError);
-        return new Response(JSON.stringify({ success: false, error: "CESANTIAS_FETCH_ERROR" }), {
-          status: 500,
-          headers: corsHeaders
-        });
-      }
-
-      if (!cesantiasRecord) {
-        return new Response(JSON.stringify({ 
-          success: false, 
-          error: "MISSING_CESANTIAS_PERIOD",
-          message: "Falta la cesantía del período. Primero calcúlala/guárdala."
-        }), {
-          status: 400,
-          headers: corsHeaders
-        });
-      }
-
-      // Calculate interest based on existing cesantías
-      const cesantiasAmount = Number(cesantiasRecord.amount) || 0;
-      amount = cesantiasAmount * interestRate;
-      formula = `cesantias_amount * ${interestRate} (${periodicidad})`;
-
-      console.log(`📈 Interest calculation: ${cesantiasAmount} * ${interestRate} = ${amount}`);
-    } else {
-      // 🔧 CORRECTED: Fórmulas con base mensual completa para otros beneficios
-      if (body.benefitType === "cesantias") {
-        amount = (baseConstitutivaTotal * days) / 360.0;
-        formula = "amount = (salario_mensual + auxilio_mensual) * days / 360";
-      } else if (body.benefitType === "prima") {
-        amount = (baseConstitutivaTotal * days) / 360.0;
-        formula = "amount = (salario_mensual + auxilio_mensual) * days / 360";
-      } else if (body.benefitType === "vacaciones") {
-        // 🔧 FIX: Vacaciones solo usa salario base (sin auxilio)
-        amount = (fullMonthlySalary * days) / 720.0;
-        formula = "amount = salario_mensual * days / 720 (sin auxilio transporte)";
-      }
+      console.log(`📈 Cálculo de intereses legal:`, {
+        cesantiaDelPeriodo,
+        rate: 0.12,
+        amount,
+        formula: `${cesantiaDelPeriodo.toFixed(2)} * 0.12 = ${amount.toFixed(2)}`
+      });
+    } else if (body.benefitType === "cesantias") {
+      amount = (basePrestaciones * days) / 360.0;
+      formula = "cesantias = (salario_mensual + auxilio_mensual) * dias / 360";
+    } else if (body.benefitType === "prima") {
+      amount = (basePrestaciones * days) / 360.0;
+      formula = "prima = (salario_mensual + auxilio_mensual) * dias / 360";
+    } else if (body.benefitType === "vacaciones") {
+      // ✅ Vacaciones: solo salario base (sin auxilio)
+      amount = (salarioMensual * days) / 720.0;
+      formula = "vacaciones = salario_mensual * dias / 720 (sin auxilio transporte)";
     }
 
     const calculation_basis = {
-      version: 3, // 🔧 UPDATED: Version incremented due to interest fix
+      version: "4_legal_2025", // ✅ Nueva versión con cálculo legal
       period: { 
         start: startDate.toISOString().slice(0,10), 
         end: endDate.toISOString().slice(0,10), 
         days 
       },
-      full_monthly_salary: fullMonthlySalary, // 🔧 NEW
-      full_monthly_auxilio: fullMonthlyAuxilio, // 🔧 NEW
-      base_constitutiva_total: baseConstitutivaTotal, // 🔧 NEW
-      smmlv_2025: SMMLV_2025, // 🔧 NEW
-      auxilio_rate: 0.15, // 🔧 NEW
-      legalBase: "CO: cesantías, intereses (12% anual), prima - base constitutiva mensual completa",
-      corrections: "Corregido: usar salario + auxilio mensual completo, no proporcional del período"
+      salario_mensual: salarioMensual,
+      auxilio_mensual: auxilioMensual,
+      base_prestaciones: basePrestaciones, // salario + auxilio
+      smmlv_2025: SMMLV_2025,
+      auxilio_transporte_2025: AUXILIO_TRANSPORTE_2025, // Valor fijo legal
+      legal_reference: "Ley 50/1990 Art. 99 - Intereses 12% anual sobre cesantías",
+      method: body.benefitType === "intereses_cesantias" ? "12pct_of_cesantia_period" : "standard_360_days"
     };
 
     const calculated_values = {
-      fullMonthlySalary, // 🔧 UPDATED
-      fullMonthlyAuxilio, // 🔧 NEW
-      baseConstitutivaTotal, // 🔧 NEW
-      days,
+      salario_mensual: salarioMensual,
+      auxilio_mensual: auxilioMensual,
+      base_prestaciones: basePrestaciones,
+      dias: days,
       formula,
       benefitType: body.benefitType,
-      calculation_method: "monthly_base_proportional", // 🔧 NEW
       computedAt: new Date().toISOString()
     };
 
-    // 🔧 NEW: Enhanced calculated_values for interest calculations
+    // ✅ Valores específicos para intereses de cesantías
     if (body.benefitType === "intereses_cesantias") {
-      const periodicidad = inferPeriodicity(days, period?.tipo_periodo);
-      const interestRate = getInterestRate(periodicidad)!;
-      
       Object.assign(calculated_values, {
-        rate_applied: interestRate,
-        periodicity_used: periodicidad,
-        interest_source: 'from_existing_cesantias'
+        cesantia_del_periodo: cesantiaDelPeriodo,
+        rate_applied: 0.12, // 12% anual
+        method: "12pct_of_cesantia_period",
+        legal_basis: "Ley 50/1990 Art. 99",
+        calculation_detail: {
+          step1_cesantia: `(${salarioMensual} + ${auxilioMensual}) * ${days} / 360 = ${cesantiaDelPeriodo.toFixed(2)}`,
+          step2_intereses: `${cesantiaDelPeriodo.toFixed(2)} * 0.12 = ${amount.toFixed(2)}`
+        }
       });
     }
 
@@ -301,7 +214,7 @@ serve(async (req) => {
         JSON.stringify({
           success: true,
           mode: "preview",
-          amount,
+          amount: Math.round(amount * 100) / 100, // 2 decimales para preview
           calculation_basis,
           calculated_values
         }),
@@ -309,7 +222,7 @@ serve(async (req) => {
       );
     }
 
-    // Guardar/Actualizar (upsert) con unicidad por (company_id, employee_id, period_start, period_end, benefit_type)
+    // Guardar/Actualizar (upsert)
     const upsertPayload = {
       company_id: employee.company_id,
       employee_id: body.employeeId,
@@ -318,16 +231,16 @@ serve(async (req) => {
       period_end: endDate.toISOString().slice(0,10),
       calculation_basis,
       calculated_values,
-      amount,
+      amount: Math.round(amount), // Redondear a peso completo para guardar
       estado: "calculado",
-      notes: (body.notes || "") + " (Corregido: base mensual completa)",
+      notes: (body.notes || "") + " (Cálculo legal 2025: Ley 50/1990)",
       created_by: userData.user.id
     };
 
     const { data: record, error: upsertError } = await supabase
       .from("social_benefit_calculations")
       .upsert(upsertPayload, {
-        onConflict: "company_id,employee_id,benefit_type,period_start,period_end", // 🔧 UPDATED: Remove period_id
+        onConflict: "company_id,employee_id,benefit_type,period_start,period_end",
         ignoreDuplicates: false
       })
       .select("*")
@@ -345,7 +258,7 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         mode: "saved",
-        amount,
+        amount: Math.round(amount),
         record,
         calculation_basis,
         calculated_values

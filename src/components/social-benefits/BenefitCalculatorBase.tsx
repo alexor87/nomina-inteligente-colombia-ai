@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,13 +23,13 @@ interface BenefitCalculatorBaseProps {
   };
 }
 
-export const BenefitCalculatorBase: React.FC<BenefitCalculatorBaseProps> = ({
+export const BenefitCalculatorBase = ({
   benefitType,
   title,
   description,
   defaultPeriod
-}) => {
-  const [selectedEmployee, setSelectedEmployee] = useState<string>('');
+}: BenefitCalculatorBaseProps) => {
+  const [selectedEmployee, setSelectedEmployee] = useState('');
   const [periodStart, setPeriodStart] = useState(defaultPeriod?.start || '');
   const [periodEnd, setPeriodEnd] = useState(defaultPeriod?.end || '');
   const [notes, setNotes] = useState('');
@@ -40,7 +39,7 @@ export const BenefitCalculatorBase: React.FC<BenefitCalculatorBaseProps> = ({
 
   // Auto-calculate preview when inputs change
   useEffect(() => {
-    if (selectedEmployee && periodStart && periodEnd) {
+    if (selectedEmployee && periodStart && periodEnd && benefitType) {
       calculatePreview(selectedEmployee, benefitType, periodStart, periodEnd);
     } else {
       clearPreview();
@@ -49,152 +48,195 @@ export const BenefitCalculatorBase: React.FC<BenefitCalculatorBaseProps> = ({
 
   const handleSave = async () => {
     if (!selectedEmployee || !periodStart || !periodEnd) return;
-
+    
     await calculateAndSave(selectedEmployee, benefitType, periodStart, periodEnd, notes);
   };
 
   const isFormValid = selectedEmployee && periodStart && periodEnd;
-  const hasValidPreview = previewResult?.success && 'amount' in previewResult;
+
+  // ✅ Renderizado del preview con desglose detallado
+  const renderPreview = () => {
+    if (!previewResult || !previewResult.success) return null;
+
+    const { amount, calculated_values } = previewResult;
+    
+    return (
+      <div className="mt-6 p-4 bg-gray-50 rounded-lg border">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center space-x-2">
+            <CheckCircle2 className="h-5 w-5 text-green-500" />
+            <h3 className="text-lg font-medium text-gray-900">Vista Previa del Cálculo</h3>
+          </div>
+          <div className="text-2xl font-bold text-blue-600">
+            {formatCurrency(amount)}
+          </div>
+        </div>
+
+        {/* ✅ Desglose detallado para intereses de cesantías */}
+        {benefitType === 'intereses_cesantias' && calculated_values?.calculation_detail && (
+          <div className="space-y-2 text-sm">
+            <div className="font-medium text-gray-700">Desglose del Cálculo Legal:</div>
+            <div className="pl-4 space-y-1 text-gray-600">
+              <div>• <strong>Base de prestaciones:</strong> {formatCurrency(calculated_values.base_prestaciones || 0)}</div>
+              <div>• <strong>Días del período:</strong> {calculated_values.dias}</div>
+              <div>• <strong>1. Cesantía del período:</strong> {calculated_values.calculation_detail.step1_cesantia}</div>
+              <div>• <strong>2. Intereses (12% anual):</strong> {calculated_values.calculation_detail.step2_intereses}</div>
+              <div className="pt-2 border-t">
+                <strong>Fundamento legal:</strong> {calculated_values.legal_basis || 'Ley 50/1990 Art. 99'}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ✅ Información estándar para otros beneficios */}
+        {benefitType !== 'intereses_cesantias' && (
+          <div className="space-y-2 text-sm">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <span className="text-gray-600">Base de cálculo:</span>
+                <div className="font-medium">{formatCurrency(calculated_values?.base_prestaciones || 0)}</div>
+              </div>
+              <div>
+                <span className="text-gray-600">Días del período:</span>
+                <div className="font-medium">{calculated_values?.dias}</div>
+              </div>
+            </div>
+            <div className="text-gray-600 text-xs pt-2 border-t">
+              <strong>Fórmula:</strong> {calculated_values?.formula}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
-    <Card className="w-full max-w-2xl mx-auto">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Calculator className="h-5 w-5" />
-          {title}
-        </CardTitle>
-        <CardDescription>{description}</CardDescription>
-      </CardHeader>
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">{title}</h2>
+        <p className="text-gray-600">{description}</p>
+        
+        {/* ✅ Información legal específica para intereses */}
+        {benefitType === 'intereses_cesantias' && (
+          <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="text-sm text-blue-800">
+              <strong>Marco Legal:</strong> Ley 50 de 1990, Artículo 99. Los intereses de cesantías corresponden al 12% anual 
+              sobre el valor de las cesantías del período. Se calculan como: <code>Intereses = Cesantía del período × 0.12</code>
+            </div>
+          </div>
+        )}
+      </div>
 
-      <CardContent className="space-y-6">
-        {/* Employee Selection */}
-        <div className="space-y-2">
-          <Label htmlFor="employee">Empleado</Label>
-          <Select
-            value={selectedEmployee}
-            onValueChange={setSelectedEmployee}
-            disabled={employeesLoading}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder={employeesLoading ? "Cargando empleados..." : "Selecciona un empleado"} />
-            </SelectTrigger>
-            <SelectContent>
-              {employees.map((employee) => (
-                <SelectItem key={employee.id} value={employee.id}>
-                  {employee.nombre} {employee.apellido} - {employee.cargo}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="space-y-4">
+          <div>
+            <label htmlFor="employee" className="block text-sm font-medium text-gray-700 mb-2">
+              Empleado
+            </label>
+            <Select value={selectedEmployee} onValueChange={setSelectedEmployee} disabled={employeesLoading}>
+              <SelectTrigger>
+                <SelectValue placeholder={employeesLoading ? "Cargando empleados..." : "Selecciona un empleado"} />
+              </SelectTrigger>
+              <SelectContent>
+                {employees.map((employee: any) => (
+                  <SelectItem key={employee.id} value={employee.id}>
+                    {employee.nombre} {employee.apellido} - {formatCurrency(employee.salario_base)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-        {/* Period Selection */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="periodStart">Fecha inicio</Label>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="period-start" className="block text-sm font-medium text-gray-700 mb-2">
+                Fecha Inicio
+              </label>
+              <Input
+                id="period-start"
+                type="date"
+                value={periodStart}
+                onChange={(e) => setPeriodStart(e.target.value)}
+              />
+            </div>
+            <div>
+              <label htmlFor="period-end" className="block text-sm font-medium text-gray-700 mb-2">
+                Fecha Fin
+              </label>
+              <Input
+                id="period-end"
+                type="date"
+                value={periodEnd}
+                onChange={(e) => setPeriodEnd(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="notes" className="block text-sm font-medium text-gray-700 mb-2">
+              Notas (Opcional)
+            </label>
             <Input
-              id="periodStart"
-              type="date"
-              value={periodStart}
-              onChange={(e) => setPeriodStart(e.target.value)}
+              id="notes"
+              placeholder="Observaciones adicionales..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="periodEnd">Fecha fin</Label>
-            <Input
-              id="periodEnd"
-              type="date"
-              value={periodEnd}
-              onChange={(e) => setPeriodEnd(e.target.value)}
-            />
-          </div>
         </div>
 
-        {/* Preview Section */}
-        {isFormValid && (
-          <>
-            <Separator />
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <Eye className="h-4 w-4" />
-                <span className="font-medium">Vista previa del cálculo</span>
-              </div>
-
+        <div className="space-y-4">
+          {isFormValid && (
+            <>
               {isCalculating ? (
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
+                <div className="flex items-center space-x-2 text-gray-600">
+                  <Calculator className="h-4 w-4 animate-pulse" />
                   <span>Calculando...</span>
                 </div>
               ) : previewResult ? (
-                previewResult.success && hasValidPreview ? (
-                  <Alert className="border-green-200 bg-green-50">
-                    <CheckCircle2 className="h-4 w-4" />
-                    <AlertDescription>
-                      <div className="font-medium text-green-800">
-                        Valor calculado: {formatCurrency(previewResult.amount)}
-                      </div>
-                      <div className="text-sm text-green-600 mt-1">
-                        {/* 🔧 NEW: Show interest calculation details for intereses_cesantias */}
-                        {benefitType === 'intereses_cesantias' && previewResult.calculated_values?.rate_applied && (
-                          <span>
-                            Tasa aplicada: {(previewResult.calculated_values.rate_applied * 100).toFixed(3)}% 
-                            ({previewResult.calculated_values.periodicity_used || 'período'})
-                          </span>
-                        )}
-                      </div>
-                    </AlertDescription>
-                  </Alert>
+                previewResult.success ? (
+                  renderPreview()
                 ) : (
                   <Alert variant="destructive">
                     <AlertTriangle className="h-4 w-4" />
                     <AlertDescription>
-                      {!previewResult.success && 'error' in previewResult ? (
-                        previewResult.error === 'MISSING_CESANTIAS_PERIOD' ? (
-                          <div>
-                            <div className="font-medium">Cesantías requeridas</div>
-                            <div className="text-sm mt-1">
-                              Para calcular los intereses de cesantías, primero debes calcular y guardar 
-                              las cesantías del mismo período.
-                            </div>
-                          </div>
-                        ) : (
-                          previewResult.error
-                        )
-                      ) : (
-                        'Error en el cálculo'
-                      )}
+                      {!previewResult.success && 'error' in previewResult 
+                        ? previewResult.error 
+                        : "Error en el cálculo"
+                      }
                     </AlertDescription>
                   </Alert>
                 )
               ) : null}
-            </div>
-          </>
-        )}
+            </>
+          )}
 
-        {/* Notes Section */}
-        <div className="space-y-2">
-          <Label htmlFor="notes">Observaciones (opcional)</Label>
-          <Textarea
-            id="notes"
-            placeholder="Agrega cualquier observación sobre este cálculo..."
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            rows={3}
-          />
-        </div>
+          <div className="space-y-3">
+            <Button
+              onClick={() => {
+                if (isFormValid) {
+                  calculatePreview(selectedEmployee, benefitType, periodStart, periodEnd);
+                }
+              }}
+              disabled={!isFormValid || isCalculating}
+              variant="outline"
+              className="w-full"
+            >
+              <Eye className="h-4 w-4 mr-2" />
+              Vista Previa
+            </Button>
 
-        {/* Action Buttons */}
-        <div className="flex gap-3 pt-4">
-          <Button
-            onClick={handleSave}
-            disabled={!isFormValid || !hasValidPreview || isCalculating}
-            className="flex items-center gap-2"
-          >
-            <Save className="h-4 w-4" />
-            Calcular y Guardar
-          </Button>
+            <Button
+              onClick={handleSave}
+              disabled={!isFormValid || isCalculating || (!previewResult || !previewResult.success)}
+              className="w-full"
+            >
+              <Save className="h-4 w-4 mr-2" />
+              {isCalculating ? 'Guardando...' : 'Calcular y Guardar'}
+            </Button>
+          </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 };

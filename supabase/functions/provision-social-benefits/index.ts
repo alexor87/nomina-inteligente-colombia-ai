@@ -24,20 +24,6 @@ type CalculationRow = {
   created_by: string;
 };
 
-// 🔧 NEW: Function to get interest rate based on periodicity
-function getInterestRate(periodicidad: string): number | null {
-  switch (periodicidad) {
-    case 'mensual':
-      return 0.01; // 1% mensual
-    case 'quincenal':
-      return 0.005; // 0.5% quincenal
-    case 'semanal':
-      return 0.12 / 52; // ~0.230769% semanal (12% anual / 52 semanas)
-    default:
-      return null; // Periodicidad no soportada
-  }
-}
-
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -111,21 +97,6 @@ Deno.serve(async (req) => {
       estado: period.estado,
     });
 
-    // 🔧 NEW: Get interest rate for this period type
-    const interestRate = getInterestRate(period.tipo_periodo);
-    if (interestRate === null) {
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'unsupported_periodicity',
-          message: `Periodicidad "${period.tipo_periodo}" no soportada para cálculo de intereses`
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-      );
-    }
-
-    console.log('📈 Interest rate for', period.tipo_periodo, ':', interestRate);
-
     // Get payrolls for the period
     const { data: payrolls, error: payrollsErr } = await supabase
       .from('payrolls')
@@ -140,7 +111,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get employee data for full monthly salary and auxilio
+    // Get employee data for full monthly salary
     const employeeIds = [...new Set(payrolls?.map(p => p.employee_id) || [])];
     const { data: employees, error: employeesErr } = await supabase
       .from('employees')
@@ -165,47 +136,43 @@ Deno.serve(async (req) => {
       const employeeId = p.employee_id as string;
       const workedDays = Number(p.dias_trabajados) || 0;
       
-      // 🔧 FIX: Use full monthly salary from employees table
+      // ✅ CORREGIDO: Usar salario mensual completo del empleado
       const employee = employeesMap.get(employeeId);
-      const fullMonthlySalary = Number(employee?.salario_base) || 0;
+      const salarioMensual = Number(employee?.salario_base) || 0;
       
-      // 🔧 FIX: Calculate full monthly auxilio (195.000 COP for 2025)
-      const SMMLV_2025 = 1300000; // Salario mínimo 2025
-      const AUXILIO_TRANSPORTE_2025 = Math.round(SMMLV_2025 * 0.15); // 15% del SMMLV
-      const fullMonthlyAuxilio = fullMonthlySalary <= (2 * SMMLV_2025) ? AUXILIO_TRANSPORTE_2025 : 0;
+      // ✅ CORREGIDO: Auxilio de transporte 2025 = $200,000 fijo
+      const SMMLV_2025 = 1300000;
+      const AUXILIO_TRANSPORTE_2025 = 200000; // Valor fijo legal 2025
+      const auxilioMensual = salarioMensual <= (2 * SMMLV_2025) ? AUXILIO_TRANSPORTE_2025 : 0;
 
-      if (!employeeId || workedDays <= 0 || fullMonthlySalary <= 0) continue;
+      if (!employeeId || workedDays <= 0 || salarioMensual <= 0) continue;
 
-      // Base constitutiva: salario mensual completo + auxilio mensual completo
-      const variableAverage = 0;
-      const otherIncluded = 0;
-      
-      // 🔧 FIX: Base constitutiva now uses full monthly amounts
-      const baseConstitutivaTotal = fullMonthlySalary + fullMonthlyAuxilio + variableAverage + otherIncluded;
+      // ✅ Base constitutiva: salario mensual completo + auxilio mensual completo
+      const basePrestaciones = salarioMensual + auxilioMensual;
 
       // Fórmulas de provisión (proporcionalmente por días trabajados)
       const fraction = workedDays / 360;
 
-      const cesantiasAmount = baseConstitutivaTotal * fraction;
+      const cesantiasAmount = basePrestaciones * fraction;
       
-      // 🔧 NEW: Calculate interest based on cesantías amount and periodic rate
-      const interesesAmount = cesantiasAmount * interestRate;
+      // ✅ CORREGIDO: Intereses = 12% de la cesantía del período (Ley 50/1990 Art. 99)
+      const interesesAmount = cesantiasAmount * 0.12;
       
-      const primaAmount = baseConstitutivaTotal * fraction;
+      const primaAmount = basePrestaciones * fraction;
       
-      // 🔧 FIX: Vacaciones: solo salario base mensual (sin auxilio transporte) * días / 720
-      const vacacionesAmount = fullMonthlySalary * workedDays / 720;
+      // ✅ Vacaciones: solo salario base mensual (sin auxilio transporte) * días / 720
+      const vacacionesAmount = salarioMensual * workedDays / 720;
 
       const calculation_basis = {
-        full_monthly_salary: fullMonthlySalary, // 🔧 NEW: Salario mensual completo
-        full_monthly_auxilio: fullMonthlyAuxilio, // 🔧 NEW: Auxilio mensual completo
-        variable_average: variableAverage,
-        other_included: otherIncluded,
-        base_constitutiva_total: baseConstitutivaTotal, // 🔧 NEW: Base constitutiva total
+        version: "4_legal_2025", // ✅ Nueva versión con cálculo legal
+        salario_mensual: salarioMensual,
+        auxilio_mensual: auxilioMensual,
+        base_prestaciones: basePrestaciones,
         worked_days: workedDays,
-        method: 'days_over_360_with_monthly_base', // 🔧 UPDATED: Method name
+        method: 'legal_monthly_base_proportional',
         smmlv_2025: SMMLV_2025,
-        auxilio_rate: 0.15,
+        auxilio_transporte_2025: AUXILIO_TRANSPORTE_2025, // Valor fijo legal
+        legal_reference: "Ley 50/1990 Art. 99 - Intereses 12% anual sobre cesantías",
         period: {
           id: period.id,
           periodo: period.periodo,
@@ -213,31 +180,31 @@ Deno.serve(async (req) => {
           end: period.fecha_fin,
           tipo: period.tipo_periodo,
         },
-        // 🔧 NEW: Legacy fields for backward compatibility
-        base_salary: fullMonthlySalary,
-        transport_allowance: fullMonthlyAuxilio,
-        base_total: baseConstitutivaTotal,
       };
 
       const calculated_values = {
         days_count: workedDays,
         formulas: {
-          cesantias: 'base_constitutiva_total * (dias/360)',
-          intereses_cesantias: `cesantias_amount * ${interestRate} (${period.tipo_periodo})`, // 🔧 NEW: Show rate used
-          prima: 'base_constitutiva_total * (dias/360)',
-          vacaciones: 'full_monthly_salary * (dias/720) - Nota: solo salario base, sin auxilio',
+          cesantias: 'base_prestaciones * (dias/360)',
+          intereses_cesantias: 'cesantias_amount * 0.12 (Ley 50/1990 Art. 99)',
+          prima: 'base_prestaciones * (dias/360)',
+          vacaciones: 'salario_mensual * (dias/720) - Solo salario base, sin auxilio',
         },
-        calculation_method: 'monthly_base_proportional', // 🔧 NEW: Clear method identifier
+        calculation_method: 'legal_monthly_base_proportional',
         calculated_at: new Date().toISOString(),
       };
 
-      // 🔧 NEW: Add interest-specific calculated values
+      // ✅ Valores específicos para intereses de cesantías
       const interestCalculatedValues = {
         ...calculated_values,
-        rate_applied: interestRate, // 🔧 NEW: Record the rate used
-        periodicity_used: period.tipo_periodo, // 🔧 NEW: Record periodicity
-        interest_source: 'from_current_provision_loop', // 🔧 NEW: Source of calculation
-        cesantias_base_amount: Math.round(cesantiasAmount), // 🔧 NEW: Base cesantías amount
+        rate_applied: 0.12, // 12% anual
+        method: "12pct_of_cesantia_period",
+        legal_basis: "Ley 50/1990 Art. 99",
+        cesantia_del_periodo: Math.round(cesantiasAmount),
+        calculation_detail: {
+          step1_cesantia: `(${salarioMensual} + ${auxilioMensual}) * ${workedDays} / 360 = ${cesantiasAmount.toFixed(2)}`,
+          step2_intereses: `${cesantiasAmount.toFixed(2)} * 0.12 = ${interesesAmount.toFixed(2)}`
+        }
       };
 
       const common = {
@@ -248,7 +215,7 @@ Deno.serve(async (req) => {
         calculation_basis,
         calculated_values,
         estado: 'calculado',
-        notes: 'Provisión con base mensual completa (corregida)',
+        notes: 'Provisión con cálculo legal 2025 (Ley 50/1990 Art. 99)',
         created_by: user.id,
       } as Omit<CalculationRow, 'benefit_type' | 'amount'>;
 
@@ -258,14 +225,14 @@ Deno.serve(async (req) => {
           ...common, 
           benefit_type: 'intereses_cesantias', 
           amount: Math.round(interesesAmount),
-          calculated_values: interestCalculatedValues // 🔧 NEW: Use enhanced calculated values
+          calculated_values: interestCalculatedValues
         },
         { ...common, benefit_type: 'prima', amount: Math.round(primaAmount) },
         { ...common, benefit_type: 'vacaciones', amount: Math.round(vacacionesAmount) },
       );
     }
 
-    console.log('🧾 Calculated provision items with corrected interest calculation:', { count: items.length });
+    console.log('🧾 Calculated provision items with legal interest calculation:', { count: items.length });
 
     if (items.length === 0) {
       return new Response(
@@ -274,9 +241,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Upsert avoiding duplicates using (company_id, employee_id, benefit_type, period_start, period_end)
-    console.log('🔁 Upserting provisions with conflict target: company_id,employee_id,benefit_type,period_start,period_end');
-
+    // Upsert avoiding duplicates
     const { data: upserted, error: upsertErr } = await supabase
       .from('social_benefit_calculations')
       .upsert(items, {
@@ -293,12 +258,12 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log('✅ Provisions upserted with corrected interest calculations:', upserted?.length || 0);
+    console.log('✅ Provisions upserted with legal interest calculations:', upserted?.length || 0);
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: 'provisions_recorded_with_corrected_interest_calculation',
+        message: 'provisions_recorded_with_legal_interest_calculation',
         count: upserted?.length || 0,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
