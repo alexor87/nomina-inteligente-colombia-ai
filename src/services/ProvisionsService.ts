@@ -23,6 +23,11 @@ export type ProvisionRecord = {
   source: string | null;
   created_at: string;
   updated_at: string;
+  // 🔧 NEW: Additional transparency fields
+  full_monthly_salary?: number;
+  full_monthly_auxilio?: number;
+  base_constitutiva_total?: number;
+  is_corrected_calculation?: boolean;
 };
 
 export type PeriodOption = {
@@ -117,11 +122,17 @@ export class ProvisionsService {
       employeesMap.set(emp.id, emp);
     });
 
-    // Transform data
+    // Transform data with enhanced transparency
     let transformedData = calculations.map((item: any) => {
       const employee = employeesMap.get(item.employee_id);
       const calculationBasis = item.calculation_basis || {};
       const calculatedValues = item.calculated_values || {};
+
+      // 🔧 ENHANCED: Extract corrected calculation details
+      const fullMonthlySalary = calculationBasis.full_monthly_salary || calculationBasis.base_salary || 0;
+      const fullMonthlyAuxilio = calculationBasis.full_monthly_auxilio || calculationBasis.transport_allowance || 0;
+      const baseConstitutivaTotal = calculationBasis.base_constitutiva_total || calculationBasis.base_total || 0;
+      const isCorrectedCalculation = calculationBasis.version >= 2 || calculationBasis.method === 'days_over_360_with_monthly_base';
 
       return {
         company_id: item.company_id,
@@ -134,16 +145,21 @@ export class ProvisionsService {
         period_end: periodData.fecha_fin,
         period_type: periodData.tipo_periodo,
         benefit_type: item.benefit_type as BenefitType,
-        base_salary: calculationBasis.base_salary || 0,
+        base_salary: calculationBasis.base_salary || fullMonthlySalary || 0,
         variable_average: calculationBasis.variable_average || 0,
-        transport_allowance: calculationBasis.transport_allowance || 0,
+        transport_allowance: calculationBasis.transport_allowance || fullMonthlyAuxilio || 0,
         other_included: calculationBasis.other_included || 0,
         days_count: calculatedValues.days_count || 0,
         provision_amount: item.amount || 0,
-        calculation_method: calculationBasis.method || null,
+        calculation_method: calculationBasis.method || calculatedValues.calculation_method || null,
         source: 'calculation',
         created_at: item.created_at,
         updated_at: item.updated_at,
+        // 🔧 NEW: Enhanced transparency fields
+        full_monthly_salary: fullMonthlySalary,
+        full_monthly_auxilio: fullMonthlyAuxilio,
+        base_constitutiva_total: baseConstitutivaTotal,
+        is_corrected_calculation: isCorrectedCalculation,
       } as ProvisionRecord;
     });
 
@@ -160,7 +176,7 @@ export class ProvisionsService {
       );
     }
 
-    console.log('📊 Final transformed data:', transformedData.length, 'records');
+    console.log('📊 Final transformed data with corrections:', transformedData.length, 'records');
     return transformedData;
   }
 
@@ -176,7 +192,7 @@ export class ProvisionsService {
       throw error;
     }
     
-    console.log('✅ Provisions recalculated:', data);
+    console.log('✅ Provisions recalculated with corrected base:', data);
     return data;
   }
 }

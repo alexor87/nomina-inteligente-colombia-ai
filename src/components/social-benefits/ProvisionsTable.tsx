@@ -1,23 +1,64 @@
 
 import React from 'react';
-import type { ProvisionRecord } from '@/hooks/useSocialBenefitProvisions';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { ChevronLeft, ChevronRight, Info, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { formatCurrency } from '@/lib/utils';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import type { ProvisionRecord } from '@/services/ProvisionsService';
 
-type Props = {
+interface ProvisionsTableProps {
   rows: ProvisionRecord[];
   page: number;
   pageSize: number;
-  setPage: (p: number) => void;
-  setPageSize: (s: number) => void;
+  setPage: (page: number) => void;
+  setPageSize: (size: number) => void;
   totalPages: number;
   loading: boolean;
+}
+
+const getBenefitTypeLabel = (type: string) => {
+  const labels = {
+    cesantias: 'Cesantías',
+    intereses_cesantias: 'Intereses Cesantías',
+    prima: 'Prima',
+    vacaciones: 'Vacaciones',
+  };
+  return labels[type as keyof typeof labels] || type;
 };
 
-const formatCurrency = (v: number) =>
-  v.toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
+const getBenefitTypeColor = (type: string) => {
+  const colors = {
+    cesantias: 'bg-blue-100 text-blue-800',
+    intereses_cesantias: 'bg-purple-100 text-purple-800',
+    prima: 'bg-green-100 text-green-800',
+    vacaciones: 'bg-orange-100 text-orange-800',
+  };
+  return colors[type as keyof typeof colors] || 'bg-gray-100 text-gray-800';
+};
 
-export const ProvisionsTable: React.FC<Props> = ({
+// 🔧 NEW: Helper to get calculation base display based on benefit type
+const getCalculationBaseDisplay = (record: ProvisionRecord) => {
+  if (record.benefit_type === 'vacaciones') {
+    // Vacaciones: solo salario base
+    return {
+      amount: record.full_monthly_salary || record.base_salary,
+      label: 'Salario base',
+      description: 'Solo salario (sin auxilio)',
+    };
+  } else {
+    // Cesantías, prima, intereses: base constitutiva completa
+    return {
+      amount: record.base_constitutiva_total || (record.base_salary + record.transport_allowance),
+      label: 'Base constitutiva',
+      description: 'Salario + auxilio transporte',
+    };
+  }
+};
+
+export const ProvisionsTable: React.FC<ProvisionsTableProps> = ({
   rows,
   page,
   pageSize,
@@ -26,85 +67,195 @@ export const ProvisionsTable: React.FC<Props> = ({
   totalPages,
   loading,
 }) => {
-  return (
-    <div className="border rounded-lg overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/50">
-            <tr>
-              <th className="text-left px-4 py-2">Empleado</th>
-              <th className="text-left px-4 py-2">Cédula</th>
-              <th className="text-left px-4 py-2">Prestación</th>
-              <th className="text-right px-4 py-2">Días</th>
-              <th className="text-right px-4 py-2">Base</th>
-              <th className="text-right px-4 py-2">Valor</th>
-              <th className="text-left px-4 py-2">Fuente</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td className="px-4 py-6 text-center text-muted-foreground" colSpan={7}>
-                  Cargando...
-                </td>
-              </tr>
-            ) : rows.length === 0 ? (
-              <tr>
-                <td className="px-4 py-6 text-center text-muted-foreground" colSpan={7}>
-                  No hay registros para mostrar.
-                </td>
-              </tr>
-            ) : (
-              rows.map((r) => {
-                const baseTotal = (r.base_salary || 0) + (r.variable_average || 0) + (r.transport_allowance || 0) + (r.other_included || 0);
-                const label =
-                  r.benefit_type === 'cesantias' ? 'Cesantías' :
-                  r.benefit_type === 'intereses_cesantias' ? 'Intereses' :
-                  r.benefit_type === 'prima' ? 'Prima' :
-                  r.benefit_type === 'vacaciones' ? 'Vacaciones' :
-                  r.benefit_type;
-                return (
-                  <tr key={`${r.period_id}-${r.employee_id}-${r.benefit_type}`} className="border-t">
-                    <td className="px-4 py-2">{r.employee_name}</td>
-                    <td className="px-4 py-2">{r.employee_cedula || '-'}</td>
-                    <td className="px-4 py-2">{label}</td>
-                    <td className="px-4 py-2 text-right">{r.days_count}</td>
-                    <td className="px-4 py-2 text-right">{formatCurrency(baseTotal)}</td>
-                    <td className="px-4 py-2 text-right font-medium">{formatCurrency(r.provision_amount || 0)}</td>
-                    <td className="px-4 py-2">{r.source || '-'}</td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="flex items-center justify-between px-3 py-2 border-t bg-background">
-        <div className="flex items-center gap-2 text-sm">
-          <span className="text-muted-foreground">Filas por página:</span>
-          <select
-            className="border rounded px-2 py-1 bg-background"
-            value={pageSize}
-            onChange={(e) => setPageSize(parseInt(e.target.value))}
-          >
-            {[10, 25, 50, 100].map((s) => (
-              <option key={s} value={s}>{s}</option>
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Cargando provisiones...</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="animate-pulse space-y-2">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="h-12 bg-gray-200 rounded" />
             ))}
-          </select>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => setPage(Math.max(1, page - 1))} disabled={page <= 1}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <span className="text-sm text-muted-foreground">
-            Página {page} de {totalPages}
-          </span>
-          <Button variant="outline" size="sm" onClick={() => setPage(Math.min(totalPages, page + 1))} disabled={page >= totalPages}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-    </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <TooltipProvider>
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            Detalle de Provisiones
+            {rows.length > 0 && (
+              <span className="text-sm font-normal text-gray-500 ml-2">
+                ({rows.length} registros)
+              </span>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {rows.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              No hay provisiones para mostrar
+            </div>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Empleado</TableHead>
+                      <TableHead>Prestación</TableHead>
+                      <TableHead className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          Base (según prestación)
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <Info className="h-3 w-3 text-gray-400" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <div className="text-xs max-w-xs">
+                                <p><strong>Cesantías/Prima:</strong> Salario + auxilio transporte</p>
+                                <p><strong>Vacaciones:</strong> Solo salario base</p>
+                                <p><strong>Intereses:</strong> Sobre cesantías calculadas</p>
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                      </TableHead>
+                      <TableHead className="text-center">Días</TableHead>
+                      <TableHead className="text-right">Valor</TableHead>
+                      <TableHead className="text-center">Estado</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {rows.map((row, index) => {
+                      const baseDisplay = getCalculationBaseDisplay(row);
+                      
+                      return (
+                        <TableRow key={index}>
+                          <TableCell>
+                            <div className="space-y-1">
+                              <div className="font-medium">{row.employee_name}</div>
+                              {row.employee_cedula && (
+                                <div className="text-xs text-gray-500">
+                                  CC: {row.employee_cedula}
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="secondary"
+                              className={getBenefitTypeColor(row.benefit_type)}
+                            >
+                              {getBenefitTypeLabel(row.benefit_type)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="space-y-1">
+                              <div className="font-medium">
+                                {formatCurrency(baseDisplay.amount)}
+                              </div>
+                              <Tooltip>
+                                <TooltipTrigger>
+                                  <div className="text-xs text-gray-500 flex items-center justify-end gap-1">
+                                    {baseDisplay.label}
+                                    <Info className="h-3 w-3" />
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <div className="text-xs max-w-xs">
+                                    <p>{baseDisplay.description}</p>
+                                    {row.full_monthly_salary && (
+                                      <>
+                                        <p className="mt-1"><strong>Salario:</strong> {formatCurrency(row.full_monthly_salary)}</p>
+                                        <p><strong>Auxilio:</strong> {formatCurrency(row.full_monthly_auxilio || 0)}</p>
+                                      </>
+                                    )}
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="outline">
+                              {row.days_count}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="space-y-1">
+                              <div className="font-semibold text-lg">
+                                {formatCurrency(row.provision_amount)}
+                              </div>
+                              {row.is_corrected_calculation && (
+                                <Tooltip>
+                                  <TooltipTrigger>
+                                    <div className="flex items-center justify-end gap-1 text-xs text-green-600">
+                                      <CheckCircle2 className="h-3 w-3" />
+                                      Corregido
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p className="text-xs">
+                                      Calculado con base mensual completa
+                                    </p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge
+                              variant="secondary"
+                              className="bg-green-100 text-green-800"
+                            >
+                              Calculado
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between space-x-2 py-4">
+                  <div className="text-sm text-gray-500">
+                    Página {page} de {totalPages}
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage(page - 1)}
+                      disabled={page <= 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                      Anterior
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage(page + 1)}
+                      disabled={page >= totalPages}
+                    >
+                      Siguiente
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </TooltipProvider>
   );
 };

@@ -2,13 +2,14 @@
 /** 
  * Edge Function: calculate-social-benefits
  * - Autenticada (usa JWT del usuario)
- * - Calcula cesantías, intereses de cesantías y prima
+ * - Calcula cesantías, intereses de cesantías, prima y vacaciones
+ * - 🔧 CORREGIDO: Usa base mensual completa para cálculos consistentes
  * - Opcionalmente guarda/actualiza el registro (upsert) en social_benefit_calculations
  */
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-type BenefitType = 'cesantias' | 'intereses_cesantias' | 'prima';
+type BenefitType = 'cesantias' | 'intereses_cesantias' | 'prima' | 'vacaciones';
 
 interface CalculatePayload {
   employeeId: string;
@@ -76,7 +77,7 @@ serve(async (req) => {
       });
     }
 
-    const validTypes: BenefitType[] = ['cesantias', 'intereses_cesantias', 'prima'];
+    const validTypes: BenefitType[] = ['cesantias', 'intereses_cesantias', 'prima', 'vacaciones'];
     if (!validTypes.includes(body.benefitType)) {
       return new Response(JSON.stringify({ success: false, error: "INVALID_BENEFIT_TYPE" }), {
         status: 400,
@@ -115,40 +116,57 @@ serve(async (req) => {
     }
 
     const days = diffDaysInclusive(startDate, endDate);
-    const baseSalary = Number(employee.salario_base) || 0;
-    const dailySalary = baseSalary / 30.0;
+    
+    // 🔧 FIX: Use full monthly salary consistently
+    const fullMonthlySalary = Number(employee.salario_base) || 0;
+    
+    // 🔧 FIX: Calculate full monthly auxilio (Colombian legal standards 2025)
+    const SMMLV_2025 = 1300000; // Salario mínimo 2025
+    const AUXILIO_TRANSPORTE_2025 = Math.round(SMMLV_2025 * 0.15); // 15% del SMMLV
+    const fullMonthlyAuxilio = fullMonthlySalary <= (2 * SMMLV_2025) ? AUXILIO_TRANSPORTE_2025 : 0;
+    
+    // 🔧 FIX: Base constitutiva uses full monthly amounts
+    const baseConstitutivaTotal = fullMonthlySalary + fullMonthlyAuxilio;
 
     let amount = 0;
     let formula = "";
 
-    // Fórmulas simplificadas y legales base:
-    // Cesantías = (Salario base * días) / 360
-    // Intereses cesantías = Cesantías * 12% proporcional: (Salario base * días / 360) * 0.12
-    // Prima = (Salario base * días) / 360
+    // 🔧 CORRECTED: Fórmulas con base mensual completa
     if (body.benefitType === "cesantias") {
-      amount = (baseSalary * days) / 360.0;
-      formula = "amount = (baseSalary * days) / 360";
+      amount = (baseConstitutivaTotal * days) / 360.0;
+      formula = "amount = (salario_mensual + auxilio_mensual) * days / 360";
     } else if (body.benefitType === "intereses_cesantias") {
-      amount = ((baseSalary * days) / 360.0) * 0.12;
-      formula = "amount = ((baseSalary * days) / 360) * 0.12";
+      amount = ((baseConstitutivaTotal * days) / 360.0) * 0.12;
+      formula = "amount = ((salario_mensual + auxilio_mensual) * days / 360) * 0.12";
     } else if (body.benefitType === "prima") {
-      amount = (baseSalary * days) / 360.0;
-      formula = "amount = (baseSalary * days) / 360";
+      amount = (baseConstitutivaTotal * days) / 360.0;
+      formula = "amount = (salario_mensual + auxilio_mensual) * days / 360";
+    } else if (body.benefitType === "vacaciones") {
+      // 🔧 FIX: Vacaciones solo usa salario base (sin auxilio)
+      amount = (fullMonthlySalary * days) / 720.0;
+      formula = "amount = salario_mensual * days / 720 (sin auxilio transporte)";
     }
 
     const calculation_basis = {
-      version: 1,
+      version: 2, // 🔧 UPDATED: Version incremented due to fix
       period: { start: body.periodStart, end: body.periodEnd, days },
-      legalBase: "CO: cesantías, intereses (12% anual), prima - fórmula proporcional",
-      assumptions: { includesOnlyBaseSalary: true, dailyDivisor: 30 }
+      full_monthly_salary: fullMonthlySalary, // 🔧 NEW
+      full_monthly_auxilio: fullMonthlyAuxilio, // 🔧 NEW
+      base_constitutiva_total: baseConstitutivaTotal, // 🔧 NEW
+      smmlv_2025: SMMLV_2025, // 🔧 NEW
+      auxilio_rate: 0.15, // 🔧 NEW
+      legalBase: "CO: cesantías, intereses (12% anual), prima - base constitutiva mensual completa",
+      corrections: "Corregido: usar salario + auxilio mensual completo, no proporcional del período"
     };
 
     const calculated_values = {
-      baseSalary,
-      dailySalary,
+      fullMonthlySalary, // 🔧 UPDATED
+      fullMonthlyAuxilio, // 🔧 NEW
+      baseConstitutivaTotal, // 🔧 NEW
       days,
       formula,
       benefitType: body.benefitType,
+      calculation_method: "monthly_base_proportional", // 🔧 NEW
       computedAt: new Date().toISOString()
     };
 
@@ -178,7 +196,7 @@ serve(async (req) => {
       calculated_values,
       amount,
       estado: "calculado",
-      notes: body.notes || null,
+      notes: (body.notes || "") + " (Corregido: base mensual completa)",
       created_by: userData.user.id
     };
 

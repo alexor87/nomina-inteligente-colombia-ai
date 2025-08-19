@@ -111,39 +111,69 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Get employee data for full monthly salary and auxilio
+    const employeeIds = [...new Set(payrolls?.map(p => p.employee_id) || [])];
+    const { data: employees, error: employeesErr } = await supabase
+      .from('employees')
+      .select('id, salario_base')
+      .in('id', employeeIds);
+
+    if (employeesErr) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'employees_query_error', details: employeesErr.message }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      );
+    }
+
+    const employeesMap = new Map();
+    employees?.forEach(emp => {
+      employeesMap.set(emp.id, emp);
+    });
+
     const items: CalculationRow[] = [];
 
     for (const p of payrolls || []) {
       const employeeId = p.employee_id as string;
-      const baseSalary = Number(p.salario_base) || 0;
       const workedDays = Number(p.dias_trabajados) || 0;
-      const auxTrans = Number(p.auxilio_transporte) || 0;
+      
+      // 🔧 FIX: Use full monthly salary from employees table
+      const employee = employeesMap.get(employeeId);
+      const fullMonthlySalary = Number(employee?.salario_base) || 0;
+      
+      // 🔧 FIX: Calculate full monthly auxilio (117.172 COP for 2025)
+      const SMMLV_2025 = 1300000; // Salario mínimo 2025
+      const AUXILIO_TRANSPORTE_2025 = Math.round(SMMLV_2025 * 0.15); // 15% del SMMLV
+      const fullMonthlyAuxilio = fullMonthlySalary <= (2 * SMMLV_2025) ? AUXILIO_TRANSPORTE_2025 : 0;
 
-      if (!employeeId || workedDays <= 0) continue;
+      if (!employeeId || workedDays <= 0 || fullMonthlySalary <= 0) continue;
 
-      // Base constitutiva simple: salario + auxilio transporte
+      // Base constitutiva: salario mensual completo + auxilio mensual completo
       const variableAverage = 0;
       const otherIncluded = 0;
-      const baseTotal = baseSalary + auxTrans + variableAverage + otherIncluded;
+      
+      // 🔧 FIX: Base constitutiva now uses full monthly amounts
+      const baseConstitutivaTotal = fullMonthlySalary + fullMonthlyAuxilio + variableAverage + otherIncluded;
 
-      // Fórmulas de provisión (período -> días/360)
+      // Fórmulas de provisión (proporcionalmente por días trabajados)
       const fraction = workedDays / 360;
 
-      const cesantiasAmount = baseTotal * fraction;
-      const interesesAmount = baseTotal * fraction * 0.12; // 12% anual sobre cesantías
-      const primaAmount = baseTotal * fraction;
+      const cesantiasAmount = baseConstitutivaTotal * fraction;
+      const interesesAmount = baseConstitutivaTotal * fraction * 0.12; // 12% anual sobre cesantías
+      const primaAmount = baseConstitutivaTotal * fraction;
       
-      // Vacaciones: solo salario base (sin auxilio transporte) * días / 720
-      const vacacionesAmount = baseSalary * workedDays / 720;
+      // 🔧 FIX: Vacaciones: solo salario base mensual (sin auxilio transporte) * días / 720
+      const vacacionesAmount = fullMonthlySalary * workedDays / 720;
 
       const calculation_basis = {
-        base_salary: baseSalary,
+        full_monthly_salary: fullMonthlySalary, // 🔧 NEW: Salario mensual completo
+        full_monthly_auxilio: fullMonthlyAuxilio, // 🔧 NEW: Auxilio mensual completo
         variable_average: variableAverage,
-        transport_allowance: auxTrans,
         other_included: otherIncluded,
-        base_total: baseTotal,
+        base_constitutiva_total: baseConstitutivaTotal, // 🔧 NEW: Base constitutiva total
         worked_days: workedDays,
-        method: 'days_over_360',
+        method: 'days_over_360_with_monthly_base', // 🔧 UPDATED: Method name
+        smmlv_2025: SMMLV_2025,
+        auxilio_rate: 0.15,
         period: {
           id: period.id,
           periodo: period.periodo,
@@ -151,16 +181,21 @@ Deno.serve(async (req) => {
           end: period.fecha_fin,
           tipo: period.tipo_periodo,
         },
+        // 🔧 NEW: Legacy fields for backward compatibility
+        base_salary: fullMonthlySalary,
+        transport_allowance: fullMonthlyAuxilio,
+        base_total: baseConstitutivaTotal,
       };
 
       const calculated_values = {
         days_count: workedDays,
         formulas: {
-          cesantias: 'base_total * (dias/360)',
-          intereses_cesantias: 'base_total * (dias/360) * 0.12',
-          prima: 'base_total * (dias/360)',
-          vacaciones: 'base_salary * (dias/720) - Nota: excluye auxilio de transporte',
+          cesantias: 'base_constitutiva_total * (dias/360)',
+          intereses_cesantias: 'base_constitutiva_total * (dias/360) * 0.12',
+          prima: 'base_constitutiva_total * (dias/360)',
+          vacaciones: 'full_monthly_salary * (dias/720) - Nota: solo salario base, sin auxilio',
         },
+        calculation_method: 'monthly_base_proportional', // 🔧 NEW: Clear method identifier
         calculated_at: new Date().toISOString(),
       };
 
@@ -172,7 +207,7 @@ Deno.serve(async (req) => {
         calculation_basis,
         calculated_values,
         estado: 'calculado',
-        notes: 'Provisión generada automáticamente desde período cerrado',
+        notes: 'Provisión con base mensual completa (corregida)',
         created_by: user.id,
       } as Omit<CalculationRow, 'benefit_type' | 'amount'>;
 
@@ -184,7 +219,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log('🧾 Calculated provision items:', { count: items.length });
+    console.log('🧾 Calculated provision items with corrected monthly base:', { count: items.length });
 
     if (items.length === 0) {
       return new Response(
@@ -210,12 +245,12 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log('✅ Provisions upserted:', upserted?.length || 0);
+    console.log('✅ Provisions upserted with corrected calculations:', upserted?.length || 0);
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: 'provisions_recorded',
+        message: 'provisions_recorded_with_monthly_base',
         count: upserted?.length || 0,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
