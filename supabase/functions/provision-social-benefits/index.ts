@@ -22,7 +22,7 @@ type CalculationRow = {
   estado: string;
   notes: string;
   created_by: string;
-  period_id?: string; // ✅ nuevo campo requerido por la migración
+  // period_id: string; // Removed: the table does not have this column
 };
 
 Deno.serve(async (req) => {
@@ -205,7 +205,7 @@ Deno.serve(async (req) => {
         employee_id: employeeId,
         period_start: period.fecha_inicio,
         period_end: period.fecha_fin,
-        period_id: period.id, // ✅ incluir period_id (requerido)
+        // period_id: period.id, // ❌ Removed: column does not exist on target table
         calculation_basis,
         calculated_values,
         estado: 'calculado',
@@ -230,11 +230,13 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Upsert avoiding duplicates (unique: company_id, employee_id, benefit_type, period_id)
+    // Upsert avoiding duplicates using (company_id, employee_id, benefit_type, period_start, period_end)
+    console.log('🔁 Upserting provisions with conflict target: company_id,employee_id,benefit_type,period_start,period_end');
+
     const { data: upserted, error: upsertErr } = await supabase
       .from('social_benefit_calculations')
       .upsert(items, {
-        onConflict: 'company_id,employee_id,period_id,benefit_type',
+        onConflict: 'company_id,employee_id,benefit_type,period_start,period_end',
         ignoreDuplicates: false,
       })
       .select('id');
