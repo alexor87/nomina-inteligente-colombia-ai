@@ -1,4 +1,5 @@
 
+
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 
@@ -41,11 +42,14 @@ Deno.serve(async (req) => {
 
     const { period_id } = await req.json().catch(() => ({}));
     if (!period_id) {
+      console.error('❌ Missing period_id in request');
       return new Response(
-        JSON.stringify({ success: false, error: 'missing_period_id' }),
+        JSON.stringify({ success: false, error: 'missing_period_id', message: 'ID de período requerido' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       );
     }
+
+    console.log('📅 Processing provisions for period_id:', period_id);
 
     // Identify user (for auditing)
     const {
@@ -54,8 +58,9 @@ Deno.serve(async (req) => {
     } = await supabase.auth.getUser();
 
     if (userError || !user) {
+      console.error('❌ Authentication failed:', userError);
       return new Response(
-        JSON.stringify({ success: false, error: 'unauthorized' }),
+        JSON.stringify({ success: false, error: 'unauthorized', message: 'No autorizado' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
       );
     }
@@ -68,8 +73,9 @@ Deno.serve(async (req) => {
       .single();
 
     if (periodErr || !period) {
+      console.error('❌ Period not found:', period_id, periodErr);
       return new Response(
-        JSON.stringify({ success: false, error: 'period_not_found' }),
+        JSON.stringify({ success: false, error: 'period_not_found', message: 'Período no encontrado' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 }
       );
     }
@@ -105,11 +111,22 @@ Deno.serve(async (req) => {
       .eq('company_id', period.company_id);
 
     if (payrollsErr) {
+      console.error('❌ Error loading payrolls:', payrollsErr);
       return new Response(
-        JSON.stringify({ success: false, error: 'payrolls_query_error', details: payrollsErr.message }),
+        JSON.stringify({ success: false, error: 'payrolls_query_error', message: 'Error cargando nóminas del período', details: payrollsErr.message }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
       );
     }
+
+    if (!payrolls || payrolls.length === 0) {
+      console.log('⚠️ No payrolls found for period:', period_id);
+      return new Response(
+        JSON.stringify({ success: true, message: 'no_payrolls_found', count: 0, details: 'No hay empleados con nómina procesada en este período' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log('📋 Found payrolls for provisioning:', payrolls.length);
 
     // Get employee data for full monthly salary
     const employeeIds = [...new Set(payrolls?.map(p => p.employee_id) || [])];
@@ -119,8 +136,9 @@ Deno.serve(async (req) => {
       .in('id', employeeIds);
 
     if (employeesErr) {
+      console.error('❌ Error loading employees:', employeesErr);
       return new Response(
-        JSON.stringify({ success: false, error: 'employees_query_error', details: employeesErr.message }),
+        JSON.stringify({ success: false, error: 'employees_query_error', message: 'Error cargando empleados', details: employeesErr.message }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
       );
     }
@@ -145,7 +163,10 @@ Deno.serve(async (req) => {
       const AUXILIO_TRANSPORTE_2025 = 200000; // Valor fijo legal 2025
       const auxilioMensual = salarioMensual <= (2 * SMMLV_2025) ? AUXILIO_TRANSPORTE_2025 : 0;
 
-      if (!employeeId || workedDays <= 0 || salarioMensual <= 0) continue;
+      if (!employeeId || workedDays <= 0 || salarioMensual <= 0) {
+        console.log('⚠️ Skipping employee with invalid data:', { employeeId, workedDays, salarioMensual });
+        continue;
+      }
 
       // ✅ Base constitutiva: salario mensual completo + auxilio mensual completo
       const basePrestaciones = salarioMensual + auxilioMensual;
@@ -215,7 +236,7 @@ Deno.serve(async (req) => {
         calculation_basis,
         calculated_values,
         estado: 'calculado',
-        notes: 'Provisión con cálculo legal 2025 (Ley 50/1990 Art. 99)',
+        notes: 'Provisión automática tras liquidación (Ley 50/1990 Art. 99)',
         created_by: user.id,
       } as Omit<CalculationRow, 'benefit_type' | 'amount'>;
 
@@ -232,11 +253,11 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log('🧾 Calculated provision items with legal interest calculation:', { count: items.length });
+    console.log('🧾 Calculated provision items:', { count: items.length, employees: employeeIds.length });
 
     if (items.length === 0) {
       return new Response(
-        JSON.stringify({ success: true, message: 'no_items_to_provision', inserted: 0, updated: 0 }),
+        JSON.stringify({ success: true, message: 'no_items_to_provision', count: 0, details: 'No hay datos válidos para calcular provisiones' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -253,25 +274,27 @@ Deno.serve(async (req) => {
     if (upsertErr) {
       console.error('❌ calculations_upsert_error:', upsertErr);
       return new Response(
-        JSON.stringify({ success: false, error: 'calculations_upsert_error', details: upsertErr.message }),
+        JSON.stringify({ success: false, error: 'calculations_upsert_error', message: 'Error guardando cálculos de provisiones', details: upsertErr.message }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
       );
     }
 
-    console.log('✅ Provisions upserted with legal interest calculations:', upserted?.length || 0);
+    const finalCount = upserted?.length || 0;
+    console.log('✅ Provisions upserted successfully:', finalCount);
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: 'provisions_recorded_with_legal_interest_calculation',
-        count: upserted?.length || 0,
+        message: 'provisions_registered_automatically',
+        count: finalCount,
+        details: `Se registraron ${finalCount} provisiones automáticamente tras la liquidación`,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (e) {
-    console.error('provision-social-benefits error:', e);
+    console.error('❌ provision-social-benefits error:', e);
     return new Response(
-      JSON.stringify({ success: false, error: 'unexpected', details: String(e) }),
+      JSON.stringify({ success: false, error: 'unexpected', message: 'Error interno del servidor', details: String(e) }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }

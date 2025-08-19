@@ -332,11 +332,12 @@ export const usePayrollLiquidation = () => {
           isFinite: Number.isFinite(result.summary.totalNetPay)
         });
 
-        // ✅ Obtener configuración de provisiones de forma segura
+        // ✅ CORREGIDO: Registrar provisiones automáticamente usando el período correcto
         try {
           const { data: authData } = await supabase.auth.getUser();
           const userId = authData.user?.id;
           let companyId: string | null = null;
+          let provisionMode: 'on_liquidation' | 'monthly_consolidation' = 'on_liquidation';
 
           if (userId) {
             const { data: profile } = await supabase
@@ -346,8 +347,6 @@ export const usePayrollLiquidation = () => {
               .single();
             companyId = profile?.company_id || null;
           }
-
-          let provisionMode: 'on_liquidation' | 'monthly_consolidation' = 'on_liquidation';
 
           if (companyId) {
             const { data: companySettings } = await supabase
@@ -360,20 +359,51 @@ export const usePayrollLiquidation = () => {
           }
 
           if (provisionMode === 'on_liquidation') {
-            console.log('🧮 Registrando provisiones automáticamente para el período:', currentPeriodId);
+            console.log('🧮 Registrando provisiones automáticamente...');
+            
+            // ✅ CORREGIDO: Usar el período correcto del resultado, no currentPeriodId
+            const finalPeriodId = result.periodId || currentPeriodId;
+            console.log('📋 Usando período para provisiones:', finalPeriodId);
+
             const { data: provisionResp, error: provisionErr } = await supabase.functions.invoke('provision-social-benefits', {
-              body: { period_id: currentPeriodId }
+              body: { period_id: finalPeriodId }
             });
+
             if (provisionErr) {
-              console.warn('⚠️ Error invocando provisiones:', provisionErr);
+              console.error('❌ Error calculando provisiones:', provisionErr);
+              toast({
+                title: "Advertencia",
+                description: "La nómina se liquidó exitosamente, pero hubo un problema calculando las provisiones automáticamente. Puede recalcularlas manualmente desde el módulo de Prestaciones Sociales.",
+                variant: "destructive",
+              });
             } else {
               console.log('✅ Provisiones registradas automáticamente:', provisionResp);
+              
+              // Mostrar notificación de éxito con conteo
+              const provisionCount = provisionResp?.count || 0;
+              if (provisionCount > 0) {
+                toast({
+                  title: "Provisiones registradas",
+                  description: `Se calcularon y registraron ${provisionCount} provisiones automáticamente.`,
+                  className: "border-green-200 bg-green-50"
+                });
+              }
             }
           } else {
             console.log('📋 Provisiones en modo consolidado mensual - no se calculan automáticamente');
+            toast({
+              title: "Modo consolidación mensual",
+              description: "Las provisiones se registrarán cuando ejecute la consolidación mensual desde Prestaciones Sociales.",
+              className: "border-blue-200 bg-blue-50"
+            });
           }
         } catch (provError) {
-          console.warn('⚠️ No se pudieron registrar provisiones (continuando):', provError);
+          console.warn('⚠️ Error procesando provisiones:', provError);
+          toast({
+            title: "Advertencia",
+            description: "La nómina se liquidó exitosamente, pero no se pudieron calcular las provisiones automáticamente. Puede hacerlo manualmente desde Prestaciones Sociales.",
+            variant: "destructive",
+          });
         }
         
         const periodType = detectPeriodType(startDate, endDate);
