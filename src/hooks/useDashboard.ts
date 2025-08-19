@@ -6,7 +6,6 @@ import {
   RecentEmployee, 
   DashboardActivity,
   MonthlyPayrollTrend,
-  SalaryDistribution,
   EfficiencyMetric
 } from '@/services/DashboardService';
 import { useToast } from '@/hooks/use-toast';
@@ -17,7 +16,6 @@ export const useDashboard = () => {
   const [recentEmployees, setRecentEmployees] = useState<RecentEmployee[]>([]);
   const [recentActivity, setRecentActivity] = useState<DashboardActivity[]>([]);
   const [payrollTrends, setPayrollTrends] = useState<MonthlyPayrollTrend[]>([]);
-  const [salaryDistribution, setSalaryDistribution] = useState<SalaryDistribution[]>([]);
   const [efficiencyMetrics, setEfficiencyMetrics] = useState<EfficiencyMetric[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -36,14 +34,12 @@ export const useDashboard = () => {
         employeesData,
         activityData,
         trendsData,
-        salaryData,
         efficiencyData
       ] = await Promise.all([
         DashboardService.getDashboardMetrics(),
         DashboardService.getRecentEmployees(),
         DashboardService.getDashboardActivity(),
         DashboardService.getMonthlyPayrollTrends(),
-        DashboardService.getSalaryDistributionByPosition(),
         DashboardService.getEfficiencyMetrics()
       ]);
 
@@ -51,7 +47,6 @@ export const useDashboard = () => {
       setRecentEmployees(employeesData);
       setRecentActivity(activityData);
       setPayrollTrends(trendsData);
-      setSalaryDistribution(salaryData);
       setEfficiencyMetrics(efficiencyData);
     } catch (error) {
       console.error('Error loading dashboard data:', error);
@@ -80,7 +75,6 @@ export const useDashboard = () => {
     recentEmployees,
     recentActivity,
     payrollTrends,
-    salaryDistribution,
     efficiencyMetrics,
     
     // Loading states

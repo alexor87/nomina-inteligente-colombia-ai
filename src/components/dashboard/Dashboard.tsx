@@ -13,7 +13,6 @@ import { MinimalEmployeeList } from './MinimalEmployeeList';
 import { MinimalActivityFeed } from './MinimalActivityFeed';
 import { EfficiencyMetrics } from './EfficiencyMetrics';
 import { RealPayrollTrends } from './RealPayrollTrends';
-import { SalaryAnalytics } from './SalaryAnalytics';
 
 export const Dashboard = () => {
   const navigate = useNavigate();
@@ -23,7 +22,6 @@ export const Dashboard = () => {
     recentEmployees,
     recentActivity,
     payrollTrends,
-    salaryDistribution,
     efficiencyMetrics,
     loading,
     refreshing,
@@ -139,11 +137,6 @@ export const Dashboard = () => {
           <div className="space-y-6">
             <RealPayrollTrends data={payrollTrends} loading={loading} />
           </div>
-        </div>
-
-        {/* Análisis Salarial - Full Width */}
-        <div className="w-full">
-          <SalaryAnalytics data={salaryDistribution} loading={loading} />
         </div>
       </div>
     </div>
