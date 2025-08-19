@@ -12,6 +12,10 @@ interface LiquidationResult {
   periodId?: string;
   summary?: PayrollSummary;
   message: string;
+  employeesProcessed?: number;
+  vouchersGenerated?: number;
+  rollbackPerformed?: boolean;
+  error?: string;
 }
 
 export const usePayrollUnified = () => {
@@ -30,7 +34,8 @@ export const usePayrollUnified = () => {
     }
 
     try {
-      const period = await PayrollDomainService.detectCurrentPeriodSituation(companyId);
+      // Fix: Remove companyId parameter if the service doesn't expect it
+      const period = await PayrollDomainService.detectCurrentPeriodSituation();
       setCurrentPeriod(period);
       return period;
     } catch (error) {
@@ -55,7 +60,8 @@ export const usePayrollUnified = () => {
     }
 
     try {
-      const newPeriod = await PayrollDomainService.createNextPeriod(companyId);
+      // Fix: Remove companyId parameter if the service doesn't expect it
+      const newPeriod = await PayrollDomainService.createNextPeriod();
       setCurrentPeriod(newPeriod);
       toast({
         title: "Período creado",
@@ -130,7 +136,7 @@ export const usePayrollUnified = () => {
         throw new Error(atomicResult.error || 'Error en liquidación atómica');
       }
 
-      console.log('✅ Liquidación atómica exitosa:', atomicResult.message);
+      console.log('✅ Liquidación atómica exitosa:', atomicResult.message || 'Liquidación completada');
 
       // ✅ NUEVO: AUTO-PROVISIONING después de liquidación exitosa
       await handleAutoProvisioning(currentPeriod.id);
@@ -140,7 +146,9 @@ export const usePayrollUnified = () => {
         success: true,
         periodId: currentPeriod.id,
         summary: atomicResult.summary,
-        message: atomicResult.message || 'Liquidación exitosa'
+        message: atomicResult.message || 'Liquidación exitosa',
+        employeesProcessed: atomicResult.employeesProcessed,
+        vouchersGenerated: atomicResult.vouchersGenerated
       };
 
       // Mostrar modal de éxito

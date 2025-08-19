@@ -4,41 +4,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCurrentCompany } from '@/hooks/useCurrentCompany';
 import { useToast } from '@/hooks/use-toast';
-import { ProvisionsService } from '@/services/ProvisionsService';
+import { ProvisionsService, type ProvisionRecord, type PeriodOption } from '@/services/ProvisionsService';
 import type { BenefitType } from '@/types/social-benefits';
-
-// Export types that components expect
-export interface PeriodOption {
-  id: string;
-  periodo: string;
-  fecha_inicio: string;
-  fecha_fin: string;
-  estado: string;
-  tipo_periodo: string;
-}
-
-export interface ProvisionRecord {
-  id: string;
-  company_id: string;
-  employee_id: string;
-  period_start: string;
-  period_end: string;
-  benefit_type: BenefitType;
-  amount: number;
-  estado: string;
-  employee_name: string;
-  employee_cedula: string;
-  created_at: string;
-  updated_at: string;
-  notes?: string;
-  calculation_basis?: any;
-  calculated_values?: any;
-  employee?: {
-    nombre: string;
-    apellido: string;
-    cedula: string;
-  };
-}
 
 export interface ProvisionTotals {
   count: number;
@@ -80,88 +47,24 @@ export const useSocialBenefitProvisions = () => {
     queryKey: ['payroll-periods', companyId],
     queryFn: async () => {
       if (!companyId) return [];
-      
-      const { data, error } = await supabase
-        .from('payroll_periods_real')
-        .select('id, periodo, fecha_inicio, fecha_fin, estado, tipo_periodo')
-        .eq('company_id', companyId)
-        .order('fecha_inicio', { ascending: false });
-        
-      if (error) throw error;
-      return data as PeriodOption[];
+      return await ProvisionsService.fetchPeriods();
     },
     enabled: !!companyId
   });
 
-  // Load provisions
+  // Load provisions using ProvisionsService
   const { data: provisions = [], isLoading: loadingProvisions, refetch } = useQuery({
     queryKey: ['social-benefit-provisions', companyId, filters.periodId, filters.benefitType, filters.search],
-    queryFn: async () => {
-      if (!companyId) return [];
+    queryFn: async (): Promise<ProvisionRecord[]> => {
+      if (!companyId || !filters.periodId) return [];
       
-      let query = supabase
-        .from('social_benefit_calculations')
-        .select(`
-          id,
-          company_id,
-          employee_id,
-          benefit_type,
-          amount,
-          period_start,
-          period_end,
-          estado,
-          created_at,
-          updated_at,
-          notes,
-          calculation_basis,
-          calculated_values,
-          employee:employees(nombre, apellido, cedula)
-        `)
-        .eq('company_id', companyId);
-
-      if (filters.periodId) {
-        const selectedPeriod = periods.find(p => p.id === filters.periodId);
-        if (selectedPeriod) {
-          query = query
-            .eq('period_start', selectedPeriod.fecha_inicio)
-            .eq('period_end', selectedPeriod.fecha_fin);
-        }
-      }
-
-      if (filters.benefitType && filters.benefitType !== 'all') {
-        query = query.eq('benefit_type', filters.benefitType);
-      }
-
-      if (filters.search) {
-        // Search by employee name or cedula
-        query = query.or(`employee.nombre.ilike.%${filters.search}%,employee.apellido.ilike.%${filters.search}%,employee.cedula.ilike.%${filters.search}%`);
-      }
-
-      const { data, error } = await query.order('period_start', { ascending: false });
-      
-      if (error) throw error;
-      
-      // Transform to expected format
-      return (data || []).map(item => ({
-        id: item.id,
-        company_id: item.company_id,
-        employee_id: item.employee_id,
-        period_start: item.period_start,
-        period_end: item.period_end,
-        benefit_type: item.benefit_type,
-        amount: item.amount,
-        estado: item.estado,
-        created_at: item.created_at,
-        updated_at: item.updated_at,
-        notes: item.notes,
-        calculation_basis: item.calculation_basis,
-        calculated_values: item.calculated_values,
-        employee_name: item.employee ? `${item.employee.nombre} ${item.employee.apellido}` : '',
-        employee_cedula: item.employee?.cedula || '',
-        employee: item.employee
-      })) as ProvisionRecord[];
+      return await ProvisionsService.fetchProvisions(
+        filters.periodId,
+        filters.benefitType,
+        filters.search
+      );
     },
-    enabled: !!companyId
+    enabled: !!companyId && !!filters.periodId
   });
 
   // ✅ NUEVO: Auto-healing effect - detectar períodos cerrados sin provisiones
@@ -171,7 +74,7 @@ export const useSocialBenefitProvisions = () => {
     const performAutoHealing = async () => {
       for (const period of periods) {
         // Solo procesar períodos cerrados que no hayan sido intentados
-        if (period.estado !== 'cerrado' || autoHealingAttempted.has(period.id)) {
+        if (period.tipo_periodo !== 'cerrado' || autoHealingAttempted.has(period.id)) {
           continue;
         }
 
@@ -255,7 +158,7 @@ export const useSocialBenefitProvisions = () => {
     };
 
     const byType = provisions.reduce((acc, provision) => {
-      const amount = Number(provision.amount) || 0;
+      const amount = Number(provision.provision_amount) || 0;
       acc[provision.benefit_type as keyof typeof acc] = (acc[provision.benefit_type as keyof typeof acc] || 0) + amount;
       return acc;
     }, {
@@ -322,10 +225,10 @@ export const useSocialBenefitProvisions = () => {
       Empleado: provision.employee_name,
       Cedula: provision.employee_cedula,
       'Tipo de Prestación': provision.benefit_type,
-      Valor: provision.amount,
+      Valor: provision.provision_amount,
       'Período Inicio': provision.period_start,
       'Período Fin': provision.period_end,
-      Estado: provision.estado
+      Estado: 'activo'
     }));
 
     const csv = [
@@ -364,3 +267,6 @@ export const useSocialBenefitProvisions = () => {
     refetch
   };
 };
+
+// Export types for components
+export type { ProvisionRecord, PeriodOption };
