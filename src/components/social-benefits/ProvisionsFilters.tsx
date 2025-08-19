@@ -65,6 +65,7 @@ export const ProvisionsFilters: React.FC<Props> = ({
             <SelectItem value="cesantias">Cesantías</SelectItem>
             <SelectItem value="intereses_cesantias">Intereses Cesantías</SelectItem>
             <SelectItem value="prima">Prima</SelectItem>
+            <SelectItem value="vacaciones">Vacaciones</SelectItem>
           </SelectContent>
         </Select>
       </div>

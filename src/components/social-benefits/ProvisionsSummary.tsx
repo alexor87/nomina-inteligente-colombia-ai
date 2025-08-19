@@ -10,6 +10,7 @@ type Props = {
       cesantias: number;
       intereses_cesantias: number;
       prima: number;
+      vacaciones: number;
     }
   }
 };
@@ -19,7 +20,7 @@ const formatCurrency = (v: number) =>
 
 export const ProvisionsSummary: React.FC<Props> = ({ totals }) => {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm text-muted-foreground">Registros</CardTitle>
@@ -53,6 +54,15 @@ export const ProvisionsSummary: React.FC<Props> = ({ totals }) => {
         </CardHeader>
         <CardContent className="pt-0">
           <div className="text-2xl font-semibold">{formatCurrency(totals.byType.prima)}</div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm text-muted-foreground">Total Vacaciones</CardTitle>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <div className="text-2xl font-semibold">{formatCurrency(totals.byType.vacaciones)}</div>
         </CardContent>
       </Card>
     </div>

@@ -8,7 +8,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-type BenefitType = 'cesantias' | 'intereses_cesantias' | 'prima';
+type BenefitType = 'cesantias' | 'intereses_cesantias' | 'prima' | 'vacaciones';
 
 type CalculationRow = {
   company_id: string;
@@ -118,6 +118,9 @@ Deno.serve(async (req) => {
       const cesantiasAmount = baseTotal * fraction;
       const interesesAmount = baseTotal * fraction * 0.12; // 12% anual sobre cesantías
       const primaAmount = baseTotal * fraction;
+      
+      // Vacaciones: solo salario base (sin auxilio transporte) * días / 720
+      const vacacionesAmount = baseSalary * workedDays / 720;
 
       const calculation_basis = {
         base_salary: baseSalary,
@@ -142,6 +145,7 @@ Deno.serve(async (req) => {
           cesantias: 'base_total * (dias/360)',
           intereses_cesantias: 'base_total * (dias/360) * 0.12',
           prima: 'base_total * (dias/360)',
+          vacaciones: 'base_salary * (dias/720) - Nota: excluye auxilio de transporte',
         },
         calculated_at: new Date().toISOString(),
       };
@@ -162,6 +166,7 @@ Deno.serve(async (req) => {
         { ...common, benefit_type: 'cesantias', amount: Math.round(cesantiasAmount) },
         { ...common, benefit_type: 'intereses_cesantias', amount: Math.round(interesesAmount) },
         { ...common, benefit_type: 'prima', amount: Math.round(primaAmount) },
+        { ...common, benefit_type: 'vacaciones', amount: Math.round(vacacionesAmount) },
       );
     }
 

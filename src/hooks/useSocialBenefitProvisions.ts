@@ -100,6 +100,7 @@ export const useSocialBenefitProvisions = () => {
       cesantias: sum(list.filter((r) => r.benefit_type === 'cesantias')),
       intereses_cesantias: sum(list.filter((r) => r.benefit_type === 'intereses_cesantias')),
       prima: sum(list.filter((r) => r.benefit_type === 'prima')),
+      vacaciones: sum(list.filter((r) => r.benefit_type === 'vacaciones')),
     };
     return {
       count: list.length,

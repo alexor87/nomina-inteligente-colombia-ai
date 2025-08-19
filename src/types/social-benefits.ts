@@ -1,5 +1,4 @@
-
-export type BenefitType = 'cesantias' | 'intereses_cesantias' | 'prima';
+export type BenefitType = 'cesantias' | 'intereses_cesantias' | 'prima' | 'vacaciones';
 
 export interface CalculateBenefitPayload {
   employeeId: string;
