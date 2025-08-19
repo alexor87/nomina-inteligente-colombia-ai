@@ -2401,7 +2401,11 @@ export type Database = {
         | "multa"
         | "descuento_voluntario"
         | "licencia_no_remunerada"
-      social_benefit_type: "cesantias" | "intereses_cesantias" | "prima"
+      social_benefit_type:
+        | "cesantias"
+        | "intereses_cesantias"
+        | "prima"
+        | "vacaciones"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2556,7 +2560,12 @@ export const Constants = {
         "descuento_voluntario",
         "licencia_no_remunerada",
       ],
-      social_benefit_type: ["cesantias", "intereses_cesantias", "prima"],
+      social_benefit_type: [
+        "cesantias",
+        "intereses_cesantias",
+        "prima",
+        "vacaciones",
+      ],
     },
   },
 } as const

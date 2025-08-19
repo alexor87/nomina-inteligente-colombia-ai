@@ -60,7 +60,9 @@ export const ProvisionsTable: React.FC<Props> = ({
                 const label =
                   r.benefit_type === 'cesantias' ? 'Cesantías' :
                   r.benefit_type === 'intereses_cesantias' ? 'Intereses' :
-                  'Prima';
+                  r.benefit_type === 'prima' ? 'Prima' :
+                  r.benefit_type === 'vacaciones' ? 'Vacaciones' :
+                  r.benefit_type;
                 return (
                   <tr key={`${r.period_id}-${r.employee_id}-${r.benefit_type}`} className="border-t">
                     <td className="px-4 py-2">{r.employee_name}</td>
