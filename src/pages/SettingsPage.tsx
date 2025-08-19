@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { CompanySettingsForm } from '@/components/company/CompanySettingsForm';
+import { EmpresaSettings } from '@/components/settings/EmpresaSettings';
 
 const SettingsPage = () => {
   return (
@@ -10,7 +10,7 @@ const SettingsPage = () => {
         <p className="text-gray-600">Administra las configuraciones de tu empresa</p>
       </div>
       
-      <CompanySettingsForm />
+      <EmpresaSettings />
     </div>
   );
 };
