@@ -11,7 +11,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CalendarDays, Calculator, Save, Eye, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { useSocialBenefits } from '@/hooks/useSocialBenefits';
-import { useCompanyEmployees } from '@/hooks/useCompanyEmployees';
+import { useSecureEmployees } from '@/hooks/useSecureQuery';
 import type { BenefitType } from '@/types/social-benefits';
 
 interface BenefitCalculatorBaseProps {
@@ -35,7 +35,7 @@ export const BenefitCalculatorBase: React.FC<BenefitCalculatorBaseProps> = ({
   const [periodEnd, setPeriodEnd] = useState(defaultPeriod?.end || '');
   const [notes, setNotes] = useState('');
 
-  const { employees, isLoading: employeesLoading } = useCompanyEmployees();
+  const { data: employees = [], isLoading: employeesLoading } = useSecureEmployees();
   const { isCalculating, previewResult, calculatePreview, calculateAndSave, clearPreview } = useSocialBenefits();
 
   // Auto-calculate preview when inputs change
@@ -148,7 +148,7 @@ export const BenefitCalculatorBase: React.FC<BenefitCalculatorBaseProps> = ({
                   <Alert variant="destructive">
                     <AlertTriangle className="h-4 w-4" />
                     <AlertDescription>
-                      {'error' in previewResult ? (
+                      {!previewResult.success && 'error' in previewResult ? (
                         previewResult.error === 'MISSING_CESANTIAS_PERIOD' ? (
                           <div>
                             <div className="font-medium">Cesantías requeridas</div>

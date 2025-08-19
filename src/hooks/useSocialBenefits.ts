@@ -35,10 +35,10 @@ export const useSocialBenefits = () => {
         let description = 'error' in result ? result.error : "No se pudo calcular la prestación";
         
         // 🔧 NEW: Enhanced error messages for missing cesantías
-        if (result.error === 'MISSING_CESANTIAS_PERIOD') {
-          description = result.message || 'Falta la cesantía del período. Primero calcúlala/guárdala.';
-        } else if (result.error === 'UNSUPPORTED_PERIODICITY') {
-          description = result.details || 'Periodicidad no soportada para cálculo de intereses';
+        if (!result.success && 'error' in result && result.error === 'MISSING_CESANTIAS_PERIOD') {
+          description = ('message' in result && result.message) || 'Falta la cesantía del período. Primero calcúlala/guárdala.';
+        } else if (!result.success && 'error' in result && result.error === 'UNSUPPORTED_PERIODICITY') {
+          description = ('details' in result && result.details) || 'Periodicidad no soportada para cálculo de intereses';
         }
         
         toast({
@@ -96,8 +96,8 @@ export const useSocialBenefits = () => {
         let description = 'error' in result ? result.error : "No se pudo guardar el cálculo";
         
         // 🔧 NEW: Enhanced error messages for missing cesantías
-        if (result.error === 'MISSING_CESANTIAS_PERIOD') {
-          description = result.message || 'Falta la cesantía del período. Primero calcúlala/guárdala.';
+        if (!result.success && 'error' in result && result.error === 'MISSING_CESANTIAS_PERIOD') {
+          description = ('message' in result && result.message) || 'Falta la cesantía del período. Primero calcúlala/guárdala.';
         }
         
         toast({
