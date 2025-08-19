@@ -493,6 +493,69 @@ export const usePayrollUnified = (companyId: string) => {
     }
   }, [currentPeriod, companyId, employees.length, toast]);
 
+  // ✅ NUEVA FUNCIÓN: Verificar y ejecutar provisiones automáticas
+  const executeAutomaticProvisioning = useCallback(async (periodId: string, startDate: string, endDate: string) => {
+    try {
+      console.log('🔍 Verificando configuración de provisiones automáticas...');
+      
+      // Verificar configuración de la empresa
+      const { data: companySettings, error: settingsError } = await supabase
+        .from('company_settings')
+        .select('provision_mode')
+        .eq('company_id', companyId)
+        .single();
+
+      if (settingsError) {
+        console.warn('⚠️ No se pudo obtener configuración de provisiones:', settingsError);
+        return;
+      }
+
+      // Solo ejecutar si está configurado para provisionar en liquidación
+      if (companySettings?.provision_mode !== 'on_liquidation') {
+        console.log('ℹ️ Provisiones no configuradas para ejecutar automáticamente en liquidación');
+        return;
+      }
+
+      console.log('✅ Ejecutando provisiones automáticas para período:', periodId);
+
+      // Invocar función de provisiones
+      const { data: provisionResult, error: provisionError } = await supabase.functions.invoke('provision-social-benefits', {
+        body: {
+          period_id: periodId,
+          company_id: companyId,
+          start_date: startDate,
+          end_date: endDate
+        }
+      });
+
+      if (provisionError) {
+        console.error('❌ Error ejecutando provisiones automáticas:', provisionError);
+        toast({
+          title: "⚠️ Advertencia",
+          description: "Las provisiones no se pudieron calcular automáticamente. Puede hacerlo manualmente en el módulo de Prestaciones Sociales.",
+          variant: "default",
+          className: "border-yellow-200 bg-yellow-50"
+        });
+        return;
+      }
+
+      if (provisionResult?.success) {
+        console.log('✅ Provisiones automáticas completadas:', provisionResult);
+        toast({
+          title: "✅ Provisiones Calculadas",
+          description: "Las provisiones de prestaciones sociales se calcularon automáticamente.",
+          className: "border-green-200 bg-green-50"
+        });
+      } else {
+        console.warn('⚠️ Provisiones no completadas:', provisionResult);
+      }
+
+    } catch (error) {
+      console.error('❌ Error en provisiones automáticas:', error);
+      // No mostrar toast para errores inesperados, solo log
+    }
+  }, [companyId, toast]);
+
   const liquidatePayroll = useCallback(async (startDate: string, endDate: string) => {
     if (!currentPeriod || employees.length === 0) return;
 
@@ -601,6 +664,12 @@ export const usePayrollUnified = (companyId: string) => {
         vouchersGenerados: liquidation.vouchers_generated
       });
 
+      // PASO 4: ✅ NUEVO - Ejecutar provisiones automáticas
+      console.log(`🔍 [TRACE-${traceId}] PASO 4: Ejecutando provisiones automáticas...`);
+      
+      // Ejecutar provisiones de forma no bloqueante
+      executeAutomaticProvisioning(currentPeriod.id, startDate, endDate);
+
       toast({
         title: "✅ Liquidación Exitosa",
         description: `${liquidation.employees_processed} empleados procesados, ${liquidation.vouchers_generated} vouchers generados`,
@@ -624,7 +693,7 @@ export const usePayrollUnified = (companyId: string) => {
       setIsLiquidating(false);
       console.log(`🔍 [TRACE-FINAL] FINALIZANDO LIQUIDACIÓN - setIsLiquidating(false)`);
     }
-  }, [currentPeriod, employees, companyId, toast]);
+  }, [currentPeriod, employees, companyId, toast, executeAutomaticProvisioning]);
 
   const refreshEmployeeNovedades = useCallback(async (employeeId: string) => {
     console.log('🔄 Refrescando novedades para empleado:', employeeId);
