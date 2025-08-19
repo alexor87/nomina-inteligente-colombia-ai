@@ -934,19 +934,30 @@ async function calculatePayroll(input: PayrollCalculationInput) {
       novedades: input.novedades.map(n => ({ tipo: n.tipo_novedad, valor: n.valor }))
     });
     
+    // KISS: 'incapacidad' es pago (devengo no salarial), no descuento
+    const tiposDevengo = [
+      'horas_extra',
+      'bonificacion', 
+      'comision',
+      'prima',
+      'otros_ingresos',
+      'recargo_nocturno',
+      'recargo_dominical',
+      'recargo_festivo',
+      'incapacidad' // <-- movido aquí
+    ];
+    
+    const tiposDeduccion = [
+      'ausencia',
+      'libranza',
+      'retencion_fuente',
+      'deduccion_especial',
+      'fondo_solidaridad',
+      'descuento_nomina'
+    ];
+    
     input.novedades.forEach(novedad => {
       const valor = Number(novedad.valor || 0);
-      
-      // Categorizar novedades por tipo para devengos vs deducciones
-      const tiposDevengo = [
-        'horas_extra', 'bonificacion', 'comision', 'prima', 'otros_ingresos',
-        'recargo_nocturno', 'recargo_dominical', 'recargo_festivo'
-      ];
-      
-      const tiposDeduccion = [
-        'incapacidad', 'ausencia', 'libranza', 'retencion_fuente', 
-        'deduccion_especial', 'fondo_solidaridad', 'descuento_nomina'
-      ];
       
       if (tiposDevengo.includes(novedad.tipo_novedad)) {
         totalDevengosNovedades += valor;
