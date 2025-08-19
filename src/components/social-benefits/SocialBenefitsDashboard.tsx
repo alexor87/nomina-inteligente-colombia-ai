@@ -1,13 +1,14 @@
+
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ProvisionsTable } from './ProvisionsTable';
-import { BenefitCalculatorBase } from './BenefitCalculatorBase';
+// Eliminado: import { BenefitCalculatorBase } from './BenefitCalculatorBase';
 import { useSocialBenefitProvisions } from '@/hooks/useSocialBenefitProvisions';
 import { MonthlyConsolidationButton } from './MonthlyConsolidationButton';
 import { CompanySettingsService } from '@/services/CompanySettingsService';
 import { useCurrentCompany } from '@/hooks/useCurrentCompany';
-import { Calculator, FileSpreadsheet, AlertCircle, Settings } from 'lucide-react';
+import { /* Calculator, FileSpreadsheet, */ AlertCircle, Settings } from 'lucide-react';
 
 export const SocialBenefitsDashboard = () => {
   const { companyId } = useCurrentCompany();
@@ -156,13 +157,15 @@ export const SocialBenefitsDashboard = () => {
         setPage={setPage}
         setPageSize={setPageSize}
         totalPages={totalPages}
+        paginated={paginated}
         recalculateCurrentPeriod={recalculateCurrentPeriod}
         recalculating={recalculating}
         exportCSV={exportCSV}
         showConsolidateButton={provisionMode === 'monthly_consolidation'}
       />
 
-      {/* Individual Calculator */}
+      {/* Eliminado: Calculadora Individual (no se permiten simulaciones) */}
+      {/* 
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
@@ -178,6 +181,7 @@ export const SocialBenefitsDashboard = () => {
           />
         </CardContent>
       </Card>
+      */}
     </div>
   );
 };

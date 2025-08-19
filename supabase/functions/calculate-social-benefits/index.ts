@@ -5,6 +5,7 @@
  * - Calcula cesantías, intereses de cesantías, prima y vacaciones
  * - 🔧 CORREGIDO: Usa base mensual completa para cálculos consistentes
  * - Opcionalmente guarda/actualiza el registro (upsert) en social_benefit_calculations
+ * - 🚫 ACTUALIZADO: Se deshabilitan simulaciones (save=false) y se exige periodId de período cerrado
  */
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -16,8 +17,9 @@ interface CalculatePayload {
   benefitType: BenefitType;
   periodStart: string; // YYYY-MM-DD
   periodEnd: string;   // YYYY-MM-DD
+  periodId?: string;   // ✅ Nuevo: exigir período real y cerrado
   notes?: string;
-  save?: boolean;      // default false
+  save?: boolean;      // debe ser true (simulaciones deshabilitadas)
 }
 
 const corsHeaders: Record<string, string> = {
@@ -69,6 +71,14 @@ serve(async (req) => {
 
     const body: CalculatePayload = await req.json();
 
+    // 🚫 Simulaciones deshabilitadas
+    if (body.save !== true) {
+      return new Response(JSON.stringify({ success: false, error: "SIMULATIONS_DISABLED" }), {
+        status: 400,
+        headers: corsHeaders
+      });
+    }
+
     // Validación básica
     if (!body?.employeeId || !body?.benefitType || !body?.periodStart || !body?.periodEnd) {
       return new Response(JSON.stringify({ success: false, error: "INVALID_INPUT" }), {
@@ -77,6 +87,7 @@ serve(async (req) => {
       });
     }
 
+    // Tipo de prestación válido
     const validTypes: BenefitType[] = ['cesantias', 'intereses_cesantias', 'prima', 'vacaciones'];
     if (!validTypes.includes(body.benefitType)) {
       return new Response(JSON.stringify({ success: false, error: "INVALID_BENEFIT_TYPE" }), {
@@ -85,8 +96,38 @@ serve(async (req) => {
       });
     }
 
-    const startDate = parseDate(body.periodStart);
-    const endDate = parseDate(body.periodEnd);
+    // Exigir periodId y que esté cerrado
+    if (!body.periodId) {
+      return new Response(JSON.stringify({ success: false, error: "MISSING_PERIOD_ID" }), {
+        status: 400,
+        headers: corsHeaders
+      });
+    }
+
+    const { data: period, error: periodError } = await supabase
+      .from('payroll_periods_real')
+      .select('id, company_id, fecha_inicio, fecha_fin, estado')
+      .eq('id', body.periodId)
+      .maybeSingle();
+
+    if (periodError || !period) {
+      console.error("Period fetch error:", periodError);
+      return new Response(JSON.stringify({ success: false, error: "PERIOD_NOT_FOUND" }), {
+        status: 404,
+        headers: corsHeaders
+      });
+    }
+
+    if (period.estado !== 'cerrado') {
+      return new Response(JSON.stringify({ success: false, error: "PERIOD_NOT_CLOSED" }), {
+        status: 400,
+        headers: corsHeaders
+      });
+    }
+
+    // Fechas del período (priorizar las del período real)
+    const startDate = parseDate(period.fecha_inicio as unknown as string) || parseDate(body.periodStart);
+    const endDate = parseDate(period.fecha_fin as unknown as string) || parseDate(body.periodEnd);
     if (!startDate || !endDate || startDate > endDate) {
       return new Response(JSON.stringify({ success: false, error: "INVALID_PERIOD_DATES" }), {
         status: 400,
@@ -111,6 +152,14 @@ serve(async (req) => {
     if (!employee) {
       return new Response(JSON.stringify({ success: false, error: "EMPLOYEE_NOT_FOUND" }), {
         status: 404,
+        headers: corsHeaders
+      });
+    }
+
+    // Coherencia de empresa entre empleado y período
+    if (employee.company_id !== period.company_id) {
+      return new Response(JSON.stringify({ success: false, error: "COMPANY_MISMATCH" }), {
+        status: 400,
         headers: corsHeaders
       });
     }
@@ -149,7 +198,12 @@ serve(async (req) => {
 
     const calculation_basis = {
       version: 2, // 🔧 UPDATED: Version incremented due to fix
-      period: { start: body.periodStart, end: body.periodEnd, days },
+      period: { 
+        id: period.id, 
+        start: startDate.toISOString().slice(0,10), 
+        end: endDate.toISOString().slice(0,10), 
+        days 
+      },
       full_monthly_salary: fullMonthlySalary, // 🔧 NEW
       full_monthly_auxilio: fullMonthlyAuxilio, // 🔧 NEW
       base_constitutiva_total: baseConstitutivaTotal, // 🔧 NEW
@@ -170,28 +224,14 @@ serve(async (req) => {
       computedAt: new Date().toISOString()
     };
 
-    // Si no se debe guardar, devolver preview
-    const shouldSave = body.save === true;
-    if (!shouldSave) {
-      return new Response(
-        JSON.stringify({
-          success: true,
-          mode: "preview",
-          amount,
-          calculation_basis,
-          calculated_values
-        }),
-        { status: 200, headers: corsHeaders }
-      );
-    }
-
-    // Guardar/Actualizar (upsert) con unicidad por (company_id, employee_id, benefit_type, period_start, period_end)
+    // Guardar/Actualizar (upsert) con unicidad por (company_id, employee_id, period_id, benefit_type)
     const upsertPayload = {
       company_id: employee.company_id,
       employee_id: body.employeeId,
       benefit_type: body.benefitType,
-      period_start: body.periodStart,
-      period_end: body.periodEnd,
+      period_id: period.id, // ✅ obligatorio y validado (período cerrado)
+      period_start: startDate.toISOString().slice(0,10),
+      period_end: endDate.toISOString().slice(0,10),
       calculation_basis,
       calculated_values,
       amount,
@@ -203,7 +243,7 @@ serve(async (req) => {
     const { data: record, error: upsertError } = await supabase
       .from("social_benefit_calculations")
       .upsert(upsertPayload, {
-        onConflict: "company_id,employee_id,benefit_type,period_start,period_end",
+        onConflict: "company_id,employee_id,period_id,benefit_type",
         ignoreDuplicates: false
       })
       .select("*")
@@ -220,7 +260,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        mode: "saved",
+        mode: "saved", // siempre guardado, no hay preview
         amount,
         record,
         calculation_basis,
