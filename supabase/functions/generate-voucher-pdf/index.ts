@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { encode as base64Encode } from "https://deno.land/std@0.190.0/encoding/base64.ts"
@@ -128,6 +129,7 @@ serve(async (req) => {
       payrollData = data;
       fileNameBase = `comprobante-${(data.employees.nombre || 'empleado').replace(/\s+/g, '-')}`;
       console.log('✅ Payroll data fetched successfully');
+      console.log('🔍 Deduction values from DB - Salud:', data.salud_empleado, 'Pensión:', data.pension_empleado);
     } else if (requestBody.employee && requestBody.period) {
       // Modo simple: construir estructura mínima compatible
       console.log('ℹ️ Using simple payload (employee + period) to build PDF');
@@ -174,6 +176,9 @@ serve(async (req) => {
         total_devengado: totalDevengado,
         total_deducciones: totalDeducciones,
         neto_pagado: netoPagado,
+        // Usar deducciones específicas del empleado si están disponibles
+        salud_empleado: Number(emp.healthDeduction ?? (totalDeducciones * 0.5)),
+        pension_empleado: Number(emp.pensionDeduction ?? (totalDeducciones * 0.5)),
       };
       fileNameBase = `comprobante-${(emp.name || 'empleado').replace(/\s+/g, '-')}`;
     } else {
@@ -241,6 +246,12 @@ async function generateProfessionalVoucherPDF(payrollData: any): Promise<Uint8Ar
   const totalDeducciones = Number(payrollData.total_deducciones) || 0;
   const netoPagado = Number(payrollData.neto_pagado) || 0;
   const horasExtra = Number(payrollData.horas_extra) || 0;
+
+  // USAR VALORES REALES DE DEDUCCIONES DESDE LA BD
+  const saludEmpleado = Number(payrollData.salud_empleado) || 0;
+  const pensionEmpleado = Number(payrollData.pension_empleado) || 0;
+  
+  console.log('💰 Using real deduction values from DB - Salud:', saludEmpleado, 'Pensión:', pensionEmpleado);
 
   // Cálculos auxiliares (sin cambios funcionales)
   const salarioProporcional = Math.round((salarioBase * diasTrabajados) / 30);
@@ -362,27 +373,29 @@ async function generateProfessionalVoucherPDF(payrollData: any): Promise<Uint8Ar
   drawSeparator(yPos);
   yPos += 12;
 
-  // Sección: Deducciones
+  // Sección: Deducciones - USANDO VALORES REALES DE LA BD
   if (totalDeducciones > 0) {
     sectionTitle('DEDUCCIONES');
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
 
-    const saludEmpleado = Math.round(salarioBase * 0.04);
-    const pensionEmpleado = Math.round(salarioBase * 0.04);
+    // Mostrar deducciones reales de la base de datos
+    if (saludEmpleado > 0) {
+      doc.setFont('helvetica', 'bold');
+      doc.text(normalizeText('Salud (4%):'), margin, yPos);
+      doc.setFont('helvetica', 'normal');
+      doc.text(formatCurrency(saludEmpleado), margin + 40, yPos);
+      yPos += lineHeight;
+    }
 
-    doc.setFont('helvetica', 'bold');
-    doc.text(normalizeText('Salud (4%):'), margin, yPos);
-    doc.setFont('helvetica', 'normal');
-    doc.text(formatCurrency(saludEmpleado), margin + 40, yPos);
-    yPos += lineHeight;
-
-    doc.setFont('helvetica', 'bold');
-    doc.text(normalizeText('Pension (4%):'), margin, yPos);
-    doc.setFont('helvetica', 'normal');
-    doc.text(formatCurrency(pensionEmpleado), margin + 40, yPos);
-    yPos += lineHeight;
+    if (pensionEmpleado > 0) {
+      doc.setFont('helvetica', 'bold');
+      doc.text(normalizeText('Pension (4%):'), margin, yPos);
+      doc.setFont('helvetica', 'normal');
+      doc.text(formatCurrency(pensionEmpleado), margin + 40, yPos);
+      yPos += lineHeight;
+    }
 
     doc.setFont('helvetica', 'bold');
     doc.text(normalizeText('TOTAL:'), margin, yPos);
