@@ -1,77 +1,180 @@
 
-import React, { useState } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CesantiasCalculator } from './CesantiasCalculator';
-import { PrimaCalculator } from './PrimaCalculator';
-import { InteresesCalculator } from './InteresesCalculator';
-import { SocialBenefitsHistory } from './SocialBenefitsHistory';
-import { SocialBenefitsError } from './SocialBenefitsError';
-import { useEmployeeData } from '@/hooks/useEmployeeData';
-import { Calculator, History, TrendingUp, Percent, PiggyBank } from 'lucide-react';
-import { ProvisionsExplorer } from './ProvisionsExplorer';
+import React, { useEffect, useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { ProvisionsTable } from './ProvisionsTable';
+import { BenefitCalculatorBase } from './BenefitCalculatorBase';
+import { useSocialBenefitProvisions } from '@/hooks/useSocialBenefitProvisions';
+import { MonthlyConsolidationButton } from './MonthlyConsolidationButton';
+import { CompanySettingsService } from '@/services/CompanySettingsService';
+import { useCurrentCompany } from '@/hooks/useCurrentCompany';
+import { Calculator, FileSpreadsheet, AlertCircle, Settings } from 'lucide-react';
 
 export const SocialBenefitsDashboard = () => {
-  const [activeTab, setActiveTab] = useState('provisiones');
-  const { error, isLoading } = useEmployeeData();
+  const { companyId } = useCurrentCompany();
+  const [provisionMode, setProvisionMode] = useState<'on_liquidation' | 'monthly_consolidation'>('on_liquidation');
+  const [loadingSettings, setLoadingSettings] = useState(true);
 
-  console.log('🏢 SocialBenefitsDashboard - Estado:', {
-    activeTab,
-    hasError: !!error,
-    isLoading,
-    errorMessage: error
-  });
+  const {
+    periods,
+    loadingPeriods,
+    provisions,
+    loadingProvisions,
+    filters,
+    setPeriodId,
+    setBenefitType,
+    setSearch,
+    totals,
+    page,
+    pageSize,
+    setPage,
+    setPageSize,
+    totalPages,
+    paginated,
+    recalculateCurrentPeriod,
+    recalculating,
+    exportCSV,
+    refetch,
+  } = useSocialBenefitProvisions();
 
-  // Si hay error crítico en la carga inicial, mostrar error
-  if (error && !isLoading) {
-    return <SocialBenefitsError error={error} />;
-  }
+  // Load company provision mode setting
+  useEffect(() => {
+    const loadProvisionMode = async () => {
+      if (!companyId) return;
+      
+      try {
+        const settings = await CompanySettingsService.getCompanySettings(companyId);
+        setProvisionMode(settings?.provision_mode || 'on_liquidation');
+      } catch (error) {
+        console.error('Error loading provision mode:', error);
+        setProvisionMode('on_liquidation'); // fallback
+      } finally {
+        setLoadingSettings(false);
+      }
+    };
+
+    loadProvisionMode();
+  }, [companyId]);
 
   return (
     <div className="space-y-6">
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="provisiones" className="flex items-center gap-2">
-            <PiggyBank className="h-4 w-4" />
-            Provisiones
-          </TabsTrigger>
-          <TabsTrigger value="cesantias" className="flex items-center gap-2">
-            <Calculator className="h-4 w-4" />
-            Cesantías
-          </TabsTrigger>
-          <TabsTrigger value="prima" className="flex items-center gap-2">
-            <TrendingUp className="h-4 w-4" />
-            Prima
-          </TabsTrigger>
-          <TabsTrigger value="intereses" className="flex items-center gap-2">
-            <Percent className="h-4 w-4" />
-            Intereses
-          </TabsTrigger>
-          <TabsTrigger value="historial" className="flex items-center gap-2">
-            <History className="h-4 w-4" />
-            Historial
-          </TabsTrigger>
-        </TabsList>
+      {/* Header with provision mode info */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold">Provisiones de Prestaciones Sociales</h2>
+          <p className="text-muted-foreground">
+            Gestiona y consulta las provisiones de cesantías, prima de servicios e intereses
+          </p>
+        </div>
+        
+        {!loadingSettings && provisionMode === 'monthly_consolidation' && (
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 rounded-md border border-blue-200">
+              <Settings className="h-4 w-4 text-blue-600" />
+              <span className="text-sm text-blue-700 font-medium">Modo: Consolidado Mensual</span>
+            </div>
+            <MonthlyConsolidationButton onConsolidated={refetch} />
+          </div>
+        )}
+      </div>
 
-        <TabsContent value="provisiones" className="mt-6">
-          <ProvisionsExplorer />
-        </TabsContent>
+      {/* Mode explanation banner */}
+      {!loadingSettings && provisionMode === 'monthly_consolidation' && (
+        <Card className="border-blue-200 bg-blue-50">
+          <CardContent className="pt-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5" />
+              <div>
+                <h3 className="font-medium text-blue-800">Modo de Consolidado Mensual Activo</h3>
+                <p className="text-blue-700 text-sm mt-1">
+                  Las provisiones no se calculan automáticamente al liquidar períodos. 
+                  Use el botón "Consolidar Mes" para procesar todos los períodos cerrados del mes actual.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-        <TabsContent value="cesantias" className="mt-6">
-          <CesantiasCalculator />
-        </TabsContent>
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Total Empleados</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totals.count}</div>
+          </CardContent>
+        </Card>
 
-        <TabsContent value="prima" className="mt-6">
-          <PrimaCalculator />
-        </TabsContent>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Cesantías</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              ${totals.byType.cesantias.toLocaleString()}
+            </div>
+          </CardContent>
+        </Card>
 
-        <TabsContent value="intereses" className="mt-6">
-          <InteresesCalculator />
-        </TabsContent>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Prima de Servicios</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              ${totals.byType.prima.toLocaleString()}
+            </div>
+          </CardContent>
+        </Card>
 
-        <TabsContent value="historial" className="mt-6">
-          <SocialBenefitsHistory />
-        </TabsContent>
-      </Tabs>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Total Provisiones</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              ${totals.total.toLocaleString()}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Provisions Table */}
+      <ProvisionsTable
+        periods={periods}
+        loadingPeriods={loadingPeriods}
+        provisions={paginated}
+        loadingProvisions={loadingProvisions}
+        filters={filters}
+        setPeriodId={setPeriodId}
+        setBenefitType={setBenefitType}
+        setSearch={setSearch}
+        totals={totals}
+        page={page}
+        pageSize={pageSize}
+        setPage={setPage}
+        setPageSize={setPageSize}
+        totalPages={totalPages}
+        recalculateCurrentPeriod={recalculateCurrentPeriod}
+        recalculating={recalculating}
+        exportCSV={exportCSV}
+        showConsolidateButton={provisionMode === 'monthly_consolidation'}
+      />
+
+      {/* Individual Calculator */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Calculator className="h-5 w-5" />
+            <CardTitle>Calculadora Individual</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <BenefitCalculatorBase />
+        </CardContent>
+      </Card>
     </div>
   );
 };

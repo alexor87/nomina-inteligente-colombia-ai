@@ -333,16 +333,30 @@ export const usePayrollLiquidation = () => {
           isFinite: Number.isFinite(result.summary.totalNetPay)
         });
 
-        // ✅ NUEVO: Registrar provisiones del período (no bloqueante)
+        // ✅ NUEVO: Verificar configuración de provisiones antes de invocar
         try {
-          console.log('🧮 Registrando provisiones de prestaciones sociales para el período:', currentPeriodId);
-          const { data: provisionResp, error: provisionErr } = await supabase.functions.invoke('provision-social-benefits', {
-            body: { period_id: currentPeriodId }
-          });
-          if (provisionErr) {
-            console.warn('⚠️ Error invocando provisiones:', provisionErr);
+          const { data: companySettings, error: settingsError } = await supabase
+            .from('company_settings')
+            .select('provision_mode')
+            .eq('company_id', await supabase.auth.getUser().then(({ data }) => 
+              supabase.from('profiles').select('company_id').eq('user_id', data.user?.id).single()
+            ).then(({ data }) => data?.company_id))
+            .single();
+
+          const provisionMode = companySettings?.provision_mode || 'on_liquidation';
+          
+          if (provisionMode === 'on_liquidation') {
+            console.log('🧮 Registrando provisiones automáticamente para el período:', currentPeriodId);
+            const { data: provisionResp, error: provisionErr } = await supabase.functions.invoke('provision-social-benefits', {
+              body: { period_id: currentPeriodId }
+            });
+            if (provisionErr) {
+              console.warn('⚠️ Error invocando provisiones:', provisionErr);
+            } else {
+              console.log('✅ Provisiones registradas automáticamente:', provisionResp);
+            }
           } else {
-            console.log('✅ Provisiones registradas:', provisionResp);
+            console.log('📋 Provisiones en modo consolidado mensual - no se calculan automáticamente');
           }
         } catch (provError) {
           console.warn('⚠️ No se pudieron registrar provisiones (continuando):', provError);
