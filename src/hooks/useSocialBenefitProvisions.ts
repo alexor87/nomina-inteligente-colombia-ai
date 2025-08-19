@@ -1,30 +1,60 @@
+
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useCurrentCompany } from '@/hooks/useCurrentCompany';
 import { useToast } from '@/hooks/use-toast';
 import { ProvisionsService } from '@/services/ProvisionsService';
+import type { BenefitType } from '@/types/social-benefits';
 
-interface Period {
+// Export types that components expect
+export interface PeriodOption {
   id: string;
   periodo: string;
   fecha_inicio: string;
   fecha_fin: string;
   estado: string;
+  tipo_periodo: string;
 }
 
-interface Provision {
+export interface ProvisionRecord {
   id: string;
+  company_id: string;
   employee_id: string;
-  benefit_type: string;
+  period_id: string;
+  benefit_type: BenefitType;
   amount: number;
   period_start: string;
   period_end: string;
   estado: string;
+  employee_name: string;
+  employee_cedula: string;
+  created_at: string;
+  updated_at: string;
+  notes?: string;
+  calculation_basis?: any;
+  calculated_values?: any;
   employee?: {
     nombre: string;
     apellido: string;
   };
+}
+
+export interface ProvisionTotals {
+  count: number;
+  total: number;
+  byType: {
+    cesantias: number;
+    intereses_cesantias: number;
+    prima: number;
+    vacaciones: number;
+  };
+}
+
+interface Filters {
+  periodId: string;
+  benefitType: BenefitType | 'all';
+  search: string;
 }
 
 export const useSocialBenefitProvisions = () => {
@@ -32,9 +62,9 @@ export const useSocialBenefitProvisions = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState<Filters>({
     periodId: '',
-    benefitType: '',
+    benefitType: 'all',
     search: ''
   });
   
@@ -53,12 +83,12 @@ export const useSocialBenefitProvisions = () => {
       
       const { data, error } = await supabase
         .from('payroll_periods_real')
-        .select('id, periodo, fecha_inicio, fecha_fin, estado')
+        .select('id, periodo, fecha_inicio, fecha_fin, estado, tipo_periodo')
         .eq('company_id', companyId)
         .order('fecha_inicio', { ascending: false });
         
       if (error) throw error;
-      return data as Period[];
+      return data as PeriodOption[];
     },
     enabled: !!companyId
   });
@@ -73,13 +103,20 @@ export const useSocialBenefitProvisions = () => {
         .from('social_benefit_calculations')
         .select(`
           id,
+          company_id,
           employee_id,
+          period_id,
           benefit_type,
           amount,
           period_start,
           period_end,
           estado,
-          employee:employees(nombre, apellido)
+          created_at,
+          updated_at,
+          notes,
+          calculation_basis,
+          calculated_values,
+          employee:employees(nombre, apellido, cedula)
         `)
         .eq('company_id', companyId);
 
@@ -92,19 +129,25 @@ export const useSocialBenefitProvisions = () => {
         }
       }
 
-      if (filters.benefitType) {
+      if (filters.benefitType && filters.benefitType !== 'all') {
         query = query.eq('benefit_type', filters.benefitType);
       }
 
       if (filters.search) {
-        // Assuming we can search by employee name - this might need adjustment based on your RLS policies
-        query = query.or(`employee.nombre.ilike.%${filters.search}%,employee.apellido.ilike.%${filters.search}%`);
+        // Search by employee name or cedula
+        query = query.or(`employee.nombre.ilike.%${filters.search}%,employee.apellido.ilike.%${filters.search}%,employee.cedula.ilike.%${filters.search}%`);
       }
 
       const { data, error } = await query.order('period_start', { ascending: false });
       
       if (error) throw error;
-      return data as Provision[];
+      
+      // Transform to expected format
+      return (data || []).map(item => ({
+        ...item,
+        employee_name: item.employee ? `${item.employee.nombre} ${item.employee.apellido}` : '',
+        employee_cedula: item.employee?.cedula || ''
+      })) as ProvisionRecord[];
     },
     enabled: !!companyId
   });
@@ -187,27 +230,36 @@ export const useSocialBenefitProvisions = () => {
     return () => clearTimeout(timer);
   }, [companyId, periods, provisions, loadingProvisions, autoHealingAttempted, toast, queryClient]);
 
-  const totals = useMemo(() => {
+  const totals: ProvisionTotals = useMemo(() => {
     if (!provisions.length) return {
-      cesantias: 0,
-      intereses_cesantias: 0,
-      prima: 0,
-      vacaciones: 0,
-      total: 0
+      count: 0,
+      total: 0,
+      byType: {
+        cesantias: 0,
+        intereses_cesantias: 0,
+        prima: 0,
+        vacaciones: 0
+      }
     };
 
-    return provisions.reduce((acc, provision) => {
+    const byType = provisions.reduce((acc, provision) => {
       const amount = Number(provision.amount) || 0;
       acc[provision.benefit_type as keyof typeof acc] = (acc[provision.benefit_type as keyof typeof acc] || 0) + amount;
-      acc.total += amount;
       return acc;
     }, {
       cesantias: 0,
       intereses_cesantias: 0,
       prima: 0,
-      vacaciones: 0,
-      total: 0
+      vacaciones: 0
     });
+
+    const total = Object.values(byType).reduce((sum, val) => sum + val, 0);
+
+    return {
+      count: provisions.length,
+      total,
+      byType
+    };
   }, [provisions]);
 
   const totalPages = Math.ceil(provisions.length / pageSize);
@@ -218,7 +270,7 @@ export const useSocialBenefitProvisions = () => {
     setPage(1);
   }, []);
 
-  const setBenefitType = useCallback((benefitType: string) => {
+  const setBenefitType = useCallback((benefitType: BenefitType | 'all') => {
     setFilters(prev => ({ ...prev, benefitType }));
     setPage(1);
   }, []);
@@ -255,7 +307,8 @@ export const useSocialBenefitProvisions = () => {
     if (!provisions.length) return;
 
     const csvData = provisions.map(provision => ({
-      Empleado: `${provision.employee?.nombre} ${provision.employee?.apellido}`,
+      Empleado: provision.employee_name,
+      Cedula: provision.employee_cedula,
       'Tipo de Prestación': provision.benefit_type,
       Valor: provision.amount,
       'Período Inicio': provision.period_start,
