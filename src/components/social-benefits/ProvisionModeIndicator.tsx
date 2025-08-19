@@ -51,7 +51,7 @@ export const ProvisionModeIndicator: React.FC<ProvisionModeIndicatorProps> = ({
             </div>
           </div>
         </CardContent>
-      </div>
+      </Card>
     </>
   );
 };
