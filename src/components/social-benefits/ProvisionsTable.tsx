@@ -198,17 +198,20 @@ export const ProvisionsTable: React.FC<ProvisionsTableProps> = ({
                 </TableCell>
               </TableRow>
             ) : (
-              provisions.map((provision) => (
-                <TableRow key={provision.id}>
-                  <TableCell>{provision.period_name}</TableCell>
-                  <TableCell>{provision.employee_name}</TableCell>
-                  <TableCell>{provision.employee_cedula}</TableCell>
-                  <TableCell>{provision.benefit_type}</TableCell>
-                  <TableCell className="text-right">
-                    ${provision.provision_amount?.toLocaleString()}
-                  </TableCell>
-                </TableRow>
-              ))
+              provisions.map((provision) => {
+                const rowKey = `${provision.period_name}-${provision.employee_cedula}-${provision.benefit_type}`;
+                return (
+                  <TableRow key={rowKey}>
+                    <TableCell>{provision.period_name}</TableCell>
+                    <TableCell>{provision.employee_name}</TableCell>
+                    <TableCell>{provision.employee_cedula}</TableCell>
+                    <TableCell>{provision.benefit_type}</TableCell>
+                    <TableCell className="text-right">
+                      ${provision.provision_amount?.toLocaleString()}
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>

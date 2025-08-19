@@ -72,13 +72,23 @@ export const ProvisionsExplorer: React.FC = () => {
           <ProvisionsSummary totals={totals} />
 
           <ProvisionsTable
-            rows={paginated}
+            periods={periods}
+            loadingPeriods={loadingPeriods}
+            provisions={paginated}
+            loadingProvisions={loadingProvisions}
+            filters={filters}
+            setPeriodId={setPeriodId}
+            setBenefitType={setBenefitType}
+            setSearch={setSearch}
+            totals={totals}
             page={page}
             pageSize={pageSize}
             setPage={setPage}
             setPageSize={setPageSize}
             totalPages={totalPages}
-            loading={loadingProvisions}
+            recalculateCurrentPeriod={recalculateCurrentPeriod}
+            recalculating={recalculating}
+            exportCSV={exportCSV}
           />
         </CardContent>
       </Card>

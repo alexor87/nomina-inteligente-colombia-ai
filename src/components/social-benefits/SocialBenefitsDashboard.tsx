@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -172,7 +171,11 @@ export const SocialBenefitsDashboard = () => {
           </div>
         </CardHeader>
         <CardContent>
-          <BenefitCalculatorBase />
+          <BenefitCalculatorBase
+            benefitType="cesantias"
+            title="Cálculo individual de prestaciones"
+            description="Calcula una prestación social para un empleado en el período seleccionado."
+          />
         </CardContent>
       </Card>
     </div>

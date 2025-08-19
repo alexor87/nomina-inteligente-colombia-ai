@@ -316,7 +316,6 @@ export const usePayrollLiquidation = () => {
       
       console.log('🚀 Iniciando liquidación con datos correctos...');
 
-      // ✅ CORREGIDO: Usar el servicio de liquidación que ya maneja todo correctamente
       const result = await PayrollLiquidationService.liquidatePayroll(
         employees, 
         startDate, 
@@ -333,18 +332,33 @@ export const usePayrollLiquidation = () => {
           isFinite: Number.isFinite(result.summary.totalNetPay)
         });
 
-        // ✅ NUEVO: Verificar configuración de provisiones antes de invocar
+        // ✅ Obtener configuración de provisiones de forma segura
         try {
-          const { data: companySettings, error: settingsError } = await supabase
-            .from('company_settings')
-            .select('provision_mode')
-            .eq('company_id', await supabase.auth.getUser().then(({ data }) => 
-              supabase.from('profiles').select('company_id').eq('user_id', data.user?.id).single()
-            ).then(({ data }) => data?.company_id))
-            .single();
+          const { data: authData } = await supabase.auth.getUser();
+          const userId = authData.user?.id;
+          let companyId: string | null = null;
 
-          const provisionMode = companySettings?.provision_mode || 'on_liquidation';
-          
+          if (userId) {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('company_id')
+              .eq('user_id', userId)
+              .single();
+            companyId = profile?.company_id || null;
+          }
+
+          let provisionMode: 'on_liquidation' | 'monthly_consolidation' = 'on_liquidation';
+
+          if (companyId) {
+            const { data: companySettings } = await supabase
+              .from('company_settings')
+              .select('provision_mode')
+              .eq('company_id', companyId)
+              .single();
+            
+            provisionMode = (companySettings?.provision_mode as any) || 'on_liquidation';
+          }
+
           if (provisionMode === 'on_liquidation') {
             console.log('🧮 Registrando provisiones automáticamente para el período:', currentPeriodId);
             const { data: provisionResp, error: provisionErr } = await supabase.functions.invoke('provision-social-benefits', {
@@ -362,7 +376,6 @@ export const usePayrollLiquidation = () => {
           console.warn('⚠️ No se pudieron registrar provisiones (continuando):', provError);
         }
         
-        // Usar el resumen calculado directamente del servicio de liquidación
         const periodType = detectPeriodType(startDate, endDate);
 
         setLiquidationResult({
@@ -370,10 +383,8 @@ export const usePayrollLiquidation = () => {
           summary: result.summary
         });
 
-        // Mostrar modal de éxito en lugar de toast
         setShowSuccessModal(true);
 
-        // Limpiar el estado después de liquidar
         setEmployees([]);
         setCurrentPeriodId(null);
         
@@ -449,7 +460,6 @@ export const usePayrollLiquidation = () => {
     lastAutoSaveTime,
     triggerManualSave,
     isRemovingEmployee,
-    // ✅ NUEVO: Estado del modal de éxito
     showSuccessModal,
     liquidationResult,
     closeSuccessModal

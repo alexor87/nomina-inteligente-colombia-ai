@@ -15,7 +15,15 @@ export class CompanySettingsService {
         throw error;
       }
 
-      return data;
+      if (!data) return null;
+
+      // Ensure provision_mode is present with a safe default
+      const normalized: CompanySettings = {
+        ...(data as any),
+        provision_mode: (data as any).provision_mode || 'on_liquidation',
+      };
+
+      return normalized;
     } catch (error) {
       console.error('Error fetching company settings:', error);
       throw error;
@@ -38,7 +46,13 @@ export class CompanySettingsService {
         .single();
 
       if (error) throw error;
-      return data;
+
+      const normalized: CompanySettings = {
+        ...(data as any),
+        provision_mode: (data as any).provision_mode || settings.provision_mode || 'on_liquidation',
+      };
+
+      return normalized;
     } catch (error) {
       console.error('Error updating company settings:', error);
       throw error;

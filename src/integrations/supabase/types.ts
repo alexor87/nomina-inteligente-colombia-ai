@@ -318,6 +318,7 @@ export type Database = {
           custom_period_days: number | null
           id: string
           periodicity: string
+          provision_mode: string
           updated_at: string
         }
         Insert: {
@@ -326,6 +327,7 @@ export type Database = {
           custom_period_days?: number | null
           id?: string
           periodicity?: string
+          provision_mode?: string
           updated_at?: string
         }
         Update: {
@@ -334,6 +336,7 @@ export type Database = {
           custom_period_days?: number | null
           id?: string
           periodicity?: string
+          provision_mode?: string
           updated_at?: string
         }
         Relationships: [
