@@ -427,53 +427,59 @@ function validatePrestamoLimits(valorCuota: number, salarioBase: number, tipoPre
   };
 }
 
-// ✅ NUEVA FUNCIÓN: Calcular IBC incluyendo novedades constitutivas
+// ✅ FUNCIÓN NUEVA/ACTUALIZADA: Calcular IBC incluyendo incapacidades en salud/pensión
 function calculateIBC(baseSalary: number, novedades: NovedadForIBC[] = [], config: PayrollConfiguration): {
   ibcSalud: number;
   ibcPension: number;
   detalleCalculo: string;
 } {
-  console.log('🔍 [IBC v2.0] Calculando IBC:', {
+  console.log('🔍 [IBC v2.1] Calculando IBC con incapacidades:', {
     baseSalary,
     novedadesCount: novedades.length,
     novedades: novedades.map(n => ({ tipo: n.tipo_novedad, valor: n.valor, constitutivo: n.constitutivo_salario }))
   });
 
-  // 1. Calcular ingresos constitutivos de salario
+  // 1) Sumar novedades constitutivas
   const novedadesConstitutivas = novedades
     .filter(n => n.constitutivo_salario === true)
     .reduce((sum, n) => sum + Number(n.valor || 0), 0);
 
+  // 2) Sumar incapacidades (siempre cuentan para salud/pensión)
+  const incapacidadSum = novedades
+    .filter(n => n.tipo_novedad === 'incapacidad')
+    .reduce((sum, n) => sum + Number(n.valor || 0), 0);
+
   const ingresosConstitutivos = baseSalary + novedadesConstitutivas;
-  
-  console.log('📊 [IBC v2.0] Ingresos constitutivos:', {
+
+  console.log('📊 [IBC v2.1] Detalle base IBC:', {
     salarioBase: baseSalary,
     novedadesConstitutivas,
+    incapacidadSum,
     totalConstitutivo: ingresosConstitutivos
   });
 
-  // 2. Aplicar límites legales (SIN FORZAR MÍNIMO PARA PERÍODOS PROPORCIONALES)
-  const topeIbcPension = config.salarioMinimo * 25; // 25 SMMLV para pensión
-  
-  // ✅ CORRECCIÓN NORMATIVA: No aplicar mínimo cuando es cálculo proporcional
-  // El mínimo solo aplica para salarios reales, no para fracciones de período
-  const ibcSalud = ingresosConstitutivos; // Sin mínimo forzado
-  
-  // Para pensión: solo aplicar tope superior, no mínimo
-  const ibcPension = Math.min(ingresosConstitutivos, topeIbcPension);
-  
-  console.log('✅ [IBC v2.0] IBC calculados:', {
+  // 3) Aplicar límites legales (pensión con tope superior; salud sin tope en este paso)
+  const topeIbcPension = config.salarioMinimo * 25;
+
+  // Salud y pensión incluyen incapacidades
+  const baseConIncapacidad = ingresosConstitutivos + incapacidadSum;
+
+  const ibcSalud = baseConIncapacidad;
+  const ibcPension = Math.min(baseConIncapacidad, topeIbcPension);
+
+  console.log('✅ [IBC v2.1] IBC calculados:', {
     ibcSalud,
     ibcPension,
-    topeAplicado: ibcPension < ingresosConstitutivos,
-    diferencia: ingresosConstitutivos - ibcPension
+    topeAplicado: ibcPension < baseConIncapacidad,
+    diferencia: baseConIncapacidad - ibcPension
   });
 
   const detalleCalculo = `IBC Salud: $${ibcSalud.toLocaleString()} - IBC Pensión: $${ibcPension.toLocaleString()}${
-    novedadesConstitutivas > 0 ? ` (incluye $${novedadesConstitutivas.toLocaleString()} en novedades constitutivas)` : ''
+    novedadesConstitutivas > 0 ? ` (incluye $${novedadesConstitutivas.toLocaleString()} constitutivos)` : ''
   }${
-    ibcPension === topeIbcPension && ingresosConstitutivos > topeIbcPension ? 
-    ` - Tope pensión aplicado (máx. 25 SMMLV)` : ''
+    incapacidadSum > 0 ? ` (incluye incapacidades por $${incapacidadSum.toLocaleString()})` : ''
+  }${
+    ibcPension === topeIbcPension && baseConIncapacidad > topeIbcPension ? ` - Tope pensión aplicado (máx. 25 SMMLV)` : ''
   }`;
 
   return {
@@ -895,18 +901,18 @@ async function validateEmployee(input: PayrollCalculationInput, eps?: string, af
   };
 }
 
-// ✅ FUNCIÓN PRINCIPAL ACTUALIZADA: Ahora incluye TODAS las novedades en liquidación
+// ✅ FUNCIÓN PRINCIPAL: incluir incapacidades en IBC salud/pensión y excluirlas de ARL
 async function calculatePayroll(input: PayrollCalculationInput) {
   const config = await getConfigurationByYear(input.year || '2025');
-  console.log(`🎯 [PAYROLL v4.0] Usando configuración para año ${input.year || '2025'}:`, {
+  console.log(`🎯 [PAYROLL v4.1] Usando configuración para año ${input.year || '2025'}:`, {
     salarioMinimo: config.salarioMinimo,
     auxilioTransporte: config.auxilioTransporte,
     uvt: config.uvt
   });
   const horasMensuales = getHorasMensuales(input.periodDate);
   const horasSemanales = getHorasSemanales(input.periodDate);
-  
-  console.log('🚀 [PAYROLL v3.0] Iniciando cálculo con IBC correcto:', {
+
+  console.log('🚀 [PAYROLL v4.1] Iniciando cálculo con IBC correcto:', {
     baseSalary: input.baseSalary,
     novedadesCount: input.novedades?.length || 0
   });
@@ -924,16 +930,16 @@ async function calculatePayroll(input: PayrollCalculationInput) {
     transportAllowance = Math.round(dailyTransportAllowance * input.workedDays);
   }
 
-  // ✅ NUEVA LÓGICA: Procesar TODAS las novedades para incluirlas en el total final
+  // Procesar novedades (incapacidad ya fue movida a devengos en cambio previo)
   let totalDevengosNovedades = 0;
   let totalDeduccionesNovedades = 0;
-  
+
   if (input.novedades && input.novedades.length > 0) {
-    console.log('📊 [PAYROLL v3.0] Procesando novedades para liquidación:', {
+    console.log('📊 [PAYROLL v4.1] Procesando novedades para liquidación:', {
       cantidad: input.novedades.length,
       novedades: input.novedades.map(n => ({ tipo: n.tipo_novedad, valor: n.valor }))
     });
-    
+
     // KISS: 'incapacidad' es pago (devengo no salarial), no descuento
     const tiposDevengo = [
       'horas_extra',
@@ -961,53 +967,66 @@ async function calculatePayroll(input: PayrollCalculationInput) {
       
       if (tiposDevengo.includes(novedad.tipo_novedad)) {
         totalDevengosNovedades += valor;
-        console.log(`💰 [PAYROLL v3.0] Devengo agregado: ${novedad.tipo_novedad} = $${valor.toLocaleString()}`);
+        console.log(`💰 [PAYROLL v4.1] Devengo agregado: ${novedad.tipo_novedad} = $${valor.toLocaleString()}`);
       } else if (tiposDeduccion.includes(novedad.tipo_novedad)) {
         totalDeduccionesNovedades += valor;
-        console.log(`📉 [PAYROLL v3.0] Deducción agregada: ${novedad.tipo_novedad} = $${valor.toLocaleString()}`);
+        console.log(`📉 [PAYROLL v4.1] Deducción agregada: ${novedad.tipo_novedad} = $${valor.toLocaleString()}`);
       }
     });
   }
 
   const grossSalary = regularPay + extraPay + input.bonuses + totalDevengosNovedades;
   const grossPay = grossSalary + transportAllowance;
-  
-  // ✅ CORRECCIÓN CRÍTICA: Para períodos quincenales, usar salario proporcional para IBC
-  const salarioBaseParaIBC = input.periodType === 'quincenal' ? 
-    input.baseSalary / 2 : // Para quincenal, usar la mitad del salario
-    input.baseSalary; // Para mensual, usar salario completo
-    
-  console.log(`🎯 [PAYROLL v3.0] Iniciando cálculo con IBC correcto: { baseSalary: ${input.baseSalary}, salarioBaseParaIBC: ${salarioBaseParaIBC}, periodType: ${input.periodType}, novedadesCount: ${(input.novedades || []).length} }`);
-  
-  // Calcular IBC con salario proporcional para períodos quincenales
+
+  // Salario proporcional para IBC (quincenal/ mensual)
+  const salarioBaseParaIBC = input.periodType === 'quincenal'
+    ? input.baseSalary / 2
+    : input.baseSalary;
+
+  console.log(`🎯 [PAYROLL v4.1] Salario para IBC: { baseSalary: ${input.baseSalary}, salarioBaseParaIBC: ${salarioBaseParaIBC}, periodType: ${input.periodType} }`);
+
+  // Calcular IBC con incapacidades incluidas para salud/pensión
   const ibcCalculation = calculateIBC(salarioBaseParaIBC, input.novedades || [], config);
-  
-  // ✅ CORREGIDO: Usar IBC para calcular deducciones de seguridad social
+
+  // Deducciones de empleado (salud/pensión) sobre IBC calculado
   const healthDeduction = Math.round(ibcCalculation.ibcSalud * config.porcentajes.saludEmpleado);
   const pensionDeduction = Math.round(ibcCalculation.ibcPension * config.porcentajes.pensionEmpleado);
   const totalDeductions = healthDeduction + pensionDeduction + totalDeduccionesNovedades;
 
-  // ✅ NUEVA FÓRMULA COMPLETA: Incluye TODAS las novedades en el cálculo final
   const netPay = grossPay - healthDeduction - pensionDeduction - totalDeduccionesNovedades;
-  
-  console.log('💼 [PAYROLL v3.0] Cálculo final completo:', {
+
+  console.log('💼 [PAYROLL v4.1] Cálculo final:', {
     grossPay,
     healthDeduction,
     pensionDeduction,
     totalDeduccionesNovedades,
-    netPay,
-    totalDevengosNovedades
+    netPay
   });
 
-  // ✅ CORREGIDO: Aportes patronales también se calculan sobre IBC
+  // ✅ Aportes patronales:
+  // Salud y pensión sobre IBC con incapacidades
+  // ARL: excluir incapacidades del IBC (no aplica en enfermedad común y mantenemos KISS sin diferenciar subtipos)
+  const incapacidadSumForArl = (input.novedades || [])
+    .filter(n => n.tipo_novedad === 'incapacidad')
+    .reduce((sum, n) => sum + Number(n.valor || 0), 0);
+
+  const ibcArlBase = Math.max(0, ibcCalculation.ibcSalud - incapacidadSumForArl);
+
   const employerHealth = Math.round(ibcCalculation.ibcSalud * config.porcentajes.saludEmpleador);
   const employerPension = Math.round(ibcCalculation.ibcPension * config.porcentajes.pensionEmpleador);
-  const employerArl = Math.round(ibcCalculation.ibcSalud * config.porcentajes.arl);
+  const employerArl = Math.round(ibcArlBase * config.porcentajes.arl); // <-- excluye incapacidades
   const employerCaja = Math.round(ibcCalculation.ibcSalud * config.porcentajes.cajaCompensacion);
   const employerIcbf = Math.round(ibcCalculation.ibcSalud * config.porcentajes.icbf);
   const employerSena = Math.round(ibcCalculation.ibcSalud * config.porcentajes.sena);
 
-  const employerContributions = employerHealth + employerPension + employerArl + 
+  console.log('🏢 [PAYROLL v4.1] Bases aportes empleador:', {
+    ibcSalud: ibcCalculation.ibcSalud,
+    ibcPension: ibcCalculation.ibcPension,
+    ibcArlBase,
+    incapacidadSumForArl
+  });
+
+  const employerContributions = employerHealth + employerPension + employerArl +
                                 employerCaja + employerIcbf + employerSena;
 
   const totalPayrollCost = netPay + employerContributions;
@@ -1029,7 +1048,6 @@ async function calculatePayroll(input: PayrollCalculationInput) {
     employerSena,
     employerContributions,
     totalPayrollCost,
-    // ✅ NUEVO: Incluir IBC en el resultado
     ibc: ibcCalculation.ibcSalud,
     jornadaInfo: {
       horasSemanales,
@@ -1041,7 +1059,7 @@ async function calculatePayroll(input: PayrollCalculationInput) {
     }
   };
 
-  console.log('✅ [PAYROLL v3.0] Cálculo completado con IBC:', {
+  console.log('✅ [PAYROLL v4.1] Cálculo completado:', {
     ibc: result.ibc,
     healthDeduction: result.healthDeduction,
     pensionDeduction: result.pensionDeduction,
