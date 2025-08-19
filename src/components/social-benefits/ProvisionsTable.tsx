@@ -39,7 +39,7 @@ interface ProvisionsTableProps {
   totalPages: number;
   recalculateCurrentPeriod: () => Promise<void>;
   recalculating: boolean;
-  exportCSV: () => void;
+  exportExcel: () => void;
   showConsolidateButton?: boolean;
 }
 
@@ -60,7 +60,7 @@ export const ProvisionsTable: React.FC<ProvisionsTableProps> = ({
   totalPages,
   recalculateCurrentPeriod,
   recalculating,
-  exportCSV,
+  exportExcel,
   showConsolidateButton = false
 }) => {
   return (
@@ -103,13 +103,13 @@ export const ProvisionsTable: React.FC<ProvisionsTableProps> = ({
             )}
 
             <Button
-              onClick={exportCSV}
+              onClick={exportExcel}
               disabled={provisions.length === 0}
               variant="outline"
               size="sm"
             >
-              <FileDown className="h-4 w-4 mr-2" />
-              Exportar CSV
+              <FileSpreadsheet className="h-4 w-4 mr-2" />
+              Exportar a Excel
             </Button>
           </div>
         </div>

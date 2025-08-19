@@ -1,10 +1,10 @@
-
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { RealtimeService } from '@/services/RealtimeService';
 import { useToast } from '@/hooks/use-toast';
 import { ProvisionsService } from '@/services/ProvisionsService';
+import { ExcelExportService } from '@/services/ExcelExportService';
 import type { BenefitType } from '@/types/social-benefits';
 import type { ProvisionRecord, PeriodOption } from '@/services/ProvisionsService';
 
@@ -107,6 +107,10 @@ export const useSocialBenefitProvisions = () => {
   const totals = useMemo(() => {
     const list = provisions || [];
     const sum = (arr: ProvisionRecord[]) => arr.reduce((acc, r) => acc + (r.provision_amount || 0), 0);
+    
+    // Count unique employees instead of total records
+    const uniqueEmployees = new Set(list.map(r => r.employee_cedula)).size;
+    
     const byType = {
       cesantias: sum(list.filter((r) => r.benefit_type === 'cesantias')),
       intereses_cesantias: sum(list.filter((r) => r.benefit_type === 'intereses_cesantias')),
@@ -114,7 +118,7 @@ export const useSocialBenefitProvisions = () => {
       vacaciones: sum(list.filter((r) => r.benefit_type === 'vacaciones')),
     };
     return {
-      count: list.length,
+      count: uniqueEmployees,
       total: sum(list),
       byType,
     };
@@ -167,8 +171,8 @@ export const useSocialBenefitProvisions = () => {
     }
   }, [filters.periodId, refetch, toast]);
 
-  // Export CSV
-  const exportCSV = useCallback(() => {
+  // Export Excel instead of CSV
+  const exportExcel = useCallback(() => {
     const list = provisions || [];
     if (list.length === 0) {
       toast({
@@ -179,51 +183,40 @@ export const useSocialBenefitProvisions = () => {
       return;
     }
 
-    const headers = [
-      'period_name',
-      'employee_name',
-      'employee_cedula',
-      'benefit_type',
-      'days_count',
-      'base_salary',
-      'variable_average',
-      'transport_allowance',
-      'other_included',
-      'provision_amount',
-      'calculation_method',
-      'source',
-    ];
+    const formattedData = list.map((r) => ({
+      'Período': r.period_name,
+      'Empleado': r.employee_name,
+      'Cédula': r.employee_cedula ?? '',
+      'Tipo de Beneficio': r.benefit_type,
+      'Días': r.days_count,
+      'Salario Base': r.base_salary,
+      'Promedio Variable': r.variable_average,
+      'Auxilio Transporte': r.transport_allowance,
+      'Otros Incluidos': r.other_included,
+      'Valor Provisionado': r.provision_amount,
+      'Método Cálculo': r.calculation_method ?? '',
+      'Origen': r.source ?? '',
+    }));
 
-    const rows = list.map((r) => ([
-      r.period_name,
-      r.employee_name,
-      r.employee_cedula ?? '',
-      r.benefit_type,
-      r.days_count,
-      r.base_salary,
-      r.variable_average,
-      r.transport_allowance,
-      r.other_included,
-      r.provision_amount,
-      r.calculation_method ?? '',
-      r.source ?? '',
-    ]));
-
-    const csv = [
-      headers.join(','),
-      ...rows.map((row) => row.map((v) => {
-        const s = String(v ?? '');
-        return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-      }).join(',')),
-    ].join('\n');
-
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `provisiones_${filters.periodId}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    try {
+      ExcelExportService.exportToExcel(
+        formattedData,
+        `provisiones_${filters.periodId}`,
+        'Provisiones'
+      );
+      
+      toast({
+        title: 'Exportación exitosa',
+        description: 'Las provisiones han sido exportadas a Excel.',
+      });
+    } catch (error) {
+      console.error('Error exportando a Excel:', error);
+      toast({
+        title: 'Error al exportar',
+        description: 'No se pudo exportar el archivo de Excel.',
+        variant: 'destructive',
+      });
+    }
   }, [provisions, filters.periodId, toast]);
 
   const setPeriodId = (periodId: string) => setFilters((prev) => ({ ...prev, periodId }));
@@ -248,7 +241,7 @@ export const useSocialBenefitProvisions = () => {
     paginated,
     recalculateCurrentPeriod,
     recalculating,
-    exportCSV,
+    exportExcel,
     refetch,
   };
 };

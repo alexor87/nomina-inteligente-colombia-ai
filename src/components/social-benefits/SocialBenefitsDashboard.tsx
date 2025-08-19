@@ -1,21 +1,10 @@
 
 import React from 'react';
-import { ProvisionsTable } from './ProvisionsTable';
-import { SummaryCards } from './SummaryCards';
-import { ProvisionModeIndicator } from './ProvisionModeIndicator';
 import { useSocialBenefitProvisions } from '@/hooks/useSocialBenefitProvisions';
-import { useProvisionMode } from '@/hooks/useProvisionMode';
-import { useCurrentCompany } from '@/hooks/useCurrentCompany';
+import { ProvisionsTable } from './ProvisionsTable';
+import { ProvisionsSummary } from './ProvisionsSummary';
 
-const DASHBOARD_CONTENT = {
-  title: 'Provisiones de Prestaciones Sociales',
-  description: 'Gestiona y consulta las provisiones de cesantías, prima de servicios e intereses',
-};
-
-export const SocialBenefitsDashboard = () => {
-  const { companyId } = useCurrentCompany();
-  const { provisionMode, loadingSettings } = useProvisionMode(companyId);
-
+export const SocialBenefitsDashboard: React.FC = () => {
   const {
     periods,
     loadingPeriods,
@@ -34,29 +23,13 @@ export const SocialBenefitsDashboard = () => {
     paginated,
     recalculateCurrentPeriod,
     recalculating,
-    exportCSV,
+    exportExcel, // Changed from exportCSV to exportExcel
     refetch,
   } = useSocialBenefitProvisions();
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h2 className="text-2xl font-bold">{DASHBOARD_CONTENT.title}</h2>
-        <p className="text-muted-foreground">{DASHBOARD_CONTENT.description}</p>
-      </div>
-      
-      {/* Provision Mode Indicator */}
-      <ProvisionModeIndicator
-        provisionMode={provisionMode}
-        loadingSettings={loadingSettings}
-        onConsolidated={refetch}
-      />
-
-      {/* Summary Cards */}
-      <SummaryCards totals={totals} />
-
-      {/* Provisions Table */}
+      <ProvisionsSummary totals={totals} />
       <ProvisionsTable
         periods={periods}
         loadingPeriods={loadingPeriods}
@@ -74,8 +47,7 @@ export const SocialBenefitsDashboard = () => {
         totalPages={totalPages}
         recalculateCurrentPeriod={recalculateCurrentPeriod}
         recalculating={recalculating}
-        exportCSV={exportCSV}
-        showConsolidateButton={provisionMode === 'monthly_consolidation'}
+        exportExcel={exportExcel} // Changed from exportCSV to exportExcel
       />
     </div>
   );
