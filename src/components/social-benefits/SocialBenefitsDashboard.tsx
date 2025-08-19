@@ -41,18 +41,17 @@ export const SocialBenefitsDashboard = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">{DASHBOARD_CONTENT.title}</h2>
-          <p className="text-muted-foreground">{DASHBOARD_CONTENT.description}</p>
-        </div>
-        
-        <ProvisionModeIndicator
-          provisionMode={provisionMode}
-          loadingSettings={loadingSettings}
-          onConsolidated={refetch}
-        />
+      <div>
+        <h2 className="text-2xl font-bold">{DASHBOARD_CONTENT.title}</h2>
+        <p className="text-muted-foreground">{DASHBOARD_CONTENT.description}</p>
       </div>
+      
+      {/* Provision Mode Indicator */}
+      <ProvisionModeIndicator
+        provisionMode={provisionMode}
+        loadingSettings={loadingSettings}
+        onConsolidated={refetch}
+      />
 
       {/* Summary Cards */}
       <SummaryCards totals={totals} />
