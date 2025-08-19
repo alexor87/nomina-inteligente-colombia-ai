@@ -26,7 +26,7 @@ export const ProvisionsExplorer: React.FC = () => {
     paginated,
     recalculateCurrentPeriod,
     recalculating,
-    exportCSV,
+    exportExcel,
   } = useSocialBenefitProvisions();
 
   if (loadingPeriods) {
@@ -66,7 +66,7 @@ export const ProvisionsExplorer: React.FC = () => {
             onSearchChange={setSearch}
             onRecalculate={recalculateCurrentPeriod}
             recalculating={recalculating}
-            onExport={exportCSV}
+            onExport={exportExcel}
           />
 
           <ProvisionsSummary totals={totals} />
@@ -88,7 +88,7 @@ export const ProvisionsExplorer: React.FC = () => {
             totalPages={totalPages}
             recalculateCurrentPeriod={recalculateCurrentPeriod}
             recalculating={recalculating}
-            exportCSV={exportCSV}
+            exportExcel={exportExcel}
           />
         </CardContent>
       </Card>
