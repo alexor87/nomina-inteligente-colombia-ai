@@ -1,3 +1,4 @@
+
 export type BenefitType = 'cesantias' | 'intereses_cesantias' | 'prima' | 'vacaciones';
 
 export interface CalculateBenefitPayload {
@@ -5,6 +6,7 @@ export interface CalculateBenefitPayload {
   benefitType: BenefitType;
   periodStart: string; // YYYY-MM-DD
   periodEnd: string;   // YYYY-MM-DD
+  periodId?: string;   // Optional: to get tipo_periodo for interest calculations
   notes?: string;
   save?: boolean;
 }
@@ -29,4 +31,4 @@ export interface BenefitCalculationSaved {
 export type BenefitCalculationResponse =
   | BenefitCalculationPreview
   | BenefitCalculationSaved
-  | { success: false; error: string; details?: any };
+  | { success: false; error: string; details?: any; message?: string };

@@ -13,9 +13,10 @@ export const useSocialBenefits = () => {
     employeeId: string,
     benefitType: BenefitType,
     periodStart: string,
-    periodEnd: string
+    periodEnd: string,
+    periodId?: string
   ) => {
-    console.log('🔍 Calculating preview for:', { employeeId, benefitType, periodStart, periodEnd });
+    console.log('🔍 Calculating preview for:', { employeeId, benefitType, periodStart, periodEnd, periodId });
     
     setIsCalculating(true);
     try {
@@ -23,16 +24,26 @@ export const useSocialBenefits = () => {
         employeeId,
         benefitType,
         periodStart,
-        periodEnd
+        periodEnd,
+        periodId
       });
 
       console.log('📊 Preview result:', result);
       setPreviewResult(result);
 
       if (!result.success) {
+        let description = 'error' in result ? result.error : "No se pudo calcular la prestación";
+        
+        // 🔧 NEW: Enhanced error messages for missing cesantías
+        if (result.error === 'MISSING_CESANTIAS_PERIOD') {
+          description = result.message || 'Falta la cesantía del período. Primero calcúlala/guárdala.';
+        } else if (result.error === 'UNSUPPORTED_PERIODICITY') {
+          description = result.details || 'Periodicidad no soportada para cálculo de intereses';
+        }
+        
         toast({
           title: "Error en el cálculo",
-          description: 'error' in result ? result.error : "No se pudo calcular la prestación",
+          description,
           variant: "destructive"
         });
       }
@@ -56,9 +67,10 @@ export const useSocialBenefits = () => {
     benefitType: BenefitType,
     periodStart: string,
     periodEnd: string,
-    notes?: string
+    notes?: string,
+    periodId?: string
   ) => {
-    console.log('💾 Calculating and saving:', { employeeId, benefitType, periodStart, periodEnd, notes });
+    console.log('💾 Calculating and saving:', { employeeId, benefitType, periodStart, periodEnd, notes, periodId });
     
     setIsCalculating(true);
     try {
@@ -67,7 +79,8 @@ export const useSocialBenefits = () => {
         benefitType,
         periodStart,
         periodEnd,
-        notes
+        notes,
+        periodId
       });
 
       console.log('✅ Save result:', result);
@@ -80,9 +93,16 @@ export const useSocialBenefits = () => {
         });
         setPreviewResult(null); // Limpiar preview después de guardar
       } else {
+        let description = 'error' in result ? result.error : "No se pudo guardar el cálculo";
+        
+        // 🔧 NEW: Enhanced error messages for missing cesantías
+        if (result.error === 'MISSING_CESANTIAS_PERIOD') {
+          description = result.message || 'Falta la cesantía del período. Primero calcúlala/guárdala.';
+        }
+        
         toast({
           title: "Error al guardar",
-          description: 'error' in result ? result.error : "No se pudo guardar el cálculo",
+          description,
           variant: "destructive"
         });
       }

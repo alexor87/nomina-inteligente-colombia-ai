@@ -16,7 +16,7 @@ export class SocialBenefitsService {
     return data!;
   }
 
-  static async calculateAndSave(payload: Omit<CalculateBenefitPayload, 'save'> & { notes?: string }): Promise<BenefitCalculationResponse> {
+  static async calculateAndSave(payload: Omit<CalculateBenefitPayload, 'save'> & { notes?: string; periodId?: string }): Promise<BenefitCalculationResponse> {
     console.log('💾 SocialBenefitsService.calculateAndSave payload:', payload);
     const { data, error } = await supabase.functions.invoke<BenefitCalculationResponse>('calculate-social-benefits', {
       body: { ...payload, save: true }
