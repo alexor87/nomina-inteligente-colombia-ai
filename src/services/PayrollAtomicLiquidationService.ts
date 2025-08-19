@@ -1,5 +1,4 @@
 import { supabase } from '@/integrations/supabase/client';
-import type { PayrollSummary } from '@/types/payroll';
 
 export interface AtomicTransaction {
   id: string;
@@ -41,9 +40,6 @@ export interface LiquidationResult {
   vouchersGenerated: number;
   employeesProcessed: number;
   periodClosed: boolean;
-  // ✅ NUEVO: propiedades opcionales esperadas por usePayrollUnified
-  message?: string;
-  summary?: PayrollSummary;
 }
 
 /**
@@ -153,16 +149,6 @@ export class PayrollAtomicLiquidationService {
 
       console.log(`✅ [ATOMIC-${transactionId}] LIQUIDACIÓN COMPLETADA EXITOSAMENTE`);
 
-      // ✅ Construir un resumen compatible para el hook (tipado de forma segura)
-      const computedSummary = ({
-        totalEmployees: calculationResult.employeesProcessed,
-        totalGrossPay: calculationResult.totalDevengado,
-        totalDeductions: calculationResult.totalDeducciones,
-        totalNetPay: calculationResult.totalNeto,
-        employerContributions: 0,
-        totalPayrollCost: (calculationResult.totalDevengado || 0) + 0
-      } as unknown) as PayrollSummary;
-
       return {
         success: true,
         transactionId,
@@ -171,9 +157,7 @@ export class PayrollAtomicLiquidationService {
         rollbackPerformed: false,
         vouchersGenerated: options.generateVouchers ? calculationResult.employeesProcessed : 0,
         employeesProcessed: calculationResult.employeesProcessed,
-        periodClosed: true,
-        message: 'Liquidación exitosa',
-        summary: computedSummary
+        periodClosed: true
       };
 
     } catch (error: any) {
@@ -195,8 +179,7 @@ export class PayrollAtomicLiquidationService {
         rollbackPerformed: rollbackResult.success,
         vouchersGenerated: 0,
         employeesProcessed: 0,
-        periodClosed: false,
-        message: error.message
+        periodClosed: false
       };
     } finally {
       this.activeTransactions.delete(transactionId);

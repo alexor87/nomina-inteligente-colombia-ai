@@ -52,7 +52,7 @@ export const PayrollSuccessModal: React.FC<PayrollSuccessModalProps> = ({
           <div className="bg-gray-50 p-4 rounded-lg space-y-2">
             <div className="flex justify-between">
               <span className="text-gray-600">Empleados procesados:</span>
-              <span className="font-medium">{summary.totalEmployees}</span>
+              <span className="font-medium">{summary.employeesCount}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Total devengado:</span>

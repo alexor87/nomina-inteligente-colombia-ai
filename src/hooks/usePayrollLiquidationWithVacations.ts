@@ -10,12 +10,9 @@ export const usePayrollLiquidationWithVacations = (companyId: string) => {
   const [conflictDetectionStep, setConflictDetectionStep] = useState<'idle' | 'detecting' | 'resolving' | 'completed'>('idle');
   const { toast } = useToast();
 
-  const payrollHook = usePayrollUnified();
+  const payrollHook = usePayrollUnified(companyId);
   const conflictHook = useVacationConflictDetection();
   const integrationHook = useVacationIntegration();
-
-  // Mock employees state since usePayrollUnified doesn't have it
-  const [employees, setEmployees] = useState<any[]>([]);
 
   // ✅ NUEVO: Método principal con integración automática completa
   const loadEmployeesWithConflictDetection = useCallback(async (
@@ -33,7 +30,7 @@ export const usePayrollLiquidationWithVacations = (companyId: string) => {
           companyId,
           startDate,
           endDate,
-          payrollHook.currentPeriod?.id
+          payrollHook.currentPeriodId
         );
       } catch (conflictError) {
         console.warn('⚠️ Conflict detection failed, continuing without conflict check:', conflictError);
@@ -64,11 +61,8 @@ export const usePayrollLiquidationWithVacations = (companyId: string) => {
       // 3. Si no hay conflictos, proceder con integración automática
       setConflictDetectionStep('completed');
       
-      // ✅ Mock employee loading since usePayrollUnified doesn't have loadEmployees
-      setEmployees([
-        { id: '1', name: 'Employee 1' },
-        { id: '2', name: 'Employee 2' }
-      ]);
+      // ✅ USAR EL NUEVO MÉTODO CON INTEGRACIÓN AUTOMÁTICA
+      await payrollHook.loadEmployees(startDate, endDate);
       
       console.log('✅ Employees loaded successfully with vacation integration');
       
@@ -87,10 +81,7 @@ export const usePayrollLiquidationWithVacations = (companyId: string) => {
       // En caso de error, intentar cargar empleados sin detección de conflictos
       try {
         console.log('🔄 Fallback: Loading employees without conflict detection...');
-        setEmployees([
-          { id: '1', name: 'Employee 1' },
-          { id: '2', name: 'Employee 2' }
-        ]);
+        await payrollHook.loadEmployees(startDate, endDate);
         
         toast({
           title: "⚠️ Carga con Advertencia",
@@ -105,7 +96,7 @@ export const usePayrollLiquidationWithVacations = (companyId: string) => {
         throw error;
       }
     }
-  }, [companyId, payrollHook.currentPeriod?.id, conflictHook, integrationHook, toast]);
+  }, [companyId, payrollHook, conflictHook, integrationHook, toast]);
 
   // Método para resolver conflictos y continuar con la carga
   const resolveConflictsAndContinue = useCallback(async (
@@ -126,10 +117,7 @@ export const usePayrollLiquidationWithVacations = (companyId: string) => {
 
       // 2. Continuar con la carga de empleados + integración automática
       setConflictDetectionStep('completed');
-      setEmployees([
-        { id: '1', name: 'Employee 1' },
-        { id: '2', name: 'Employee 2' }
-      ]);
+      await payrollHook.loadEmployees(startDate, endDate);
 
       toast({
         title: "✅ Liquidación Lista",
@@ -143,7 +131,7 @@ export const usePayrollLiquidationWithVacations = (companyId: string) => {
       setConflictDetectionStep('idle');
       throw error;
     }
-  }, [conflictHook, toast]);
+  }, [conflictHook, payrollHook, toast]);
 
   // Cancelar resolución de conflictos
   const cancelConflictResolution = useCallback(() => {
@@ -160,7 +148,6 @@ export const usePayrollLiquidationWithVacations = (companyId: string) => {
   return {
     // Estado del proceso de liquidación extendido (incluye modal de éxito)
     ...payrollHook,
-    employees,
     
     // Estado de detección de conflictos
     conflictDetectionStep,
@@ -180,7 +167,7 @@ export const usePayrollLiquidationWithVacations = (companyId: string) => {
     resetConflictDetection,
     
     // Estados calculados
-    canProceedWithLiquidation: conflictDetectionStep === 'completed' && employees.length > 0,
+    canProceedWithLiquidation: conflictDetectionStep === 'completed' && payrollHook.employees.length > 0,
     needsConflictResolution: conflictDetectionStep === 'resolving' && conflictHook.hasConflicts,
     isLoadingWithConflicts: conflictDetectionStep === 'detecting' || conflictHook.isDetecting || integrationHook.isProcessing
   };

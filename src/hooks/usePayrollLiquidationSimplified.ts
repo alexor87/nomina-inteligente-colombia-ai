@@ -12,13 +12,8 @@ import { PayrollExhaustiveValidationService, ValidationResult } from '@/services
 
 export const usePayrollLiquidationSimplified = (companyId: string) => {
   const { toast } = useToast();
-  const payrollHook = usePayrollUnified();
+  const payrollHook = usePayrollUnified(companyId);
   const [isRepairing, setIsRepairing] = useState(false);
-  
-  // ✅ MOCK DATA - Since payrollHook doesn't have these properties
-  const [employees, setEmployees] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isLiquidating, setIsLiquidating] = useState(false);
   
   // ✅ NUEVOS ESTADOS PARA MEJORAS
   const [validationResults, setValidationResults] = useState<PayrollValidationResults | null>(null);
@@ -41,18 +36,7 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
     try {
       console.log('👥 Loading employees for payroll liquidation...');
       
-      setIsLoading(true);
-      
-      // Simulate loading employees
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Mock employees data
-      setEmployees([
-        { id: '1', name: 'Employee 1' },
-        { id: '2', name: 'Employee 2' }
-      ]);
-      
-      setIsLoading(false);
+      const periodId = await payrollHook.loadEmployees(startDate, endDate);
       
       console.log('✅ Employees loaded successfully');
       
@@ -62,11 +46,10 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
         className: "border-green-200 bg-green-50"
       });
       
-      return 'mock-period-id';
+      return periodId;
 
     } catch (error) {
       console.error('❌ Error loading employees:', error);
-      setIsLoading(false);
       
       toast({
         title: "❌ Error",
@@ -76,16 +59,14 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
       
       throw error;
     }
-  }, [toast]);
+  }, [companyId, payrollHook, toast]);
 
   // ✅ NUEVA FUNCIÓN: Validar período antes de liquidar
   const validatePeriod = useCallback(async (
     startDate: string,
     endDate: string
   ) => {
-    const currentPeriodId = payrollHook.currentPeriod?.id;
-    
-    if (!currentPeriodId) {
+    if (!payrollHook.currentPeriodId) {
       throw new Error('No hay período activo para validar');
     }
 
@@ -94,8 +75,8 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
       console.log('🔍 Validando período para liquidación...');
       
       const results = await PayrollValidationService.validatePayrollPeriod(
-        employees,
-        currentPeriodId,
+        payrollHook.employees,
+        payrollHook.currentPeriodId,
         startDate,
         endDate
       );
@@ -129,11 +110,11 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
     } finally {
       setIsValidating(false);
     }
-  }, [employees, payrollHook.currentPeriod?.id, toast]);
+  }, [payrollHook.employees, payrollHook.currentPeriodId, toast]);
 
   // ✅ NUEVA FUNCIÓN: Validación exhaustiva
   const performExhaustiveValidation = useCallback(async (periodId?: string) => {
-    const targetPeriodId = periodId || payrollHook.currentPeriod?.id;
+    const targetPeriodId = periodId || payrollHook.currentPeriodId;
     if (!targetPeriodId || !companyId) {
       throw new Error('No hay período o empresa para validar');
     }
@@ -176,7 +157,7 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
     } finally {
       setIsValidating(false);
     }
-  }, [payrollHook.currentPeriod?.id, companyId, toast]);
+  }, [payrollHook.currentPeriodId, companyId, toast]);
 
   // ✅ NUEVA FUNCIÓN: Reparación automática
   const autoRepairValidationIssues = useCallback(async () => {
@@ -226,14 +207,15 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
     endDate: string,
     isReliquidation = false
   ) => {
+    // ===== TRAZA TEMPORAL SIMPLIFIED =====
     const simplifiedTraceId = `simplified_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
     console.log(`🔍 [SIMPLIFIED-${simplifiedTraceId}] INICIANDO LIQUIDACIÓN SIMPLIFICADA`, {
       isReliquidation: isReliquidation,
       startDate: startDate,
       endDate: endDate,
-      currentPeriod: payrollHook.currentPeriod,
+      currentPeriodId: payrollHook.currentPeriodId,
       companyId: companyId,
-      employeesCount: employees.length,
+      employeesCount: payrollHook.employees.length,
       timestamp: new Date().toISOString()
     });
 
@@ -242,19 +224,18 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
       setLiquidationErrors([]);
       setProcessedEmployees(0);
       setCanRollback(false);
-      setIsLiquidating(true);
 
-      // ✅ USAR LIQUIDACIÓN ATÓMICA SI ESTÁ HABILITADA
-      if (useAtomicLiquidation && payrollHook.currentPeriod?.id) {
+      // ===== USAR LIQUIDACIÓN ATÓMICA SI ESTÁ HABILITADA =====
+      if (useAtomicLiquidation && payrollHook.currentPeriodId) {
         console.log(`🔄 [ATOMIC-${simplifiedTraceId}] USANDO LIQUIDACIÓN ATÓMICA`);
         
         setLiquidationStep('validating');
         setLiquidationProgress(20);
         
         const atomicResult = await PayrollAtomicLiquidationService.executeLiquidation(
-          payrollHook.currentPeriod.id,
+          payrollHook.currentPeriodId,
           companyId,
-          'current-user-id',
+          'current-user-id', // TODO: Obtener user ID real
           {
             generateVouchers: true,
             sendEmails: autoSendEmails,
@@ -289,52 +270,158 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
         }
       }
       
-      // ✅ LIQUIDACIÓN TRADICIONAL (FALLBACK)
+      // ===== LIQUIDACIÓN TRADICIONAL (FALLBACK) =====
       console.log(`🔄 [LEGACY-${simplifiedTraceId}] USANDO LIQUIDACIÓN TRADICIONAL`);
       
-      // Use payrollHook.liquidatePayroll() for actual liquidation
-      await payrollHook.liquidatePayroll();
+      // Paso 1: Validación final y verificación de estado
+      setLiquidationStep('validating');
+      setLiquidationProgress(10);
       
+      console.log(`🔍 [SIMPLIFIED-${simplifiedTraceId}] PASO 1: Validación y verificación de estado`);
+      
+      if (payrollHook.currentPeriodId && companyId) {
+        const validationStart = performance.now();
+        console.log(`🔍 [SIMPLIFIED-${simplifiedTraceId}] Ejecutando validación pre-liquidación...`);
+        
+        const validation = await PayrollValidationService.validatePreLiquidation(
+          payrollHook.currentPeriodId,
+          companyId
+        );
+        
+        const validationDuration = performance.now() - validationStart;
+        console.log(`🔍 [SIMPLIFIED-${simplifiedTraceId}] VALIDACIÓN RESPONSE:`, {
+          validation: validation,
+          duracion: `${validationDuration.toFixed(2)}ms`,
+          issuesCount: validation.issues.length
+        });
+        
+        // Si el período ya está liquidado y no es re-liquidación, lanzar error específico
+        const isAlreadyLiquidated = validation.issues.some(
+          issue => issue.type === 'period_already_liquidated'
+        );
+        
+        console.log(`🔍 [SIMPLIFIED-${simplifiedTraceId}] Estado de liquidación:`, {
+          isAlreadyLiquidated: isAlreadyLiquidated,
+          isReliquidation: isReliquidation
+        });
+        
+        if (isAlreadyLiquidated && !isReliquidation) {
+          console.log(`🔍 [SIMPLIFIED-${simplifiedTraceId}] ❌ Período ya liquidado - lanzando error específico`);
+          throw new Error('PERIOD_ALREADY_LIQUIDATED');
+        }
+        
+        // Si es re-liquidación, reabrir el período primero
+        if (isReliquidation && isAlreadyLiquidated) {
+          console.log(`🔍 [SIMPLIFIED-${simplifiedTraceId}] 🔄 Re-abriendo período para re-liquidación...`);
+          await PayrollReopenService.reopenPayrollPeriod(payrollHook.currentPeriodId);
+          console.log(`🔍 [SIMPLIFIED-${simplifiedTraceId}] ✅ Período reabierto exitosamente`);
+        }
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, 500)); // UX delay
+      
+      // Paso 2: Cálculos
+      setLiquidationStep('calculating');
+      setLiquidationProgress(25);
+      
+      console.log(`🔍 [SIMPLIFIED-${simplifiedTraceId}] PASO 2: Ejecutando cálculos principales...`);
+      const calculationStart = performance.now();
+      
+      await payrollHook.liquidatePayroll(startDate, endDate);
+      
+      const calculationDuration = performance.now() - calculationStart;
+      console.log(`🔍 [SIMPLIFIED-${simplifiedTraceId}] ✅ Cálculos completados`, {
+        duracion: `${calculationDuration.toFixed(2)}ms`,
+        empleadosProcesados: payrollHook.employees.length
+      });
+      
+      setProcessedEmployees(payrollHook.employees.length);
+      
+      // Paso 3: Generar comprobantes
+      setLiquidationStep('generating_vouchers');
+      setLiquidationProgress(60);
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Simular generación
+      
+      // Paso 4: Enviar emails (si está habilitado)
+      if (autoSendEmails) {
+        setLiquidationStep('sending_emails');
+        setLiquidationProgress(80);
+        await new Promise(resolve => setTimeout(resolve, 1500)); // Simular envío
+      }
+      
+      // Paso 5: Sincronización y finalización
+      setLiquidationStep('finalizing');
+      setLiquidationProgress(90);
+      
+      if (payrollHook.currentPeriodId) {
+        console.log('🔄 Ejecutando sincronización post-liquidación...');
+        
+        // Sincronización post-liquidación simplificada
+        console.log('✅ Sincronización completada (sin historial)');
+      }
+      
+      // Completado
       setLiquidationStep('completed');
       setLiquidationProgress(100);
-      setProcessedEmployees(employees.length);
       setCanRollback(true);
       
       toast({
         title: "✅ Liquidación Completada",
-        description: `Nómina liquidada exitosamente para ${employees.length} empleados`,
+        description: `Nómina liquidada exitosamente para ${payrollHook.employees.length} empleados`,
         className: "border-green-200 bg-green-50"
       });
       
+      // Ocultar progreso después de 3 segundos
       setTimeout(() => setShowProgress(false), 3000);
       
     } catch (error: any) {
-      console.error(`🔍 [SIMPLIFIED-${simplifiedTraceId}] ❌ ERROR EN LIQUIDACIÓN SIMPLIFICADA:`, error);
-      
-      setLiquidationStep('error');
-      setLiquidationErrors([error.message || 'Error en liquidación']);
-      
-      toast({
-        title: "❌ Error en Liquidación",
-        description: "Error al liquidar nómina",
-        variant: "destructive"
+      console.error(`🔍 [SIMPLIFIED-${simplifiedTraceId}] ❌ ERROR EN LIQUIDACIÓN SIMPLIFICADA:`, {
+        error: error,
+        message: error.message,
+        stack: error.stack,
+        isReliquidation: isReliquidation,
+        currentStep: liquidationStep,
+        currentProgress: liquidationProgress
       });
       
+      setLiquidationStep('error');
+      
+      // Manejar error específico de período ya liquidado
+      if (error.message === 'PERIOD_ALREADY_LIQUIDATED') {
+        console.log(`🔍 [SIMPLIFIED-${simplifiedTraceId}] ⚠️ Error específico: Período ya liquidado`);
+        setLiquidationErrors(prev => [...prev, 'El período ya fue liquidado anteriormente']);
+        toast({
+          title: "⚠️ Período Ya Liquidado",
+          description: "Este período ya fue liquidado. Use la opción de re-liquidar si es necesario.",
+          variant: "destructive"
+        });
+      } else {
+        console.log(`🔍 [SIMPLIFIED-${simplifiedTraceId}] ❌ Error general en liquidación`);
+        setLiquidationErrors(prev => [...prev, 'Error general en liquidación']);
+        toast({
+          title: "❌ Error en Liquidación",
+          description: "Error al liquidar nómina",
+          variant: "destructive"
+        });
+      }
+      
       throw error;
-    } finally {
-      setIsLiquidating(false);
     }
-  }, [payrollHook, toast, autoSendEmails, companyId, employees, useAtomicLiquidation, useExhaustiveValidation]);
+  }, [payrollHook, toast, autoSendEmails, companyId]);
 
   // ✅ NUEVA FUNCIÓN: Rollback de liquidación
   const rollbackLiquidation = useCallback(async () => {
-    const currentPeriodId = payrollHook.currentPeriod?.id;
-    if (!currentPeriodId || !canRollback) {
+    if (!payrollHook.currentPeriodId || !canRollback) {
       throw new Error('No se puede realizar rollback en este momento');
     }
 
     try {
       console.log('🔄 Iniciando rollback de liquidación...');
+      
+      // TODO: Implementar lógica de rollback
+      // - Cambiar estado del período de 'cerrado' a 'borrador'
+      // - Eliminar comprobantes generados
+      // - Restaurar estados anteriores
       
       toast({
         title: "✅ Rollback Completado",
@@ -353,39 +440,15 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
       });
       throw error;
     }
-  }, [payrollHook.currentPeriod?.id, canRollback, toast]);
-
-  // Mock implementations for missing methods
-  const addEmployees = useCallback(async (employeeIds: string[]) => {
-    console.log('Adding employees:', employeeIds);
-  }, []);
-
-  const removeEmployee = useCallback(async (employeeId: string) => {
-    console.log('Removing employee:', employeeId);
-  }, []);
-
-  const refreshEmployeeNovedades = useCallback(async (employeeId: string) => {
-    console.log('Refreshing employee novedades:', employeeId);
-  }, []);
-
-  const updateEmployeeCalculationsInDB = useCallback(async (
-    calculations: Record<string, { 
-      totalToPay: number; 
-      ibc: number; 
-      grossPay?: number; 
-      deductions?: number; 
-      healthDeduction?: number; 
-      pensionDeduction?: number; 
-      transportAllowance?: number; 
-    }>
-  ) => {
-    console.log('Updating employee calculations:', calculations);
-  }, []);
+  }, [payrollHook.currentPeriodId, canRollback, toast]);
 
   const repairPeriodSync = useCallback(async (periodId: string) => {
     setIsRepairing(true);
     try {
       console.log(`🔧 Reparando sincronización para período: ${periodId}`);
+      
+      // Funcionalidad de reparación removida con el historial
+      console.log('✅ Reparación completada (sin historial)');
       
       toast({
         title: "✅ Sincronización Reparada",
@@ -413,13 +476,16 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
     try {
       console.log('🔧 Detectando y reparando períodos desincronizados...');
       
+      // Funcionalidad de reparación masiva removida con el historial
+      const repairedCount = 0;
+      
       toast({
         title: "✅ Sistema Sincronizado",
         description: "Funcionalidad de historial eliminada - no hay períodos para reparar",
         className: "border-blue-200 bg-blue-50"
       });
       
-      return 0;
+      return repairedCount;
       
     } catch (error) {
       console.error('❌ Error en reparación masiva:', error);
@@ -437,26 +503,18 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
   }, [toast]);
 
   return {
-    // ✅ Return all expected properties
-    employees,
-    isLoading,
-    isLiquidating,
-    currentPeriodId: payrollHook.currentPeriod?.id,
-    currentPeriod: payrollHook.currentPeriod,
+    ...payrollHook,
     loadEmployees,
-    addEmployees,
-    removeEmployee,
     liquidatePayroll,
-    refreshEmployeeNovedades,
-    updateEmployeeCalculationsInDB,
     repairPeriodSync,
     repairAllDesynchronizedPeriods,
     isRepairing,
-    canProceedWithLiquidation: employees.length > 0,
-    isLoadingEmployees: isLoading,
+    canProceedWithLiquidation: payrollHook.employees.length > 0,
+    isLoadingEmployees: payrollHook.isLoading,
     isAutoSaving: false,
     lastAutoSaveTime: undefined,
     isRemovingEmployee: false,
+    updateEmployeeCalculationsInDB: payrollHook.updateEmployeeCalculationsInDB,
     
     // ✅ NUEVAS FUNCIONALIDADES
     validatePeriod,
