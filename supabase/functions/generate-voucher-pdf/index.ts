@@ -221,175 +221,154 @@ serve(async (req) => {
 async function generateProfessionalVoucherPDF(payrollData: any): Promise<Uint8Array> {
   // Importar jsPDF dinámicamente
   const jsPDF = (await import('https://esm.sh/jspdf@2.5.1')).default;
-
   const doc = new (jsPDF as any)();
-  
+
   // Configuración inicial
   const pageWidth = doc.internal.pageSize.width;
   const pageHeight = doc.internal.pageSize.height;
   const margin = 20;
   let yPos = margin;
 
-  // Datos normalizados para mejor renderizado
+  // Datos normalizados
   const employee = payrollData.employees;
   const period = payrollData.payroll_periods_real;
   const company = payrollData.companies;
 
-  // CORRECCIÓN: Usar datos reales de la base de datos
+  // Datos numéricos
   const salarioBase = Number(employee.salario_base) || 0;
   const diasTrabajados = Number(payrollData.dias_trabajados) || 15;
   const totalDevengado = Number(payrollData.total_devengado) || 0;
   const totalDeducciones = Number(payrollData.total_deducciones) || 0;
   const netoPagado = Number(payrollData.neto_pagado) || 0;
   const horasExtra = Number(payrollData.horas_extra) || 0;
-  
-  // Cálculos auxiliares
+
+  // Cálculos auxiliares (sin cambios funcionales)
   const salarioProporcional = Math.round((salarioBase * diasTrabajados) / 30);
   const valorHoraExtra = Math.round((salarioBase / 240) * 1.25);
   const totalHorasExtra = horasExtra > 0 ? horasExtra * valorHoraExtra : 0;
-  
-  // === HEADER PRINCIPAL ===
-  doc.setFillColor(41, 128, 185);
-  doc.rect(0, 0, pageWidth, 35, 'F');
-  
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(16);
-  doc.setFont('helvetica', 'bold');
-  
-  // Título normalizado sin acentos
-  const titleText = normalizeText('COMPROBANTE DE NOMINA');
-  doc.text(titleText, pageWidth / 2, 15, { align: 'center' });
-  
-  doc.setFontSize(12);
-  const companyText = normalizeText(company.razon_social || 'Mi Empresa');
-  doc.text(companyText, pageWidth / 2, 25, { align: 'center' });
-  
-  yPos = 45;
 
-  // === INFORMACIÓN BÁSICA ===
+  // Utilidades de dibujo minimalista
+  const drawSeparator = (y: number) => {
+    doc.setLineWidth(0.2);
+    doc.setDrawColor(0, 0, 0); // Negro
+    doc.line(margin, y, pageWidth - margin, y);
+  };
+
+  const sectionTitle = (text: string) => {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text(normalizeText(text), margin, yPos);
+    yPos += 6;
+    drawSeparator(yPos);
+    yPos += 8;
+  };
+
+  // Header simple (sin colores)
   doc.setTextColor(0, 0, 0);
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-
-  // Empleado
   doc.setFont('helvetica', 'bold');
+  doc.setFontSize(16);
+  doc.text(normalizeText('COMPROBANTE DE NOMINA'), pageWidth / 2, yPos, { align: 'center' });
+  yPos += 8;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(11);
+  doc.text(normalizeText(company?.razon_social || 'Mi Empresa'), pageWidth / 2, yPos, { align: 'center' });
+  yPos += 10;
+  drawSeparator(yPos);
+  yPos += 12;
+
+  // Información básica
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
   doc.text(normalizeText('EMPLEADO:'), margin, yPos);
   doc.setFont('helvetica', 'normal');
-  const employeeName = normalizeText(`${employee.nombre} ${employee.apellido || ''}`.trim());
-  doc.text(employeeName, margin + 35, yPos);
+  doc.text(normalizeText(`${employee.nombre} ${employee.apellido || ''}`.trim()), margin + 35, yPos);
   yPos += 7;
 
-  // Documento
   doc.setFont('helvetica', 'bold');
   doc.text(normalizeText('CEDULA:'), margin, yPos);
   doc.setFont('helvetica', 'normal');
   doc.text(employee.cedula || 'N/A', margin + 35, yPos);
   yPos += 7;
 
-  // Período
   doc.setFont('helvetica', 'bold');
   doc.text(normalizeText('PERIODO:'), margin, yPos);
   doc.setFont('helvetica', 'normal');
-  const periodText = normalizeText(period.periodo || 'N/A');
-  doc.text(periodText, margin + 35, yPos);
-  yPos += 10;
+  doc.text(normalizeText(period?.periodo || 'N/A'), margin + 35, yPos);
+  yPos += 12;
 
-  // === SECCIÓN DATOS DE PAGO (CORREGIDA) ===
-  yPos += 5;
-  
-  // Header de datos de pago
-  doc.setFillColor(52, 152, 219);
-  doc.rect(margin, yPos - 5, pageWidth - (margin * 2), 12, 'F');
-  
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(11);
-  doc.setFont('helvetica', 'bold');
-  const datosTitle = normalizeText('DATOS DE PAGO');
-  doc.text(datosTitle, margin + 5, yPos + 2);
-  
-  yPos += 15;
-  doc.setTextColor(0, 0, 0);
+  drawSeparator(yPos);
+  yPos += 12;
+
+  // Sección: Datos de pago
+  sectionTitle('DATOS DE PAGO');
+
+  const lineHeight = 8;
+
+  // Columna izquierda
+  let leftY = yPos;
   doc.setFontSize(9);
 
-  // CORRECCIÓN: Ajustar posiciones Y para evitar solapamiento
-  const lineHeight = 8; // Aumentado de 6 a 8 para más separación
-  
-  // Columna izquierda - Conceptos base
-  let leftColumnY = yPos;
-  
   doc.setFont('helvetica', 'bold');
-  doc.text(normalizeText('Salario Base:'), margin, leftColumnY);
+  doc.text(normalizeText('Salario Base:'), margin, leftY);
   doc.setFont('helvetica', 'normal');
-  doc.text(formatCurrency(salarioBase), margin + 50, leftColumnY);
-  leftColumnY += lineHeight;
+  doc.text(formatCurrency(salarioBase), margin + 50, leftY);
+  leftY += lineHeight;
 
   doc.setFont('helvetica', 'bold');
-  doc.text(normalizeText('Dias Trabajados:'), margin, leftColumnY);
+  doc.text(normalizeText('Dias Trabajados:'), margin, leftY);
   doc.setFont('helvetica', 'normal');
-  doc.text(diasTrabajados.toString(), margin + 50, leftColumnY);
-  leftColumnY += lineHeight;
+  doc.text(String(diasTrabajados), margin + 50, leftY);
+  leftY += lineHeight;
 
   doc.setFont('helvetica', 'bold');
-  doc.text(normalizeText('Salario Proporcional:'), margin, leftColumnY);
+  doc.text(normalizeText('Salario Proporcional:'), margin, leftY);
   doc.setFont('helvetica', 'normal');
-  doc.text(formatCurrency(salarioProporcional), margin + 50, leftColumnY);
-  leftColumnY += lineHeight;
+  doc.text(formatCurrency(salarioProporcional), margin + 50, leftY);
+  leftY += lineHeight;
 
-  // Horas extra solo si existen
   if (totalHorasExtra > 0) {
     doc.setFont('helvetica', 'bold');
-    doc.text(normalizeText('Horas Extra (' + horasExtra + '):'), margin, leftColumnY);
+    doc.text(normalizeText(`Horas Extra (${horasExtra}):`), margin, leftY);
     doc.setFont('helvetica', 'normal');
-    doc.text(formatCurrency(totalHorasExtra), margin + 50, leftColumnY);
-    leftColumnY += lineHeight;
+    doc.text(formatCurrency(totalHorasExtra), margin + 50, leftY);
+    leftY += lineHeight;
   }
 
-  // Columna derecha - Deducciones y neto (CORREGIDA)
-  let rightColumnY = yPos;
-  const rightColumnX = pageWidth / 2 + 10; // Más separación entre columnas
-  
+  // Columna derecha
+  let rightY = yPos;
+  const rightX = pageWidth / 2 + 10;
+
   doc.setFont('helvetica', 'bold');
-  doc.text(normalizeText('Total Devengado:'), rightColumnX, rightColumnY);
+  doc.text(normalizeText('Total Devengado:'), rightX, rightY);
   doc.setFont('helvetica', 'normal');
-  doc.text(formatCurrency(totalDevengado), rightColumnX + 50, rightColumnY);
-  rightColumnY += lineHeight;
+  doc.text(formatCurrency(totalDevengado), rightX + 50, rightY);
+  rightY += lineHeight;
 
   doc.setFont('helvetica', 'bold');
-  doc.text(normalizeText('Total Deducciones:'), rightColumnX, rightColumnY);
+  doc.text(normalizeText('Total Deducciones:'), rightX, rightY);
   doc.setFont('helvetica', 'normal');
-  doc.text(formatCurrency(totalDeducciones), rightColumnX + 50, rightColumnY);
-  rightColumnY += lineHeight;
+  doc.text(formatCurrency(totalDeducciones), rightX + 50, rightY);
+  rightY += lineHeight;
 
-  // NETO A PAGAR - destacado
-  rightColumnY += 3; // Espacio extra antes del neto
-  doc.setFillColor(46, 204, 113);
-  doc.rect(rightColumnX - 2, rightColumnY - 4, 85, 10, 'F');
-  
-  doc.setTextColor(255, 255, 255);
+  // Neto a pagar (tipografía solo, sin fondo)
+  rightY += 2;
   doc.setFont('helvetica', 'bold');
-  doc.text(normalizeText('NETO A PAGAR:'), rightColumnX, rightColumnY);
-  doc.text(formatCurrency(netoPagado), rightColumnX + 50, rightColumnY);
+  doc.setFontSize(11);
+  doc.text(normalizeText('NETO A PAGAR:'), rightX, rightY);
+  doc.text(formatCurrency(netoPagado), rightX + 50, rightY);
 
-  // Actualizar yPos para siguiente sección
-  yPos = Math.max(leftColumnY, rightColumnY) + 20;
+  yPos = Math.max(leftY, rightY) + 14;
+  drawSeparator(yPos);
+  yPos += 12;
 
-  // === SECCIÓN DEDUCCIONES DETALLADAS ===
+  // Sección: Deducciones
   if (totalDeducciones > 0) {
-    doc.setTextColor(0, 0, 0);
-    doc.setFillColor(231, 76, 60);
-    doc.rect(margin, yPos - 5, pageWidth - (margin * 2), 12, 'F');
-    
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    const deduccionesTitle = normalizeText('DEDUCCIONES');
-    doc.text(deduccionesTitle, margin + 5, yPos + 2);
-    
-    yPos += 15;
-    doc.setTextColor(0, 0, 0);
+    sectionTitle('DEDUCCIONES');
+
+    doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
 
-    // Deducciones calculadas
     const saludEmpleado = Math.round(salarioBase * 0.04);
     const pensionEmpleado = Math.round(salarioBase * 0.04);
 
@@ -397,41 +376,37 @@ async function generateProfessionalVoucherPDF(payrollData: any): Promise<Uint8Ar
     doc.text(normalizeText('Salud (4%):'), margin, yPos);
     doc.setFont('helvetica', 'normal');
     doc.text(formatCurrency(saludEmpleado), margin + 40, yPos);
-    yPos += 8;
+    yPos += lineHeight;
 
     doc.setFont('helvetica', 'bold');
     doc.text(normalizeText('Pension (4%):'), margin, yPos);
     doc.setFont('helvetica', 'normal');
     doc.text(formatCurrency(pensionEmpleado), margin + 40, yPos);
-    yPos += 8;
+    yPos += lineHeight;
 
     doc.setFont('helvetica', 'bold');
     doc.text(normalizeText('TOTAL:'), margin, yPos);
-    doc.setFont('helvetica', 'bold');
     doc.text(formatCurrency(totalDeducciones), margin + 40, yPos);
-    yPos += 15;
+    yPos += 14;
+
+    drawSeparator(yPos);
+    yPos += 10;
   }
 
-  // === FOOTER PROFESIONAL ===
-  const footerY = pageHeight - 40;
-  
-  doc.setFillColor(44, 62, 80);
-  doc.rect(0, footerY - 5, pageWidth, 50, 'F');
-  
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(8);
+  // Footer sobrio (sin bloques de color)
+  const footerY = pageHeight - 35;
+  if (yPos < footerY - 10) {
+    drawSeparator(footerY - 8);
+  }
   doc.setFont('helvetica', 'normal');
-  
-  const fechaGeneracion = new Date().toLocaleDateString('es-CO');
-  const footerText1 = normalizeText('Generado: ' + fechaGeneracion);
-  const footerText2 = normalizeText('Software de Nomina Profesional - Finppi');
-  const footerText3 = normalizeText('Este comprobante es valido sin firma autografa');
-  
-  doc.text(footerText1, pageWidth / 2, footerY + 5, { align: 'center' });
-  doc.text(footerText2, pageWidth / 2, footerY + 12, { align: 'center' });
-  doc.text(footerText3, pageWidth / 2, footerY + 19, { align: 'center' });
+  doc.setFontSize(8);
 
-  // Generar PDF
+  const fechaGeneracion = new Date().toLocaleDateString('es-CO');
+  doc.text(normalizeText('Generado: ' + fechaGeneracion), pageWidth / 2, footerY, { align: 'center' });
+  doc.text(normalizeText('Software de Nomina Profesional - Finppi'), pageWidth / 2, footerY + 7, { align: 'center' });
+  doc.text(normalizeText('Este comprobante es valido sin firma autografa'), pageWidth / 2, footerY + 14, { align: 'center' });
+
+  // Salida PDF
   const pdfOutput = doc.output('arraybuffer');
   return new Uint8Array(pdfOutput);
 }
