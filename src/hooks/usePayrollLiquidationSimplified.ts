@@ -12,7 +12,7 @@ import { PayrollExhaustiveValidationService, ValidationResult } from '@/services
 
 export const usePayrollLiquidationSimplified = (companyId: string) => {
   const { toast } = useToast();
-  const payrollHook = usePayrollUnified(); // ✅ No arguments needed
+  const payrollHook = usePayrollUnified();
   const [isRepairing, setIsRepairing] = useState(false);
   
   // ✅ MOCK DATA - Since payrollHook doesn't have these properties
@@ -41,7 +41,6 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
     try {
       console.log('👥 Loading employees for payroll liquidation...');
       
-      // Mock implementation - replace with actual logic
       setIsLoading(true);
       
       // Simulate loading employees
@@ -84,7 +83,7 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
     startDate: string,
     endDate: string
   ) => {
-    const currentPeriodId = payrollHook.currentPeriod?.id; // ✅ Fixed property access
+    const currentPeriodId = payrollHook.currentPeriod?.id;
     
     if (!currentPeriodId) {
       throw new Error('No hay período activo para validar');
@@ -134,7 +133,7 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
 
   // ✅ NUEVA FUNCIÓN: Validación exhaustiva
   const performExhaustiveValidation = useCallback(async (periodId?: string) => {
-    const targetPeriodId = periodId || payrollHook.currentPeriod?.id; // ✅ Fixed property access
+    const targetPeriodId = periodId || payrollHook.currentPeriod?.id;
     if (!targetPeriodId || !companyId) {
       throw new Error('No hay período o empresa para validar');
     }
@@ -294,7 +293,7 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
       console.log(`🔄 [LEGACY-${simplifiedTraceId}] USANDO LIQUIDACIÓN TRADICIONAL`);
       
       // Use payrollHook.liquidatePayroll() for actual liquidation
-      await payrollHook.liquidatePayroll(); // ✅ No arguments needed
+      await payrollHook.liquidatePayroll();
       
       setLiquidationStep('completed');
       setLiquidationProgress(100);
@@ -369,8 +368,18 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
     console.log('Refreshing employee novedades:', employeeId);
   }, []);
 
-  const updateEmployeeCalculationsInDB = useCallback(async (employeeId: string, calculations: any) => {
-    console.log('Updating employee calculations:', employeeId, calculations);
+  const updateEmployeeCalculationsInDB = useCallback(async (
+    calculations: Record<string, { 
+      totalToPay: number; 
+      ibc: number; 
+      grossPay?: number; 
+      deductions?: number; 
+      healthDeduction?: number; 
+      pensionDeduction?: number; 
+      transportAllowance?: number; 
+    }>
+  ) => {
+    console.log('Updating employee calculations:', calculations);
   }, []);
 
   const repairPeriodSync = useCallback(async (periodId: string) => {

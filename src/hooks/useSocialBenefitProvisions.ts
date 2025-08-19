@@ -21,11 +21,10 @@ export interface ProvisionRecord {
   id: string;
   company_id: string;
   employee_id: string;
-  period_id: string;
-  benefit_type: BenefitType;
-  amount: number;
   period_start: string;
   period_end: string;
+  benefit_type: BenefitType;
+  amount: number;
   estado: string;
   employee_name: string;
   employee_cedula: string;
@@ -37,6 +36,7 @@ export interface ProvisionRecord {
   employee?: {
     nombre: string;
     apellido: string;
+    cedula: string;
   };
 }
 
@@ -105,7 +105,6 @@ export const useSocialBenefitProvisions = () => {
           id,
           company_id,
           employee_id,
-          period_id,
           benefit_type,
           amount,
           period_start,
@@ -144,9 +143,22 @@ export const useSocialBenefitProvisions = () => {
       
       // Transform to expected format
       return (data || []).map(item => ({
-        ...item,
+        id: item.id,
+        company_id: item.company_id,
+        employee_id: item.employee_id,
+        period_start: item.period_start,
+        period_end: item.period_end,
+        benefit_type: item.benefit_type,
+        amount: item.amount,
+        estado: item.estado,
+        created_at: item.created_at,
+        updated_at: item.updated_at,
+        notes: item.notes,
+        calculation_basis: item.calculation_basis,
+        calculated_values: item.calculated_values,
         employee_name: item.employee ? `${item.employee.nombre} ${item.employee.apellido}` : '',
-        employee_cedula: item.employee?.cedula || ''
+        employee_cedula: item.employee?.cedula || '',
+        employee: item.employee
       })) as ProvisionRecord[];
     },
     enabled: !!companyId

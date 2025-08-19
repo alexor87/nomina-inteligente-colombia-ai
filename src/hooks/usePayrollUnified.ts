@@ -1,9 +1,10 @@
+
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useCurrentCompany } from '@/hooks/useCurrentCompany';
 import { PayrollDomainService } from '@/services/PayrollDomainService';
-import { AtomicLiquidationService } from '@/services/AtomicLiquidationService';
+import { PayrollAtomicLiquidationService } from '@/services/PayrollAtomicLiquidationService';
 import type { PayrollSummary } from '@/types/payroll';
 
 interface LiquidationResult {
@@ -119,13 +120,14 @@ export const usePayrollUnified = () => {
       console.log('🚀 Iniciando liquidación atómica para período:', currentPeriod.id);
 
       // Ejecutar liquidación atómica
-      const atomicResult = await AtomicLiquidationService.execute_atomic_liquidation(
+      const atomicResult = await PayrollAtomicLiquidationService.executeLiquidation(
         currentPeriod.id, 
-        companyId
+        companyId,
+        'current-user-id'
       );
 
       if (!atomicResult.success) {
-        throw new Error(atomicResult.message || 'Error en liquidación atómica');
+        throw new Error(atomicResult.error || 'Error en liquidación atómica');
       }
 
       console.log('✅ Liquidación atómica exitosa:', atomicResult.message);
@@ -138,7 +140,7 @@ export const usePayrollUnified = () => {
         success: true,
         periodId: currentPeriod.id,
         summary: atomicResult.summary,
-        message: atomicResult.message
+        message: atomicResult.message || 'Liquidación exitosa'
       };
 
       // Mostrar modal de éxito
