@@ -353,14 +353,9 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
                   </TableCell>
 
                   <TableCell className="text-right">
-                    <div className={`font-medium ${ibc !== employee.baseSalary ? 'text-blue-600' : 'text-gray-600'}`}>
+                    <div className="font-medium text-gray-600">
                       {formatCurrency(ibc)}
                     </div>
-                    {ibc !== employee.baseSalary && (
-                      <div className="text-xs text-blue-500">
-                        +{formatCurrency(ibc - employee.baseSalary)} constitutivo
-                      </div>
-                    )}
                   </TableCell>
                   
                   <TableCell className="text-center font-medium">
