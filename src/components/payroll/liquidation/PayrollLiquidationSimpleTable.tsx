@@ -13,7 +13,8 @@ import {
   AlertTriangle,
   CheckCircle,
   Clock,
-  DollarSign
+  DollarSign,
+  Loader2
 } from 'lucide-react';
 import { PayrollEmployee } from '@/types/payroll';
 import { EmployeeCalculationModal } from '../modals/EmployeeCalculationModal';
