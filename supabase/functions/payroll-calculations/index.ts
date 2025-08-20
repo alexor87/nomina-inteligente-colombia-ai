@@ -51,7 +51,9 @@ interface NovedadCalculationInput {
   salarioBase: number;
   horas?: number;
   dias?: number;
-  fechaPeriodo?: string; // 'YYYY-MM-DD'
+  valorManual?: number;
+  cuotas?: number;
+  fechaPeriodo?: string;
 }
 
 interface NovedadCalculationResult {
@@ -66,6 +68,34 @@ interface NovedadCalculationResult {
     ley: string;
     descripcion: string;
   };
+}
+
+// ✅ NUEVO: Cálculo de totales de novedades (centralizado profesional)
+interface NovedadesTotalsInput {
+  salarioBase: number;
+  fechaPeriodo?: string;
+  novedades: Array<{
+    tipo_novedad: string;
+    subtipo?: string;
+    valor?: number;
+    dias?: number;
+    horas?: number;
+    constitutivo_salario?: boolean;
+  }>;
+}
+
+interface NovedadesTotalsResult {
+  totalDevengos: number;
+  totalDeducciones: number;
+  totalNeto: number;
+  breakdown: Array<{
+    tipo_novedad: string;
+    subtipo?: string;
+    valorCalculado: number;
+    valorOriginal?: number;
+    esDevengo: boolean;
+    detalleCalculo?: string;
+  }>;
 }
 
 // ✅ NUEVA FUNCIÓN: Calcular valor de incapacidad según normativa colombiana
@@ -238,6 +268,143 @@ function getFactorRecargoBySubtype(subtipo: string | undefined, fecha: Date): { 
   return { factor: 0, porcentaje: '0%', normativa: 'Subtipo no reconocido' };
 }
 
+// ✅ NUEVA FUNCIÓN PROFESIONAL: Calcular totales de novedades centralizadamente
+function calculateNovedadesTotals(input: NovedadesTotalsInput): NovedadesTotalsResult {
+  const fecha = parseFecha(input.fechaPeriodo);
+  let totalDevengos = 0;
+  let totalDeducciones = 0;
+  const breakdown: NovedadesTotalsResult['breakdown'] = [];
+
+  console.log('📊 BACKEND: Calculando totales de novedades profesionales:', {
+    salarioBase: input.salarioBase,
+    fechaPeriodo: input.fechaPeriodo,
+    novedadesCount: input.novedades.length
+  });
+
+  for (const novedad of input.novedades) {
+    let valorCalculado = Number(novedad.valor || 0);
+    let detalleCalculo = 'Valor manual';
+    let esDevengo = true;
+
+    // ✅ CÁLCULO PROFESIONAL: Recalcular según normativa si es necesario
+    switch (novedad.tipo_novedad) {
+      case 'incapacidad': {
+        const dias = Number(novedad.dias || 0);
+        if (dias > 0) {
+          valorCalculado = Math.round(calculateIncapacityValue(
+            input.salarioBase,
+            dias,
+            novedad.subtipo || 'general'
+          ));
+          detalleCalculo = `Incapacidad ${novedad.subtipo || 'general'}: ${dias} días según normativa`;
+          console.log('🏥 BACKEND: Incapacidad calculada:', {
+            subtipo: novedad.subtipo,
+            dias,
+            valorCalculado
+          });
+        }
+        esDevengo = true;
+        break;
+      }
+      
+      case 'horas_extra': {
+        const horas = Number(novedad.horas || 0);
+        if (horas > 0) {
+          const factor = getFactorHorasExtra(novedad.subtipo);
+          const baseHora = calcularValorHoraExtraBase(input.salarioBase, fecha);
+          valorCalculado = Math.round(baseHora * factor * horas);
+          detalleCalculo = `Horas extra ${novedad.subtipo || 'diurnas'}: ${horas}h × ${factor}`;
+          console.log('⏰ BACKEND: Horas extra calculadas:', {
+            subtipo: novedad.subtipo,
+            horas,
+            factor,
+            valorCalculado
+          });
+        }
+        esDevengo = true;
+        break;
+      }
+      
+      case 'recargo_nocturno': {
+        const horas = Number(novedad.horas || 0);
+        if (horas > 0) {
+          const { factor, porcentaje } = getFactorRecargoBySubtype(novedad.subtipo, fecha);
+          const divisor = 30 * 7.333;
+          const valorHora = input.salarioBase / divisor;
+          valorCalculado = Math.round(valorHora * factor * horas);
+          detalleCalculo = `Recargo ${novedad.subtipo || 'nocturno'}: ${horas}h × ${porcentaje}`;
+          console.log('🌙 BACKEND: Recargo calculado:', {
+            subtipo: novedad.subtipo,
+            horas,
+            factor,
+            valorCalculado
+          });
+        }
+        esDevengo = true;
+        break;
+      }
+      
+      case 'vacaciones':
+      case 'licencia_remunerada':
+      case 'bonificacion':
+      case 'comision':
+      case 'prima':
+      case 'otros_ingresos':
+        esDevengo = true;
+        break;
+        
+      case 'salud':
+      case 'pension':
+      case 'fondo_solidaridad':
+      case 'retencion_fuente':
+      case 'libranza':
+      case 'ausencia':
+      case 'multa':
+      case 'descuento_voluntario':
+      case 'licencia_no_remunerada':
+        esDevengo = false;
+        break;
+        
+      default:
+        console.warn('⚠️ BACKEND: Tipo de novedad no clasificado:', novedad.tipo_novedad);
+        esDevengo = true;
+    }
+
+    // Acumular en el total correspondiente
+    if (esDevengo) {
+      totalDevengos += valorCalculado;
+    } else {
+      totalDeducciones += Math.abs(valorCalculado);
+    }
+
+    // Agregar al breakdown
+    breakdown.push({
+      tipo_novedad: novedad.tipo_novedad,
+      subtipo: novedad.subtipo,
+      valorCalculado,
+      valorOriginal: novedad.valor,
+      esDevengo,
+      detalleCalculo
+    });
+  }
+
+  const totalNeto = totalDevengos - totalDeducciones;
+
+  console.log('✅ BACKEND: Totales calculados profesionalmente:', {
+    totalDevengos,
+    totalDeducciones,
+    totalNeto,
+    itemsProcessed: breakdown.length
+  });
+
+  return {
+    totalDevengos: Math.round(totalDevengos),
+    totalDeducciones: Math.round(totalDeducciones),
+    totalNeto: Math.round(totalNeto),
+    breakdown
+  };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -247,7 +414,32 @@ serve(async (req) => {
     const { action, data } = await req.json();
     console.log('📊 Payroll calculation request:', { action, data });
 
-    // ✅ NUEVO HANDLER: cálculo individual de novedad (para horas extra, recargos, incapacidad)
+    // ✅ NUEVO HANDLER PROFESIONAL: cálculo centralizado de totales de novedades
+    if (action === 'calculate-novedades-totals') {
+      const input = data as NovedadesTotalsInput;
+      
+      if (!input.salarioBase || input.salarioBase <= 0) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Salario base inválido' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+        );
+      }
+
+      const result = calculateNovedadesTotals(input);
+      
+      console.log('✅ BACKEND: Totales de novedades calculados:', {
+        totalDevengos: result.totalDevengos,
+        totalDeducciones: result.totalDeducciones,
+        totalNeto: result.totalNeto
+      });
+
+      return new Response(
+        JSON.stringify({ success: true, data: result }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // ✅ HANDLER EXISTENTE: cálculo individual de novedad (para horas extra, recargos, incapacidad)
     if (action === 'calculate-novedad') {
       const input = data as NovedadCalculationInput;
       const fecha = parseFecha(input.fechaPeriodo);

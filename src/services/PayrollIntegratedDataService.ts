@@ -1,7 +1,7 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { DisplayNovedad, convertNovedadToDisplay } from '@/types/vacation-integration';
 import { NovedadesEnhancedService } from './NovedadesEnhancedService';
-import { IncapacityCalculationService } from './IncapacityCalculationService';
 
 export class PayrollIntegratedDataService {
   static async getEmployeePeriodData(
@@ -9,7 +9,7 @@ export class PayrollIntegratedDataService {
     periodId: string
   ): Promise<DisplayNovedad[]> {
     try {
-      console.log('🔍 PayrollIntegratedDataService - Obteniendo datos unificados (solo novedades):', {
+      console.log('🔍 PayrollIntegratedDataService - PROFESSIONAL: Obteniendo datos unificados (solo novedades):', {
         employeeId,
         periodId
       });
@@ -25,58 +25,24 @@ export class PayrollIntegratedDataService {
         return [];
       }
 
-      const { data: employee } = await supabase
-        .from('employees')
-        .select('salario_base')
-        .eq('id', employeeId)
-        .single();
-
-      const employeeSalary = employee?.salario_base || 0;
-
+      // ✅ PROFESSIONAL: Obtener novedades sin estimaciones locales
       const novedadesData = await NovedadesEnhancedService.getNovedadesByEmployee(
         employeeId,
         periodId
       );
 
+      // ✅ PROFESSIONAL: No más estimaciones locales - el backend maneja todo
       const displayData: DisplayNovedad[] = novedadesData.map(novedad => {
         return convertNovedadToDisplay(novedad);
       });
 
-      // Usar servicio centralizado para estimar valor de incapacidad solo para mostrar en UI
-      const enhancedData: DisplayNovedad[] = displayData.map(item => {
-        if (item.tipo_novedad === 'incapacidad') {
-          const dias = Number(item.dias || 0);
-          const valorActual = Number(item.valor || 0);
-
-          if (dias > 0 && valorActual === 0 && employeeSalary > 0) {
-            const calculated = IncapacityCalculationService.computeIncapacityValue(
-              employeeSalary,
-              dias,
-              item.subtipo
-            );
-            if (calculated > 0) {
-              console.log('🩺 UI: Valor de incapacidad estimado para mostrar (centralizado):', {
-                id: item.id,
-                dias,
-                subtipo: item.subtipo,
-                salario: employeeSalary,
-                calculated
-              });
-              return { ...item, valor: calculated };
-            }
-          }
-        }
-        return item;
-      });
-
-      const sortedData = enhancedData.sort((a, b) =>
+      const sortedData = displayData.sort((a, b) =>
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
 
-      console.log('✅ PayrollIntegratedDataService - Datos unificados obtenidos:', {
+      console.log('✅ PayrollIntegratedDataService - PROFESSIONAL: Datos unificados obtenidos (backend calculations):', {
         totalElementos: sortedData.length,
-        novedades: sortedData.filter(item => item.origen === 'novedades').length,
-        ausenciasFragmentadas: sortedData.filter(item => item.origen === 'vacaciones').length
+        novedades: sortedData.filter(item => item.origen === 'novedades').length
       });
 
       return sortedData;

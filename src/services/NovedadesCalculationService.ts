@@ -1,12 +1,40 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollNovedad } from '@/types/novedades-enhanced';
-import { IncapacityCalculationService } from './IncapacityCalculationService';
 
 export interface NovedadesTotals {
   totalDevengos: number;
   totalDeducciones: number;
   totalNeto: number;
   hasNovedades: boolean;
+}
+
+// ✅ NUEVO: Interface para el backend profesional
+interface BackendNovedadesTotalsInput {
+  salarioBase: number;
+  fechaPeriodo?: string;
+  novedades: Array<{
+    tipo_novedad: string;
+    subtipo?: string;
+    valor?: number;
+    dias?: number;
+    horas?: number;
+    constitutivo_salario?: boolean;
+  }>;
+}
+
+interface BackendNovedadesTotalsResult {
+  totalDevengos: number;
+  totalDeducciones: number;
+  totalNeto: number;
+  breakdown: Array<{
+    tipo_novedad: string;
+    subtipo?: string;
+    valorCalculado: number;
+    valorOriginal?: number;
+    esDevengo: boolean;
+    detalleCalculo?: string;
+  }>;
 }
 
 const cache = new Map<string, NovedadesTotals>();
@@ -27,9 +55,9 @@ class NovedadesCalculationServiceClass {
     }
   }
 
-  // Nuevo: obtener salario base para poder estimar incapacidades con valor 0
+  // ✅ REFACTORED: Obtener salario base del empleado
   private async getEmployeeSalary(employeeId: string): Promise<number> {
-    console.log('🔎 Fetching employee salary for incapacity estimation:', employeeId);
+    console.log('🔎 Fetching employee salary for backend calculation:', employeeId);
     const { data, error } = await supabase
       .from('employees')
       .select('salario_base')
@@ -37,7 +65,7 @@ class NovedadesCalculationServiceClass {
       .single();
 
     if (error) {
-      console.warn('⚠️ Could not fetch employee salary, incapacity estimation may be skipped:', error);
+      console.warn('⚠️ Could not fetch employee salary:', error);
       return 0;
     }
 
@@ -46,6 +74,23 @@ class NovedadesCalculationServiceClass {
     return salary;
   }
 
+  // ✅ REFACTORED: Obtener fecha del período
+  private async getPeriodDate(periodId: string): Promise<string | undefined> {
+    const { data, error } = await supabase
+      .from('payroll_periods_real')
+      .select('fecha_inicio')
+      .eq('id', periodId)
+      .single();
+
+    if (error || !data) {
+      console.warn('⚠️ Could not fetch period date:', error);
+      return undefined;
+    }
+
+    return data.fecha_inicio;
+  }
+
+  // ✅ PROFESIONAL: Calcular totales usando backend centralizado
   async calculateEmployeeNovedadesTotals(employeeId: string, periodId: string): Promise<NovedadesTotals> {
     const cacheKey = this.generateCacheKey(employeeId, periodId);
 
@@ -55,76 +100,84 @@ class NovedadesCalculationServiceClass {
     }
 
     try {
-      console.log(`🧮 Calculating novedades totals for employee ${employeeId} in period ${periodId}`);
-      const novedades = await this.getEmployeeNovedades(employeeId, periodId);
+      console.log(`🧮 PROFESSIONAL: Calculating novedades totals via backend for employee ${employeeId} in period ${periodId}`);
+      
+      // Obtener datos necesarios
+      const [employeeSalary, fechaPeriodo, novedades] = await Promise.all([
+        this.getEmployeeSalary(employeeId),
+        this.getPeriodDate(periodId),
+        this.getEmployeeNovedades(employeeId, periodId)
+      ]);
 
-      let totalDevengos = 0;
-      let totalDeducciones = 0;
+      if (employeeSalary <= 0) {
+        console.warn('⚠️ Invalid employee salary, returning zeros');
+        return {
+          totalDevengos: 0,
+          totalDeducciones: 0,
+          totalNeto: 0,
+          hasNovedades: false
+        };
+      }
 
-      // Obtener salario una sola vez para posibles estimaciones de incapacidad
-      const employeeSalary = await this.getEmployeeSalary(employeeId);
+      // ✅ BACKEND CALL: Usar el endpoint profesional
+      const backendInput: BackendNovedadesTotalsInput = {
+        salarioBase: employeeSalary,
+        fechaPeriodo,
+        novedades: novedades.map(novedad => ({
+          tipo_novedad: novedad.tipo_novedad,
+          subtipo: novedad.subtipo,
+          valor: novedad.valor,
+          dias: (novedad as any).dias,
+          horas: (novedad as any).horas,
+          constitutivo_salario: novedad.tipo_novedad === 'horas_extra' // Simplificado
+        }))
+      };
 
-      novedades.forEach(novedad => {
-        let valor = Number(novedad.valor);
-        if (isNaN(valor)) valor = 0;
+      console.log('📞 BACKEND CALL: Calling professional calculation service:', {
+        employeeId,
+        salarioBase: backendInput.salarioBase,
+        novedadesCount: backendInput.novedades.length
+      });
 
-        // Estimación normativa: si es incapacidad y el valor almacenado es 0, intentar calcular
-        if (novedad.tipo_novedad === 'incapacidad' && valor === 0) {
-          const dias = Number((novedad as any).dias || 0);
-          const subtipo = (novedad as any).subtipo as string | undefined;
-
-          if (employeeSalary > 0 && dias > 0) {
-            const estimated = IncapacityCalculationService.computeIncapacityValue(employeeSalary, dias, subtipo);
-            if (estimated > 0) {
-              console.log('🩺 Estimating incapacity value for totals (UI only):', {
-                employeeId,
-                periodId,
-                dias,
-                subtipo,
-                employeeSalary,
-                estimated
-              });
-              valor = estimated; // solo para sumar en UI, no persiste
-            }
-          }
-        }
-
-        switch (novedad.tipo_novedad) {
-          case 'horas_extra':
-          case 'recargo_nocturno':
-          case 'vacaciones':
-          case 'licencia_remunerada':
-          case 'licencia_no_remunerada':
-          case 'incapacidad':
-          case 'bonificacion':
-          case 'comision':
-          case 'prima':
-          case 'otros_ingresos':
-            totalDevengos += valor;
-            break;
-          case 'salud':
-          case 'pension':
-          case 'fondo_solidaridad':
-          case 'retencion_fuente':
-          case 'libranza':
-          case 'ausencia':
-          case 'multa':
-          case 'descuento_voluntario':
-            totalDeducciones += valor;
-            break;
-          default:
-            console.warn(`⚠️ Unknown novedad type: ${novedad.tipo_novedad}`);
+      const { data: backendResponse, error: backendError } = await supabase.functions.invoke('payroll-calculations', {
+        body: {
+          action: 'calculate-novedades-totals',
+          data: backendInput
         }
       });
 
-      const totalNeto = totalDevengos - totalDeducciones;
-      const hasNovedades = novedades.length > 0;
-      const totals: NovedadesTotals = { totalDevengos, totalDeducciones, totalNeto, hasNovedades };
+      if (backendError) {
+        console.error('❌ Backend calculation error:', backendError);
+        throw new Error('Error en el cálculo backend de novedades');
+      }
+
+      if (!backendResponse.success) {
+        throw new Error(backendResponse.error || 'Error desconocido en cálculo backend');
+      }
+
+      const backendResult = backendResponse.data as BackendNovedadesTotalsResult;
+      
+      const totals: NovedadesTotals = {
+        totalDevengos: backendResult.totalDevengos,
+        totalDeducciones: backendResult.totalDeducciones,
+        totalNeto: backendResult.totalNeto,
+        hasNovedades: novedades.length > 0
+      };
+
+      console.log('✅ PROFESSIONAL: Backend totals calculated:', {
+        employeeId,
+        totalDevengos: totals.totalDevengos,
+        totalDeducciones: totals.totalDeducciones,
+        totalNeto: totals.totalNeto,
+        hasNovedades: totals.hasNovedades,
+        breakdownItems: backendResult.breakdown.length
+      });
 
       cache.set(cacheKey, totals);
       return totals;
+
     } catch (error) {
-      console.error('❌ Error calculating employee novedades totals:', error);
+      console.error('❌ Error calculating employee novedades totals via backend:', error);
       return {
         totalDevengos: 0,
         totalDeducciones: 0,
@@ -142,14 +195,15 @@ class NovedadesCalculationServiceClass {
       return totals;
     }
 
-    console.log(`📊 Calculating novedades totals for ${employeeIds.length} employees in period ${periodId}`);
+    console.log(`📊 PROFESSIONAL: Calculating novedades totals via backend for ${employeeIds.length} employees in period ${periodId}`);
 
+    // ✅ PROFESIONAL: Usar backend para cada empleado
     for (const employeeId of employeeIds) {
       try {
         const employeeTotals = await this.calculateEmployeeNovedadesTotals(employeeId, periodId);
         totals[employeeId] = employeeTotals;
       } catch (error) {
-        console.error(`❌ Error calculating totals for employee ${employeeId}:`, error);
+        console.error(`❌ Error calculating backend totals for employee ${employeeId}:`, error);
         totals[employeeId] = {
           totalDevengos: 0,
           totalDeducciones: 0,
@@ -171,7 +225,6 @@ class NovedadesCalculationServiceClass {
     try {
       console.log(`📋 Fetching novedades for employee ${employeeId} in period ${periodId}`);
       
-      // ✅ FIXED: Use correct table name 'payroll_novedades'
       const { data, error } = await supabase
         .from('payroll_novedades')
         .select('*')
