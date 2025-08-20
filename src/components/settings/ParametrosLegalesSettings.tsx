@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { ConfigurationService, PayrollConfiguration } from '@/services/ConfigurationService';
-import { CompanySettingsService } from '@/services/CompanySettingsService';
+import { CompanyPayrollPoliciesService } from '@/services/CompanyPayrollPoliciesService';
 import { useCurrentCompany } from '@/hooks/useCurrentCompany';
 import { PayrollPoliciesSettings } from '@/components/settings/PayrollPoliciesSettings';
 import { Plus, Trash2, Copy } from 'lucide-react';
@@ -76,17 +76,17 @@ export const ParametrosLegalesSettings = () => {
     }
     
     try {
-      console.log('🔄 Loading company policies for companyId:', companyId);
-      const settings = await CompanySettingsService.getCompanySettings(companyId);
-      if (settings) {
-        console.log('✅ Loaded company settings:', settings);
-        setIncapacityPolicy(settings.incapacity_policy || 'standard_2d_100_rest_66');
+      console.log('🔄 Loading company payroll policies for companyId:', companyId);
+      const policies = await CompanyPayrollPoliciesService.getPayrollPolicies(companyId);
+      if (policies) {
+        console.log('✅ Loaded payroll policies:', policies);
+        setIncapacityPolicy(policies.incapacity_policy || 'standard_2d_100_rest_66');
       } else {
-        console.log('⚠️ No existing company settings found, using defaults');
+        console.log('⚠️ No existing payroll policies found, using defaults');
         setIncapacityPolicy('standard_2d_100_rest_66');
       }
     } catch (error) {
-      console.error('❌ Error loading company policies:', error);
+      console.error('❌ Error loading payroll policies:', error);
       toast({
         title: "Error",
         description: "No se pudieron cargar las políticas de la empresa",
@@ -257,28 +257,27 @@ export const ParametrosLegalesSettings = () => {
     try {
       console.log('💾 Saving incapacity policy:', incapacityPolicy);
       
-      // First, load existing company settings to preserve all current values
-      const existingSettings = await CompanySettingsService.getCompanySettings(companyId);
+      // Load existing policies to preserve other settings
+      const existingPolicies = await CompanyPayrollPoliciesService.getPayrollPolicies(companyId);
       
-      // Prepare settings object, preserving existing values or using sensible defaults
-      const settingsToSave = {
-        periodicity: existingSettings?.periodicity || 'mensual',
-        provision_mode: existingSettings?.provision_mode || 'on_liquidation',
-        custom_period_days: existingSettings?.custom_period_days,
-        incapacity_policy: incapacityPolicy // This is what we're actually updating
+      // Prepare the policies object, preserving existing values
+      const policiesToSave = {
+        ibc_mode: existingPolicies?.ibc_mode || 'proportional',
+        incapacity_policy: incapacityPolicy,
+        notes: existingPolicies?.notes || null
       };
 
-      console.log('📋 Settings to save:', settingsToSave);
+      console.log('📋 Policies to save:', policiesToSave);
 
-      await CompanySettingsService.upsertCompanySettings(companyId, settingsToSave);
+      await CompanyPayrollPoliciesService.upsertPayrollPolicies(companyId, policiesToSave);
 
-      console.log('✅ Company policies saved successfully');
+      console.log('✅ Company payroll policies saved successfully');
       toast({
         title: "Políticas de nómina guardadas",
         description: "Las políticas de cálculo han sido actualizadas correctamente.",
       });
     } catch (error) {
-      console.error('❌ Error saving company policies:', error);
+      console.error('❌ Error saving payroll policies:', error);
       toast({
         title: "Error",
         description: "No se pudieron guardar las políticas de nómina.",
