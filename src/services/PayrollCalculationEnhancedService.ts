@@ -7,7 +7,7 @@
 
 import { ConfigurationService, PayrollConfiguration } from './ConfigurationService';
 import { PayrollPeriodService } from './PayrollPeriodService';
-import { DeductionCalculationService } from './DeductionCalculationService';
+import { DeductionCalculationService, DeductionCalculationInput } from './DeductionCalculationService';
 import { getJornadaLegal, getHourlyDivisor, getJornadaTooltip } from '@/utils/jornadaLegal';
 
 export interface PayrollCalculationInputEnhanced {
@@ -226,14 +226,16 @@ export class PayrollCalculationEnhancedService {
     console.log(`🎯 CORRECCIÓN DEDUCCIONES - Período: ${input.periodType}, Salario original: $${input.baseSalary}, Salario para deducciones: $${salarioBaseParaDeducciones}`);
 
     // Calcular deducciones correctamente usando el salario proporcional
-    const deductionResult = await DeductionCalculationService.calculateDeductions({
+    const deductionInput: DeductionCalculationInput = {
       salarioBase: salarioBaseParaDeducciones,
       totalDevengado: grossPay,
       auxilioTransporte: transportAllowance,
       periodType: input.periodType,
       empleadoId: input.empleadoId,
       periodoId: input.periodoId
-    });
+    };
+
+    const deductionResult = DeductionCalculationService.calculateDeductions(deductionInput);
 
     // Neto pagado
     const netPay = grossPay - deductionResult.totalDeducciones;
