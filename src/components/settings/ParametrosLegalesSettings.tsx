@@ -6,12 +6,15 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { CompanySettingsService } from '@/services/CompanySettingsService';
 import { useCurrentCompany } from '@/hooks/useCurrentCompany';
-import { CompanySettings, CompanySettingsFormData } from '@/types/company-settings';
+import { CompanySettingsFormData } from '@/types/company-settings';
 import { PayrollPoliciesSettings } from '@/components/settings/PayrollPoliciesSettings';
-import { Loader2, Settings, Calculator, Clock, Building, CheckCircle } from 'lucide-react';
+import { YearConfigurationSettings } from '@/components/settings/YearConfigurationSettings';
+import { AportesSettings } from '@/components/settings/AportesSettings';
+import { Loader2, Settings, Calculator, Clock, Building, CheckCircle, Calendar, DollarSign } from 'lucide-react';
 
 export const ParametrosLegalesSettings = () => {
   const { companyId } = useCurrentCompany();
@@ -123,119 +126,151 @@ export const ParametrosLegalesSettings = () => {
         </div>
       </div>
 
-      {/* Payroll Configuration */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center space-x-2">
-            <Clock className="h-5 w-5" />
-            <CardTitle>Configuración de Nómina</CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <Label htmlFor="periodicity">Periodicidad de Nómina</Label>
-              <Select
-                value={settings.periodicity}
-                onValueChange={(value: 'semanal' | 'quincenal' | 'mensual') =>
-                  setSettings(prev => ({ ...prev, periodicity: value }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="semanal">Semanal</SelectItem>
-                  <SelectItem value="quincenal">Quincenal</SelectItem>
-                  <SelectItem value="mensual">Mensual</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-sm text-muted-foreground">
-                Define la frecuencia con la que se procesará la nómina
-              </p>
-            </div>
+      <Tabs defaultValue="general" className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="general" className="flex items-center gap-2">
+            <Clock className="h-4 w-4" />
+            General
+          </TabsTrigger>
+          <TabsTrigger value="years" className="flex items-center gap-2">
+            <Calendar className="h-4 w-4" />
+            Años
+          </TabsTrigger>
+          <TabsTrigger value="aportes" className="flex items-center gap-2">
+            <DollarSign className="h-4 w-4" />
+            Aportes
+          </TabsTrigger>
+          <TabsTrigger value="policies" className="flex items-center gap-2">
+            <Settings className="h-4 w-4" />
+            Políticas
+          </TabsTrigger>
+        </TabsList>
 
-            {settings.periodicity === 'mensual' && (
-              <div className="space-y-2">
-                <Label htmlFor="custom_period_days">Días por Período Personalizado</Label>
-                <Input
-                  id="custom_period_days"
-                  type="number"
-                  min="1"
-                  max="31"
-                  value={settings.custom_period_days || 30}
-                  onChange={(e) =>
-                    setSettings(prev => ({
-                      ...prev,
-                      custom_period_days: parseInt(e.target.value) || 30
-                    }))
-                  }
-                />
-                <p className="text-sm text-muted-foreground">
-                  Número de días que comprende cada período mensual
-                </p>
+        <TabsContent value="general" className="space-y-6">
+          {/* Payroll Configuration */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center space-x-2">
+                <Clock className="h-5 w-5" />
+                <CardTitle>Configuración de Nómina</CardTitle>
               </div>
-            )}
-          </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="periodicity">Periodicidad de Nómina</Label>
+                  <Select
+                    value={settings.periodicity}
+                    onValueChange={(value: 'semanal' | 'quincenal' | 'mensual') =>
+                      setSettings(prev => ({ ...prev, periodicity: value }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="semanal">Semanal</SelectItem>
+                      <SelectItem value="quincenal">Quincenal</SelectItem>
+                      <SelectItem value="mensual">Mensual</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-sm text-muted-foreground">
+                    Define la frecuencia con la que se procesará la nómina
+                  </p>
+                </div>
 
-          <Separator />
-
-          <div className="space-y-2">
-            <Label htmlFor="provision_mode">Modo de Cálculo de Provisiones</Label>
-            <Select
-              value={settings.provision_mode}
-              onValueChange={(value: 'on_liquidation' | 'monthly_consolidation') =>
-                setSettings(prev => ({ ...prev, provision_mode: value }))
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="on_liquidation">
-                  <div className="flex flex-col">
-                    <span>Al liquidar cada período</span>
-                    <span className="text-sm text-muted-foreground">Recomendado</span>
+                {settings.periodicity === 'mensual' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="custom_period_days">Días por Período Personalizado</Label>
+                    <Input
+                      id="custom_period_days"
+                      type="number"
+                      min="1"
+                      max="31"
+                      value={settings.custom_period_days || 30}
+                      onChange={(e) =>
+                        setSettings(prev => ({
+                          ...prev,
+                          custom_period_days: parseInt(e.target.value) || 30
+                        }))
+                      }
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      Número de días que comprende cada período mensual
+                    </p>
                   </div>
-                </SelectItem>
-                <SelectItem value="monthly_consolidation">
-                  <div className="flex flex-col">
-                    <span>Consolidado mensual únicamente</span>
-                    <span className="text-sm text-muted-foreground">Manual</span>
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            <div className="p-3 bg-blue-50 rounded-lg">
-              <p className="text-sm text-blue-800">
-                {settings.provision_mode === 'on_liquidation'
-                  ? '✅ Las provisiones (cesantías, intereses, prima, vacaciones) se calculan automáticamente al liquidar cada período de nómina'
-                  : '⚠️ Las provisiones solo se calculan mediante consolidado mensual manual. Requiere procesamiento adicional.'
-                }
-              </p>
-            </div>
-          </div>
+                )}
+              </div>
 
-          <div className="flex justify-end">
-            <Button onClick={handleSave} disabled={saving || loading}>
-              {saving ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Guardando...
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Guardar Configuración General
-                </>
-              )}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+              <Separator />
 
-      {/* Payroll Policies Section - Now manages its own state */}
-      <PayrollPoliciesSettings />
+              <div className="space-y-2">
+                <Label htmlFor="provision_mode">Modo de Cálculo de Provisiones</Label>
+                <Select
+                  value={settings.provision_mode}
+                  onValueChange={(value: 'on_liquidation' | 'monthly_consolidation') =>
+                    setSettings(prev => ({ ...prev, provision_mode: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="on_liquidation">
+                      <div className="flex flex-col">
+                        <span>Al liquidar cada período</span>
+                        <span className="text-sm text-muted-foreground">Recomendado</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="monthly_consolidation">
+                      <div className="flex flex-col">
+                        <span>Consolidado mensual únicamente</span>
+                        <span className="text-sm text-muted-foreground">Manual</span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <div className="p-3 bg-blue-50 rounded-lg">
+                  <p className="text-sm text-blue-800">
+                    {settings.provision_mode === 'on_liquidation'
+                      ? '✅ Las provisiones (cesantías, intereses, prima, vacaciones) se calculan automáticamente al liquidar cada período de nómina'
+                      : '⚠️ Las provisiones solo se calculan mediante consolidado mensual manual. Requiere procesamiento adicional.'
+                    }
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <Button onClick={handleSave} disabled={saving || loading}>
+                  {saving ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Guardando...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Guardar Configuración General
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="years">
+          <YearConfigurationSettings />
+        </TabsContent>
+
+        <TabsContent value="aportes">
+          <AportesSettings />
+        </TabsContent>
+
+        <TabsContent value="policies">
+          <PayrollPoliciesSettings />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
