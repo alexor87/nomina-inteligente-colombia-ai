@@ -17,10 +17,12 @@ export class CompanySettingsService {
 
       if (!data) return null;
 
-      // Ensure provision_mode is present with a safe default
+      // Ensure all fields are present with safe defaults
       const normalized: CompanySettings = {
         ...(data as any),
         provision_mode: (data as any).provision_mode || 'on_liquidation',
+        ibc_mode: (data as any).ibc_mode || 'proportional',
+        incapacity_policy: (data as any).incapacity_policy || 'standard_2d_100_rest_66',
       };
 
       return normalized;
@@ -50,6 +52,8 @@ export class CompanySettingsService {
       const normalized: CompanySettings = {
         ...(data as any),
         provision_mode: (data as any).provision_mode || settings.provision_mode || 'on_liquidation',
+        ibc_mode: (data as any).ibc_mode || settings.ibc_mode || 'proportional',
+        incapacity_policy: (data as any).incapacity_policy || settings.incapacity_policy || 'standard_2d_100_rest_66',
       };
 
       return normalized;
@@ -63,7 +67,9 @@ export class CompanySettingsService {
     return {
       periodicity: 'mensual',
       custom_period_days: 30,
-      provision_mode: 'on_liquidation'
+      provision_mode: 'on_liquidation',
+      ibc_mode: 'proportional',
+      incapacity_policy: 'standard_2d_100_rest_66'
     };
   }
 }
