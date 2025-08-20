@@ -15,6 +15,7 @@ import { VoucherSendDialog } from '../modals/VoucherSendDialog';
 import { EmployeeLiquidationModal } from '../modals/EmployeeLiquidationModal';
 import { EmployeeNotesModal } from '../notes/EmployeeNotesModal';
 import { NovedadUnifiedModal } from '../novedades/NovedadUnifiedModal';
+import { useCurrentCompany } from '@/hooks/useCurrentCompany';
 
 interface PayrollTableActionsProps {
   employee: PayrollEmployee;
@@ -41,6 +42,8 @@ export const PayrollTableActions: React.FC<PayrollTableActionsProps> = ({
   const [showLiquidationModal, setShowLiquidationModal] = useState(false);
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [showNovedadesModal, setShowNovedadesModal] = useState(false);
+
+  const { companyId } = useCurrentCompany();
 
   const handleCreateNovedad = async (novedadData: any) => {
     console.log('Creando novedad:', novedadData);
@@ -152,6 +155,7 @@ export const PayrollTableActions: React.FC<PayrollTableActionsProps> = ({
         onSubmit={handleCreateNovedad}
         selectedNovedadType={null}
         onClose={() => setShowNovedadesModal(false)}
+        companyId={companyId}
       />
 
       {/* Modal de Edición de Liquidación */}
