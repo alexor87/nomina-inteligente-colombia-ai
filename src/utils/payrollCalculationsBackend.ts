@@ -135,6 +135,21 @@ export const isNovedadConstitutiva = (tipoNovedad: string, valorExplícito?: boo
   return false;
 };
 
+// ✅ NUEVO: Normalizador de subtipos de incapacidad para que el backend no reciba "comun"
+const normalizeIncapacitySubtype = (subtipo?: string): 'general' | 'laboral' | undefined => {
+  if (!subtipo) return undefined;
+  const s = subtipo.toLowerCase().trim();
+
+  // Mapear variantes comunes a los subtipos esperados por el backend
+  if (['comun', 'común', 'enfermedad_general', 'eg', 'general'].includes(s)) {
+    return 'general';
+  }
+  if (['laboral', 'arl', 'accidente_laboral', 'riesgo_laboral', 'at'].includes(s)) {
+    return 'laboral';
+  }
+  return undefined; // si no es conocido, no forzar
+};
+
 // ✅ FUNCIÓN NORMATIVA: Convertir novedades aplicando reglas constitutivas CORREGIDAS
 export const convertNovedadesToIBC = (novedades: any[]): NovedadForIBC[] => {
   return novedades.map(novedad => {
@@ -144,13 +159,19 @@ export const convertNovedadesToIBC = (novedades: any[]): NovedadForIBC[] => {
       novedad.constitutivo_salario
     );
 
-    console.log('🔍 Aplicando constitutividad normativa CORREGIDA:', {
+    // Normalizar solo para incapacidades
+    const normalizedSubtype = novedad.tipo_novedad === 'incapacidad'
+      ? normalizeIncapacitySubtype(novedad.subtipo) ?? novedad.subtipo
+      : novedad.subtipo;
+
+    console.log('🔍 Aplicando constitutividad y normalización de incapacidad:', {
       tipo: novedad.tipo_novedad,
       valorOriginal: novedad.constitutivo_salario,
       constitutivo,
       valor: novedad.valor,
       dias: novedad.dias,
-      subtipo: novedad.subtipo
+      subtipoOriginal: novedad.subtipo,
+      subtipoNormalizado: normalizedSubtype
     });
 
     const mapped: NovedadForIBC = {
@@ -159,7 +180,7 @@ export const convertNovedadesToIBC = (novedades: any[]): NovedadForIBC[] => {
       tipo_novedad: novedad.tipo_novedad || 'otros',
       // ✅ Pasar detalles necesarios para incapacidades y otros cálculos en backend
       dias: typeof novedad.dias === 'number' ? novedad.dias : (novedad.dias ? Number(novedad.dias) : undefined),
-      subtipo: novedad.subtipo || undefined
+      subtipo: normalizedSubtype || undefined
     };
 
     return mapped;
