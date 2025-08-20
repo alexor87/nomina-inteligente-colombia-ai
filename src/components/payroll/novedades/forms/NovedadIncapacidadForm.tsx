@@ -25,10 +25,10 @@ interface NovedadIncapacidadFormProps {
 const INCAPACIDAD_SUBTIPOS = [
   { 
     value: 'general', 
-    label: 'Común - EPS (66.7%)', 
-    description: 'Días 1 y 2 paga empleador al 66.67%, desde el día 3 EPS al 66.67%',
-    porcentaje: 66.67,
-    normativa: 'Ley 100/1993 Art. 227 - Empleador paga días 1 y 2 al 66.67%'
+    label: 'Común - EPS', 
+    description: 'Días 1-2: empleador 100% | Días 3+: EPS 66.67%',
+    porcentaje: '100% / 66.67%',
+    normativa: 'Ley 100/1993 Art. 227 - Días 1-2 empleador, días 3+ EPS'
   },
   { 
     value: 'laboral', 
@@ -75,6 +75,33 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
   const calculatedDays = calculateDaysBetween(formData.fecha_inicio, formData.fecha_fin);
   const isValidRange = isValidDateRange(formData.fecha_inicio, formData.fecha_fin);
 
+  // ✅ NUEVA FUNCIÓN: Calcular valor de incapacidad según normativa
+  const calculateIncapacityValue = useCallback((days: number, subtipo: string): number => {
+    if (days <= 0 || !employeeSalary) return 0;
+    
+    const dailySalary = employeeSalary / 30;
+    
+    switch (subtipo) {
+      case 'general':
+        // ✅ NORMATIVA CORREGIDA: Días 1-2 al 100%, días 3+ al 66.67%
+        if (days <= 2) {
+          return dailySalary * days; // 100% todos los días
+        } else {
+          // Días 1-2 al 100% + días 3+ al 66.67%
+          const first2Days = dailySalary * 2; // 100%
+          const remainingDays = dailySalary * (days - 2) * 0.6667; // 66.67%
+          return first2Days + remainingDays;
+        }
+      
+      case 'laboral':
+        // ARL paga desde día 1 al 100%
+        return dailySalary * days;
+      
+      default:
+        return 0;
+    }
+  }, [employeeSalary]);
+
   // ✅ CORRECCIÓN: Cálculo automático cuando cambien fechas o subtipo
   useEffect(() => {
     // Advertir si el rango se sale del período, pero no bloquear
@@ -90,41 +117,23 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
       setDateRangeError('');
     }
 
+    // ✅ NUEVO CÁLCULO LOCAL CON NORMATIVA CORRECTA
     if (calculatedDays > 0 && isValidRange && formData.subtipo && employeeSalary > 0) {
-      console.log('🔄 Triggering calculation for incapacidad:', {
+      const calculatedValue = calculateIncapacityValue(calculatedDays, formData.subtipo);
+      
+      console.log('🏥 Calculating incapacity locally:', {
         subtipo: formData.subtipo,
         dias: calculatedDays,
         salario: employeeSalary,
+        valor: calculatedValue,
         fechaInicio: formData.fecha_inicio,
-        fechaFin: formData.fecha_fin,
-        periodo: periodoFecha
+        fechaFin: formData.fecha_fin
       });
       
-      // ✅ KISS: Callback directo que actualiza el estado inmediatamente
-      calculateNovedadDebounced(
-        {
-          tipoNovedad: 'incapacidad' as NovedadType,
-          subtipo: formData.subtipo,
-          salarioBase: employeeSalary,
-          dias: calculatedDays,
-          fechaPeriodo: (periodoFecha || new Date()).toISOString()
-        },
-        (result) => {
-          if (result && typeof result.valor === 'number') {
-            console.log('💰 Updating calculated value for', calculatedDays, 'days:', result.valor);
-            setFormData(prev => ({ 
-              ...prev, 
-              valor: result.valor 
-            }));
-          } else {
-            console.log('⚠️ Calculation returned no value');
-            setFormData(prev => ({ 
-              ...prev, 
-              valor: 0 
-            }));
-          }
-        }
-      );
+      setFormData(prev => ({ 
+        ...prev, 
+        valor: Math.round(calculatedValue)
+      }));
     } else if (calculatedDays === 0 || !isValidRange) {
       // ✅ Limpiar valor cuando no hay días válidos
       setFormData(prev => ({ 
@@ -132,7 +141,7 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
         valor: 0 
       }));
     }
-  }, [formData.subtipo, formData.fecha_inicio, formData.fecha_fin, calculatedDays, isValidRange, employeeSalary, calculateNovedadDebounced, periodoFecha, periodStartDate, periodEndDate]);
+  }, [formData.subtipo, formData.fecha_inicio, formData.fecha_fin, calculatedDays, isValidRange, employeeSalary, calculateIncapacityValue, periodStartDate, periodEndDate]);
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -153,8 +162,6 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
       alert('La fecha de fin debe ser igual o posterior a la fecha de inicio');
       return;
     }
-
-    // ⚠️ Ya no bloquea por cruce de período: la incapacidad se fraccionará en la liquidación
 
     if (calculatedDays <= 0) {
       alert('El rango de fechas debe ser válido');
@@ -185,6 +192,36 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
   };
 
   const currentSubtipoInfo = getSubtipoInfo(formData.subtipo);
+
+  // ✅ NUEVA FUNCIÓN: Calcular desglose para UI
+  const getIncapacityBreakdown = (days: number, subtipo: string) => {
+    if (days <= 0 || subtipo !== 'general') return null;
+    
+    const dailySalary = employeeSalary / 30;
+    
+    if (days <= 2) {
+      return {
+        employerDays: days,
+        employerAmount: dailySalary * days,
+        epsDays: 0,
+        epsAmount: 0,
+        total: dailySalary * days
+      };
+    } else {
+      const employerAmount = dailySalary * 2; // Días 1-2 al 100%
+      const epsAmount = dailySalary * (days - 2) * 0.6667; // Días 3+ al 66.67%
+      
+      return {
+        employerDays: 2,
+        employerAmount,
+        epsDays: days - 2,
+        epsAmount,
+        total: employerAmount + epsAmount
+      };
+    }
+  };
+
+  const breakdown = calculatedDays > 0 ? getIncapacityBreakdown(calculatedDays, formData.subtipo) : null;
 
   return (
     <div className="space-y-6">
@@ -221,14 +258,17 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
             </SelectContent>
           </Select>
           
-          {/* ✅ MEJORA UX: Información normativa clara */}
+          {/* ✅ INFORMACIÓN NORMATIVA ACTUALIZADA */}
           {currentSubtipoInfo && (
-            <div className="mt-2 p-2 bg-blue-100 rounded text-xs">
+            <div className="mt-2 p-3 bg-blue-100 rounded text-xs">
               <div className="flex items-start gap-2">
                 <Info className="h-3 w-3 text-blue-600 mt-0.5 flex-shrink-0" />
                 <div>
                   <div className="font-medium text-blue-800">
-                    Cobertura: {currentSubtipoInfo.porcentaje}%
+                    {formData.subtipo === 'general' 
+                      ? 'Días 1-2: 100% (empleador) | Días 3+: 66.67% (EPS)'
+                      : `Cobertura: ${currentSubtipoInfo.porcentaje}%`
+                    }
                   </div>
                   <div className="text-blue-700 mt-1">
                     {currentSubtipoInfo.normativa}
@@ -271,7 +311,7 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
           </div>
         </div>
 
-        {/* ✅ NUEVO: Mostrar días calculados automáticamente */}
+        {/* ✅ MOSTRAR DÍAS CALCULADOS */}
         {formData.fecha_inicio && formData.fecha_fin && (
           <div className="bg-white p-3 rounded border border-blue-200">
             <div className="flex items-center gap-2">
@@ -291,24 +331,12 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
           </div>
         )}
 
-        {/* ✅ MEJORA UX: Feedback de cálculo más claro */}
-        {isLoading && calculatedDays > 0 && (
-          <div className="bg-blue-50 p-3 rounded border border-blue-200">
-            <div className="flex items-center gap-2">
-              <Calculator className="h-4 w-4 text-blue-600 animate-spin" />
-              <span className="text-sm text-blue-700">
-                Calculando valor para {calculatedDays} días según normativa colombiana...
-              </span>
-            </div>
-          </div>
-        )}
-
         <div>
           <Label htmlFor="valor" className="text-gray-700">
             Valor Calculado *
             {formData.valor > 0 && currentSubtipoInfo && (
               <span className="text-xs text-green-600 ml-2">
-                ({currentSubtipoInfo.porcentaje}% del salario proporcional)
+                (según normativa colombiana)
               </span>
             )}
           </Label>
@@ -334,6 +362,29 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
           />
         </div>
 
+        {/* ✅ NUEVO: Desglose detallado para incapacidad general */}
+        {breakdown && formData.subtipo === 'general' && (
+          <div className="bg-white p-4 rounded border border-blue-200">
+            <h5 className="text-sm font-medium text-gray-700 mb-3">Desglose Normativo (Incapacidad General)</h5>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span>Días 1-2 (Empleador al 100%):</span>
+                <span className="font-medium">{formatCurrency(breakdown.employerAmount)}</span>
+              </div>
+              {breakdown.epsDays > 0 && (
+                <div className="flex justify-between">
+                  <span>Días 3-{calculatedDays} (EPS al 66.67%):</span>
+                  <span className="font-medium">{formatCurrency(breakdown.epsAmount)}</span>
+                </div>
+              )}
+              <div className="border-t pt-2 flex justify-between font-semibold">
+                <span>Total:</span>
+                <span>{formatCurrency(breakdown.total)}</span>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ✅ Preview mejorado */}
         {formData.valor > 0 && calculatedDays > 0 && (
           <div className="bg-green-50 p-3 rounded text-center border border-green-200">
@@ -343,11 +394,9 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
             <div className="text-sm text-gray-700 mt-2">
               {calculatedDays} días de incapacidad {currentSubtipoInfo?.label.toLowerCase()}
             </div>
-            {currentSubtipoInfo && (
-              <div className="text-xs text-gray-600 mt-1">
-                Calculado al {currentSubtipoInfo.porcentaje}% según normativa colombiana
-              </div>
-            )}
+            <div className="text-xs text-gray-600 mt-1">
+              Calculado según normativa colombiana
+            </div>
           </div>
         )}
       </div>

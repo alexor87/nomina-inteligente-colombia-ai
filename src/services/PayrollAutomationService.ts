@@ -48,6 +48,7 @@ export class PayrollAutomationService {
             const updatedValue = await this.calculateAbsenceValue(
               absence.empleado_id,
               absence.tipo_novedad,
+              absence.subtipo || 'general',
               absence.dias || 0
             );
 
@@ -80,11 +81,12 @@ export class PayrollAutomationService {
   }
 
   /**
-   * ✅ KISS: Calcular valor de ausencia según tipo
+   * ✅ NUEVA LÓGICA: Calcular valor de ausencia según tipo y normativa colombiana
    */
   private static async calculateAbsenceValue(
     employeeId: string,
     absenceType: string,
+    subtipo: string = 'general',
     days: number
   ): Promise<number> {
     // Obtener salario del empleado
@@ -100,6 +102,14 @@ export class PayrollAutomationService {
 
     const dailySalary = employee.salario_base / 30;
 
+    console.log('💰 Calculating absence value:', {
+      absenceType,
+      subtipo,
+      days,
+      dailySalary,
+      baseSalary: employee.salario_base
+    });
+
     // Calcular según tipo de ausencia
     switch (absenceType) {
       case 'vacaciones':
@@ -107,9 +117,37 @@ export class PayrollAutomationService {
         return dailySalary * days; // Pagado al 100%
       
       case 'incapacidad':
-        // ✅ CORRECCIÓN NORMATIVA: Enfermedad general se reconoce al 66.67% todos los días.
-        // Días 1 y 2: paga empleador. Día 3 en adelante: EPS. (Clasificación como devengo no salarial)
-        return dailySalary * days * 0.6667;
+        // ✅ NUEVA LÓGICA NORMATIVA: Incapacidad según subtipo
+        switch (subtipo) {
+          case 'general':
+            // Días 1-2 al 100%, días 3+ al 66.67%
+            if (days <= 2) {
+              const value = dailySalary * days; // 100% todos los días
+              console.log('🏥 General incapacity ≤2 days at 100%:', value);
+              return value;
+            } else {
+              // Días 1-2 al 100% + días 3+ al 66.67%
+              const first2Days = dailySalary * 2; // 100%
+              const remainingDays = dailySalary * (days - 2) * 0.6667; // 66.67%
+              const value = first2Days + remainingDays;
+              console.log('🏥 General incapacity breakdown:', {
+                first2Days: first2Days.toLocaleString(),
+                remainingDays: remainingDays.toLocaleString(),
+                total: value.toLocaleString()
+              });
+              return value;
+            }
+          
+          case 'laboral':
+            // ARL paga desde día 1 al 100%
+            const value = dailySalary * days;
+            console.log('🏥 Labor incapacity at 100%:', value);
+            return value;
+          
+          default:
+            console.warn('🏥 Unknown incapacity subtype:', subtipo);
+            return dailySalary * days * 0.6667; // Fallback conservador
+        }
       
       case 'ausencia':
       default:
@@ -156,4 +194,3 @@ export class PayrollAutomationService {
     }
   }
 }
-
