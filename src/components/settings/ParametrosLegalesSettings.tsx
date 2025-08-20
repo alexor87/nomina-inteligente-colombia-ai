@@ -11,6 +11,7 @@ import { CompanyPayrollPoliciesService } from '@/services/CompanyPayrollPolicies
 import { useCurrentCompany } from '@/hooks/useCurrentCompany';
 import { PayrollPoliciesSettings } from '@/components/settings/PayrollPoliciesSettings';
 import { Plus, Trash2, Copy } from 'lucide-react';
+import { IncapacityPolicyTester } from '@/components/settings/IncapacityPolicyTester';
 
 export const ParametrosLegalesSettings = () => {
   const { toast } = useToast();
@@ -81,9 +82,22 @@ export const ParametrosLegalesSettings = () => {
       if (policies) {
         console.log('✅ Loaded payroll policies:', policies);
         setIncapacityPolicy(policies.incapacity_policy || 'standard_2d_100_rest_66');
+        
+        // 🆕 DEBUG: Log policy loading for UI verification
+        toast({
+          title: "📋 Políticas Cargadas",
+          description: `Política de incapacidades: ${policies.incapacity_policy === 'standard_2d_100_rest_66' ? 'Estándar (2 días 100%)' : 'Desde día 1 (66.67%)'}`,
+          className: "border-blue-200 bg-blue-50"
+        });
       } else {
         console.log('⚠️ No existing payroll policies found, using defaults');
         setIncapacityPolicy('standard_2d_100_rest_66');
+        
+        toast({
+          title: "⚙️ Políticas por Defecto",
+          description: "No se encontraron políticas guardadas. Usando configuración estándar.",
+          variant: "default"
+        });
       }
     } catch (error) {
       console.error('❌ Error loading payroll policies:', error);
@@ -257,10 +271,8 @@ export const ParametrosLegalesSettings = () => {
     try {
       console.log('💾 Saving incapacity policy:', incapacityPolicy);
       
-      // Load existing policies to preserve other settings
       const existingPolicies = await CompanyPayrollPoliciesService.getPayrollPolicies(companyId);
       
-      // Prepare the policies object, preserving existing values
       const policiesToSave = {
         ibc_mode: existingPolicies?.ibc_mode || 'proportional',
         incapacity_policy: incapacityPolicy,
@@ -272,10 +284,19 @@ export const ParametrosLegalesSettings = () => {
       await CompanyPayrollPoliciesService.upsertPayrollPolicies(companyId, policiesToSave);
 
       console.log('✅ Company payroll policies saved successfully');
+      
+      // 🆕 Enhanced success message with verification
       toast({
-        title: "Políticas de nómina guardadas",
-        description: "Las políticas de cálculo han sido actualizadas correctamente.",
+        title: "✅ Políticas Guardadas",
+        description: `Política de incapacidades actualizada: ${incapacityPolicy === 'standard_2d_100_rest_66' ? 'Estándar (2 días 100% + resto 66.67%)' : 'Desde día 1 al 66.67% con piso SMLDV'}`,
+        className: "border-green-200 bg-green-50"
       });
+
+      // 🆕 Reload policies to verify persistence
+      setTimeout(() => {
+        loadCompanyPolicies();
+      }, 1000);
+
     } catch (error) {
       console.error('❌ Error saving payroll policies:', error);
       toast({
@@ -704,20 +725,42 @@ export const ParametrosLegalesSettings = () => {
 
         <div className="flex gap-4">
           <Button onClick={handleSavePolicies} className="bg-green-600 hover:bg-green-700">
-            Guardar Políticas de Nómina
+            💾 Guardar Políticas de Nómina
           </Button>
           <Button 
             variant="outline"
             onClick={() => {
               loadCompanyPolicies();
               toast({
-                title: "Políticas revertidas",
+                title: "🔄 Políticas Revertidas",
                 description: "Se han restaurado las políticas guardadas.",
               });
             }}
           >
-            Revertir Políticas
+            ↩️ Revertir Políticas
           </Button>
+          <Button 
+            variant="secondary"
+            onClick={() => {
+              console.log('🔍 Current state debug:', {
+                companyId,
+                currentIncapacityPolicy: incapacityPolicy,
+                timestamp: new Date().toISOString()
+              });
+              toast({
+                title: "🔍 Debug Info",
+                description: `Política actual: ${incapacityPolicy}. Ver consola para más detalles.`,
+                className: "border-gray-200 bg-gray-50"
+              });
+            }}
+          >
+            🔍 Debug Estado
+          </Button>
+        </div>
+
+        {/* 🆕 Policy Testing Component */}
+        <div className="pt-6">
+          <IncapacityPolicyTester currentPolicy={incapacityPolicy} />
         </div>
       </div>
     </div>
