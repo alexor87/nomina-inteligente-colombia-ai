@@ -38,8 +38,7 @@ export const CompanySettingsForm = () => {
         setSettings({
           periodicity: data.periodicity,
           custom_period_days: data.custom_period_days,
-          provision_mode: data.provision_mode,
-          incapacity_policy: data.incapacity_policy || 'standard_2d_100_rest_66'
+          provision_mode: data.provision_mode
         });
       }
     } catch (error) {
@@ -167,27 +166,24 @@ export const CompanySettingsForm = () => {
               }
             </p>
           </div>
+
+          <div className="flex justify-end">
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Guardando...
+                </>
+              ) : (
+                'Guardar Configuración'
+              )}
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
-      {/* Payroll Policies Section */}
-      <PayrollPoliciesSettings
-        incapacityPolicy={settings.incapacity_policy || 'standard_2d_100_rest_66'}
-        onIncapacityPolicyChange={(value) => setSettings(prev => ({ ...prev, incapacity_policy: value }))}
-      />
-
-      <div className="flex justify-end">
-        <Button onClick={handleSave} disabled={saving}>
-          {saving ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Guardando...
-            </>
-          ) : (
-            'Guardar Configuración'
-          )}
-        </Button>
-      </div>
+      {/* Payroll Policies Section - Now manages its own state */}
+      <PayrollPoliciesSettings />
     </div>
   );
 };

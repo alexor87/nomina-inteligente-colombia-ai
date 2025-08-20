@@ -41,8 +41,7 @@ export const ParametrosLegalesSettings = () => {
         setSettings({
           periodicity: data.periodicity,
           custom_period_days: data.custom_period_days,
-          provision_mode: data.provision_mode,
-          incapacity_policy: data.incapacity_policy || 'standard_2d_100_rest_66'
+          provision_mode: data.provision_mode
         });
       } else {
         console.log('ℹ️ No settings found, using defaults');
@@ -55,7 +54,6 @@ export const ParametrosLegalesSettings = () => {
         description: "No se pudieron cargar las configuraciones. Se usarán valores por defecto.",
         variant: "destructive"
       });
-      // Usar configuración por defecto en caso de error
       setSettings(CompanySettingsService.getDefaultSettings());
     } finally {
       setLoading(false);
@@ -217,47 +215,27 @@ export const ParametrosLegalesSettings = () => {
               </p>
             </div>
           </div>
+
+          <div className="flex justify-end">
+            <Button onClick={handleSave} disabled={saving || loading}>
+              {saving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Guardando...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Guardar Configuración General
+                </>
+              )}
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
-      {/* Payroll Policies Section */}
-      <PayrollPoliciesSettings
-        incapacityPolicy={settings.incapacity_policy || 'standard_2d_100_rest_66'}
-        onIncapacityPolicyChange={(value) => setSettings(prev => ({ ...prev, incapacity_policy: value }))}
-      />
-
-      <div className="flex justify-end space-x-4">
-        <Button 
-          variant="outline" 
-          onClick={loadSettings}
-          disabled={loading || saving}
-        >
-          {loading ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Cargando...
-            </>
-          ) : (
-            <>
-              <Settings className="h-4 w-4 mr-2" />
-              Recargar
-            </>
-          )}
-        </Button>
-        <Button onClick={handleSave} disabled={saving || loading}>
-          {saving ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Guardando...
-            </>
-          ) : (
-            <>
-              <CheckCircle className="h-4 w-4 mr-2" />
-              Guardar Configuración
-            </>
-          )}
-        </Button>
-      </div>
+      {/* Payroll Policies Section - Now manages its own state */}
+      <PayrollPoliciesSettings />
     </div>
   );
 };
