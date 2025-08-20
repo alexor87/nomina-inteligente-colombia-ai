@@ -59,7 +59,6 @@ export const ParametrosLegalesSettings = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   // Company policies state
-  const [ibcMode, setIbcMode] = useState<'proportional' | 'incapacity'>('proportional');
   const [incapacityPolicy, setIncapacityPolicy] = useState<'standard_2d_100_rest_66' | 'from_day1_66_with_floor'>('standard_2d_100_rest_66');
 
   useEffect(() => {
@@ -77,7 +76,6 @@ export const ParametrosLegalesSettings = () => {
     try {
       const settings = await CompanySettingsService.getCompanySettings(companyId);
       if (settings) {
-        setIbcMode(settings.ibc_mode || 'proportional');
         setIncapacityPolicy(settings.incapacity_policy || 'standard_2d_100_rest_66');
       }
     } catch (error) {
@@ -247,7 +245,6 @@ export const ParametrosLegalesSettings = () => {
     try {
       await CompanySettingsService.upsertCompanySettings(companyId, {
         periodicity: 'mensual', // Default value, this should come from existing settings
-        ibc_mode: ibcMode,
         incapacity_policy: incapacityPolicy,
         provision_mode: 'on_liquidation' // Default value
       });
@@ -678,9 +675,7 @@ export const ParametrosLegalesSettings = () => {
         </div>
 
         <PayrollPoliciesSettings
-          ibcMode={ibcMode}
           incapacityPolicy={incapacityPolicy}
-          onIbcModeChange={setIbcMode}
           onIncapacityPolicyChange={setIncapacityPolicy}
         />
 

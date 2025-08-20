@@ -39,7 +39,6 @@ export const CompanySettingsForm = () => {
           periodicity: data.periodicity,
           custom_period_days: data.custom_period_days,
           provision_mode: data.provision_mode,
-          ibc_mode: data.ibc_mode || 'proportional',
           incapacity_policy: data.incapacity_policy || 'standard_2d_100_rest_66'
         });
       }
@@ -173,9 +172,7 @@ export const CompanySettingsForm = () => {
 
       {/* New Payroll Policies Section */}
       <PayrollPoliciesSettings
-        ibcMode={settings.ibc_mode || 'proportional'}
         incapacityPolicy={settings.incapacity_policy || 'standard_2d_100_rest_66'}
-        onIbcModeChange={(value) => setSettings(prev => ({ ...prev, ibc_mode: value }))}
         onIncapacityPolicyChange={(value) => setSettings(prev => ({ ...prev, incapacity_policy: value }))}
       />
 
