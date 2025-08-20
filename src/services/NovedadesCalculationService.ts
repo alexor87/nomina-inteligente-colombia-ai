@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollNovedad } from '@/types/novedades-enhanced';
 
@@ -90,7 +89,7 @@ class NovedadesCalculationServiceClass {
     return data.fecha_inicio;
   }
 
-  // ✅ PROFESIONAL: Calcular totales usando backend centralizado
+  // ✅ PROFESIONAL: Calcular totales usando backend centralizado - NUEVA IMPLEMENTACIÓN
   async calculateEmployeeNovedadesTotals(employeeId: string, periodId: string): Promise<NovedadesTotals> {
     const cacheKey = this.generateCacheKey(employeeId, periodId);
 
@@ -119,7 +118,7 @@ class NovedadesCalculationServiceClass {
         };
       }
 
-      // ✅ BACKEND CALL: Usar el endpoint profesional
+      // ✅ BACKEND CALL: Usar el endpoint profesional con breakdown
       const backendInput: BackendNovedadesTotalsInput = {
         salarioBase: employeeSalary,
         fechaPeriodo,
@@ -129,11 +128,11 @@ class NovedadesCalculationServiceClass {
           valor: novedad.valor,
           dias: (novedad as any).dias,
           horas: (novedad as any).horas,
-          constitutivo_salario: novedad.tipo_novedad === 'horas_extra' // Simplificado
+          constitutivo_salario: novedad.tipo_novedad === 'horas_extra' || novedad.tipo_novedad === 'recargo_nocturno'
         }))
       };
 
-      console.log('📞 BACKEND CALL: Calling professional calculation service:', {
+      console.log('📞 BACKEND CALL: Calling professional calculation service with breakdown:', {
         employeeId,
         salarioBase: backendInput.salarioBase,
         novedadesCount: backendInput.novedades.length
@@ -157,6 +156,18 @@ class NovedadesCalculationServiceClass {
 
       const backendResult = backendResponse.data as BackendNovedadesTotalsResult;
       
+      // ✅ NUEVO: Log del breakdown para debugging
+      console.log('📊 BACKEND BREAKDOWN:', {
+        employeeId,
+        breakdown: backendResult.breakdown?.map(item => ({
+          tipo: item.tipo_novedad,
+          subtipo: item.subtipo,
+          valorOriginal: item.valorOriginal,
+          valorCalculado: item.valorCalculado,
+          detalle: item.detalleCalculo
+        }))
+      });
+      
       const totals: NovedadesTotals = {
         totalDevengos: backendResult.totalDevengos,
         totalDeducciones: backendResult.totalDeducciones,
@@ -164,7 +175,7 @@ class NovedadesCalculationServiceClass {
         hasNovedades: novedades.length > 0
       };
 
-      console.log('✅ PROFESSIONAL: Backend totals calculated:', {
+      console.log('✅ PROFESSIONAL: Backend totals calculated with normative values:', {
         employeeId,
         totalDevengos: totals.totalDevengos,
         totalDeducciones: totals.totalDeducciones,
@@ -184,6 +195,46 @@ class NovedadesCalculationServiceClass {
         totalNeto: 0,
         hasNovedades: false
       };
+    }
+  }
+
+  // ✅ NUEVO: Método para obtener breakdown detallado (opcional, para UI avanzada)
+  async getEmployeeNovedadesBreakdown(employeeId: string, periodId: string): Promise<any[]> {
+    try {
+      const [employeeSalary, fechaPeriodo, novedades] = await Promise.all([
+        this.getEmployeeSalary(employeeId),
+        this.getPeriodDate(periodId),
+        this.getEmployeeNovedades(employeeId, periodId)
+      ]);
+
+      if (employeeSalary <= 0 || novedades.length === 0) {
+        return [];
+      }
+
+      const backendInput: BackendNovedadesTotalsInput = {
+        salarioBase: employeeSalary,
+        fechaPeriodo,
+        novedades: novedades.map(novedad => ({
+          tipo_novedad: novedad.tipo_novedad,
+          subtipo: novedad.subtipo,
+          valor: novedad.valor,
+          dias: (novedad as any).dias,
+          horas: (novedad as any).horas,
+          constitutivo_salario: novedad.tipo_novedad === 'horas_extra' || novedad.tipo_novedad === 'recargo_nocturno'
+        }))
+      };
+
+      const { data: backendResponse } = await supabase.functions.invoke('payroll-calculations', {
+        body: {
+          action: 'calculate-novedades-totals',
+          data: backendInput
+        }
+      });
+
+      return backendResponse?.success ? (backendResponse.data?.breakdown || []) : [];
+    } catch (error) {
+      console.error('❌ Error getting novedades breakdown:', error);
+      return [];
     }
   }
 

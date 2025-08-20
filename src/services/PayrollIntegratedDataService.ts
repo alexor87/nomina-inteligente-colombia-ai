@@ -2,6 +2,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { DisplayNovedad, convertNovedadToDisplay } from '@/types/vacation-integration';
 import { NovedadesEnhancedService } from './NovedadesEnhancedService';
+import { NovedadesCalculationService } from './NovedadesCalculationService';
 
 export class PayrollIntegratedDataService {
   static async getEmployeePeriodData(
@@ -9,7 +10,7 @@ export class PayrollIntegratedDataService {
     periodId: string
   ): Promise<DisplayNovedad[]> {
     try {
-      console.log('🔍 PayrollIntegratedDataService - PROFESSIONAL: Obteniendo datos unificados (solo novedades):', {
+      console.log('🔍 PayrollIntegratedDataService - PROFESSIONAL: Obteniendo datos unificados con valores normativos:', {
         employeeId,
         periodId
       });
@@ -25,24 +26,57 @@ export class PayrollIntegratedDataService {
         return [];
       }
 
-      // ✅ PROFESSIONAL: Obtener novedades sin estimaciones locales
-      const novedadesData = await NovedadesEnhancedService.getNovedadesByEmployee(
-        employeeId,
-        periodId
-      );
+      // ✅ PROFESSIONAL: Obtener novedades y breakdown del backend
+      const [novedadesData, breakdown] = await Promise.all([
+        NovedadesEnhancedService.getNovedadesByEmployee(employeeId, periodId),
+        NovedadesCalculationService.getEmployeeNovedadesBreakdown(employeeId, periodId)
+      ]);
 
-      // ✅ PROFESSIONAL: No más estimaciones locales - el backend maneja todo
+      // ✅ PROFESSIONAL: Crear un mapa de valores calculados por el backend
+      const calculatedValuesMap = new Map();
+      breakdown.forEach((item: any) => {
+        const key = `${item.tipo_novedad}_${item.subtipo || 'default'}`;
+        calculatedValuesMap.set(key, {
+          valorCalculado: item.valorCalculado,
+          valorOriginal: item.valorOriginal,
+          detalleCalculo: item.detalleCalculo
+        });
+      });
+
+      // ✅ PROFESSIONAL: Convertir novedades usando valores calculados del backend
       const displayData: DisplayNovedad[] = novedadesData.map(novedad => {
-        return convertNovedadToDisplay(novedad);
+        const key = `${novedad.tipo_novedad}_${novedad.subtipo || 'default'}`;
+        const calculatedInfo = calculatedValuesMap.get(key);
+        
+        // Si tenemos valor calculado del backend, usarlo; sino, usar el valor de DB
+        const displayNovedad = convertNovedadToDisplay(novedad);
+        
+        if (calculatedInfo && calculatedInfo.valorCalculado !== undefined) {
+          console.log('🔄 Using backend calculated value:', {
+            tipo: novedad.tipo_novedad,
+            subtipo: novedad.subtipo,
+            valorOriginal: calculatedInfo.valorOriginal,
+            valorCalculado: calculatedInfo.valorCalculado,
+            detalleCalculo: calculatedInfo.detalleCalculo
+          });
+          
+          // Usar el valor calculado normativamente por el backend
+          displayNovedad.valor = calculatedInfo.valorCalculado;
+          displayNovedad.valorOriginal = calculatedInfo.valorOriginal;
+          displayNovedad.observacion = `${displayNovedad.observacion || ''} | ${calculatedInfo.detalleCalculo || ''}`.trim();
+        }
+        
+        return displayNovedad;
       });
 
       const sortedData = displayData.sort((a, b) =>
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
 
-      console.log('✅ PayrollIntegratedDataService - PROFESSIONAL: Datos unificados obtenidos (backend calculations):', {
+      console.log('✅ PayrollIntegratedDataService - PROFESSIONAL: Datos unificados con valores normativos:', {
         totalElementos: sortedData.length,
-        novedades: sortedData.filter(item => item.origen === 'novedades').length
+        novedades: sortedData.filter(item => item.origen === 'novedades').length,
+        valoresCalculados: breakdown.length
       });
 
       return sortedData;

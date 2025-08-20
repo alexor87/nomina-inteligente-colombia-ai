@@ -91,8 +91,8 @@ interface NovedadesTotalsResult {
   breakdown: Array<{
     tipo_novedad: string;
     subtipo?: string;
-    valorCalculado: number;
     valorOriginal?: number;
+    valorCalculado: number;
     esDevengo: boolean;
     detalleCalculo?: string;
   }>;
@@ -285,22 +285,61 @@ function calculateNovedadesTotals(input: NovedadesTotalsInput): NovedadesTotalsR
     let valorCalculado = Number(novedad.valor || 0);
     let detalleCalculo = 'Valor manual';
     let esDevengo = true;
+    let valorOriginal = valorCalculado;
 
     // ✅ CÁLCULO PROFESIONAL: Recalcular según normativa si es necesario
     switch (novedad.tipo_novedad) {
       case 'incapacidad': {
         const dias = Number(novedad.dias || 0);
         if (dias > 0) {
+          valorOriginal = valorCalculado; // Guardar valor original de la DB
           valorCalculado = Math.round(calculateIncapacityValue(
             input.salarioBase,
             dias,
             novedad.subtipo || 'general'
           ));
-          detalleCalculo = `Incapacidad ${novedad.subtipo || 'general'}: ${dias} días según normativa`;
-          console.log('🏥 BACKEND: Incapacidad calculada:', {
+          
+          // ✅ NUEVO: Breakdown detallado para incapacidades
+          const dailySalary = input.salarioBase / 30;
+          let breakdown_incapacidad = {};
+          
+          if (novedad.subtipo === 'laboral') {
+            breakdown_incapacidad = {
+              tipo: 'laboral',
+              dias_total: dias,
+              dias_100: dias,
+              valor_100: Math.round(dailySalary * dias),
+              dias_66: 0,
+              valor_66: 0,
+              total: valorCalculado,
+              normativa: 'ARL paga 100% desde día 1'
+            };
+          } else {
+            // General: días 1-2 al 100%, 3+ al 66.67%
+            const dias100 = Math.min(dias, 2);
+            const dias66 = Math.max(dias - 2, 0);
+            const valor100 = Math.round(dailySalary * dias100);
+            const valor66 = Math.round(dailySalary * dias66 * 0.6667);
+            
+            breakdown_incapacidad = {
+              tipo: 'general',
+              dias_total: dias,
+              dias_100: dias100,
+              valor_100: valor100,
+              dias_66: dias66,
+              valor_66: valor66,
+              total: valorCalculado,
+              normativa: 'Días 1-2 al 100%, día 3+ al 66.67%'
+            };
+          }
+          
+          detalleCalculo = `Incapacidad ${novedad.subtipo || 'general'}: ${dias} días según normativa - ${JSON.stringify(breakdown_incapacidad)}`;
+          console.log('🏥 BACKEND: Incapacidad calculada con breakdown:', {
             subtipo: novedad.subtipo,
             dias,
-            valorCalculado
+            valorOriginal,
+            valorCalculado,
+            breakdown: breakdown_incapacidad
           });
         }
         esDevengo = true;
@@ -310,6 +349,7 @@ function calculateNovedadesTotals(input: NovedadesTotalsInput): NovedadesTotalsR
       case 'horas_extra': {
         const horas = Number(novedad.horas || 0);
         if (horas > 0) {
+          valorOriginal = valorCalculado;
           const factor = getFactorHorasExtra(novedad.subtipo);
           const baseHora = calcularValorHoraExtraBase(input.salarioBase, fecha);
           valorCalculado = Math.round(baseHora * factor * horas);
@@ -318,6 +358,7 @@ function calculateNovedadesTotals(input: NovedadesTotalsInput): NovedadesTotalsR
             subtipo: novedad.subtipo,
             horas,
             factor,
+            valorOriginal,
             valorCalculado
           });
         }
@@ -328,6 +369,7 @@ function calculateNovedadesTotals(input: NovedadesTotalsInput): NovedadesTotalsR
       case 'recargo_nocturno': {
         const horas = Number(novedad.horas || 0);
         if (horas > 0) {
+          valorOriginal = valorCalculado;
           const { factor, porcentaje } = getFactorRecargoBySubtype(novedad.subtipo, fecha);
           const divisor = 30 * 7.333;
           const valorHora = input.salarioBase / divisor;
@@ -337,6 +379,7 @@ function calculateNovedadesTotals(input: NovedadesTotalsInput): NovedadesTotalsR
             subtipo: novedad.subtipo,
             horas,
             factor,
+            valorOriginal,
             valorCalculado
           });
         }
@@ -377,12 +420,12 @@ function calculateNovedadesTotals(input: NovedadesTotalsInput): NovedadesTotalsR
       totalDeducciones += Math.abs(valorCalculado);
     }
 
-    // Agregar al breakdown
+    // Agregar al breakdown con valores originales y calculados
     breakdown.push({
       tipo_novedad: novedad.tipo_novedad,
       subtipo: novedad.subtipo,
+      valorOriginal,
       valorCalculado,
-      valorOriginal: novedad.valor,
       esDevengo,
       detalleCalculo
     });
