@@ -273,6 +273,36 @@ export type Database = {
         }
         Relationships: []
       }
+      company_payroll_policies: {
+        Row: {
+          company_id: string
+          created_at: string
+          ibc_mode: string
+          id: string
+          incapacity_policy: string
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          ibc_mode?: string
+          id?: string
+          incapacity_policy?: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          ibc_mode?: string
+          id?: string
+          incapacity_policy?: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       company_schema_versions: {
         Row: {
           changes_summary: string
