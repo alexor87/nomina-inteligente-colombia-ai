@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -128,8 +127,8 @@ export const NovedadForm: React.FC<NovedadFormProps> = ({
       ...Object.entries(NOVEDAD_CATEGORIES.deducciones.types || {})
     ];
 
-  const showCalculationBreakdown = showCalculationDetails && calculationResult && !isCalculating;
-  const hasValueAdjustment = calculationResult && formData.base_calculo?.valor_original_usuario !== calculationResult.valor;
+  const showCalculationBreakdown = showCalculationDetails && formData.base_calculo && !isCalculating;
+  const hasValueAdjustment = formData.base_calculo && formData.base_calculo.valor_original_usuario !== formData.base_calculo.valor_calculado;
 
   return (
     <div className="space-y-6">
@@ -248,8 +247,11 @@ export const NovedadForm: React.FC<NovedadFormProps> = ({
       </div>
 
       {/* ✅ ENHANCED BREAKDOWN DISPLAY */}
-      {showCalculationBreakdown && formData.base_calculo && (
-        <NovedadBreakdownDisplay baseCalculo={formData.base_calculo} />
+      {showCalculationBreakdown && (
+        <NovedadBreakdownDisplay 
+          baseCalculo={formData.base_calculo} 
+          showFullDetails={showCalculationDetails}
+        />
       )}
 
       {calculationError && (

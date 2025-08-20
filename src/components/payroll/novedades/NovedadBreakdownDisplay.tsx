@@ -4,53 +4,24 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Info, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
+import { BaseCalculoData } from '@/types/novedades-enhanced';
 
 interface NovedadBreakdownDisplayProps {
-  novedad: {
-    id: string;
-    tipo_novedad: string;
-    subtipo?: string;
-    valor: number;
-    dias?: number;
-    horas?: number;
-    base_calculo?: any; // Can be JSON string or object
-  };
-  employeeName: string;
+  baseCalculo: BaseCalculoData;
   showFullDetails?: boolean;
 }
 
 export const NovedadBreakdownDisplay: React.FC<NovedadBreakdownDisplayProps> = ({
-  novedad,
-  employeeName,
-  showFullDetails = false
+  baseCalculo,
+  showFullDetails = true
 }) => {
-  // ✅ FIXED: Parse base_calculo if it's a JSON string
-  let baseCalculo = null;
-  try {
-    baseCalculo = typeof novedad.base_calculo === 'string' 
-      ? JSON.parse(novedad.base_calculo) 
-      : novedad.base_calculo;
-  } catch (error) {
-    console.warn('Failed to parse base_calculo:', error);
-    baseCalculo = novedad.base_calculo;
-  }
-
-  const hasBreakdown = baseCalculo;
-  const isAdjusted = hasBreakdown && 
-    baseCalculo.valor_original_usuario !== baseCalculo.valor_calculado;
+  const isAdjusted = baseCalculo.valor_original_usuario !== baseCalculo.valor_calculado;
   
-  const getTypeLabel = (tipo: string, subtipo?: string) => {
-    if (tipo === 'incapacidad') {
-      return `Incapacidad ${subtipo === 'laboral' ? 'Laboral (ARL)' : 'General (EPS)'}`;
-    }
-    return tipo.replace('_', ' ').toUpperCase();
-  };
-
   return (
     <Card className={`${isAdjusted ? 'border-orange-200' : 'border-gray-200'}`}>
       <CardHeader className="pb-3">
         <CardTitle className="text-sm flex items-center justify-between">
-          <span>{getTypeLabel(novedad.tipo_novedad, novedad.subtipo)} - {employeeName}</span>
+          <span>Detalle del Cálculo</span>
           {isAdjusted && (
             <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
               <AlertTriangle className="h-3 w-3 mr-1" />
@@ -63,25 +34,21 @@ export const NovedadBreakdownDisplay: React.FC<NovedadBreakdownDisplayProps> = (
       <CardContent className="space-y-3">
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div>
-            <span className="text-gray-600">Valor aplicado en nómina:</span>
+            <span className="text-gray-600">Valor calculado:</span>
             <div className="font-semibold text-lg">
-              {formatCurrency(novedad.valor)}
+              {formatCurrency(baseCalculo.valor_calculado)}
             </div>
           </div>
           
-          {(novedad.dias || novedad.horas) && (
-            <div>
-              <span className="text-gray-600">
-                {novedad.dias ? 'Días:' : 'Horas:'}
-              </span>
-              <div className="font-semibold">
-                {novedad.dias || novedad.horas}
-              </div>
+          <div>
+            <span className="text-gray-600">Salario base:</span>
+            <div className="font-semibold">
+              {formatCurrency(baseCalculo.salario_base)}
             </div>
-          )}
+          </div>
         </div>
 
-        {hasBreakdown && showFullDetails && (
+        {showFullDetails && (
           <div className="space-y-3 border-t pt-3">
             <div className="text-xs font-medium text-gray-700">Detalle del Cálculo:</div>
             
@@ -115,15 +82,6 @@ export const NovedadBreakdownDisplay: React.FC<NovedadBreakdownDisplayProps> = (
                 <div>Salario base: {formatCurrency(baseCalculo.policy_snapshot.salary_used)}</div>
               </div>
             )}
-          </div>
-        )}
-
-        {!hasBreakdown && (
-          <div className="bg-yellow-50 p-2 rounded text-xs border border-yellow-200">
-            <div className="flex items-center gap-2 text-yellow-700">
-              <AlertTriangle className="h-3 w-3" />
-              <span>Novedad registrada antes de la implementación de políticas detalladas</span>
-            </div>
           </div>
         )}
       </CardContent>
