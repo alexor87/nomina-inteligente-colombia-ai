@@ -9,6 +9,7 @@ export interface DisplayNovedad {
   tipo_novedad: NovedadType | VacationAbsenceType;
   subtipo?: string;
   valor: number;
+  valorOriginal?: number; // ✅ NUEVO: Valor original antes de cálculos normativos
   dias?: number;
   horas?: number;
   observacion?: string;
