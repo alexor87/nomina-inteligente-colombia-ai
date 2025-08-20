@@ -136,25 +136,20 @@ serve(async (req) => {
       
       console.log('⚙️ Using configuration:', config);
       
-      // Calculate base salary proportional to worked days
+      // Base daily salary
       const dailySalary = input.baseSalary / 30;
-      const proportionalSalary = Math.round(dailySalary * input.workedDays);
-      
-      // Transport allowance (if applicable)
-      let transportAllowance = 0;
-      const transportLimit = config.salarioMinimo * 2;
-      if (input.baseSalary <= transportLimit) {
-        const dailyTransport = config.auxilioTransporte / 30;
-        transportAllowance = Math.round(dailyTransport * input.workedDays);
-      }
-      
-      // ✅ PROCESAR NOVEDADES CON NUEVA LÓGICA DE INCAPACIDAD
+
+      // Acumuladores
       let bonusesConstitutivos = 0;
       let bonusesNoConstitutivos = 0;
       let extraHours = 0;
       let additionalEarnings = 0;
       let additionalDeductions = 0;
-      
+
+      // ✅ NUEVO: acumular días de incapacidad para descontar del salario ordinario
+      let totalIncapacityDays = 0;
+
+      // ✅ PROCESAR NOVEDADES CON NORMATIVA (mantenemos la lógica existente)
       if (input.novedades && input.novedades.length > 0) {
         console.log('📋 Processing novedades:', input.novedades.length);
         
@@ -169,10 +164,15 @@ serve(async (req) => {
             constitutivo: esConstitutivo,
             dias: novedad.dias
           });
+
+          if (novedad.tipo_novedad === 'incapacidad') {
+            // Sumar días de incapacidad para descontar del salario ordinario
+            totalIncapacityDays += Number(novedad.dias || 0);
+          }
           
           switch (novedad.tipo_novedad) {
-            case 'incapacidad':
-              // ✅ NUEVA LÓGICA: Recalcular incapacidad con normativa correcta
+            case 'incapacidad': {
+              // ✅ Recalcular incapacidad con normativa correcta (1-2 días 100%, 3+ al 66.67%)
               if (novedad.dias && novedad.dias > 0) {
                 const recalculatedValue = calculateIncapacityValue(
                   input.baseSalary,
@@ -184,11 +184,12 @@ serve(async (req) => {
                   recalculated: recalculatedValue,
                   difference: recalculatedValue - valor
                 });
-                additionalEarnings += recalculatedValue;
+                additionalEarnings += Math.round(recalculatedValue);
               } else {
                 additionalEarnings += valor;
               }
               break;
+            }
               
             case 'horas_extra':
             case 'recargo_nocturno':
@@ -221,16 +222,31 @@ serve(async (req) => {
           }
         }
       }
+
+      // ✅ NUEVO: Días efectivamente trabajados = días reportados - días de incapacidad
+      const effectiveWorkedDays = Math.max(0, (input.workedDays || 0) - (totalIncapacityDays || 0));
+      const transportLimit = config.salarioMinimo * 2;
+
+      // ✅ Recalcular salario proporcional con días efectivos
+      const proportionalSalary = Math.round(dailySalary * effectiveWorkedDays);
+      
+      // ✅ Auxilio de transporte proporcional a días efectivos
+      let transportAllowance = 0;
+      if (input.baseSalary <= transportLimit) {
+        const dailyTransport = config.auxilioTransporte / 30;
+        transportAllowance = Math.round(dailyTransport * effectiveWorkedDays);
+      }
       
       // Calculate IBC (includes constitutive bonuses and extra hours)
       const salarioBaseParaAportes = proportionalSalary + bonusesConstitutivos + extraHours;
       
+      // ✅ Mínimo IBC proporcional a días efectivos cuando base < SMMLV
       let ibcSalud, ibcPension;
       if (input.baseSalary >= config.salarioMinimo) {
         ibcSalud = salarioBaseParaAportes;
         ibcPension = salarioBaseParaAportes;
       } else {
-        const minIbc = (config.salarioMinimo / 30) * input.workedDays;
+        const minIbc = (config.salarioMinimo / 30) * effectiveWorkedDays;
         ibcSalud = Math.max(salarioBaseParaAportes, minIbc);
         ibcPension = Math.max(salarioBaseParaAportes, minIbc);
       }
@@ -277,7 +293,15 @@ serve(async (req) => {
         ibc: ibcSalud
       };
       
-      console.log('✅ Calculation result:', result);
+      console.log('✅ Calculation result (with incapacity days deducted):', {
+        totalIncapacityDays,
+        effectiveWorkedDays,
+        proportionalSalary,
+        transportAllowance,
+        grossPay,
+        healthDeduction,
+        pensionDeduction
+      });
       
       return new Response(
         JSON.stringify({ success: true, data: result }),
@@ -307,7 +331,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('❌ Payroll calculation error:', error);
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ success: false, error: (error as Error).message }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }

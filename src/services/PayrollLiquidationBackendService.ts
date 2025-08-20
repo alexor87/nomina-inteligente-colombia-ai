@@ -8,6 +8,14 @@ export interface PayrollCalculationInput {
   bonuses: number;
   absences: number;
   periodType: 'quincenal' | 'mensual';
+  // ✅ NUEVO: enviar novedades completas al backend (para reflejar incapacidades)
+  novedades?: Array<{
+    valor: number;
+    constitutivo_salario: boolean;
+    tipo_novedad: string;
+    subtipo?: string;
+    dias?: number;
+  }>;
 }
 
 export interface PayrollCalculationResult {
@@ -289,8 +297,24 @@ export const PayrollLiquidationBackendService = {
             }
           });
 
-          // Use default worked days from company configuration minus absences
-          const workedDays = Math.max(0, defaultWorkedDays - absences);
+          // ✅ NUEVO: Mapear novedades para el backend (incluyendo días y subtipo)
+          const mappedNovedades = allNovedades.map(nv => ({
+            valor: Number(nv.valor || 0),
+            constitutivo_salario: typeof nv.constitutivo_salario === 'boolean'
+              ? nv.constitutivo_salario
+              : (['horas_extra', 'recargo_nocturno', 'comision'].includes(nv.tipo_novedad)),
+            tipo_novedad: nv.tipo_novedad,
+            subtipo: nv.subtipo || undefined,
+            dias: nv.dias || undefined
+          }));
+
+          // ✅ NUEVO: Restar días de incapacidad del cómputo de días trabajados
+          const incapacityDays = allNovedades
+            .filter(nv => nv.tipo_novedad === 'incapacidad')
+            .reduce((sum, nv) => sum + (Number(nv.dias) || 0), 0);
+
+          // Use default worked days from company configuration minus ausencias e incapacidades
+          const workedDays = Math.max(0, defaultWorkedDays - absences - incapacityDays);
 
           const input: PayrollCalculationInput = {
             baseSalary: Number(employee.salario_base) || 1300000,
@@ -299,7 +323,9 @@ export const PayrollLiquidationBackendService = {
             disabilities,
             bonuses,
             absences,
-            periodType: activePeriod?.tipo_periodo as 'quincenal' | 'mensual' || companySettings?.periodicity as 'quincenal' | 'mensual' || 'mensual'
+            periodType: activePeriod?.tipo_periodo as 'quincenal' | 'mensual' || companySettings?.periodicity as 'quincenal' | 'mensual' || 'mensual',
+            // ✅ Enviar novedades completas para que el backend sume devengados y descuente días
+            novedades: mappedNovedades
           };
 
           try {
@@ -425,7 +451,6 @@ export const PayrollLiquidationBackendService = {
         throw payrollError;
       }
 
-      // Generate vouchers with upsert as well
       const voucherRecords = liquidationData.employees.map(emp => ({
         employee_id: emp.id,
         company_id: profile.company_id,
