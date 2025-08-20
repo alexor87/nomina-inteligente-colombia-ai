@@ -11,6 +11,7 @@ import { AlertTriangle, Calculator, Info, CheckCircle2 } from 'lucide-react';
 import { CreateNovedadData, NovedadType, NOVEDAD_CATEGORIES } from '@/types/novedades-enhanced';
 import { useNovedadBackendCalculation } from '@/hooks/useNovedadBackendCalculation';
 import { formatCurrency } from '@/lib/utils';
+import { NovedadBreakdownDisplay } from './NovedadBreakdownDisplay';
 
 interface NovedadFormProps {
   formData: CreateNovedadData;
@@ -111,12 +112,21 @@ export const NovedadForm: React.FC<NovedadFormProps> = ({
     } else if (modalType === 'deduccion') {
       return NOVEDAD_CATEGORIES.deducciones;
     }
-    return NOVEDAD_CATEGORIES;
+    // Return both categories if no specific modal type
+    return {
+      ...NOVEDAD_CATEGORIES.devengados,
+      ...NOVEDAD_CATEGORIES.deducciones
+    };
   };
 
   const categories = getFilteredCategories();
-  // ✅ FIXED: Access types property correctly
-  const tipoOptions = Object.entries(categories.types || {});
+  // ✅ FIXED: Access types property correctly based on structure
+  const tipoOptions = modalType ? 
+    Object.entries(categories.types || {}) :
+    [
+      ...Object.entries(NOVEDAD_CATEGORIES.devengados.types || {}),
+      ...Object.entries(NOVEDAD_CATEGORIES.deducciones.types || {})
+    ];
 
   const showCalculationBreakdown = showCalculationDetails && calculationResult && !isCalculating;
   const hasValueAdjustment = calculationResult && formData.base_calculo?.valor_original_usuario !== calculationResult.valor;
@@ -237,50 +247,9 @@ export const NovedadForm: React.FC<NovedadFormProps> = ({
         )}
       </div>
 
-      {/* ✅ CALCULATION BREAKDOWN: Show detailed calculation info */}
-      {showCalculationBreakdown && (
-        <Card className="border-blue-200 bg-blue-50">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Calculator className="h-4 w-4" />
-              Detalle del Cálculo
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span>Valor calculado:</span>
-                <Badge variant="outline" className="bg-white">
-                  {formatCurrency(calculationResult.valor)}
-                </Badge>
-              </div>
-              
-              {calculationResult.factorCalculo && (
-                <div className="flex justify-between">
-                  <span>Factor aplicado:</span>
-                  <span className="font-mono text-xs">{calculationResult.factorCalculo}x</span>
-                </div>
-              )}
-            </div>
-            
-            {calculationResult.detalleCalculo && (
-              <div className="bg-white p-2 rounded text-xs border">
-                <div className="flex items-start gap-2">
-                  <Info className="h-3 w-3 mt-0.5 text-blue-500 flex-shrink-0" />
-                  <span>{calculationResult.detalleCalculo}</span>
-                </div>
-              </div>
-            )}
-
-            {calculationResult.jornadaInfo && (
-              <div className="text-xs text-gray-600 bg-white p-2 rounded border">
-                <div className="font-medium mb-1">Información de jornada:</div>
-                <div>• Valor hora ordinaria: {formatCurrency(calculationResult.jornadaInfo.valorHoraOrdinaria || 0)}</div>
-                <div>• {calculationResult.jornadaInfo.descripcion}</div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+      {/* ✅ ENHANCED BREAKDOWN DISPLAY */}
+      {showCalculationBreakdown && formData.base_calculo && (
+        <NovedadBreakdownDisplay baseCalculo={formData.base_calculo} />
       )}
 
       {calculationError && (
