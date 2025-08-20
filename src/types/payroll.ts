@@ -17,11 +17,14 @@ export interface PayrollPeriod {
   numero_periodo_anual?: number;
 }
 
-// ✅ NUEVA INTERFACE: Para novedades en cálculo de IBC
+// ✅ Ampliamos el tipo para soportar cálculo correcto de incapacidades en backend
 export interface NovedadForIBC {
   valor: number;
   constitutivo_salario: boolean;
   tipo_novedad: string;
+  // Campos adicionales para incapacidades y otras novedades que requieren detalle
+  dias?: number;
+  subtipo?: string;
 }
 
 export interface PayrollEmployee {

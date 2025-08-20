@@ -148,13 +148,20 @@ export const convertNovedadesToIBC = (novedades: any[]): NovedadForIBC[] => {
       tipo: novedad.tipo_novedad,
       valorOriginal: novedad.constitutivo_salario,
       constitutivo,
-      valor: novedad.valor
+      valor: novedad.valor,
+      dias: novedad.dias,
+      subtipo: novedad.subtipo
     });
 
-    return {
+    const mapped: NovedadForIBC = {
       valor: Number(novedad.valor || 0),
       constitutivo_salario: constitutivo,
-      tipo_novedad: novedad.tipo_novedad || 'otros'
+      tipo_novedad: novedad.tipo_novedad || 'otros',
+      // ✅ Pasar detalles necesarios para incapacidades y otros cálculos en backend
+      dias: typeof novedad.dias === 'number' ? novedad.dias : (novedad.dias ? Number(novedad.dias) : undefined),
+      subtipo: novedad.subtipo || undefined
     };
+
+    return mapped;
   });
 };
