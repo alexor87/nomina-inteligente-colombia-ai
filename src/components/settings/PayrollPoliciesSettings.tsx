@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,7 +21,6 @@ export const PayrollPoliciesSettings = () => {
   const [companyId, setCompanyId] = useState<string>('');
   const { toast } = useToast();
 
-  // Load company ID and policies
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -91,6 +89,10 @@ export const PayrollPoliciesSettings = () => {
     if (policies) {
       setPolicies({ ...policies, ...updates });
     }
+  };
+
+  const handleIncapacityPolicyChange = (value: 'standard_2d_100_rest_66' | 'from_day1_66_with_floor') => {
+    updatePolicies({ incapacity_policy: value });
   };
 
   if (isLoading) {
@@ -165,9 +167,7 @@ export const PayrollPoliciesSettings = () => {
             <Label htmlFor="incapacity_policy">Política de Incapacidades</Label>
             <Select 
               value={policies?.incapacity_policy || 'standard_2d_100_rest_66'} 
-              onValueChange={(value: 'standard_2d_100_rest_66' | 'from_day1_66_with_floor') => 
-                updatePolicies({ incapacity_policy: value })
-              }
+              onValueChange={handleIncapacityPolicyChange}
             >
               <SelectTrigger>
                 <SelectValue />
@@ -224,8 +224,12 @@ export const PayrollPoliciesSettings = () => {
       </Card>
 
       {/* Policy Manager */}
-      {companyId && (
-        <NovedadPolicyManager companyId={companyId} />
+      {companyId && policies && (
+        <NovedadPolicyManager 
+          companyId={companyId} 
+          incapacityPolicy={policies.incapacity_policy}
+          onIncapacityPolicyChange={handleIncapacityPolicyChange}
+        />
       )}
 
       {/* Policy Tester */}

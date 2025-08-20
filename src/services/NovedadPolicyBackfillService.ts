@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { CompanyPayrollPoliciesService } from './CompanyPayrollPoliciesService';
 import { IncapacityCalculationService } from './IncapacityCalculationService';
@@ -7,10 +6,100 @@ interface BackfillResult {
   success: boolean;
   processed: number;
   updated: number;
+  updatedCount?: number;
   errors: string[];
 }
 
+interface AnalysisResult {
+  totalIncapacities: number;
+  periodsAffected: string[];
+  employeesAffected: number;
+}
+
 export class NovedadPolicyBackfillService {
+  /**
+   * ✅ ANALYZE: Check incapacities that would be affected by policy change
+   */
+  static async analyzeIncapacitiesForBackfill(companyId: string): Promise<AnalysisResult> {
+    try {
+      console.log('🔍 Analyzing incapacities for backfill...', { companyId });
+
+      // Get open period IDs first
+      const { data: openPeriods, error: periodError } = await supabase
+        .from('payroll_periods_real')
+        .select('id, periodo')
+        .eq('company_id', companyId)
+        .in('estado', ['borrador', 'en_proceso']);
+
+      if (periodError) {
+        throw periodError;
+      }
+
+      if (!openPeriods || openPeriods.length === 0) {
+        return {
+          totalIncapacities: 0,
+          periodsAffected: [],
+          employeesAffected: 0
+        };
+      }
+
+      const openPeriodIds = openPeriods.map(p => p.id);
+
+      // Count incapacities in open periods
+      const { data: incapacities, error: incapacityError } = await supabase
+        .from('payroll_novedades')
+        .select('id, empleado_id, periodo_id')
+        .eq('company_id', companyId)
+        .eq('tipo_novedad', 'incapacidad')
+        .in('periodo_id', openPeriodIds);
+
+      if (incapacityError) {
+        throw incapacityError;
+      }
+
+      const uniqueEmployees = new Set(incapacities?.map(i => i.empleado_id) || []);
+
+      return {
+        totalIncapacities: incapacities?.length || 0,
+        periodsAffected: openPeriods.map(p => p.periodo),
+        employeesAffected: uniqueEmployees.size
+      };
+
+    } catch (error) {
+      console.error('❌ Error analyzing incapacities:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ BACKFILL: Update existing incapacities with new policy
+   */
+  static async backfillIncapacitiesWithNewPolicy(
+    companyId: string,
+    newPolicy: 'standard_2d_100_rest_66' | 'from_day1_66_with_floor'
+  ): Promise<BackfillResult> {
+    try {
+      console.log('🔄 Starting backfill with new policy...', { companyId, newPolicy });
+
+      const result = await this.backfillIncapacityNovelties(companyId, undefined, false);
+      
+      return {
+        ...result,
+        updatedCount: result.updated
+      };
+
+    } catch (error) {
+      console.error('❌ Error in backfill:', error);
+      return {
+        success: false,
+        processed: 0,
+        updated: 0,
+        updatedCount: 0,
+        errors: [`Backfill error: ${error}`]
+      };
+    }
+  }
+
   /**
    * ✅ BACKFILL: Update existing incapacities with proper policy-aware calculations
    */
@@ -35,7 +124,7 @@ export class NovedadPolicyBackfillService {
 
       console.log('📋 Using incapacity policy:', incapacityPolicy);
 
-      // ✅ FIXED: Get open period IDs first
+      // Get open period IDs first
       const { data: openPeriods, error: periodError } = await supabase
         .from('payroll_periods_real')
         .select('id')
@@ -118,7 +207,7 @@ export class NovedadPolicyBackfillService {
             incapacityPolicy
           );
 
-          // Create detailed base_calculo - ✅ FIXED: Store as JSON
+          // Create detailed base_calculo
           const updatedBaseCalculo = JSON.stringify({
             salario_base: employeeSalary,
             valor_original_usuario: novedad.valor,
@@ -248,7 +337,7 @@ export class NovedadPolicyBackfillService {
 
           const calculationResult = backendResponse.data;
 
-          // ✅ FIXED: Store base_calculo as JSON string
+          // Store base_calculo as JSON string
           const baseCalculoJson = JSON.stringify({
             salario_base: employeeSalary,
             valor_original_usuario: novedad.valor,
