@@ -239,7 +239,7 @@ function getSupabaseClient(req: Request) {
   });
 }
 
-// Cargar política de la empresa del usuario (con fallback por defecto)
+// Cargar política de la empresa del usuario (ahora prioriza company_settings y cae a company_payroll_policies)
 async function getCompanyPolicy(req: Request): Promise<{ companyId: string | null; policy: CompanyPayrollPolicy }> {
   try {
     const supabase = getSupabaseClient(req);
@@ -250,6 +250,24 @@ async function getCompanyPolicy(req: Request): Promise<{ companyId: string | nul
       return { companyId: null, policy: { ibc_mode: 'proportional', incapacity_policy: 'standard_2d_100_rest_66' } };
     }
 
+    // 1) Intentar leer desde company_settings
+    const { data: settingsRow, error: settingsErr } = await supabase
+      .from('company_settings')
+      .select('ibc_mode, incapacity_policy')
+      .eq('company_id', companyIdData)
+      .limit(1)
+      .single();
+
+    if (settingsRow) {
+      const ibcMode = (settingsRow.ibc_mode as IbcMode) || 'proportional';
+      const incapacityPolicy = (settingsRow.incapacity_policy as IncapacityPolicy) || 'standard_2d_100_rest_66';
+      console.log('🏢 Policy from company_settings:', { ibcMode, incapacityPolicy });
+      return { companyId: companyIdData, policy: { ibc_mode: ibcMode, incapacity_policy: incapacityPolicy } };
+    } else if (settingsErr) {
+      console.log('ℹ️ company_settings not available or columns missing, trying company_payroll_policies:', settingsErr.message);
+    }
+
+    // 2) Fallback a company_payroll_policies
     const { data: policyRows, error: polErr } = await supabase
       .from('company_payroll_policies')
       .select('ibc_mode, incapacity_policy')
@@ -257,7 +275,7 @@ async function getCompanyPolicy(req: Request): Promise<{ companyId: string | nul
       .limit(1);
 
     if (polErr) {
-      console.log('⚠️ Error fetching policy, using defaults:', polErr.message);
+      console.log('⚠️ Error fetching policy (fallback), using defaults:', polErr.message);
       return { companyId: companyIdData, policy: { ibc_mode: 'proportional', incapacity_policy: 'standard_2d_100_rest_66' } };
     }
 
@@ -310,20 +328,22 @@ function calculateIncapacityValuePolicyAware(
     const smldv = salarioMinimo / 30;
     const dailyApplied = Math.max(daily66, smldv);
     const value = Math.round(dailyApplied * days);
-    console.log('🏥 General with floor: daily66, smldv, applied, total', daily66, smldv, dailyApplied, value);
+    console.log('🏥 General with floor (from day 1): daily66, smldv, applied, total', daily66, smldv, dailyApplied, value);
     return value;
   }
 
-  // Estándar: días 1-2 al 100%, 3+ al 66.67%
+  // Estándar: días 1-2 al 100%, 3+ al 66.67% con piso SMLDV
   if (days <= 2) {
     const value = Math.round(dailySalary * days);
-    console.log('🏥 General standard ≤2 days:', value);
+    console.log('🏥 General standard ≤2 days (100%):', value);
     return value;
   } else {
-    const first2 = dailySalary * 2;
-    const rest = dailySalary * (days - 2) * 0.6667;
+    const smldv = salarioMinimo / 30;
+    const first2 = dailySalary * 2; // 2 días al 100%
+    const dailyRest = Math.max(dailySalary * 0.6667, smldv); // piso SMLDV desde el día 3
+    const rest = dailyRest * (days - 2);
     const value = Math.round(first2 + rest);
-    console.log('🏥 General standard >2 days: first2, rest, total', first2, rest, value);
+    console.log('🏥 General standard >2 days with SMLDV floor: first2, dailyRest, restDays, total', first2, dailyRest, days - 2, value);
     return value;
   }
 }
@@ -361,15 +381,18 @@ function calculateNovedadesTotalsWithPolicy(input: any, policy: CompanyPayrollPo
             salarioMinimo
           );
           const dailySalary = Number(input.salarioBase || 0) / 30;
-          if (policy.incapacity_policy === 'from_day1_66_with_floor') {
+          if (normalizeIncapacitySubtype(novedad.subtipo) === 'laboral') {
+            detalleCalculo = `Incapacidad laboral: ${dias} días × 100% = ${valorCalculado.toLocaleString()}`;
+          } else if (policy.incapacity_policy === 'from_day1_66_with_floor') {
             const smldv = salarioMinimo / 30;
             const daily66 = dailySalary * 0.6667;
             const dailyApplied = Math.max(daily66, smldv);
-            detalleCalculo = `Incapacidad ${novedad.subtipo || 'general'}: ${dias} días × máx(66.67% diario, SMLDV=${Math.round(smldv)}) = ${valorCalculado.toLocaleString()}`;
+            detalleCalculo = `Incapacidad general (política día 1 con piso): ${dias} días × máx(66.67% diario, SMLDV=${Math.round(smldv)}) = ${valorCalculado.toLocaleString()}`;
           } else {
             const dias100 = Math.min(dias, 2);
-            const dias66 = Math.max(dias - 2, 0);
-            detalleCalculo = `Incapacidad general: ${dias100} días al 100% + ${dias66} días al 66.67%`;
+            const diasResto = Math.max(dias - 2, 0);
+            const smldv = salarioMinimo / 30;
+            detalleCalculo = `Incapacidad general (estándar): ${dias100} días al 100% + ${diasResto} días × máx(66.67% diario, SMLDV=${Math.round(smldv)}) = ${valorCalculado.toLocaleString()}`;
           }
           console.log('🏥 Totals incapacidad calculada:', { valorOriginal, valorCalculado, detalleCalculo });
         }
@@ -472,7 +495,6 @@ serve(async (req) => {
     // Cargar política de la empresa del usuario
     const { policy } = await getCompanyPolicy(req);
 
-    // ✅ NUEVO HANDLER PROFESIONAL: cálculo centralizado de totales de novedades
     if (action === 'calculate-novedades-totals') {
       const input = data as any; // NovedadesTotalsInput
       if (!input.salarioBase || input.salarioBase <= 0) {
@@ -486,7 +508,6 @@ serve(async (req) => {
       return new Response(JSON.stringify({ success: true, data: result }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // ✅ HANDLER EXISTENTE: cálculo individual de novedad
     if (action === 'calculate-novedad') {
       const input = data as any; // NovedadCalculationInput
       const fecha = parseFecha(input.fechaPeriodo);
@@ -549,13 +570,29 @@ serve(async (req) => {
       } else if (input.tipoNovedad === 'incapacidad') {
         const dias = Number(input.dias || 0);
         const valor = Math.round(
-          calculateIncapacityValuePolicyAware(salario, dias, input.subtipo, policy, getConfiguration(input.year).salarioMinimo)
+          calculateIncapacityValuePolicyAware(salario, dias, input.subtipo, policy, config.salarioMinimo)
         );
         const jornada = getJornadaLegalInfo(fecha);
+
+        // Detalle según política y subtipo
+        let detalle = '';
+        const s = normalizeIncapacitySubtype(input.subtipo);
+        if (s === 'laboral') {
+          detalle = `Incapacidad laboral: ${dias} días × 100%`;
+        } else if (policy.incapacity_policy === 'from_day1_66_with_floor') {
+          const smldv = config.salarioMinimo / 30;
+          detalle = `Incapacidad general: ${dias} días × máx(66.67% diario, SMLDV=${Math.round(smldv)})`;
+        } else {
+          const smldv = config.salarioMinimo / 30;
+          const dias100 = Math.min(dias, 2);
+          const diasResto = Math.max(dias - 2, 0);
+          detalle = `Incapacidad general: ${dias100} días al 100% + ${diasResto} días × máx(66.67% diario, SMLDV=${Math.round(smldv)})`;
+        }
+
         result = {
           valor,
           factorCalculo: dias,
-          detalleCalculo: `Incapacidad ${input.subtipo || 'general'} según política (${policy.incapacity_policy})`,
+          detalleCalculo: `${detalle} (política=${policy.incapacity_policy})`,
           jornadaInfo: {
             horasSemanales: jornada.horasSemanales,
             horasMensuales: jornada.horasMensuales,
