@@ -1,414 +1,319 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+
+import React, { useState, useEffect, useCallback } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { NovedadType, CreateNovedadData, calcularValorNovedadEnhanced } from '@/types/novedades-enhanced';
-import { Calculator } from 'lucide-react';
-
-// Define the enhanced categories structure that matches the enhanced types
-const NOVEDAD_CATEGORIES_ENHANCED = {
-  devengados: {
-    label: 'Devengados',
-    types: {
-      horas_extra: { label: 'Horas Extra', icon: '⏰' },
-      recargo_nocturno: { label: 'Recargo Nocturno', icon: '🌙' },
-      vacaciones: { label: 'Vacaciones', icon: '🏖️' },
-      licencia_remunerada: { label: 'Licencia Remunerada', icon: '📋' },
-      incapacidad: { label: 'Incapacidad', icon: '🏥' },
-      bonificacion: { label: 'Bonificación', icon: '🎁' },
-      comision: { label: 'Comisión', icon: '💰' },
-      prima: { label: 'Prima', icon: '⭐' },
-      otros_ingresos: { label: 'Otros Ingresos', icon: '💵' }
-    }
-  },
-  deducciones: {
-    label: 'Deducciones',
-    types: {
-      libranza: { label: 'Libranza', icon: '🏦' },
-      multa: { label: 'Multa', icon: '⚠️' },
-      ausencia: { label: 'Ausencia', icon: '❌' },
-      descuento_voluntario: { label: 'Descuento Voluntario', icon: '📝' },
-      retencion_fuente: { label: 'Retención en la Fuente', icon: '📊' },
-      fondo_solidaridad: { label: 'Fondo de Solidaridad', icon: '🤝' },
-      salud: { label: 'Salud', icon: '🏥' },
-      pension: { label: 'Pensión', icon: '👴' },
-      arl: { label: 'ARL', icon: '🛡️' },
-      caja_compensacion: { label: 'Caja de Compensión', icon: '👨‍👩‍👧‍👦' },
-      icbf: { label: 'ICBF', icon: '👶' },
-      sena: { label: 'SENA', icon: '🎓' }
-    }
-  }
-} as const;
+import { AlertTriangle, Calculator, Info, CheckCircle2 } from 'lucide-react';
+import { CreateNovedadData, NovedadType, NOVEDAD_CATEGORIES } from '@/types/novedades-enhanced';
+import { useNovedadBackendCalculation } from '@/hooks/useNovedadBackendCalculation';
+import { formatCurrency } from '@/lib/utils';
 
 interface NovedadFormProps {
   formData: CreateNovedadData;
   onFormDataChange: (data: CreateNovedadData) => void;
-  initialData?: Partial<CreateNovedadData>;
-  employeeSalary?: number;
-  calculateSuggestedValue?: (
-    tipoNovedad: NovedadType,
-    subtipo: string | undefined,
-    horas?: number,
-    dias?: number
-  ) => number | null;
+  employeeSalary: number;
   modalType?: 'devengado' | 'deduccion';
+  showCalculationDetails?: boolean;
 }
 
-export const NovedadForm = ({
+export const NovedadForm: React.FC<NovedadFormProps> = ({
   formData,
   onFormDataChange,
-  initialData,
-  employeeSalary = 1300000,
-  calculateSuggestedValue,
-  modalType = 'devengado'
-}: NovedadFormProps) => {
-  const [selectedCategory, setSelectedCategory] = useState<'devengados' | 'deducciones'>(
-    modalType === 'devengado' ? 'devengados' : 'deducciones'
-  );
-  const [currentPeriodDate] = useState<Date>(new Date());
+  employeeSalary,
+  modalType,
+  showCalculationDetails = true
+}) => {
+  const { calculateNovedadDebounced, isLoading } = useNovedadBackendCalculation();
+  const [calculationResult, setCalculationResult] = useState<any>(null);
+  const [isCalculating, setIsCalculating] = useState(false);
+  const [calculationError, setCalculationError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (initialData?.tipo_novedad) {
-      const isInDevengados = Object.keys(NOVEDAD_CATEGORIES_ENHANCED.devengados.types).includes(initialData.tipo_novedad);
-      setSelectedCategory(isInDevengados ? 'devengados' : 'deducciones');
+  // ✅ UNIFIED CALCULATION: Always use backend for consistency
+  const triggerBackendCalculation = useCallback(() => {
+    if (!employeeSalary || employeeSalary <= 0) {
+      console.log('⚠️ No valid salary for calculation');
+      return;
     }
-  }, [initialData]);
 
-  // Configuración de campos dinámicos basada en el tipo de novedad
-  const fieldConfig = useMemo(() => {
-    const config = {
-      showHours: false,
-      showDays: false,
-      showDates: false,
-      showSubtipo: false,
-      requiresHours: false,
-      requiresDays: false,
-      requiresDates: false,
-      isAutoCalculated: false,
-      subtipoOptions: [] as Array<{value: string, label: string}>
+    setIsCalculating(true);
+    setCalculationError(null);
+
+    const calculationInput = {
+      tipoNovedad: formData.tipo_novedad,
+      subtipo: formData.subtipo,
+      salarioBase: employeeSalary,
+      horas: formData.horas ? Number(formData.horas) : undefined,
+      dias: formData.dias ? Number(formData.dias) : undefined,
+      valorManual: formData.valor ? Number(formData.valor) : undefined,
+      fechaPeriodo: new Date().toISOString() // Current period for policy lookup
     };
 
-    switch (formData.tipo_novedad) {
-      case 'horas_extra':
-        config.showHours = true;
-        config.requiresHours = true;
-        config.showSubtipo = true;
-        config.isAutoCalculated = true;
-        config.subtipoOptions = [
-          { value: 'diurnas', label: 'Diurnas (25%)' },
-          { value: 'nocturnas', label: 'Nocturnas (75%)' },
-          { value: 'dominicales_diurnas', label: 'Dominicales Diurnas (100%)' },
-          { value: 'dominicales_nocturnas', label: 'Dominicales Nocturnas (150%)' },
-          { value: 'festivas_diurnas', label: 'Festivas Diurnas (100%)' },
-          { value: 'festivas_nocturnas', label: 'Festivas Nocturnas (150%)' }
-        ];
-        break;
+    console.log('🎯 Triggering unified backend calculation:', calculationInput);
 
-      case 'recargo_nocturno':
-        config.showHours = true;
-        config.requiresHours = true;
-        config.isAutoCalculated = true;
-        break;
-
-      case 'vacaciones':
-      case 'licencia_remunerada':
-        config.showDays = true;
-        config.showDates = true;
-        config.requiresDays = true;
-        config.requiresDates = true;
-        config.isAutoCalculated = true;
-        break;
-
-      case 'incapacidad':
-        config.showDays = true;
-        config.showDates = true;
-        config.showSubtipo = true;
-        config.requiresDays = true;
-        config.requiresDates = true;
-        config.isAutoCalculated = true;
-        config.subtipoOptions = [
-          { value: 'comun', label: 'Común - EPS (66.7%)' },
-          { value: 'laboral', label: 'Laboral - ARL (100%)' }
-        ];
-        break;
-
-      case 'ausencia':
-        config.showDays = true;
-        config.showDates = true;
-        config.requiresDays = true;
-        config.isAutoCalculated = true;
-        break;
-
-      case 'bonificacion':
-      case 'comision':
-      case 'prima':
-      case 'otros_ingresos':
-        config.showHours = true;
-        config.showDays = true;
-        config.showDates = true;
-        break;
-    }
-
-    return config;
-  }, [formData.tipo_novedad]);
-
-  // Función de cálculo mejorada
-  const suggestedValue = useMemo(() => {
-    if (!employeeSalary || employeeSalary <= 0) return null;
-    if (!fieldConfig.isAutoCalculated) return null;
-    
-    const needsHours = fieldConfig.requiresHours && (!formData.horas || formData.horas <= 0);
-    const needsDays = fieldConfig.requiresDays && (!formData.dias || formData.dias <= 0);
-    
-    if (needsHours || needsDays) {
-      return null;
-    }
-
-    try {
-      if (calculateSuggestedValue) {
-        return calculateSuggestedValue(
-          formData.tipo_novedad,
-          formData.subtipo,
-          formData.horas || undefined,
-          formData.dias || undefined
-        );
+    calculateNovedadDebounced(calculationInput, (result) => {
+      setIsCalculating(false);
+      
+      if (result) {
+        console.log('✅ Backend calculation result:', result);
+        setCalculationResult(result);
+        
+        // ✅ STORE DETAILED BREAKDOWN: Update form with calculated value and breakdown
+        const updatedFormData = {
+          ...formData,
+          valor: result.valor, // Use backend-calculated value
+          base_calculo: {
+            valor_original_usuario: formData.valor || 0,
+            valor_calculado: result.valor,
+            factor_calculo: result.factorCalculo,
+            detalle_calculo: result.detalleCalculo,
+            breakdown: result.jornadaInfo || {},
+            policy_snapshot: {
+              calculation_date: new Date().toISOString(),
+              salary_used: employeeSalary,
+              days_used: formData.dias,
+              hours_used: formData.horas
+            }
+          }
+        };
+        
+        onFormDataChange(updatedFormData);
+      } else {
+        setCalculationError('Error en el cálculo backend');
       }
-      
-      const resultado = calcularValorNovedadEnhanced(
-        formData.tipo_novedad,
-        formData.subtipo,
-        employeeSalary,
-        formData.dias || undefined,
-        formData.horas || undefined,
-        currentPeriodDate
-      );
-      
-      return resultado.valor > 0 ? resultado.valor : null;
-    } catch (error) {
-      console.error('Error calculating suggested value:', error);
-      return null;
-    }
-  }, [
-    employeeSalary,
-    formData.tipo_novedad,
-    formData.subtipo,
-    formData.horas,
-    formData.dias,
-    fieldConfig.isAutoCalculated,
-    fieldConfig.requiresHours,
-    fieldConfig.requiresDays,
-    currentPeriodDate,
-    calculateSuggestedValue
-  ]);
+    }, 300);
+  }, [formData.tipo_novedad, formData.subtipo, employeeSalary, formData.horas, formData.dias, formData.valor, calculateNovedadDebounced, onFormDataChange, formData]);
 
-  // Auto-apply suggested value when available
+  // Trigger calculation when relevant fields change
   useEffect(() => {
-    if (suggestedValue && suggestedValue > 0 && formData.valor === 0) {
-      onFormDataChange({ ...formData, valor: suggestedValue });
+    if (shouldTriggerAutoCalculation()) {
+      triggerBackendCalculation();
     }
-  }, [suggestedValue, formData, onFormDataChange]);
+  }, [formData.tipo_novedad, formData.subtipo, formData.horas, formData.dias, employeeSalary, triggerBackendCalculation]);
 
-  const handleInputChange = useCallback((field: keyof CreateNovedadData, value: any) => {
-    onFormDataChange({ ...formData, [field]: value });
-  }, [formData, onFormDataChange]);
+  const shouldTriggerAutoCalculation = () => {
+    const requiresHours = ['horas_extra', 'recargo_nocturno'].includes(formData.tipo_novedad);
+    const requiresDays = ['vacaciones', 'incapacidad', 'licencia_remunerada', 'licencia_no_remunerada', 'ausencia'].includes(formData.tipo_novedad);
+
+    if (requiresHours && (!formData.horas || formData.horas <= 0)) return false;
+    if (requiresDays && (!formData.dias || formData.dias <= 0)) return false;
+    
+    return employeeSalary > 0;
+  };
+
+  const getFilteredCategories = () => {
+    if (modalType === 'devengado') {
+      return NOVEDAD_CATEGORIES.devengados;
+    } else if (modalType === 'deduccion') {
+      return NOVEDAD_CATEGORIES.deducciones;
+    }
+    return NOVEDAD_CATEGORIES;
+  };
+
+  const categories = getFilteredCategories();
+  const tipoOptions = Object.entries(categories.types || {});
+
+  const showCalculationBreakdown = showCalculationDetails && calculationResult && !isCalculating;
+  const hasValueAdjustment = calculationResult && formData.base_calculo?.valor_original_usuario !== calculationResult.valor;
 
   return (
-    <div className="space-y-4">
-      {/* Category Selection - Only show if modalType is not defined */}
-      {!modalType && (
-        <div className="flex rounded-lg border p-1">
-          <Button
-            type="button"
-            variant={selectedCategory === 'devengados' ? 'default' : 'ghost'}
-            onClick={() => setSelectedCategory('devengados')}
-            className="flex-1"
-            size="sm"
-          >
-            Devengados
-          </Button>
-          <Button
-            type="button"
-            variant={selectedCategory === 'deducciones' ? 'default' : 'ghost'}
-            onClick={() => setSelectedCategory('deducciones')}
-            className="flex-1"
-            size="sm"
-          >
-            Deducciones
-          </Button>
-        </div>
-      )}
-
+    <div className="space-y-6">
       {/* Tipo de Novedad */}
       <div className="space-y-2">
-        <Label>Tipo de Novedad</Label>
-        <Select
-          value={formData.tipo_novedad}
-          onValueChange={(value) => {
-            const newTipoNovedad = value as NovedadType;
-            onFormDataChange({
-              ...formData,
-              tipo_novedad: newTipoNovedad,
-              subtipo: newTipoNovedad === 'horas_extra' ? 'diurnas' : 
-                       newTipoNovedad === 'incapacidad' ? 'comun' : '',
-              horas: null,
-              dias: null,
-              fecha_inicio: '',
-              fecha_fin: '',
-              valor: 0
+        <Label htmlFor="tipo_novedad">Tipo de Novedad *</Label>
+        <Select 
+          value={formData.tipo_novedad} 
+          onValueChange={(value: NovedadType) => {
+            onFormDataChange({ 
+              ...formData, 
+              tipo_novedad: value,
+              subtipo: undefined, // Reset subtipo when changing type
+              valor: 0 // Reset value for recalculation
             });
           }}
         >
           <SelectTrigger>
-            <SelectValue />
+            <SelectValue placeholder="Seleccionar tipo" />
           </SelectTrigger>
           <SelectContent>
-            {Object.entries(NOVEDAD_CATEGORIES_ENHANCED[selectedCategory].types).map(([key, config]) => (
+            {tipoOptions.map(([key, config]) => (
               <SelectItem key={key} value={key}>
-                <div className="flex items-center space-x-2">
-                  <span>{config.icon}</span>
-                  <span>{config.label}</span>
-                </div>
+                {config.label}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
       </div>
 
-      {/* Subtipo Selection */}
-      {fieldConfig.showSubtipo && fieldConfig.subtipoOptions.length > 0 && (
+      {/* Subtipo (conditional) */}
+      {formData.tipo_novedad === 'incapacidad' && (
         <div className="space-y-2">
-          <Label>
-            {formData.tipo_novedad === 'horas_extra' ? 'Tipo de Horas Extra' : 'Tipo de Incapacidad'}
-          </Label>
-          <Select
-            value={formData.subtipo || (formData.tipo_novedad === 'horas_extra' ? 'diurnas' : 'comun')}
-            onValueChange={(value) => handleInputChange('subtipo', value)}
+          <Label htmlFor="subtipo">Subtipo de Incapacidad *</Label>
+          <Select 
+            value={formData.subtipo || ''} 
+            onValueChange={(value) => onFormDataChange({ ...formData, subtipo: value })}
           >
             <SelectTrigger>
-              <SelectValue />
+              <SelectValue placeholder="Seleccionar subtipo" />
             </SelectTrigger>
             <SelectContent>
-              {fieldConfig.subtipoOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
+              <SelectItem value="general">General (EPS)</SelectItem>
+              <SelectItem value="laboral">Laboral (ARL)</SelectItem>
             </SelectContent>
           </Select>
         </div>
       )}
 
-      {/* Campos dinámicos en una fila */}
-      {(fieldConfig.showHours || fieldConfig.showDays) && (
-        <div className="grid grid-cols-2 gap-4">
-          {fieldConfig.showHours && (
-            <div className="space-y-2">
-              <Label>Horas {fieldConfig.requiresHours && '*'}</Label>
-              <Input
-                type="number"
-                min="0"
-                max="24"
-                step="0.5"
-                value={formData.horas || ''}
-                onChange={(e) => handleInputChange('horas', e.target.value ? parseFloat(e.target.value) : null)}
-                placeholder="0"
-              />
-            </div>
-          )}
-
-          {fieldConfig.showDays && (
-            <div className="space-y-2">
-              <Label>Días {fieldConfig.requiresDays && '*'}</Label>
-              <Input
-                type="number"
-                min="0"
-                value={formData.dias || ''}
-                onChange={(e) => handleInputChange('dias', e.target.value ? parseInt(e.target.value) : null)}
-                placeholder="0"
-              />
-            </div>
-          )}
+      {/* Días (conditional) */}
+      {['vacaciones', 'incapacidad', 'licencia_remunerada', 'licencia_no_remunerada', 'ausencia'].includes(formData.tipo_novedad) && (
+        <div className="space-y-2">
+          <Label htmlFor="dias">Días *</Label>
+          <Input
+            id="dias"
+            type="number"
+            min="0"
+            step="1"
+            value={formData.dias || ''}
+            onChange={(e) => onFormDataChange({ 
+              ...formData, 
+              dias: e.target.value ? Number(e.target.value) : undefined 
+            })}
+            placeholder="Número de días"
+          />
         </div>
       )}
 
-      {/* Date Fields */}
-      {fieldConfig.showDates && (
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Fecha Inicio {fieldConfig.requiresDates && '*'}</Label>
-            <Input
-              type="date"
-              value={formData.fecha_inicio || ''}
-              onChange={(e) => handleInputChange('fecha_inicio', e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Fecha Fin {fieldConfig.requiresDates && '*'}</Label>
-            <Input
-              type="date"
-              value={formData.fecha_fin || ''}
-              onChange={(e) => handleInputChange('fecha_fin', e.target.value)}
-            />
-          </div>
+      {/* Horas (conditional) */}
+      {['horas_extra', 'recargo_nocturno'].includes(formData.tipo_novedad) && (
+        <div className="space-y-2">
+          <Label htmlFor="horas">Horas *</Label>
+          <Input
+            id="horas"
+            type="number"
+            min="0"
+            step="0.5"
+            value={formData.horas || ''}
+            onChange={(e) => onFormDataChange({ 
+              ...formData, 
+              horas: e.target.value ? Number(e.target.value) : undefined 
+            })}
+            placeholder="Número de horas"
+          />
         </div>
       )}
 
-      {/* Valor */}
+      {/* ✅ UNIFIED VALUE DISPLAY: Show backend-calculated value */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label>Valor *</Label>
-          {suggestedValue && suggestedValue !== formData.valor && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => handleInputChange('valor', suggestedValue)}
-              className="text-xs h-7 px-2 bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
-            >
-              <Calculator className="h-3 w-3 mr-1" />
-              ${suggestedValue.toLocaleString()}
-            </Button>
+        <Label htmlFor="valor">Valor Calculado</Label>
+        <div className="relative">
+          <Input
+            id="valor"
+            type="number"
+            value={formData.valor || ''}
+            onChange={(e) => onFormDataChange({ 
+              ...formData, 
+              valor: e.target.value ? Number(e.target.value) : 0 
+            })}
+            placeholder="Valor será calculado automáticamente"
+            className={hasValueAdjustment ? 'border-orange-300 bg-orange-50' : ''}
+          />
+          {isCalculating && (
+            <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+            </div>
           )}
         </div>
-
-        <Input
-          type="number"
-          min="0"
-          step="1000"
-          value={formData.valor}
-          onChange={(e) => handleInputChange('valor', parseFloat(e.target.value) || 0)}
-          placeholder="0"
-          className="text-lg font-medium"
-        />
+        
+        {hasValueAdjustment && (
+          <div className="flex items-center gap-2 text-sm text-orange-600">
+            <AlertTriangle className="h-4 w-4" />
+            <span>Valor ajustado por política empresarial</span>
+          </div>
+        )}
       </div>
+
+      {/* ✅ CALCULATION BREAKDOWN: Show detailed calculation info */}
+      {showCalculationBreakdown && (
+        <Card className="border-blue-200 bg-blue-50">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Calculator className="h-4 w-4" />
+              Detalle del Cálculo
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span>Valor calculado:</span>
+                <Badge variant="outline" className="bg-white">
+                  {formatCurrency(calculationResult.valor)}
+                </Badge>
+              </div>
+              
+              {calculationResult.factorCalculo && (
+                <div className="flex justify-between">
+                  <span>Factor aplicado:</span>
+                  <span className="font-mono text-xs">{calculationResult.factorCalculo}x</span>
+                </div>
+              )}
+            </div>
+            
+            {calculationResult.detalleCalculo && (
+              <div className="bg-white p-2 rounded text-xs border">
+                <div className="flex items-start gap-2">
+                  <Info className="h-3 w-3 mt-0.5 text-blue-500 flex-shrink-0" />
+                  <span>{calculationResult.detalleCalculo}</span>
+                </div>
+              </div>
+            )}
+
+            {calculationResult.jornadaInfo && (
+              <div className="text-xs text-gray-600 bg-white p-2 rounded border">
+                <div className="font-medium mb-1">Información de jornada:</div>
+                <div>• Valor hora ordinaria: {formatCurrency(calculationResult.jornadaInfo.valorHoraOrdinaria || 0)}</div>
+                <div>• {calculationResult.jornadaInfo.descripcion}</div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {calculationError && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+          <div className="flex items-center gap-2 text-red-600 text-sm">
+            <AlertTriangle className="h-4 w-4" />
+            <span>{calculationError}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Manual recalculation button */}
+      {employeeSalary > 0 && !isCalculating && (
+        <Button 
+          type="button"
+          variant="outline" 
+          onClick={triggerBackendCalculation}
+          className="w-full"
+        >
+          <Calculator className="h-4 w-4 mr-2" />
+          Recalcular con Política Actual
+        </Button>
+      )}
 
       {/* Observaciones */}
       <div className="space-y-2">
-        <Label>Observaciones</Label>
+        <Label htmlFor="observacion">Observaciones</Label>
         <Textarea
+          id="observacion"
           value={formData.observacion || ''}
-          onChange={(e) => handleInputChange('observacion', e.target.value)}
-          placeholder="Observaciones adicionales..."
-          rows={2}
-          className="resize-none"
+          onChange={(e) => onFormDataChange({ ...formData, observacion: e.target.value })}
+          placeholder="Observaciones adicionales (opcional)"
+          rows={3}
         />
       </div>
-
-      {/* Preview simple */}
-      {formData.valor > 0 && (
-        <div className="p-2 bg-gray-50 rounded text-center">
-          <Badge 
-            variant={selectedCategory === 'devengados' ? 'default' : 'destructive'}
-            className="text-sm px-3 py-1"
-          >
-            {selectedCategory === 'devengados' ? '+' : '-'} ${formData.valor.toLocaleString()}
-          </Badge>
-        </div>
-      )}
     </div>
   );
 };

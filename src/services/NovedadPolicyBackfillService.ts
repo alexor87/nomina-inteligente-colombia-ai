@@ -1,0 +1,281 @@
+
+import { supabase } from '@/integrations/supabase/client';
+import { CompanyPayrollPoliciesService } from './CompanyPayrollPoliciesService';
+import { IncapacityCalculationService } from './IncapacityCalculationService';
+
+interface BackfillResult {
+  success: boolean;
+  processed: number;
+  updated: number;
+  errors: string[];
+}
+
+export class NovedadPolicyBackfillService {
+  /**
+   * ✅ BACKFILL: Update existing incapacities with proper policy-aware calculations
+   */
+  static async backfillIncapacityNovelties(
+    companyId: string, 
+    periodId?: string,
+    dryRun: boolean = false
+  ): Promise<BackfillResult> {
+    const result: BackfillResult = {
+      success: false,
+      processed: 0,
+      updated: 0,
+      errors: []
+    };
+
+    try {
+      console.log('🔄 Starting incapacity novelties backfill...', { companyId, periodId, dryRun });
+
+      // Get company's incapacity policy
+      const policies = await CompanyPayrollPoliciesService.getPayrollPolicies(companyId);
+      const incapacityPolicy = policies?.incapacity_policy || 'standard_2d_100_rest_66';
+
+      console.log('📋 Using incapacity policy:', incapacityPolicy);
+
+      // Build query for incapacities
+      let query = supabase
+        .from('payroll_novedades')
+        .select(`
+          id,
+          empleado_id,
+          periodo_id,
+          tipo_novedad,
+          subtipo,
+          valor,
+          dias,
+          fecha_inicio,
+          fecha_fin,
+          base_calculo,
+          employees!inner(salario_base)
+        `)
+        .eq('company_id', companyId)
+        .eq('tipo_novedad', 'incapacidad');
+
+      if (periodId) {
+        query = query.eq('periodo_id', periodId);
+      }
+
+      // Only process novelties from open periods
+      const { data: novelties, error: fetchError } = await query
+        .in('periodo_id', 
+          supabase
+            .from('payroll_periods_real')
+            .select('id')
+            .eq('company_id', companyId)
+            .in('estado', ['borrador', 'en_proceso'])
+        );
+
+      if (fetchError) {
+        throw fetchError;
+      }
+
+      console.log(`📊 Found ${novelties?.length || 0} incapacity novelties to process`);
+
+      if (!novelties || novelties.length === 0) {
+        result.success = true;
+        return result;
+      }
+
+      // Process each incapacity
+      for (const novedad of novelties) {
+        result.processed++;
+
+        try {
+          const employeeSalary = (novedad.employees as any)?.salario_base || 0;
+          
+          if (employeeSalary <= 0) {
+            result.errors.push(`Salary not found for employee ${novedad.empleado_id}`);
+            continue;
+          }
+
+          // Calculate correct value using current policy
+          const correctValue = IncapacityCalculationService.computeIncapacityValue(
+            employeeSalary,
+            novedad.dias || 0,
+            novedad.subtipo,
+            incapacityPolicy
+          );
+
+          const expectedBreakdown = IncapacityCalculationService.calculateExpectedValueByPolicy(
+            employeeSalary,
+            novedad.dias || 0,
+            novedad.subtipo || 'general',
+            incapacityPolicy
+          );
+
+          // Create detailed base_calculo
+          const updatedBaseCalculo = {
+            valor_original_usuario: novedad.valor,
+            valor_calculado: correctValue,
+            detalle_calculo: expectedBreakdown.breakdown,
+            policy_snapshot: {
+              incapacity_policy: incapacityPolicy,
+              calculation_date: new Date().toISOString(),
+              salary_used: employeeSalary,
+              days_used: novedad.dias,
+              subtipo_used: novedad.subtipo,
+              backfilled: true
+            },
+            factor_calculo: correctValue / employeeSalary * 30, // Approximate factor
+            breakdown: expectedBreakdown
+          };
+
+          // Only update if there's a significant difference or missing breakdown
+          const shouldUpdate = 
+            !novedad.base_calculo || 
+            Math.abs((novedad.valor || 0) - correctValue) > 1;
+
+          if (shouldUpdate && !dryRun) {
+            const { error: updateError } = await supabase
+              .from('payroll_novedades')
+              .update({
+                valor: correctValue,
+                base_calculo: updatedBaseCalculo,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', novedad.id);
+
+            if (updateError) {
+              result.errors.push(`Failed to update ${novedad.id}: ${updateError.message}`);
+              continue;
+            }
+
+            result.updated++;
+            console.log(`✅ Updated incapacity ${novedad.id}: ${novedad.valor} → ${correctValue}`);
+          } else if (shouldUpdate && dryRun) {
+            console.log(`🔍 DRY RUN - Would update ${novedad.id}: ${novedad.valor} → ${correctValue}`);
+            result.updated++;
+          }
+
+        } catch (noveltyError) {
+          result.errors.push(`Error processing ${novedad.id}: ${noveltyError}`);
+          console.error('Error processing novelty:', noveltyError);
+        }
+      }
+
+      result.success = result.errors.length < result.processed * 0.5; // Success if <50% errors
+
+      console.log('✅ Backfill completed:', result);
+      return result;
+
+    } catch (error) {
+      console.error('❌ Backfill failed:', error);
+      result.errors.push(`Global error: ${error}`);
+      return result;
+    }
+  }
+
+  /**
+   * ✅ BATCH RECALCULATION: Recalculate multiple novelties using backend service
+   */
+  static async recalculateNoveltyBatch(
+    companyId: string,
+    noveltyIds: string[]
+  ): Promise<BackfillResult> {
+    const result: BackfillResult = {
+      success: false,
+      processed: 0,
+      updated: 0,
+      errors: []
+    };
+
+    try {
+      console.log('🔄 Starting batch recalculation for novelties:', noveltyIds);
+
+      for (const noveltyId of noveltyIds) {
+        result.processed++;
+
+        try {
+          // Get novedad details
+          const { data: novedad, error: fetchError } = await supabase
+            .from('payroll_novedades')
+            .select(`
+              id,
+              empleado_id,
+              tipo_novedad,
+              subtipo,
+              dias,
+              horas,
+              valor,
+              employees!inner(salario_base)
+            `)
+            .eq('id', noveltyId)
+            .eq('company_id', companyId)
+            .single();
+
+          if (fetchError || !novedad) {
+            result.errors.push(`Novelty ${noveltyId} not found`);
+            continue;
+          }
+
+          const employeeSalary = (novedad.employees as any)?.salario_base || 0;
+
+          // Call backend calculation service
+          const { data: backendResponse, error: backendError } = await supabase.functions.invoke('payroll-calculations', {
+            body: {
+              action: 'calculate-novedad',
+              data: {
+                tipoNovedad: novedad.tipo_novedad,
+                subtipo: novedad.subtipo,
+                salarioBase: employeeSalary,
+                dias: novedad.dias,
+                horas: novedad.horas,
+                fechaPeriodo: new Date().toISOString().split('T')[0]
+              }
+            }
+          });
+
+          if (backendError || !backendResponse.success) {
+            result.errors.push(`Backend calculation failed for ${noveltyId}: ${backendError?.message || backendResponse.error}`);
+            continue;
+          }
+
+          const calculationResult = backendResponse.data;
+
+          // Update with backend result
+          const { error: updateError } = await supabase
+            .from('payroll_novedades')
+            .update({
+              valor: calculationResult.valor,
+              base_calculo: {
+                valor_original_usuario: novedad.valor,
+                valor_calculado: calculationResult.valor,
+                detalle_calculo: calculationResult.detalleCalculo,
+                factor_calculo: calculationResult.factorCalculo,
+                policy_snapshot: {
+                  calculation_date: new Date().toISOString(),
+                  salary_used: employeeSalary,
+                  recalculated: true
+                },
+                breakdown: calculationResult.jornadaInfo
+              },
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', noveltyId);
+
+          if (updateError) {
+            result.errors.push(`Failed to update ${noveltyId}: ${updateError.message}`);
+            continue;
+          }
+
+          result.updated++;
+          console.log(`✅ Recalculated novelty ${noveltyId}: ${novedad.valor} → ${calculationResult.valor}`);
+
+        } catch (noveltyError) {
+          result.errors.push(`Error processing ${noveltyId}: ${noveltyError}`);
+        }
+      }
+
+      result.success = result.updated > 0;
+      return result;
+
+    } catch (error) {
+      console.error('❌ Batch recalculation failed:', error);
+      result.errors.push(`Global error: ${error}`);
+      return result;
+    }
+  }
+}

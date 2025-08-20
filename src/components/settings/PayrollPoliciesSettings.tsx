@@ -1,154 +1,237 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Info, CheckCircle2 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Separator } from '@/components/ui/separator';
+import { Settings, Save, AlertTriangle, CheckCircle2, Info } from 'lucide-react';
+import { CompanyPayrollPoliciesService, CompanyPayrollPolicies } from '@/services/CompanyPayrollPoliciesService';
+import { NovedadPolicyManager } from './NovedadPolicyManager';
+import { IncapacityPolicyTester } from './IncapacityPolicyTester';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
-interface PayrollPoliciesSettingsProps {
-  incapacityPolicy: 'standard_2d_100_rest_66' | 'from_day1_66_with_floor';
-  onIncapacityPolicyChange: (value: 'standard_2d_100_rest_66' | 'from_day1_66_with_floor') => void;
-}
+export const PayrollPoliciesSettings = () => {
+  const [policies, setPolicies] = useState<CompanyPayrollPolicies | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [companyId, setCompanyId] = useState<string>('');
+  const { toast } = useToast();
 
-export const PayrollPoliciesSettings = ({
-  incapacityPolicy,
-  onIncapacityPolicyChange
-}: PayrollPoliciesSettingsProps) => {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          ⚙️ Políticas de Cálculo de Nómina
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Current Policy Status */}
-        <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-          <div className="flex items-center gap-2 mb-2">
-            <CheckCircle2 className="h-5 w-5 text-green-600" />
-            <h4 className="font-medium text-green-900">Política Activa Actual</h4>
-          </div>
-          <div className="text-sm text-green-800">
-            <strong>Incapacidades:</strong> {incapacityPolicy === 'standard_2d_100_rest_66' 
-              ? 'Primeros 2 días al 100%, resto al 66.67% con piso SMLDV' 
-              : 'Todos los días al 66.67% con piso SMLDV'}
-          </div>
-          <div className="text-xs text-green-600 mt-1">
-            Código: <code className="bg-green-100 px-1 rounded">{incapacityPolicy}</code>
-          </div>
-        </div>
+  // Load company ID and policies
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
 
-        {/* Automatic IBC Explanation */}
-        <div className="bg-blue-50 p-4 rounded-lg">
-          <h4 className="font-medium text-blue-900 mb-2">🤖 Cálculo Automático de IBC</h4>
-          <div className="text-sm text-blue-800 space-y-1">
-            <p><strong>Con incapacidades:</strong> IBC = Valor total de incapacidades del período</p>
-            <p><strong>Sin incapacidades:</strong> IBC = (Salario Base ÷ 30) × Días Trabajados</p>
-            <p className="text-xs text-blue-600 mt-2">
-              El sistema determina automáticamente el método más apropiado según las circunstancias de cada empleado.
-            </p>
-          </div>
-        </div>
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('company_id')
+          .eq('user_id', user.id)
+          .single();
 
-        {/* Incapacity Policy Configuration */}
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <Label className="text-base font-medium">Política de Incapacidades</Label>
-            <Tooltip>
-              <TooltipTrigger>
-                <Info className="h-4 w-4 text-gray-400" />
-              </TooltipTrigger>
-              <TooltipContent className="max-w-sm">
-                <p>Define cómo se calculan las incapacidades generales:</p>
-                <ul className="mt-2 list-disc list-inside text-sm">
-                  <li><strong>Estándar:</strong> Primeros 2 días al 100%, resto al 66.67% con piso SMLDV</li>
-                  <li><strong>Desde día 1:</strong> Todos los días al 66.67% con piso SMLDV</li>
-                </ul>
-                <p className="mt-2 text-xs">Las incapacidades laborales siempre se pagan al 100% desde el día 1.</p>
-              </TooltipContent>
-            </Tooltip>
-          </div>
+        if (profile?.company_id) {
+          setCompanyId(profile.company_id);
           
-          <RadioGroup value={incapacityPolicy} onValueChange={onIncapacityPolicyChange}>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="standard_2d_100_rest_66" id="policy-standard" />
-              <Label htmlFor="policy-standard" className="cursor-pointer">
-                <div>
-                  <div className="font-medium">Estándar (2 días 100% + resto 66.67%)</div>
-                  <div className="text-sm text-gray-600">
-                    Primeros 2 días pagados por el empleador al 100%, resto por EPS al 66.67% con piso SMLDV
+          const existingPolicies = await CompanyPayrollPoliciesService.getPayrollPolicies(profile.company_id);
+          setPolicies(existingPolicies || {
+            company_id: profile.company_id,
+            ...CompanyPayrollPoliciesService.getDefaultPolicies()
+          });
+        }
+      } catch (error) {
+        console.error('Error loading policies:', error);
+        toast({
+          title: "Error",
+          description: "No se pudieron cargar las políticas",
+          variant: "destructive"
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadData();
+  }, [toast]);
+
+  const handleSave = async () => {
+    if (!policies || !companyId) return;
+
+    setIsSaving(true);
+    try {
+      await CompanyPayrollPoliciesService.upsertPayrollPolicies(companyId, {
+        ibc_mode: policies.ibc_mode,
+        incapacity_policy: policies.incapacity_policy,
+        notes: policies.notes
+      });
+
+      toast({
+        title: "✅ Políticas Guardadas",
+        description: "Las políticas de nómina se han actualizado correctamente",
+        className: "border-green-200 bg-green-50"
+      });
+    } catch (error) {
+      console.error('Error saving policies:', error);
+      toast({
+        title: "❌ Error",
+        description: "No se pudieron guardar las políticas",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const updatePolicies = (updates: Partial<CompanyPayrollPolicies>) => {
+    if (policies) {
+      setPolicies({ ...policies, ...updates });
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Settings className="h-5 w-5" />
+            ⚙️ Políticas de Nómina
+          </CardTitle>
+        </CardHeader>
+        
+        <CardContent className="space-y-6">
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertDescription>
+              Estas políticas definen cómo se calculan automáticamente las incapacidades y el IBC (Ingreso Base de Cotización) en su empresa.
+            </AlertDescription>
+          </Alert>
+
+          {/* IBC Calculation Mode */}
+          <div className="space-y-3">
+            <Label htmlFor="ibc_mode">Modo de Cálculo del IBC</Label>
+            <Select 
+              value={policies?.ibc_mode || 'proportional'} 
+              onValueChange={(value: 'proportional' | 'full_salary') => 
+                updatePolicies({ ibc_mode: value })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="proportional">
+                  <div className="space-y-1">
+                    <div>Proporcional a días trabajados</div>
+                    <div className="text-xs text-gray-500">IBC = (Salario ÷ 30) × días trabajados + novedades constitutivas</div>
                   </div>
-                  <div className="text-xs text-blue-600 mt-1">
-                    ✅ Cumple con Art. 227 CST - Mejora legal voluntaria para días 1-2
+                </SelectItem>
+                <SelectItem value="full_salary">
+                  <div className="space-y-1">
+                    <div>Salario completo</div>
+                    <div className="text-xs text-gray-500">IBC = Salario mensual completo + novedades constitutivas</div>
                   </div>
-                </div>
-              </Label>
-            </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
             
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="from_day1_66_with_floor" id="policy-from-day1" />
-              <Label htmlFor="policy-from-day1" className="cursor-pointer">
-                <div>
-                  <div className="font-medium">Desde día 1 al 66.67% con piso SMLDV</div>
-                  <div className="text-sm text-gray-600">
-                    Todos los días al 66.67% del salario con piso de SMLDV (compatible con otro software)
-                  </div>
-                  <div className="text-xs text-blue-600 mt-1">
-                    ⚖️ Cumple estrictamente con Art. 227 CST - Pago mínimo legal
-                  </div>
-                </div>
-              </Label>
-            </div>
-          </RadioGroup>
-        </div>
-
-        {/* Legal Framework */}
-        <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-          <h4 className="font-medium text-yellow-900 mb-2">⚖️ Marco Legal de Incapacidades</h4>
-          <div className="text-sm text-yellow-800 space-y-2">
-            <div>
-              <strong>Incapacidad General (EPS):</strong>
-              <ul className="list-disc list-inside ml-2 text-xs">
-                <li>Mínimo legal: 66.67% del salario con piso de SMLDV (Art. 227 CST)</li>
-                <li>Empleador puede mejorar condiciones (pagar días 1-2 al 100%)</li>
-                <li>Días 3+ siempre a cargo de EPS al 66.67%</li>
-              </ul>
-            </div>
-            <div>
-              <strong>Incapacidad Laboral (ARL):</strong>
-              <ul className="list-disc list-inside ml-2 text-xs">
-                <li>Siempre 100% del salario desde el día 1</li>
-                <li>A cargo de ARL (no aplica política de empresa)</li>
-              </ul>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                Actual: {policies?.ibc_mode === 'proportional' ? 'Proporcional' : 'Salario Completo'}
+              </Badge>
             </div>
           </div>
-        </div>
 
-        {/* Preview/Example with Current Policy */}
-        <div className="bg-green-50 p-4 rounded-lg">
-          <h4 className="font-medium text-green-900 mb-2">💡 Ejemplo con configuración actual:</h4>
-          <div className="text-sm text-green-800 space-y-1">
-            <p><strong>IBC:</strong> Se calcula automáticamente según las circunstancias del empleado</p>
-            <p><strong>Incapacidad general (15 días, $1,400,000 salario):</strong></p>
-            <div className="ml-4 text-xs bg-white/50 p-2 rounded">
-              {incapacityPolicy === 'standard_2d_100_rest_66' ? (
-                <>
-                  <div>• Días 1-2: $93,333 × 2 = $186,667 (100%)</div>
-                  <div>• Días 3-15: máx($62,222, $47,450) × 13 = $808,888 (66.67% con piso SMLDV)</div>
-                  <div className="font-medium border-t pt-1 mt-1">Total: $995,555</div>
-                </>
-              ) : (
-                <>
-                  <div>• Días 1-15: máx($62,222, $47,450) × 15 = $933,333 (66.67% con piso SMLDV)</div>
-                  <div className="font-medium border-t pt-1 mt-1">Total: $933,333</div>
-                </>
-              )}
+          <Separator />
+
+          {/* Incapacity Policy */}
+          <div className="space-y-3">
+            <Label htmlFor="incapacity_policy">Política de Incapacidades</Label>
+            <Select 
+              value={policies?.incapacity_policy || 'standard_2d_100_rest_66'} 
+              onValueChange={(value: 'standard_2d_100_rest_66' | 'from_day1_66_with_floor') => 
+                updatePolicies({ incapacity_policy: value })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="standard_2d_100_rest_66">
+                  <div className="space-y-1">
+                    <div>Estándar: 2 días 100% + resto 66.67%</div>
+                    <div className="text-xs text-gray-500">Primeros 2 días al 100%, demás días al 66.67% con piso SMLDV</div>
+                  </div>
+                </SelectItem>
+                <SelectItem value="from_day1_66_with_floor">
+                  <div className="space-y-1">
+                    <div>Desde día 1 al 66.67% con piso</div>
+                    <div className="text-xs text-gray-500">Todos los días al 66.67% con piso SMLDV desde el primer día</div>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="bg-green-50 text-green-700">
+                Actual: {policies?.incapacity_policy === 'standard_2d_100_rest_66' ? 'Estándar' : 'Día 1 al 66.67%'}
+              </Badge>
             </div>
-            <p><strong>Incapacidad laboral (15 días):</strong> $93,333 × 15 = $1,400,000 (100% automático)</p>
           </div>
-        </div>
-      </CardContent>
-    </Card>
+
+          {/* Notes */}
+          <div className="space-y-3">
+            <Label htmlFor="notes">Notas Adicionales</Label>
+            <Textarea
+              id="notes"
+              placeholder="Notas sobre las políticas de la empresa..."
+              value={policies?.notes || ''}
+              onChange={(e) => updatePolicies({ notes: e.target.value })}
+              rows={3}
+            />
+          </div>
+
+          {/* Save Button */}
+          <Button 
+            onClick={handleSave} 
+            disabled={isSaving}
+            className="w-full"
+          >
+            {isSaving ? (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+            ) : (
+              <Save className="h-4 w-4 mr-2" />
+            )}
+            Guardar Políticas
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Policy Manager */}
+      {companyId && (
+        <NovedadPolicyManager companyId={companyId} />
+      )}
+
+      {/* Policy Tester */}
+      {policies && (
+        <IncapacityPolicyTester currentPolicy={policies.incapacity_policy} />
+      )}
+    </div>
   );
 };
