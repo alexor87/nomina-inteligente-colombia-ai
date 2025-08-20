@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -221,11 +222,9 @@ function getFactorRecargoBySubtype(subtipo: string | undefined, fecha: Date): { 
   return { factor: 0, porcentaje: '0%', normativa: 'Subtipo no reconocido' };
 }
 
-// ✅ NUEVOS TIPOS: Política de nómina por empresa
-type IbcMode = 'proportional' | 'incapacity'
+// ✅ SIMPLIFICADO: Solo política de incapacidades (sin IBC mode)
 type IncapacityPolicy = 'standard_2d_100_rest_66' | 'from_day1_66_with_floor'
 interface CompanyPayrollPolicy {
-  ibc_mode: IbcMode;
   incapacity_policy: IncapacityPolicy;
 }
 
@@ -239,7 +238,7 @@ function getSupabaseClient(req: Request) {
   });
 }
 
-// Cargar política de la empresa del usuario (ahora prioriza company_settings y cae a company_payroll_policies)
+// ✅ SIMPLIFICADO: Cargar solo política de incapacidades
 async function getCompanyPolicy(req: Request): Promise<{ companyId: string | null; policy: CompanyPayrollPolicy }> {
   try {
     const supabase = getSupabaseClient(req);
@@ -247,22 +246,21 @@ async function getCompanyPolicy(req: Request): Promise<{ companyId: string | nul
     const { data: companyIdData, error: companyErr } = await supabase.rpc('get_current_user_company_id');
     if (companyErr || !companyIdData) {
       console.log('ℹ️ No company_id from context, using defaults.', companyErr?.message);
-      return { companyId: null, policy: { ibc_mode: 'proportional', incapacity_policy: 'standard_2d_100_rest_66' } };
+      return { companyId: null, policy: { incapacity_policy: 'standard_2d_100_rest_66' } };
     }
 
     // 1) Intentar leer desde company_settings
     const { data: settingsRow, error: settingsErr } = await supabase
       .from('company_settings')
-      .select('ibc_mode, incapacity_policy')
+      .select('incapacity_policy')
       .eq('company_id', companyIdData)
       .limit(1)
       .single();
 
     if (settingsRow) {
-      const ibcMode = (settingsRow.ibc_mode as IbcMode) || 'proportional';
       const incapacityPolicy = (settingsRow.incapacity_policy as IncapacityPolicy) || 'standard_2d_100_rest_66';
-      console.log('🏢 Policy from company_settings:', { ibcMode, incapacityPolicy });
-      return { companyId: companyIdData, policy: { ibc_mode: ibcMode, incapacity_policy: incapacityPolicy } };
+      console.log('🏢 Policy from company_settings:', { incapacityPolicy });
+      return { companyId: companyIdData, policy: { incapacity_policy: incapacityPolicy } };
     } else if (settingsErr) {
       console.log('ℹ️ company_settings not available or columns missing, trying company_payroll_policies:', settingsErr.message);
     }
@@ -270,25 +268,25 @@ async function getCompanyPolicy(req: Request): Promise<{ companyId: string | nul
     // 2) Fallback a company_payroll_policies
     const { data: policyRows, error: polErr } = await supabase
       .from('company_payroll_policies')
-      .select('ibc_mode, incapacity_policy')
+      .select('incapacity_policy')
       .eq('company_id', companyIdData)
       .limit(1);
 
     if (polErr) {
       console.log('⚠️ Error fetching policy (fallback), using defaults:', polErr.message);
-      return { companyId: companyIdData, policy: { ibc_mode: 'proportional', incapacity_policy: 'standard_2d_100_rest_66' } };
+      return { companyId: companyIdData, policy: { incapacity_policy: 'standard_2d_100_rest_66' } };
     }
 
     const row = policyRows && policyRows[0];
     if (!row) {
       // Fallback por defecto si no hay fila creada
-      return { companyId: companyIdData, policy: { ibc_mode: 'proportional', incapacity_policy: 'standard_2d_100_rest_66' } };
+      return { companyId: companyIdData, policy: { incapacity_policy: 'standard_2d_100_rest_66' } };
     }
 
-    return { companyId: companyIdData, policy: { ibc_mode: row.ibc_mode as IbcMode, incapacity_policy: row.incapacity_policy as IncapacityPolicy } };
+    return { companyId: companyIdData, policy: { incapacity_policy: row.incapacity_policy as IncapacityPolicy } };
   } catch (e) {
     console.log('⚠️ getCompanyPolicy fatal, using defaults:', e);
-    return { companyId: null, policy: { ibc_mode: 'proportional', incapacity_policy: 'standard_2d_100_rest_66' } };
+    return { companyId: null, policy: { incapacity_policy: 'standard_2d_100_rest_66' } };
   }
 }
 
@@ -702,16 +700,17 @@ serve(async (req) => {
       // Salario base para aportes tradicionales
       const salarioBaseParaAportes = proportionalSalary + bonusesConstitutivos + extraHours;
 
-      // Mínimo IBC proporcional si base < SMLV
+      // ✅ LÓGICA AUTOMÁTICA DE IBC: Si hay incapacidades, usar valor de incapacidad; si no, usar proporcional
       let ibcSalud: number;
       let ibcPension: number;
 
-      if (policy.ibc_mode === 'incapacity' && totalIncapacityDays > 0) {
-        // ✅ IBC tomado del valor de incapacidad recalculado según la política
+      if (totalIncapacityDays > 0 && totalIncapacityValue > 0) {
+        // Automático: Si hay incapacidades, IBC basado en valor de incapacidad
         ibcSalud = totalIncapacityValue;
         ibcPension = totalIncapacityValue;
-        console.log('🧮 IBC por política "incapacity":', { totalIncapacityValue, totalIncapacityDays });
+        console.log('🧮 IBC automático (incapacidad):', { totalIncapacityValue, totalIncapacityDays });
       } else {
+        // Automático: Si no hay incapacidades, IBC proporcional
         if (input.baseSalary >= config.salarioMinimo) {
           ibcSalud = salarioBaseParaAportes;
           ibcPension = salarioBaseParaAportes;
@@ -720,6 +719,7 @@ serve(async (req) => {
           ibcSalud = Math.max(salarioBaseParaAportes, minIbc);
           ibcPension = Math.max(salarioBaseParaAportes, minIbc);
         }
+        console.log('🧮 IBC automático (proporcional):', { ibcSalud, effectiveWorkedDays });
       }
 
       // Total devengado
@@ -764,10 +764,11 @@ serve(async (req) => {
         ibc: ibcSalud
       };
 
-      console.log('✅ Calculation (policy-aware) result:', {
+      console.log('✅ Calculation (automatic IBC) result:', {
         policy,
         totalIncapacityDays,
         totalIncapacityValue,
+        ibcMode: totalIncapacityDays > 0 ? 'incapacity' : 'proportional',
         ibcSalud: result.ibc,
         healthDeduction: result.healthDeduction,
         pensionDeduction: result.pensionDeduction

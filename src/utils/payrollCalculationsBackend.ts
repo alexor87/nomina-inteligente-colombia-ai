@@ -1,3 +1,4 @@
+
 import { PayrollCalculationBackendService, PayrollCalculationInput } from '@/services/PayrollCalculationBackendService';
 import { PayrollEmployee, BaseEmployeeData, PayrollSummary, NovedadForIBC } from '@/types/payroll';
 import { NOVEDAD_CATEGORIES } from '@/types/novedades-enhanced';
@@ -21,7 +22,7 @@ export const calculateEmployeeBackend = async (
     bonuses: baseEmployee.bonuses, // Now includes all positive novedades
     absences: baseEmployee.absences,
     periodType,
-    // ✅ NUEVO: Incluir novedades para cálculo correcto de IBC
+    // ✅ NUEVO: Incluir novedades para cálculo correcto de IBC automático
     novedades: baseEmployee.novedades || []
   };
 
@@ -31,7 +32,7 @@ export const calculateEmployeeBackend = async (
       PayrollCalculationBackendService.validateEmployee(input, baseEmployee.eps, baseEmployee.afp)
     ]);
 
-    console.log('✅ calculateEmployeeBackend: Cálculo completado:', {
+    console.log('✅ calculateEmployeeBackend: Cálculo completado con IBC automático:', {
       employeeId: baseEmployee.id,
       ibc: calculation.ibc,
       healthDeduction: calculation.healthDeduction,
@@ -45,7 +46,7 @@ export const calculateEmployeeBackend = async (
       netPay: calculation.netPay,
       transportAllowance: calculation.transportAllowance,
       employerContributions: calculation.employerContributions,
-      // ✅ NUEVO: Incluir IBC calculado
+      // ✅ NUEVO: Incluir IBC calculado automáticamente
       ibc: calculation.ibc,
       status: validation.isValid ? 'valid' : 'error',
       errors: [...validation.errors, ...validation.warnings],
@@ -164,7 +165,7 @@ export const convertNovedadesToIBC = (novedades: any[]): NovedadForIBC[] => {
       ? normalizeIncapacitySubtype(novedad.subtipo) ?? novedad.subtipo
       : novedad.subtipo;
 
-    console.log('🔍 Aplicando constitutividad y normalización de incapacidad:', {
+    console.log('🔍 Aplicando constitutividad y normalización de incapacidad (IBC automático):', {
       tipo: novedad.tipo_novedad,
       valorOriginal: novedad.constitutivo_salario,
       constitutivo,
