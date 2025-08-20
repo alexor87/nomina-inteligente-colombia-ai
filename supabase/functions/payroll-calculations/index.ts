@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -43,6 +42,30 @@ interface PayrollCalculationResult {
   employerContributions: number;
   totalPayrollCost: number;
   ibc: number;
+}
+
+// ✅ NUEVOS TIPOS: cálculo individual de novedad (usado por el hook del frontend)
+interface NovedadCalculationInput {
+  tipoNovedad: 'horas_extra' | 'recargo_nocturno' | 'incapacidad' | string;
+  subtipo?: string;
+  salarioBase: number;
+  horas?: number;
+  dias?: number;
+  fechaPeriodo?: string; // 'YYYY-MM-DD'
+}
+
+interface NovedadCalculationResult {
+  valor: number;
+  factorCalculo: number;
+  detalleCalculo: string;
+  jornadaInfo: {
+    horasSemanales: number;
+    horasMensuales: number;
+    divisorHorario: number;
+    valorHoraOrdinaria: number;
+    ley: string;
+    descripcion: string;
+  };
 }
 
 // ✅ NUEVA FUNCIÓN: Calcular valor de incapacidad según normativa colombiana
@@ -121,6 +144,100 @@ const PORCENTAJES_NOMINA = {
   SENA: 0.02
 };
 
+// =======================
+// ✅ HELPERS JORNADA EXTRA
+// =======================
+
+// Fechas de inicio de cada fase (jornada laboral) para horas extra
+const JORNADAS_LEGALES = [
+  { fechaInicio: new Date('2026-07-15'), horasSemanales: 42, descripcion: 'Jornada final según Ley 2101 de 2021' },
+  { fechaInicio: new Date('2025-07-15'), horasSemanales: 44, descripcion: 'Cuarta fase de reducción - Ley 2101 de 2021' },
+  { fechaInicio: new Date('2024-07-15'), horasSemanales: 46, descripcion: 'Tercera fase de reducción - Ley 2101 de 2021' },
+  { fechaInicio: new Date('2023-07-15'), horasSemanales: 47, descripcion: 'Segunda fase de reducción - Ley 2101 de 2021' },
+  { fechaInicio: new Date('1950-01-01'), horasSemanales: 48, descripcion: 'Jornada máxima tradicional - Código Sustantivo del Trabajo' }
+];
+
+const HORAS_MENSUALES_POR_JORNADA: Record<number, number> = {
+  48: 240,
+  47: 235,
+  46: 230,
+  44: 220,
+  42: 210
+};
+
+function parseFecha(fechaStr?: string): Date {
+  if (!fechaStr) return new Date();
+  // Espera 'YYYY-MM-DD' o ISO, nos quedamos con la parte de fecha
+  try {
+    const iso = fechaStr.includes('T') ? fechaStr : `${fechaStr}T00:00:00`;
+    return new Date(iso);
+  } catch {
+    return new Date();
+  }
+}
+
+function getJornadaLegalInfo(fecha: Date) {
+  const vigente = [...JORNADAS_LEGALES]
+    .sort((a, b) => b.fechaInicio.getTime() - a.fechaInicio.getTime())
+    .find(j => fecha >= j.fechaInicio) || JORNADAS_LEGALES[JORNADAS_LEGALES.length - 1];
+
+  const horasMensuales = HORAS_MENSUALES_POR_JORNADA[vigente.horasSemanales] || 240;
+
+  return {
+    horasSemanales: vigente.horasSemanales,
+    horasMensuales,
+    descripcion: vigente.descripcion,
+    ley: 'Ley 2101 de 2021'
+  };
+}
+
+// Valor base hora para HORAS EXTRA: (salario/30) / (horasSemanales/6)
+function calcularValorHoraExtraBase(salarioMensual: number, fecha: Date): number {
+  const jornada = getJornadaLegalInfo(fecha);
+  const horasPorDia = jornada.horasSemanales / 6;
+  const valorDiario = salarioMensual / 30;
+  const valorHora = valorDiario / horasPorDia;
+  console.log('⏱️ Valor hora extra base:', { salarioMensual, valorDiario, horasPorDia, valorHora });
+  return valorHora;
+}
+
+function getFactorHorasExtra(subtipo?: string): number {
+  switch (subtipo) {
+    case 'diurnas': return 1.25;
+    case 'nocturnas': return 1.75;
+    case 'dominicales_diurnas': return 2.0;
+    case 'dominicales_nocturnas': return 2.5;
+    case 'festivas_diurnas': return 2.0;
+    case 'festivas_nocturnas': return 2.5;
+    default: return 1.0;
+  }
+}
+
+// =======================
+// ✅ HELPERS RECARGOS
+// =======================
+function getFactorRecargoBySubtype(subtipo: string | undefined, fecha: Date): { factor: number; porcentaje: string; normativa: string } {
+  const s = (subtipo || '').toLowerCase();
+  if (s === 'nocturno') {
+    return { factor: 0.35, porcentaje: '35%', normativa: 'CST Art. 168 - Recargo nocturno ordinario' };
+  }
+  if (s === 'dominical') {
+    if (fecha < new Date('2025-07-01')) {
+      return { factor: 0.75, porcentaje: '75%', normativa: 'Ley 789/2002 Art. 3 - hasta 30-jun-2025' };
+    } else if (fecha < new Date('2026-07-01')) {
+      return { factor: 0.80, porcentaje: '80%', normativa: 'Ley 2466/2025 - 01-jul-2025 a 30-jun-2026' };
+    } else if (fecha < new Date('2027-07-01')) {
+      return { factor: 0.90, porcentaje: '90%', normativa: 'Ley 2466/2025 - 01-jul-2026 a 30-jun-2027' };
+    } else {
+      return { factor: 1.00, porcentaje: '100%', normativa: 'Ley 2466/2025 - desde 01-jul-2027' };
+    }
+  }
+  if (s === 'nocturno_dominical') {
+    return { factor: 1.15, porcentaje: '115%', normativa: 'CST - Recargo nocturno dominical' };
+  }
+  return { factor: 0, porcentaje: '0%', normativa: 'Subtipo no reconocido' };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -129,6 +246,107 @@ serve(async (req) => {
   try {
     const { action, data } = await req.json();
     console.log('📊 Payroll calculation request:', { action, data });
+
+    // ✅ NUEVO HANDLER: cálculo individual de novedad (para horas extra, recargos, incapacidad)
+    if (action === 'calculate-novedad') {
+      const input = data as NovedadCalculationInput;
+      const fecha = parseFecha(input.fechaPeriodo);
+      const salario = Number(input.salarioBase || 0);
+
+      if (!salario || salario <= 0) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Salario base inválido' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+        );
+      }
+
+      let result: NovedadCalculationResult | null = null;
+
+      if (input.tipoNovedad === 'horas_extra') {
+        const factor = getFactorHorasExtra(input.subtipo);
+        const baseHora = calcularValorHoraExtraBase(salario, fecha);
+        const horas = Number(input.horas || 0);
+        const valor = Math.round(baseHora * factor * horas);
+
+        const jornada = getJornadaLegalInfo(fecha);
+        result = {
+          valor,
+          factorCalculo: factor,
+          detalleCalculo: `Horas extra ${input.subtipo || '—'}: ((salario ÷ 30) ÷ (jornada_semanal ÷ 6)) × factor × horas = (${Math.round(salario/30)} ÷ ${(jornada.horasSemanales/6).toFixed(3)}) × ${factor} × ${horas} = ${valor.toLocaleString()}`,
+          jornadaInfo: {
+            horasSemanales: jornada.horasSemanales,
+            horasMensuales: jornada.horasMensuales,
+            divisorHorario: jornada.horasMensuales,
+            valorHoraOrdinaria: Math.round(baseHora),
+            ley: jornada.ley,
+            descripcion: jornada.descripcion
+          }
+        };
+      } else if (input.tipoNovedad === 'recargo_nocturno') {
+        const horas = Number(input.horas || 0);
+        const { factor, porcentaje, normativa } = getFactorRecargoBySubtype(input.subtipo, fecha);
+        if (factor <= 0 || horas <= 0) {
+          return new Response(
+            JSON.stringify({ success: false, error: 'Datos insuficientes para recargo' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+          );
+        }
+        // Fórmula usada por el servicio de recargos: salario ÷ (30 × 7.333)
+        const divisor = 30 * 7.333;
+        const valorHora = salario / divisor;
+        const valorRecargo = Math.round(valorHora * factor * horas);
+
+        result = {
+          valor: valorRecargo,
+          factorCalculo: factor,
+          detalleCalculo: `Recargo ${input.subtipo || '—'}: (${salario.toLocaleString()} ÷ ${divisor.toFixed(3)}) × ${factor} × ${horas}h = ${valorRecargo.toLocaleString()} (${porcentaje}, ${normativa})`,
+          jornadaInfo: {
+            horasSemanales: 44,
+            horasMensuales: 220,
+            divisorHorario: 220,
+            valorHoraOrdinaria: Math.round(valorHora),
+            ley: 'CST / Ley 2466/2025',
+            descripcion: 'Divisor recargos 30×7.333; jornada informativa 44h/220h'
+          }
+        };
+      } else if (input.tipoNovedad === 'incapacidad') {
+        const dias = Number(input.dias || 0);
+        const subtipo = (input.subtipo || 'general').toLowerCase();
+        const valor = Math.round(calculateIncapacityValue(salario, dias, subtipo));
+        const jornada = getJornadaLegalInfo(fecha);
+
+        result = {
+          valor,
+          factorCalculo: dias, // informativo
+          detalleCalculo: `Incapacidad ${subtipo}: cálculo normativo aplicado sobre salario diario (días=${dias})`,
+          jornadaInfo: {
+            horasSemanales: jornada.horasSemanales,
+            horasMensuales: jornada.horasMensuales,
+            divisorHorario: jornada.horasMensuales,
+            valorHoraOrdinaria: Math.round((salario/30) / (jornada.horasSemanales/6)),
+            ley: jornada.ley,
+            descripcion: jornada.descripcion
+          }
+        };
+      } else {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Tipo de novedad no soportado' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+        );
+      }
+
+      console.log('✅ NOVEDAD RESULT:', {
+        tipo: input.tipoNovedad,
+        subtipo: input.subtipo,
+        valor: result?.valor,
+        factor: result?.factorCalculo
+      });
+
+      return new Response(
+        JSON.stringify({ success: true, data: result }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     if (action === 'calculate') {
       const input = data as PayrollCalculationInput;
