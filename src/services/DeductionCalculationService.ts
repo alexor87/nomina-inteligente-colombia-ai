@@ -1,5 +1,5 @@
-
 import { ConfigurationService } from './ConfigurationService';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface DeductionCalculationInput {
   salarioBase: number;
@@ -199,13 +199,57 @@ export class DeductionCalculationService {
     };
   }
 
-  // Add missing methods expected by other services
-  static validatePeriodDeductions(periodId: string): { isValid: boolean; errors: string[] } {
-    // Simplified validation - can be expanded later
-    return {
-      isValid: true,
-      errors: []
-    };
+  // Updated: return detailed shape expected by PeriodValidationService, with real counts from Supabase
+  static async validatePeriodDeductions(periodId: string): Promise<{
+    hasIssues: boolean;
+    issueCount: number;
+    totalEmployees: number;
+    message: string;
+  }> {
+    try {
+      console.log('🔎 validatePeriodDeductions: checking period', periodId);
+
+      const { data: payrolls, error } = await supabase
+        .from('payrolls')
+        .select('id, employee_id, total_deducciones')
+        .eq('period_id', periodId);
+
+      if (error) {
+        console.error('❌ Supabase error in validatePeriodDeductions:', error);
+        return {
+          hasIssues: false,
+          issueCount: 0,
+          totalEmployees: 0,
+          message: 'No se pudo verificar las deducciones del período'
+        };
+      }
+
+      const totalEmployees = payrolls?.length || 0;
+      const issueCount = (payrolls || []).filter(p => {
+        const val = (p as any).total_deducciones;
+        // Considerar problema si total_deducciones es null/undefined o <= 0
+        return val === null || val === undefined || Number(val) <= 0;
+      }).length;
+
+      const hasIssues = issueCount > 0;
+
+      return {
+        hasIssues,
+        issueCount,
+        totalEmployees,
+        message: hasIssues
+          ? `Se detectaron ${issueCount} empleados con deducciones en cero o faltantes`
+          : 'Sin inconsistencias de deducciones'
+      };
+    } catch (e) {
+      console.error('❌ validatePeriodDeductions unexpected error:', e);
+      return {
+        hasIssues: false,
+        issueCount: 0,
+        totalEmployees: 0,
+        message: 'Error al validar deducciones'
+      };
+    }
   }
 
   static getConfigurationInfo(year: string = '2025') {
