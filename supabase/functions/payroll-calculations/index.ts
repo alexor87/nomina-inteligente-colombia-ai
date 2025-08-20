@@ -99,18 +99,18 @@ interface NovedadesTotalsResult {
   }>;
 }
 
-// Configuration for different years
+// ✅ CORRECTED Configuration for different years - using correct 2025 values
 const getConfiguration = (year: string = '2025') => {
   const configs = {
     '2025': {
-      salarioMinimo: 1300000,
-      auxilioTransporte: 162000,
-      uvt: 47065
+      salarioMinimo: 1423500, // ✅ CORRECTED from 1300000
+      auxilioTransporte: 200000, // ✅ CORRECTED from 162000
+      uvt: 49799 // ✅ CORRECTED from 47065
     },
     '2024': {
-      salarioMinimo: 1160000,
-      auxilioTransporte: 140606,
-      uvt: 42412
+      salarioMinimo: 1300000, // Historical value for 2024 only
+      auxilioTransporte: 162000, // Historical value for 2024 only
+      uvt: 47065 // Historical value for 2024 only
     }
   };
   
