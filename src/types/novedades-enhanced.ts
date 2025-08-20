@@ -19,6 +19,7 @@ export interface PayrollNovedad {
   updated_at: string;
 }
 
+// ✅ UPDATED: Extended BaseCalculoData to support new calculation details
 export interface BaseCalculoData {
   salario_base: number;
   factor_calculo: number;
@@ -26,6 +27,19 @@ export interface BaseCalculoData {
   porcentaje_ley?: number;
   dias_periodo?: number;
   detalle_calculo: string;
+  // ✅ NEW: Extended properties for policy-aware calculations
+  valor_original_usuario?: number;
+  valor_calculado?: number;
+  breakdown?: any;
+  policy_snapshot?: {
+    calculation_date: string;
+    salary_used: number;
+    days_used?: number;
+    hours_used?: number;
+    incapacity_policy?: string;
+    backfilled?: boolean;
+    recalculated?: boolean;
+  };
 }
 
 // ✅ UNIFIED: Usar la misma interfaz que el servicio

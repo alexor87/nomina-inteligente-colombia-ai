@@ -13,12 +13,7 @@ interface NovedadBreakdownDisplayProps {
     valor: number;
     dias?: number;
     horas?: number;
-    base_calculo?: {
-      valor_original_usuario?: number;
-      valor_calculado?: number;
-      detalle_calculo?: string;
-      policy_snapshot?: any;
-    };
+    base_calculo?: any; // Can be JSON string or object
   };
   employeeName: string;
   showFullDetails?: boolean;
@@ -29,9 +24,20 @@ export const NovedadBreakdownDisplay: React.FC<NovedadBreakdownDisplayProps> = (
   employeeName,
   showFullDetails = false
 }) => {
-  const hasBreakdown = novedad.base_calculo;
+  // ✅ FIXED: Parse base_calculo if it's a JSON string
+  let baseCalculo = null;
+  try {
+    baseCalculo = typeof novedad.base_calculo === 'string' 
+      ? JSON.parse(novedad.base_calculo) 
+      : novedad.base_calculo;
+  } catch (error) {
+    console.warn('Failed to parse base_calculo:', error);
+    baseCalculo = novedad.base_calculo;
+  }
+
+  const hasBreakdown = baseCalculo;
   const isAdjusted = hasBreakdown && 
-    novedad.base_calculo.valor_original_usuario !== novedad.base_calculo.valor_calculado;
+    baseCalculo.valor_original_usuario !== baseCalculo.valor_calculado;
   
   const getTypeLabel = (tipo: string, subtipo?: string) => {
     if (tipo === 'incapacidad') {
@@ -79,11 +85,11 @@ export const NovedadBreakdownDisplay: React.FC<NovedadBreakdownDisplayProps> = (
           <div className="space-y-3 border-t pt-3">
             <div className="text-xs font-medium text-gray-700">Detalle del Cálculo:</div>
             
-            {novedad.base_calculo.detalle_calculo && (
+            {baseCalculo.detalle_calculo && (
               <div className="bg-blue-50 p-2 rounded text-xs border">
                 <div className="flex items-start gap-2">
                   <Info className="h-3 w-3 mt-0.5 text-blue-500 flex-shrink-0" />
-                  <span>{novedad.base_calculo.detalle_calculo}</span>
+                  <span>{baseCalculo.detalle_calculo}</span>
                 </div>
               </div>
             )}
@@ -93,20 +99,20 @@ export const NovedadBreakdownDisplay: React.FC<NovedadBreakdownDisplayProps> = (
                 <div className="space-y-1">
                   <div className="flex justify-between">
                     <span>Valor original:</span>
-                    <span className="font-mono">{formatCurrency(novedad.base_calculo.valor_original_usuario || 0)}</span>
+                    <span className="font-mono">{formatCurrency(baseCalculo.valor_original_usuario || 0)}</span>
                   </div>
                   <div className="flex justify-between font-semibold">
                     <span>Valor ajustado:</span>
-                    <span className="font-mono">{formatCurrency(novedad.base_calculo.valor_calculado || 0)}</span>
+                    <span className="font-mono">{formatCurrency(baseCalculo.valor_calculado || 0)}</span>
                   </div>
                 </div>
               </div>
             )}
 
-            {novedad.base_calculo.policy_snapshot && (
+            {baseCalculo.policy_snapshot && (
               <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
-                <div>Calculado: {new Date(novedad.base_calculo.policy_snapshot.calculation_date).toLocaleString()}</div>
-                <div>Salario base: {formatCurrency(novedad.base_calculo.policy_snapshot.salary_used)}</div>
+                <div>Calculado: {new Date(baseCalculo.policy_snapshot.calculation_date).toLocaleString()}</div>
+                <div>Salario base: {formatCurrency(baseCalculo.policy_snapshot.salary_used)}</div>
               </div>
             )}
           </div>

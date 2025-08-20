@@ -35,6 +35,25 @@ export class NovedadPolicyBackfillService {
 
       console.log('📋 Using incapacity policy:', incapacityPolicy);
 
+      // ✅ FIXED: Get open period IDs first
+      const { data: openPeriods, error: periodError } = await supabase
+        .from('payroll_periods_real')
+        .select('id')
+        .eq('company_id', companyId)
+        .in('estado', ['borrador', 'en_proceso']);
+
+      if (periodError) {
+        throw periodError;
+      }
+
+      if (!openPeriods || openPeriods.length === 0) {
+        console.log('⚠️ No open periods found');
+        result.success = true;
+        return result;
+      }
+
+      const openPeriodIds = openPeriods.map(p => p.id);
+
       // Build query for incapacities
       let query = supabase
         .from('payroll_novedades')
@@ -52,21 +71,14 @@ export class NovedadPolicyBackfillService {
           employees!inner(salario_base)
         `)
         .eq('company_id', companyId)
-        .eq('tipo_novedad', 'incapacidad');
+        .eq('tipo_novedad', 'incapacidad')
+        .in('periodo_id', openPeriodIds);
 
       if (periodId) {
         query = query.eq('periodo_id', periodId);
       }
 
-      // Only process novelties from open periods
-      const { data: novelties, error: fetchError } = await query
-        .in('periodo_id', 
-          supabase
-            .from('payroll_periods_real')
-            .select('id')
-            .eq('company_id', companyId)
-            .in('estado', ['borrador', 'en_proceso'])
-        );
+      const { data: novelties, error: fetchError } = await query;
 
       if (fetchError) {
         throw fetchError;
@@ -106,10 +118,12 @@ export class NovedadPolicyBackfillService {
             incapacityPolicy
           );
 
-          // Create detailed base_calculo
-          const updatedBaseCalculo = {
+          // Create detailed base_calculo - ✅ FIXED: Store as JSON
+          const updatedBaseCalculo = JSON.stringify({
+            salario_base: employeeSalary,
             valor_original_usuario: novedad.valor,
             valor_calculado: correctValue,
+            factor_calculo: correctValue / employeeSalary * 30, // Approximate factor
             detalle_calculo: expectedBreakdown.breakdown,
             policy_snapshot: {
               incapacity_policy: incapacityPolicy,
@@ -119,9 +133,8 @@ export class NovedadPolicyBackfillService {
               subtipo_used: novedad.subtipo,
               backfilled: true
             },
-            factor_calculo: correctValue / employeeSalary * 30, // Approximate factor
             breakdown: expectedBreakdown
-          };
+          });
 
           // Only update if there's a significant difference or missing breakdown
           const shouldUpdate = 
@@ -235,23 +248,27 @@ export class NovedadPolicyBackfillService {
 
           const calculationResult = backendResponse.data;
 
+          // ✅ FIXED: Store base_calculo as JSON string
+          const baseCalculoJson = JSON.stringify({
+            salario_base: employeeSalary,
+            valor_original_usuario: novedad.valor,
+            valor_calculado: calculationResult.valor,
+            factor_calculo: calculationResult.factorCalculo,
+            detalle_calculo: calculationResult.detalleCalculo,
+            policy_snapshot: {
+              calculation_date: new Date().toISOString(),
+              salary_used: employeeSalary,
+              recalculated: true
+            },
+            breakdown: calculationResult.jornadaInfo
+          });
+
           // Update with backend result
           const { error: updateError } = await supabase
             .from('payroll_novedades')
             .update({
               valor: calculationResult.valor,
-              base_calculo: {
-                valor_original_usuario: novedad.valor,
-                valor_calculado: calculationResult.valor,
-                detalle_calculo: calculationResult.detalleCalculo,
-                factor_calculo: calculationResult.factorCalculo,
-                policy_snapshot: {
-                  calculation_date: new Date().toISOString(),
-                  salary_used: employeeSalary,
-                  recalculated: true
-                },
-                breakdown: calculationResult.jornadaInfo
-              },
+              base_calculo: baseCalculoJson,
               updated_at: new Date().toISOString()
             })
             .eq('id', noveltyId);

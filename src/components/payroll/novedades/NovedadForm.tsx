@@ -66,6 +66,7 @@ export const NovedadForm: React.FC<NovedadFormProps> = ({
           ...formData,
           valor: result.valor, // Use backend-calculated value
           base_calculo: {
+            salario_base: employeeSalary,
             valor_original_usuario: formData.valor || 0,
             valor_calculado: result.valor,
             factor_calculo: result.factorCalculo,
@@ -114,6 +115,7 @@ export const NovedadForm: React.FC<NovedadFormProps> = ({
   };
 
   const categories = getFilteredCategories();
+  // ✅ FIXED: Access types property correctly
   const tipoOptions = Object.entries(categories.types || {});
 
   const showCalculationBreakdown = showCalculationDetails && calculationResult && !isCalculating;
@@ -141,7 +143,7 @@ export const NovedadForm: React.FC<NovedadFormProps> = ({
           <SelectContent>
             {tipoOptions.map(([key, config]) => (
               <SelectItem key={key} value={key}>
-                {config.label}
+                {(config as any).label}
               </SelectItem>
             ))}
           </SelectContent>
