@@ -1,16 +1,20 @@
-
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { ConfigurationService, PayrollConfiguration } from '@/services/ConfigurationService';
+import { CompanySettingsService } from '@/services/CompanySettingsService';
+import { useCurrentCompany } from '@/hooks/useCurrentCompany';
+import { PayrollPoliciesSettings } from '@/components/settings/PayrollPoliciesSettings';
 import { Plus, Trash2, Copy } from 'lucide-react';
 
 export const ParametrosLegalesSettings = () => {
   const { toast } = useToast();
+  const { currentCompany } = useCurrentCompany();
   const [availableYears, setAvailableYears] = useState<string[]>([]);
   const [selectedYear, setSelectedYear] = useState('2025');
   const [config, setConfig] = useState<PayrollConfiguration>({
@@ -53,13 +57,32 @@ export const ParametrosLegalesSettings = () => {
   const [showNewYearForm, setShowNewYearForm] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Company policies state
+  const [ibcMode, setIbcMode] = useState<'proportional' | 'incapacity'>('proportional');
+  const [incapacityPolicy, setIncapacityPolicy] = useState<'standard_2d_100_rest_66' | 'from_day1_66_with_floor'>('standard_2d_100_rest_66');
+
   useEffect(() => {
     loadAvailableYears();
+    loadCompanyPolicies();
   }, []);
 
   useEffect(() => {
     loadYearConfiguration();
   }, [selectedYear]);
+
+  const loadCompanyPolicies = async () => {
+    if (!currentCompany?.id) return;
+    
+    try {
+      const settings = await CompanySettingsService.getCompanySettings(currentCompany.id);
+      if (settings) {
+        setIbcMode(settings.ibc_mode || 'proportional');
+        setIncapacityPolicy(settings.incapacity_policy || 'standard_2d_100_rest_66');
+      }
+    } catch (error) {
+      console.error('Error loading company policies:', error);
+    }
+  };
 
   const loadAvailableYears = async () => {
     try {
@@ -208,6 +231,38 @@ export const ParametrosLegalesSettings = () => {
       title: "Valores recomendados cargados",
       description: `Se han cargado los valores oficiales para ${selectedYear}.`,
     });
+  };
+
+  const handleSavePolicies = async () => {
+    if (!currentCompany?.id) {
+      toast({
+        title: "Error",
+        description: "No se pudo identificar la empresa.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await CompanySettingsService.upsertCompanySettings(currentCompany.id, {
+        periodicity: 'mensual', // Default value, this should come from existing settings
+        ibc_mode: ibcMode,
+        incapacity_policy: incapacityPolicy,
+        provision_mode: 'on_liquidation' // Default value
+      });
+
+      toast({
+        title: "Políticas de nómina guardadas",
+        description: "Las políticas de cálculo han sido actualizadas correctamente.",
+      });
+    } catch (error) {
+      console.error('Error saving company policies:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron guardar las políticas de nómina.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -607,6 +662,44 @@ export const ParametrosLegalesSettings = () => {
         <Button variant="secondary" onClick={loadRecommendedValues}>
           Cargar Valores Oficiales {selectedYear}
         </Button>
+      </div>
+
+      {/* Separator between legal parameters and company policies */}
+      <Separator className="my-8" />
+
+      {/* Company Payroll Policies Section */}
+      <div className="space-y-4">
+        <div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Políticas de Nómina de la Empresa</h2>
+          <p className="text-gray-600">
+            Configura cómo se calculan los IBC y las incapacidades específicamente para tu empresa
+          </p>
+        </div>
+
+        <PayrollPoliciesSettings
+          ibcMode={ibcMode}
+          incapacityPolicy={incapacityPolicy}
+          onIbcModeChange={setIbcMode}
+          onIncapacityPolicyChange={setIncapacityPolicy}
+        />
+
+        <div className="flex gap-4">
+          <Button onClick={handleSavePolicies} className="bg-green-600 hover:bg-green-700">
+            Guardar Políticas de Nómina
+          </Button>
+          <Button 
+            variant="outline"
+            onClick={() => {
+              loadCompanyPolicies();
+              toast({
+                title: "Políticas revertidas",
+                description: "Se han restaurado las políticas guardadas.",
+              });
+            }}
+          >
+            Revertir Políticas
+          </Button>
+        </div>
       </div>
     </div>
   );
