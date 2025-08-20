@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,7 +11,6 @@ import { NovedadUnifiedModal } from '@/components/payroll/novedades/NovedadUnifi
 import { JornadaLegalTester } from '@/components/payroll/debug/JornadaLegalTester';
 import { useNovedades } from '@/hooks/useNovedades';
 import { usePayrollNovedades } from '@/hooks/usePayrollNovedades';
-import { useCurrentCompany } from '@/hooks/useCurrentCompany';
 import { PayrollEmployee } from '@/types/payroll';
 import { CreateNovedadData } from '@/types/novedades-enhanced';
 
@@ -49,7 +49,6 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({
   const [isNovedadModalOpen, setIsNovedadModalOpen] = useState(false);
   const [showDebugMode, setShowDebugMode] = useState(false);
 
-  const { companyId } = useCurrentCompany();
   const { createNovedad } = useNovedades(periodoId);
   const { refreshEmployeeNovedades } = usePayrollNovedades(periodoId);
 
@@ -61,7 +60,6 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({
     const novedadData: CreateNovedadData = {
       empleado_id: selectedEmployee.id,
       periodo_id: periodoId,
-      company_id: companyId || '',
       ...data
     };
     
@@ -229,7 +227,6 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({
             setIsNovedadModalOpen(false);
             setSelectedEmployee(null);
           }}
-          companyId={companyId}
         />
       )}
     </>
