@@ -1,9 +1,19 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+interface NovedadCalculationInput {
+  tipoNovedad: string;
+  subtipo?: string;
+  salarioBase: number;
+  horas?: number;
+  dias?: number;
+  fechaPeriodo?: string;
 }
 
 interface PayrollCalculationInput {
@@ -14,451 +24,29 @@ interface PayrollCalculationInput {
   bonuses: number;
   absences: number;
   periodType: 'quincenal' | 'mensual';
-  novedades?: Array<{
-    valor: number;
-    constitutivo_salario: boolean;
-    tipo_novedad: string;
-    subtipo?: string;
-    dias?: number;
-  }>;
+  novedades?: any[];
   year?: string;
+  // ✅ NUEVO: Política de incapacidades
+  incapacityPolicy?: 'standard_2d_100_rest_66' | 'from_day1_66_with_floor';
 }
 
-interface PayrollCalculationResult {
-  regularPay: number;
-  extraPay: number;
-  transportAllowance: number;
-  grossPay: number;
-  healthDeduction: number;
-  pensionDeduction: number;
-  totalDeductions: number;
-  netPay: number;
-  employerHealth: number;
-  employerPension: number;
-  employerArl: number;
-  employerCaja: number;
-  employerIcbf: number;
-  employerSena: number;
-  employerContributions: number;
-  totalPayrollCost: number;
-  ibc: number;
-}
-
-// ✅ NUEVOS TIPOS: cálculo individual de novedad (usado por el hook del frontend)
-interface NovedadCalculationInput {
-  tipoNovedad: 'horas_extra' | 'recargo_nocturno' | 'incapacidad' | string;
-  subtipo?: string;
-  salarioBase: number;
-  horas?: number;
-  dias?: number;
-  valorManual?: number;
-  cuotas?: number;
-  fechaPeriodo?: string;
-}
-
-interface NovedadCalculationResult {
-  valor: number;
-  factorCalculo: number;
-  detalleCalculo: string;
-  jornadaInfo: {
-    horasSemanales: number;
-    horasMensuales: number;
-    divisorHorario: number;
-    valorHoraOrdinaria: number;
-    ley: string;
-    descripcion: string;
-  };
-}
-
-// ✅ NUEVO: Cálculo de totales de novedades (centralizado profesional)
-interface NovedadesTotalsInput {
-  salarioBase: number;
-  fechaPeriodo?: string;
-  novedades: Array<{
-    tipo_novedad: string;
-    subtipo?: string;
-    valor?: number;
-    dias?: number;
-    horas?: number;
-    constitutivo_salario?: boolean;
-  }>;
-}
-
-interface NovedadesTotalsResult {
-  totalDevengos: number;
-  totalDeducciones: number;
-  totalNeto: number;
-  breakdown: Array<{
-    tipo_novedad: string;
-    subtipo?: string;
-    valorOriginal?: number;
-    valorCalculado: number;
-    esDevengo: boolean;
-    detalleCalculo?: string;
-  }>;
-}
-
-// Configuration for different years
-const getConfiguration = (year: string = '2025') => {
-  const configs = {
-    '2025': {
-      salarioMinimo: 1300000,
-      auxilioTransporte: 162000,
-      uvt: 47065
-    },
-    '2024': {
-      salarioMinimo: 1160000,
-      auxilioTransporte: 140606,
-      uvt: 42412
-    }
-  };
-  
-  return configs[year as keyof typeof configs] || configs['2025'];
+// ✅ CONSTANTES NORMATIVAS 2025
+const CONFIGURACION_2025 = {
+  salarioMinimo: 1300000,
+  auxilioTransporte: 162000,
+  uvt: 47065,
+  smldv: 43333, // SMLDV = salario mínimo / 30 días
+  porcentajes: {
+    saludEmpleado: 0.04,
+    pensionEmpleado: 0.04,
+    saludEmpleador: 0.085,
+    pensionEmpleador: 0.12,
+    arl: 0.00522,
+    caja: 0.04,
+    icbf: 0.03,
+    sena: 0.02
+  }
 };
-
-const PORCENTAJES_NOMINA = {
-  SALUD_EMPLEADO: 0.04,
-  SALUD_EMPLEADOR: 0.085,
-  PENSION_EMPLEADO: 0.04,
-  PENSION_EMPLEADOR: 0.12,
-  ARL: 0.00522,
-  CAJA_COMPENSACION: 0.04,
-  ICBF: 0.03,
-  SENA: 0.02
-};
-
-// =======================
-// ✅ HELPERS JORNADA EXTRA
-// =======================
-
-// Fechas de inicio de cada fase (jornada laboral) para horas extra
-const JORNADAS_LEGALES = [
-  { fechaInicio: new Date('2026-07-15'), horasSemanales: 42, descripcion: 'Jornada final según Ley 2101 de 2021' },
-  { fechaInicio: new Date('2025-07-15'), horasSemanales: 44, descripcion: 'Cuarta fase de reducción - Ley 2101 de 2021' },
-  { fechaInicio: new Date('2024-07-15'), horasSemanales: 46, descripcion: 'Tercera fase de reducción - Ley 2101 de 2021' },
-  { fechaInicio: new Date('2023-07-15'), horasSemanales: 47, descripcion: 'Segunda fase de reducción - Ley 2101 de 2021' },
-  { fechaInicio: new Date('1950-01-01'), horasSemanales: 48, descripcion: 'Jornada máxima tradicional - Código Sustantivo del Trabajo' }
-];
-
-const HORAS_MENSUALES_POR_JORNADA: Record<number, number> = {
-  48: 240,
-  47: 235,
-  46: 230,
-  44: 220,
-  42: 210
-};
-
-function parseFecha(fechaStr?: string): Date {
-  if (!fechaStr) return new Date();
-  // Espera 'YYYY-MM-DD' o ISO, nos quedamos con la parte de fecha
-  try {
-    const iso = fechaStr.includes('T') ? fechaStr : `${fechaStr}T00:00:00`;
-    return new Date(iso);
-  } catch {
-    return new Date();
-  }
-}
-
-function getJornadaLegalInfo(fecha: Date) {
-  const vigente = [...JORNADAS_LEGALES]
-    .sort((a, b) => b.fechaInicio.getTime() - a.fechaInicio.getTime())
-    .find(j => fecha >= j.fechaInicio) || JORNADAS_LEGALES[JORNADAS_LEGALES.length - 1];
-
-  const horasMensuales = HORAS_MENSUALES_POR_JORNADA[vigente.horasSemanales] || 240;
-
-  return {
-    horasSemanales: vigente.horasSemanales,
-    horasMensuales,
-    descripcion: vigente.descripcion,
-    ley: 'Ley 2101 de 2021'
-  };
-}
-
-// Valor base hora para HORAS EXTRA: (salario/30) / (horasSemanales/6)
-function calcularValorHoraExtraBase(salarioMensual: number, fecha: Date): number {
-  const jornada = getJornadaLegalInfo(fecha);
-  const horasPorDia = jornada.horasSemanales / 6;
-  const valorDiario = salarioMensual / 30;
-  const valorHora = valorDiario / horasPorDia;
-  console.log('⏱️ Valor hora extra base:', { salarioMensual, valorDiario, horasPorDia, valorHora });
-  return valorHora;
-}
-
-function getFactorHorasExtra(subtipo?: string): number {
-  switch (subtipo) {
-    case 'diurnas': return 1.25;
-    case 'nocturnas': return 1.75;
-    case 'dominicales_diurnas': return 2.0;
-    case 'dominicales_nocturnas': return 2.5;
-    case 'festivas_diurnas': return 2.0;
-    case 'festivas_nocturnas': return 2.5;
-    default: return 1.0;
-  }
-}
-
-// =======================
-// ✅ HELPERS RECARGOS
-// =======================
-function getFactorRecargoBySubtype(subtipo: string | undefined, fecha: Date): { factor: number; porcentaje: string; normativa: string } {
-  const s = (subtipo || '').toLowerCase();
-  if (s === 'nocturno') {
-    return { factor: 0.35, porcentaje: '35%', normativa: 'CST Art. 168 - Recargo nocturno ordinario' };
-  }
-  if (s === 'dominical') {
-    if (fecha < new Date('2025-07-01')) {
-      return { factor: 0.75, porcentaje: '75%', normativa: 'Ley 789/2002 Art. 3 - hasta 30-jun-2025' };
-    } else if (fecha < new Date('2026-07-01')) {
-      return { factor: 0.80, porcentaje: '80%', normativa: 'Ley 2466/2025 - 01-jul-2025 a 30-jun-2026' };
-    } else if (fecha < new Date('2027-07-01')) {
-      return { factor: 0.90, porcentaje: '90%', normativa: 'Ley 2466/2025 - 01-jul-2026 a 30-jun-2027' };
-    } else {
-      return { factor: 1.00, porcentaje: '100%', normativa: 'Ley 2466/2025 - desde 01-jul-2027' };
-    }
-  }
-  if (s === 'nocturno_dominical') {
-    return { factor: 1.15, porcentaje: '115%', normativa: 'CST - Recargo nocturno dominical' };
-  }
-  return { factor: 0, porcentaje: '0%', normativa: 'Subtipo no reconocido' };
-}
-
-// ✅ NUEVOS TIPOS: Política de nómina por empresa
-type IbcMode = 'proportional' | 'incapacity'
-type IncapacityPolicy = 'standard_2d_100_rest_66' | 'from_day1_66_with_floor'
-interface CompanyPayrollPolicy {
-  ibc_mode: IbcMode;
-  incapacity_policy: IncapacityPolicy;
-}
-
-// Helper para cliente Supabase con contexto del usuario
-function getSupabaseClient(req: Request) {
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-  const authHeader = req.headers.get('Authorization') || '';
-  return createClient(supabaseUrl, supabaseAnonKey, {
-    global: { headers: { Authorization: authHeader } }
-  });
-}
-
-// Cargar política de la empresa del usuario (con fallback por defecto)
-async function getCompanyPolicy(req: Request): Promise<{ companyId: string | null; policy: CompanyPayrollPolicy }> {
-  try {
-    const supabase = getSupabaseClient(req);
-    // Obtener company_id del usuario actual
-    const { data: companyIdData, error: companyErr } = await supabase.rpc('get_current_user_company_id');
-    if (companyErr || !companyIdData) {
-      console.log('ℹ️ No company_id from context, using defaults.', companyErr?.message);
-      return { companyId: null, policy: { ibc_mode: 'proportional', incapacity_policy: 'standard_2d_100_rest_66' } };
-    }
-
-    const { data: policyRows, error: polErr } = await supabase
-      .from('company_payroll_policies')
-      .select('ibc_mode, incapacity_policy')
-      .eq('company_id', companyIdData)
-      .limit(1);
-
-    if (polErr) {
-      console.log('⚠️ Error fetching policy, using defaults:', polErr.message);
-      return { companyId: companyIdData, policy: { ibc_mode: 'proportional', incapacity_policy: 'standard_2d_100_rest_66' } };
-    }
-
-    const row = policyRows && policyRows[0];
-    if (!row) {
-      // Fallback por defecto si no hay fila creada
-      return { companyId: companyIdData, policy: { ibc_mode: 'proportional', incapacity_policy: 'standard_2d_100_rest_66' } };
-    }
-
-    return { companyId: companyIdData, policy: { ibc_mode: row.ibc_mode as IbcMode, incapacity_policy: row.incapacity_policy as IncapacityPolicy } };
-  } catch (e) {
-    console.log('⚠️ getCompanyPolicy fatal, using defaults:', e);
-    return { companyId: null, policy: { ibc_mode: 'proportional', incapacity_policy: 'standard_2d_100_rest_66' } };
-  }
-}
-
-// Normalizador de subtipos de incapacidad
-function normalizeIncapacitySubtype(subtipo?: string): 'general' | 'laboral' {
-  const s = (subtipo || 'general').toLowerCase().trim();
-  if (['laboral', 'arl', 'accidente_laboral', 'riesgo_laboral', 'at'].includes(s)) return 'laboral';
-  return 'general'; // comun/común/eg/general → general
-}
-
-// ✅ NUEVA VERSIÓN con política: cálculo de incapacidad
-function calculateIncapacityValuePolicyAware(
-  baseSalary: number,
-  days: number,
-  subtipo: string | undefined,
-  policy: CompanyPayrollPolicy,
-  salarioMinimo: number
-): number {
-  const dailySalary = baseSalary / 30;
-  const s = normalizeIncapacitySubtype(subtipo);
-
-  console.log('🏥 Incapacity with policy:', {
-    baseSalary, days, subtipo, normalized: s, policy, dailySalary, smlv: salarioMinimo
-  });
-
-  if (s === 'laboral') {
-    // ARL paga 100% desde el día 1
-    const value = Math.round(dailySalary * days);
-    console.log('🏥 Laboral 100% value:', value);
-    return value;
-  }
-
-  // general/común
-  if (policy.incapacity_policy === 'from_day1_66_with_floor') {
-    // Desde día 1 al 66.67% con piso diario SMLDV (SMLV/30)
-    const daily66 = dailySalary * 0.6667;
-    const smldv = salarioMinimo / 30;
-    const dailyApplied = Math.max(daily66, smldv);
-    const value = Math.round(dailyApplied * days);
-    console.log('🏥 General with floor: daily66, smldv, applied, total', daily66, smldv, dailyApplied, value);
-    return value;
-  }
-
-  // Estándar: días 1-2 al 100%, 3+ al 66.67%
-  if (days <= 2) {
-    const value = Math.round(dailySalary * days);
-    console.log('🏥 General standard ≤2 days:', value);
-    return value;
-  } else {
-    const first2 = dailySalary * 2;
-    const rest = dailySalary * (days - 2) * 0.6667;
-    const value = Math.round(first2 + rest);
-    console.log('🏥 General standard >2 days: first2, rest, total', first2, rest, value);
-    return value;
-  }
-}
-
-// ✅ Actualizamos el cálculo profesional de totales de novedades para usar política
-function calculateNovedadesTotalsWithPolicy(input: any, policy: CompanyPayrollPolicy, salarioMinimo: number): any {
-  const fecha = parseFecha(input.fechaPeriodo);
-  let totalDevengos = 0;
-  let totalDeducciones = 0;
-  const breakdown: any[] = [];
-
-  console.log('📊 BACKEND: Calculando totales de novedades con política:', {
-    salarioBase: input.salarioBase,
-    fechaPeriodo: input.fechaPeriodo,
-    novedadesCount: input.novedades.length,
-    policy
-  });
-
-  for (const novedad of input.novedades) {
-    let valorCalculado = Number(novedad.valor || 0);
-    let detalleCalculo = 'Valor manual';
-    let esDevengo = true;
-    let valorOriginal = valorCalculado;
-
-    switch (novedad.tipo_novedad) {
-      case 'incapacidad': {
-        const dias = Number(novedad.dias || 0);
-        if (dias > 0) {
-          valorOriginal = valorCalculado;
-          valorCalculado = calculateIncapacityValuePolicyAware(
-            Number(input.salarioBase || 0),
-            dias,
-            novedad.subtipo,
-            policy,
-            salarioMinimo
-          );
-          const dailySalary = Number(input.salarioBase || 0) / 30;
-          if (policy.incapacity_policy === 'from_day1_66_with_floor') {
-            const smldv = salarioMinimo / 30;
-            const daily66 = dailySalary * 0.6667;
-            const dailyApplied = Math.max(daily66, smldv);
-            detalleCalculo = `Incapacidad ${novedad.subtipo || 'general'}: ${dias} días × máx(66.67% diario, SMLDV=${Math.round(smldv)}) = ${valorCalculado.toLocaleString()}`;
-          } else {
-            const dias100 = Math.min(dias, 2);
-            const dias66 = Math.max(dias - 2, 0);
-            detalleCalculo = `Incapacidad general: ${dias100} días al 100% + ${dias66} días al 66.67%`;
-          }
-          console.log('🏥 Totals incapacidad calculada:', { valorOriginal, valorCalculado, detalleCalculo });
-        }
-        esDevengo = true;
-        break;
-      }
-
-      case 'horas_extra': {
-        const horas = Number(novedad.horas || 0);
-        if (horas > 0) {
-          valorOriginal = valorCalculado;
-          const factor = getFactorHorasExtra(novedad.subtipo);
-          const baseHora = calcularValorHoraExtraBase(Number(input.salarioBase || 0), fecha);
-          valorCalculado = Math.round(baseHora * factor * horas);
-          detalleCalculo = `Horas extra ${novedad.subtipo || 'diurnas'}: ${horas}h × ${factor}`;
-        }
-        esDevengo = true;
-        break;
-      }
-
-      case 'recargo_nocturno': {
-        const horas = Number(novedad.horas || 0);
-        if (horas > 0) {
-          valorOriginal = valorCalculado;
-          const { factor, porcentaje } = getFactorRecargoBySubtype(novedad.subtipo, fecha);
-          const divisor = 30 * 7.333;
-          const valorHora = Number(input.salarioBase || 0) / divisor;
-          valorCalculado = Math.round(valorHora * factor * horas);
-          detalleCalculo = `Recargo ${novedad.subtipo || 'nocturno'}: ${horas}h × ${porcentaje}`;
-        }
-        esDevengo = true;
-        break;
-      }
-
-      case 'vacaciones':
-      case 'licencia_remunerada':
-      case 'bonificacion':
-      case 'comision':
-      case 'prima':
-      case 'otros_ingresos':
-        esDevengo = true;
-        break;
-
-      case 'salud':
-      case 'pension':
-      case 'fondo_solidaridad':
-      case 'retencion_fuente':
-      case 'libranza':
-      case 'ausencia':
-      case 'multa':
-      case 'descuento_voluntario':
-      case 'licencia_no_remunerada':
-        esDevengo = false;
-        break;
-
-      default:
-        console.warn('⚠️ BACKEND: Tipo de novedad no clasificado:', novedad.tipo_novedad);
-        esDevengo = true;
-    }
-
-    if (esDevengo) totalDevengos += valorCalculado;
-    else totalDeducciones += Math.abs(valorCalculado);
-
-    breakdown.push({
-      tipo_novedad: novedad.tipo_novedad,
-      subtipo: novedad.subtipo,
-      valorOriginal,
-      valorCalculado,
-      esDevengo,
-      detalleCalculo
-    });
-  }
-
-  const totalNeto = totalDevengos - totalDeducciones;
-
-  console.log('✅ BACKEND: Totales (policy-aware):', {
-    totalDevengos,
-    totalDeducciones,
-    totalNeto,
-    itemsProcessed: breakdown.length
-  });
-
-  return {
-    totalDevengos: Math.round(totalDevengos),
-    totalDeducciones: Math.round(totalDeducciones),
-    totalNeto: Math.round(totalNeto),
-    breakdown
-  };
-}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -467,301 +55,311 @@ serve(async (req) => {
 
   try {
     const { action, data } = await req.json();
-    console.log('📊 Payroll calculation request:', { action, data });
 
-    // Cargar política de la empresa del usuario
-    const { policy } = await getCompanyPolicy(req);
-
-    // ✅ NUEVO HANDLER PROFESIONAL: cálculo centralizado de totales de novedades
-    if (action === 'calculate-novedades-totals') {
-      const input = data as any; // NovedadesTotalsInput
-      if (!input.salarioBase || input.salarioBase <= 0) {
-        return new Response(
-          JSON.stringify({ success: false, error: 'Salario base inválido' }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-        );
-      }
-      const config = getConfiguration(input.year);
-      const result = calculateNovedadesTotalsWithPolicy(input, policy, config.salarioMinimo);
-      return new Response(JSON.stringify({ success: true, data: result }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    switch (action) {
+      case 'calculate-novedad':
+        return await handleNovedadCalculation(data);
+      case 'calculate':
+        return await handlePayrollCalculation(data);
+      case 'batch-calculate':
+        return await handleBatchCalculation(data);
+      case 'validate':
+        return await handleValidation(data);
+      default:
+        throw new Error(`Acción desconocida: ${action}`);
     }
-
-    // ✅ HANDLER EXISTENTE: cálculo individual de novedad
-    if (action === 'calculate-novedad') {
-      const input = data as any; // NovedadCalculationInput
-      const fecha = parseFecha(input.fechaPeriodo);
-      const salario = Number(input.salarioBase || 0);
-
-      if (!salario || salario <= 0) {
-        return new Response(
-          JSON.stringify({ success: false, error: 'Salario base inválido' }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-        );
-      }
-
-      const config = getConfiguration(input.year);
-      let result: any | null = null;
-
-      if (input.tipoNovedad === 'horas_extra') {
-        const factor = getFactorHorasExtra(input.subtipo);
-        const baseHora = calcularValorHoraExtraBase(salario, fecha);
-        const horas = Number(input.horas || 0);
-        const valor = Math.round(baseHora * factor * horas);
-        const jornada = getJornadaLegalInfo(fecha);
-        result = {
-          valor,
-          factorCalculo: factor,
-          detalleCalculo: `Horas extra ${input.subtipo || '—'}: ((salario ÷ 30) ÷ (jornada_semanal ÷ 6)) × factor × horas = (${Math.round(salario/30)} ÷ ${(jornada.horasSemanales/6).toFixed(3)}) × ${factor} × ${horas} = ${valor.toLocaleString()}`,
-          jornadaInfo: {
-            horasSemanales: jornada.horasSemanales,
-            horasMensuales: jornada.horasMensuales,
-            divisorHorario: jornada.horasMensuales,
-            valorHoraOrdinaria: Math.round(baseHora),
-            ley: jornada.ley,
-            descripcion: jornada.descripcion
-          }
-        };
-      } else if (input.tipoNovedad === 'recargo_nocturno') {
-        const horas = Number(input.horas || 0);
-        const { factor, porcentaje, normativa } = getFactorRecargoBySubtype(input.subtipo, fecha);
-        if (factor <= 0 || horas <= 0) {
-          return new Response(
-            JSON.stringify({ success: false, error: 'Datos insuficientes para recargo' }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-          );
-        }
-        const divisor = 30 * 7.333;
-        const valorHora = salario / divisor;
-        const valorRecargo = Math.round(valorHora * factor * horas);
-        result = {
-          valor: valorRecargo,
-          factorCalculo: factor,
-          detalleCalculo: `Recargo ${input.subtipo || '—'}: (${salario.toLocaleString()} ÷ ${divisor.toFixed(3)}) × ${factor} × ${horas}h = ${valorRecargo.toLocaleString()} (${porcentaje}, ${normativa})`,
-          jornadaInfo: {
-            horasSemanales: 44,
-            horasMensuales: 220,
-            divisorHorario: 220,
-            valorHoraOrdinaria: Math.round(valorHora),
-            ley: 'CST / Ley 2466/2025',
-            descripcion: 'Divisor recargos 30×7.333; jornada informativa 44h/220h'
-          }
-        };
-      } else if (input.tipoNovedad === 'incapacidad') {
-        const dias = Number(input.dias || 0);
-        const valor = Math.round(
-          calculateIncapacityValuePolicyAware(salario, dias, input.subtipo, policy, getConfiguration(input.year).salarioMinimo)
-        );
-        const jornada = getJornadaLegalInfo(fecha);
-        result = {
-          valor,
-          factorCalculo: dias,
-          detalleCalculo: `Incapacidad ${input.subtipo || 'general'} según política (${policy.incapacity_policy})`,
-          jornadaInfo: {
-            horasSemanales: jornada.horasSemanales,
-            horasMensuales: jornada.horasMensuales,
-            divisorHorario: jornada.horasMensuales,
-            valorHoraOrdinaria: Math.round((salario/30) / (jornada.horasSemanales/6)),
-            ley: jornada.ley,
-            descripcion: jornada.descripcion
-          }
-        };
-      } else {
-        return new Response(
-          JSON.stringify({ success: false, error: 'Tipo de novedad no soportado' }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-        );
-      }
-
-      return new Response(JSON.stringify({ success: true, data: result }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
-
-    if (action === 'calculate') {
-      const input = data as any; // PayrollCalculationInput
-      const config = getConfiguration(input.year);
-
-      console.log('⚙️ Using configuration:', config, 'Policy:', policy);
-
-      // Base daily salary
-      const dailySalary = input.baseSalary / 30;
-
-      // Acumuladores
-      let bonusesConstitutivos = 0;
-      let bonusesNoConstitutivos = 0;
-      let extraHours = 0;
-      let additionalEarnings = 0;
-      let additionalDeductions = 0;
-
-      let totalIncapacityDays = 0;
-      let totalIncapacityValue = 0;
-
-      if (input.novedades && input.novedades.length > 0) {
-        console.log('📋 Processing novedades:', input.novedades.length);
-
-        for (const novedad of input.novedades) {
-          const valorDB = Number(novedad.valor) || 0;
-          const esConstitutivo = Boolean(novedad.constitutivo_salario);
-
-          if (novedad.tipo_novedad === 'incapacidad') {
-            const dias = Number(novedad.dias || 0);
-            totalIncapacityDays += dias;
-
-            // Recalcular según política (incluye piso SMLDV si aplica)
-            const recalculated = calculateIncapacityValuePolicyAware(
-              input.baseSalary,
-              dias,
-              novedad.subtipo,
-              policy,
-              config.salarioMinimo
-            );
-            totalIncapacityValue += Math.round(recalculated);
-            additionalEarnings += Math.round(recalculated); // usar recalculado en devengos
-            continue;
-          }
-
-          switch (novedad.tipo_novedad) {
-            case 'horas_extra':
-            case 'recargo_nocturno':
-              extraHours += valorDB;
-              additionalEarnings += valorDB;
-              break;
-
-            case 'bonificacion':
-            case 'comision':
-            case 'prima':
-            case 'otros_ingresos':
-              if (esConstitutivo) bonusesConstitutivos += valorDB;
-              else bonusesNoConstitutivos += valorDB;
-              additionalEarnings += valorDB;
-              break;
-
-            case 'retencion_fuente':
-            case 'prestamo':
-            case 'embargo':
-            case 'descuento_voluntario':
-            case 'fondo_solidaridad':
-              additionalDeductions += valorDB;
-              break;
-
-            default:
-              console.log('   ⚠️ Unclassified novedad type:', novedad.tipo_novedad);
-          }
-        }
-      }
-
-      // Días efectivamente trabajados = reportados - incapacidad
-      const effectiveWorkedDays = Math.max(0, (input.workedDays || 0) - (totalIncapacityDays || 0));
-      const transportLimit = config.salarioMinimo * 2;
-
-      // Salario proporcional con días efectivos
-      const proportionalSalary = Math.round(dailySalary * effectiveWorkedDays);
-
-      // Auxilio transporte proporcional
-      let transportAllowance = 0;
-      if (input.baseSalary <= transportLimit) {
-        const dailyTransport = config.auxilioTransporte / 30;
-        transportAllowance = Math.round(dailyTransport * effectiveWorkedDays);
-      }
-
-      // Salario base para aportes tradicionales
-      const salarioBaseParaAportes = proportionalSalary + bonusesConstitutivos + extraHours;
-
-      // Mínimo IBC proporcional si base < SMLV
-      let ibcSalud: number;
-      let ibcPension: number;
-
-      if (policy.ibc_mode === 'incapacity' && totalIncapacityDays > 0) {
-        // ✅ IBC tomado del valor de incapacidad recalculado según la política
-        ibcSalud = totalIncapacityValue;
-        ibcPension = totalIncapacityValue;
-        console.log('🧮 IBC por política "incapacity":', { totalIncapacityValue, totalIncapacityDays });
-      } else {
-        if (input.baseSalary >= config.salarioMinimo) {
-          ibcSalud = salarioBaseParaAportes;
-          ibcPension = salarioBaseParaAportes;
-        } else {
-          const minIbc = (config.salarioMinimo / 30) * effectiveWorkedDays;
-          ibcSalud = Math.max(salarioBaseParaAportes, minIbc);
-          ibcPension = Math.max(salarioBaseParaAportes, minIbc);
-        }
-      }
-
-      // Total devengado
-      const grossPay = proportionalSalary + transportAllowance + additionalEarnings;
-
-      // Deducciones empleado
-      const healthDeduction = Math.round(ibcSalud * PORCENTAJES_NOMINA.SALUD_EMPLEADO);
-      const pensionDeduction = Math.round(ibcPension * PORCENTAJES_NOMINA.PENSION_EMPLEADO);
-      const totalDeductions = healthDeduction + pensionDeduction + additionalDeductions;
-
-      // Neto
-      const netPay = grossPay - totalDeductions;
-
-      // Aportes empleador
-      const employerHealth = Math.round(ibcSalud * PORCENTAJES_NOMINA.SALUD_EMPLEADOR);
-      const employerPension = Math.round(ibcPension * PORCENTAJES_NOMINA.PENSION_EMPLEADOR);
-      const employerArl = Math.round(salarioBaseParaAportes * PORCENTAJES_NOMINA.ARL);
-      const employerCaja = Math.round(salarioBaseParaAportes * PORCENTAJES_NOMINA.CAJA_COMPENSACION);
-      const employerIcbf = Math.round(salarioBaseParaAportes * PORCENTAJES_NOMINA.ICBF);
-      const employerSena = Math.round(salarioBaseParaAportes * PORCENTAJES_NOMINA.SENA);
-
-      const employerContributions = employerHealth + employerPension + employerArl + employerCaja + employerIcbf + employerSena;
-      const totalPayrollCost = netPay + employerContributions;
-
-      const result = {
-        regularPay: proportionalSalary,
-        extraPay: extraHours,
-        transportAllowance,
-        grossPay,
-        healthDeduction,
-        pensionDeduction,
-        totalDeductions,
-        netPay,
-        employerHealth,
-        employerPension,
-        employerArl,
-        employerCaja,
-        employerIcbf,
-        employerSena,
-        employerContributions,
-        totalPayrollCost,
-        ibc: ibcSalud
-      };
-
-      console.log('✅ Calculation (policy-aware) result:', {
-        policy,
-        totalIncapacityDays,
-        totalIncapacityValue,
-        ibcSalud: result.ibc,
-        healthDeduction: result.healthDeduction,
-        pensionDeduction: result.pensionDeduction
-      });
-
-      return new Response(
-        JSON.stringify({ success: true, data: result }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    if (action === 'validate') {
-      // Basic validation logic
-      const validation = {
-        isValid: true,
-        errors: [],
-        warnings: []
-      };
-      return new Response(JSON.stringify({ success: true, data: validation }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
-
-    return new Response(
-      JSON.stringify({ success: false, error: 'Unknown action' }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-    );
-
   } catch (error) {
-    console.error('❌ Payroll calculation error:', error);
+    console.error('❌ Error in payroll-calculations:', error);
     return new Response(
-      JSON.stringify({ success: false, error: (error as Error).message }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      JSON.stringify({ 
+        success: false, 
+        error: error.message || 'Error interno del servidor' 
+      }),
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
     );
   }
 });
+
+async function handleNovedadCalculation(input: NovedadCalculationInput) {
+  console.log('🎯 Calculando novedad:', input);
+
+  const { tipoNovedad, subtipo, salarioBase, horas, dias, fechaPeriodo } = input;
+
+  if (!salarioBase || salarioBase <= 0) {
+    throw new Error('Salario base requerido');
+  }
+
+  const year = fechaPeriodo ? new Date(fechaPeriodo).getFullYear().toString() : '2025';
+  const config = year === '2025' ? CONFIGURACION_2025 : CONFIGURACION_2025; // Fallback
+  
+  let valor = 0;
+  let factorCalculo = 0;
+  let detalleCalculo = '';
+
+  // ✅ CÁLCULO NORMATIVO DE HORAS EXTRA
+  if (tipoNovedad === 'horas_extra') {
+    if (!horas || horas <= 0) {
+      throw new Error('Número de horas requerido para horas extra');
+    }
+
+    const valorHoraOrdinaria = salarioBase / 240; // 240 horas mensuales según Ley 789/2002
+    
+    switch (subtipo) {
+      case 'diurna':
+        factorCalculo = 1.25; // 25% recargo
+        valor = valorHoraOrdinaria * factorCalculo * horas;
+        detalleCalculo = `${horas} horas × $${valorHoraOrdinaria.toLocaleString()} × 125% = $${valor.toLocaleString()}`;
+        break;
+      case 'nocturna':
+        factorCalculo = 1.75; // 75% recargo
+        valor = valorHoraOrdinaria * factorCalculo * horas;
+        detalleCalculo = `${horas} horas × $${valorHoraOrdinaria.toLocaleString()} × 175% = $${valor.toLocaleString()}`;
+        break;
+      case 'dominical_diurna':
+        factorCalculo = 2.0; // 100% recargo
+        valor = valorHoraOrdinaria * factorCalculo * horas;
+        detalleCalculo = `${horas} horas × $${valorHoraOrdinaria.toLocaleString()} × 200% = $${valor.toLocaleString()}`;
+        break;
+      case 'dominical_nocturna':
+        factorCalculo = 2.5; // 150% recargo
+        valor = valorHoraOrdinaria * factorCalculo * horas;
+        detalleCalculo = `${horas} horas × $${valorHoraOrdinaria.toLocaleString()} × 250% = $${valor.toLocaleString()}`;
+        break;
+      default:
+        factorCalculo = 1.25;
+        valor = valorHoraOrdinaria * factorCalculo * horas;
+        detalleCalculo = `${horas} horas × $${valorHoraOrdinaria.toLocaleString()} × 125% (diurna por defecto)`;
+    }
+  }
+
+  // ✅ CÁLCULO NORMATIVO DE INCAPACIDADES CON PISO SMLDV
+  else if (tipoNovedad === 'incapacidad') {
+    if (!dias || dias <= 0) {
+      throw new Error('Número de días requerido para incapacidad');
+    }
+
+    const salarioDiario = salarioBase / 30;
+    const smldv = config.smldv;
+
+    switch (subtipo) {
+      case 'general':
+        // ✅ POLÍTICA ESTÁNDAR CON PISO SMLDV: Días 1-2 al 100%, días 3+ al 66.67% con piso SMLDV
+        if (dias <= 2) {
+          valor = salarioDiario * dias;
+          detalleCalculo = `${dias} días × $${salarioDiario.toLocaleString()} (100% empleador) = $${valor.toLocaleString()}`;
+        } else {
+          const primerosDias = salarioDiario * 2; // Días 1-2 al 100%
+          const salarioDiario66 = salarioDiario * 0.6667;
+          const diasRestantes = dias - 2;
+          
+          // ✅ APLICAR PISO SMLDV desde día 3
+          const valorDiarioConPiso = Math.max(salarioDiario66, smldv);
+          const diasRestantesValor = valorDiarioConPiso * diasRestantes;
+          
+          valor = primerosDias + diasRestantesValor;
+          
+          if (salarioDiario66 < smldv) {
+            detalleCalculo = `2 días × $${salarioDiario.toLocaleString()} (100% empleador) + ${diasRestantes} días × $${smldv.toLocaleString()} (piso SMLDV, 66.67% EPS) = $${valor.toLocaleString()}`;
+          } else {
+            detalleCalculo = `2 días × $${salarioDiario.toLocaleString()} (100% empleador) + ${diasRestantes} días × $${salarioDiario66.toLocaleString()} (66.67% EPS) = $${valor.toLocaleString()}`;
+          }
+        }
+        break;
+        
+      case 'laboral':
+        // ARL paga 100% desde día 1
+        valor = salarioDiario * dias;
+        detalleCalculo = `${dias} días × $${salarioDiario.toLocaleString()} (100% ARL desde día 1) = $${valor.toLocaleString()}`;
+        break;
+        
+      default:
+        // Fallback conservador con piso SMLDV
+        const salario66 = salarioDiario * 0.6667;
+        const valorConPiso = Math.max(salario66, smldv);
+        valor = valorConPiso * dias;
+        detalleCalculo = `${dias} días × $${valorConPiso.toLocaleString()} (66.67% con piso SMLDV) = $${valor.toLocaleString()}`;
+    }
+  }
+
+  // ✅ OTROS CÁLCULOS (vacaciones, licencias, etc.)
+  else if (tipoNovedad === 'vacaciones' || tipoNovedad === 'licencia_remunerada') {
+    if (!dias || dias <= 0) {
+      throw new Error('Número de días requerido');
+    }
+    
+    const salarioDiario = salarioBase / 30;
+    valor = salarioDiario * dias;
+    detalleCalculo = `${dias} días × $${salarioDiario.toLocaleString()} = $${valor.toLocaleString()}`;
+  }
+
+  else if (tipoNovedad === 'recargo_nocturno') {
+    if (!horas || horas <= 0) {
+      throw new Error('Número de horas requerido para recargo nocturno');
+    }
+    
+    const valorHoraOrdinaria = salarioBase / 240;
+    factorCalculo = 0.35; // 35% recargo nocturno
+    valor = valorHoraOrdinaria * factorCalculo * horas;
+    detalleCalculo = `${horas} horas × $${valorHoraOrdinaria.toLocaleString()} × 35% = $${valor.toLocaleString()}`;
+  }
+
+  else if (tipoNovedad === 'ausencia') {
+    if (!dias || dias <= 0) {
+      throw new Error('Número de días requerido para ausencia');
+    }
+    
+    const salarioDiario = salarioBase / 30;
+    valor = -(salarioDiario * dias); // Negativo porque es descuento
+    detalleCalculo = `${dias} días × $${salarioDiario.toLocaleString()} (descuento) = $${valor.toLocaleString()}`;
+  }
+
+  else {
+    throw new Error(`Tipo de novedad no soportado: ${tipoNovedad}`);
+  }
+
+  console.log('✅ Resultado cálculo novedad:', { valor, factorCalculo, detalleCalculo });
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      data: {
+        valor: Math.round(valor),
+        factorCalculo,
+        detalleCalculo,
+        jornadaInfo: {
+          horasSemanales: 48,
+          horasMensuales: 240,
+          divisorHorario: 240,
+          valorHoraOrdinaria: salarioBase / 240,
+          ley: 'Ley 789/2002',
+          descripcion: 'Jornada ordinaria máxima 48 horas semanales'
+        }
+      }
+    }),
+    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  );
+}
+
+async function handlePayrollCalculation(input: PayrollCalculationInput) {
+  console.log('💰 Calculando nómina:', input);
+
+  const year = input.year || '2025';
+  const config = year === '2025' ? CONFIGURACION_2025 : CONFIGURACION_2025;
+
+  // Cálculos básicos
+  const dailySalary = input.baseSalary / 30;
+  const regularPay = dailySalary * input.workedDays;
+  const transportAllowance = input.baseSalary <= (2 * config.salarioMinimo) ? config.auxilioTransporte : 0;
+  
+  // Extra hours calculation
+  const extraHourValue = input.baseSalary / 240; // 240 horas mensuales
+  const extraPay = extraHourValue * 1.25 * input.extraHours; // 25% recargo básico
+  
+  // Gross pay
+  const grossPay = regularPay + extraPay + transportAllowance + input.bonuses + input.disabilities;
+  
+  // IBC calculation (sin auxilio de transporte)
+  const baseIbc = Math.max(regularPay + extraPay + input.bonuses + input.disabilities, config.salarioMinimo);
+  const ibc = Math.min(baseIbc, config.salarioMinimo * 25); // Tope 25 SMMLV
+  
+  // Employee deductions
+  const healthDeduction = ibc * config.porcentajes.saludEmpleado;
+  const pensionDeduction = ibc * config.porcentajes.pensionEmpleado;
+  const totalDeductions = healthDeduction + pensionDeduction + input.absences;
+  
+  // Net pay
+  const netPay = grossPay - totalDeductions;
+  
+  // Employer contributions
+  const employerHealth = ibc * config.porcentajes.saludEmpleador;
+  const employerPension = ibc * config.porcentajes.pensionEmpleador;
+  const employerArl = ibc * config.porcentajes.arl;
+  const employerCaja = ibc * config.porcentajes.caja;
+  const employerIcbf = ibc * config.porcentajes.icbf;
+  const employerSena = ibc * config.porcentajes.sena;
+  
+  const employerContributions = employerHealth + employerPension + employerArl + employerCaja + employerIcbf + employerSena;
+  const totalPayrollCost = grossPay + employerContributions;
+
+  const result = {
+    regularPay: Math.round(regularPay),
+    extraPay: Math.round(extraPay),
+    transportAllowance: Math.round(transportAllowance),
+    grossPay: Math.round(grossPay),
+    healthDeduction: Math.round(healthDeduction),
+    pensionDeduction: Math.round(pensionDeduction),
+    totalDeductions: Math.round(totalDeductions),
+    netPay: Math.round(netPay),
+    employerHealth: Math.round(employerHealth),
+    employerPension: Math.round(employerPension),
+    employerArl: Math.round(employerArl),
+    employerCaja: Math.round(employerCaja),
+    employerIcbf: Math.round(employerIcbf),
+    employerSena: Math.round(employerSena),
+    employerContributions: Math.round(employerContributions),
+    totalPayrollCost: Math.round(totalPayrollCost),
+    ibc: Math.round(ibc)
+  };
+
+  console.log('✅ Resultado cálculo nómina:', result);
+
+  return new Response(
+    JSON.stringify({ success: true, data: result }),
+    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  );
+}
+
+async function handleBatchCalculation(data: { inputs: PayrollCalculationInput[] }) {
+  const results = [];
+  
+  for (const input of data.inputs) {
+    const response = await handlePayrollCalculation(input);
+    const result = await response.json();
+    if (result.success) {
+      results.push(result.data);
+    } else {
+      throw new Error(`Error en cálculo por lotes: ${result.error}`);
+    }
+  }
+
+  return new Response(
+    JSON.stringify({ success: true, data: results }),
+    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  );
+}
+
+async function handleValidation(data: any) {
+  const errors = [];
+  const warnings = [];
+
+  if (!data.baseSalary || data.baseSalary < 0) {
+    errors.push('Salario base requerido y debe ser positivo');
+  }
+
+  if (data.baseSalary < CONFIGURACION_2025.salarioMinimo) {
+    warnings.push(`Salario base menor al mínimo legal ($${CONFIGURACION_2025.salarioMinimo.toLocaleString()})`);
+  }
+
+  if (!data.eps && data.baseSalary > 0) {
+    warnings.push('EPS no especificada');
+  }
+
+  if (!data.afp && data.baseSalary > 0) {
+    warnings.push('AFP no especificada');
+  }
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      data: {
+        isValid: errors.length === 0,
+        errors,
+        warnings
+      }
+    }),
+    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  );
+}
