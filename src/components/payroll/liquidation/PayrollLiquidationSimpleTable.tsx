@@ -1,11 +1,11 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Loader2 } from 'lucide-react';
 import { PayrollEmployee, NovedadForIBC } from '@/types/payroll';
 import { NovedadUnifiedModal } from '@/components/payroll/novedades/NovedadUnifiedModal';
 import { usePayrollNovedadesUnified } from '@/hooks/usePayrollNovedadesUnified';
+import { useCurrentCompany } from '@/hooks/useCurrentCompany';
 import { formatCurrency } from '@/lib/utils';
 import { ConfigurationService } from '@/services/ConfigurationService';
 import { CreateNovedadData } from '@/types/novedades-enhanced';
@@ -68,6 +68,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
     transportAllowance: number; 
   }>>({});
   const { toast } = useToast();
+  const { companyId } = useCurrentCompany();
 
   // ✅ NUEVO: Calcular fecha del período para usar en cálculos de jornada legal
   const getPeriodDate = () => {
@@ -426,6 +427,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
           employeeId={selectedEmployee.id}
           employeeSalary={selectedEmployee.baseSalary}
           periodId={currentPeriodId}
+          companyId={companyId || ''}
           onSubmit={handleNovedadSubmit}
           selectedNovedadType={null}
           onClose={handleCloseNovedadModal}
