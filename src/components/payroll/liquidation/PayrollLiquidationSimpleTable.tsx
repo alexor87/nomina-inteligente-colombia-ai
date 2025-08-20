@@ -244,6 +244,10 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
 
   const handleCloseNovedadModal = async () => {
     if (selectedEmployee) {
+      // ✅ CORRECCIÓN CRÍTICA: Delay antes de sincronización final para asegurar que BD esté lista
+      console.log('⏳ Esperando sincronización final de BD antes de cerrar modal...');
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
       // Asegurar sincronización final al cerrar el modal
       console.log('🔄 Sincronización final al cerrar modal para:', selectedEmployee.name);
       await onEmployeeNovedadesChange(selectedEmployee.id);

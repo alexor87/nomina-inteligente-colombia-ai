@@ -306,6 +306,10 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       console.log('💾 Creando novedad desde ausencia:', novedadData);
       await onSubmit(novedadData);
 
+      // ✅ CORRECCIÓN CRÍTICA: Delay antes de cambiar estado para asegurar sincronización con BD
+      console.log('⏳ Esperando sincronización de BD antes de actualizar vista...');
+      await new Promise(resolve => setTimeout(resolve, 300));
+
       // ✅ Volver al módulo de novedades después de crear
       if (mode === 'ajustes') {
         handleClose();
@@ -373,6 +377,10 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       }
       
       console.log('✅ All novelty entries processed successfully');
+      
+      // ✅ CORRECCIÓN CRÍTICA: Delay antes de cambiar estado para asegurar sincronización con BD
+      console.log('⏳ Esperando sincronización de BD antes de actualizar vista...');
+      await new Promise(resolve => setTimeout(resolve, 300));
       
       // En modo ajustes, cerrar el modal directamente
       if (mode === 'ajustes') {
