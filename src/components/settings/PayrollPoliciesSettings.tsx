@@ -1,109 +1,20 @@
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Info, Loader2, CheckCircle } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { useCurrentCompany } from '@/hooks/useCurrentCompany';
-import { PayrollPoliciesService, PayrollPoliciesFormData } from '@/services/PayrollPoliciesService';
+import { Info } from 'lucide-react';
 
-export const PayrollPoliciesSettings = () => {
-  const { companyId } = useCurrentCompany();
-  const { toast } = useToast();
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [policies, setPolicies] = useState<PayrollPoliciesFormData>(
-    PayrollPoliciesService.getDefaultPolicies()
-  );
+interface PayrollPoliciesSettingsProps {
+  incapacityPolicy: 'standard_2d_100_rest_66' | 'from_day1_66_with_floor';
+  onIncapacityPolicyChange: (value: 'standard_2d_100_rest_66' | 'from_day1_66_with_floor') => void;
+}
 
-  useEffect(() => {
-    if (companyId) {
-      loadPolicies();
-    }
-  }, [companyId]);
-
-  const loadPolicies = async () => {
-    if (!companyId) return;
-    
-    try {
-      setLoading(true);
-      console.log('🔄 Loading payroll policies for:', companyId);
-      const data = await PayrollPoliciesService.getPayrollPolicies(companyId);
-      
-      if (data) {
-        console.log('✅ Loaded policies:', data);
-        setPolicies({
-          ibc_mode: data.ibc_mode,
-          incapacity_policy: data.incapacity_policy,
-          notes: data.notes || ''
-        });
-      } else {
-        console.log('ℹ️ No policies found, using defaults');
-        setPolicies(PayrollPoliciesService.getDefaultPolicies());
-      }
-    } catch (error) {
-      console.error('❌ Error loading policies:', error);
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar las políticas de nómina. Se usarán valores por defecto.",
-        variant: "destructive"
-      });
-      setPolicies(PayrollPoliciesService.getDefaultPolicies());
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSave = async () => {
-    if (!companyId) {
-      toast({
-        title: "Error",
-        description: "No se pudo identificar la empresa",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    try {
-      setSaving(true);
-      console.log('💾 Saving policies:', policies);
-      
-      const result = await PayrollPoliciesService.upsertPayrollPolicies(companyId, policies);
-      console.log('✅ Policies saved successfully:', result);
-      
-      toast({
-        title: "Políticas guardadas",
-        description: "Las políticas de nómina se han actualizado exitosamente",
-        variant: "default"
-      });
-    } catch (error) {
-      console.error('❌ Error saving policies:', error);
-      toast({
-        title: "Error",
-        description: "No se pudieron guardar las políticas de nómina",
-        variant: "destructive"
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-center space-x-2 py-8">
-            <Loader2 className="h-6 w-6 animate-spin" />
-            <span className="text-lg">Cargando políticas de nómina...</span>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
+export const PayrollPoliciesSettings = ({
+  incapacityPolicy,
+  onIncapacityPolicyChange
+}: PayrollPoliciesSettingsProps) => {
   return (
     <Card>
       <CardHeader>
@@ -143,12 +54,7 @@ export const PayrollPoliciesSettings = () => {
             </Tooltip>
           </div>
           
-          <RadioGroup 
-            value={policies.incapacity_policy} 
-            onValueChange={(value: 'standard_2d_100_rest_66' | 'from_day1_66_with_floor') =>
-              setPolicies(prev => ({ ...prev, incapacity_policy: value }))
-            }
-          >
+          <RadioGroup value={incapacityPolicy} onValueChange={onIncapacityPolicyChange}>
             <div className="flex items-center space-x-2">
               <RadioGroupItem value="standard_2d_100_rest_66" id="policy-standard" />
               <Label htmlFor="policy-standard" className="cursor-pointer">
@@ -180,28 +86,11 @@ export const PayrollPoliciesSettings = () => {
           <h4 className="font-medium text-green-900 mb-2">Ejemplo con configuración actual:</h4>
           <div className="text-sm text-green-800 space-y-1">
             <p><strong>IBC:</strong> Se calcula automáticamente según las circunstancias del empleado</p>
-            <p><strong>Incapacidad general:</strong> {policies.incapacity_policy === 'standard_2d_100_rest_66' 
+            <p><strong>Incapacidad general:</strong> {incapacityPolicy === 'standard_2d_100_rest_66' 
               ? 'Primeros 2 días 100%, resto 66.67% con piso SMLDV' 
               : 'Todos los días 66.67% con piso SMLDV'}</p>
             <p><strong>Incapacidad laboral:</strong> 100% desde el día 1 (automático)</p>
           </div>
-        </div>
-
-        {/* Save Button */}
-        <div className="flex justify-end">
-          <Button onClick={handleSave} disabled={saving || loading}>
-            {saving ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Guardando...
-              </>
-            ) : (
-              <>
-                <CheckCircle className="h-4 w-4 mr-2" />
-                Guardar Políticas
-              </>
-            )}
-          </Button>
         </div>
       </CardContent>
     </Card>

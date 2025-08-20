@@ -21,6 +21,7 @@ export class CompanySettingsService {
       const normalized: CompanySettings = {
         ...(data as any),
         provision_mode: (data as any).provision_mode || 'on_liquidation',
+        incapacity_policy: (data as any).incapacity_policy || 'standard_2d_100_rest_66',
       };
 
       return normalized;
@@ -50,6 +51,7 @@ export class CompanySettingsService {
       const normalized: CompanySettings = {
         ...(data as any),
         provision_mode: (data as any).provision_mode || settings.provision_mode || 'on_liquidation',
+        incapacity_policy: (data as any).incapacity_policy || settings.incapacity_policy || 'standard_2d_100_rest_66',
       };
 
       return normalized;
@@ -63,7 +65,8 @@ export class CompanySettingsService {
     return {
       periodicity: 'mensual',
       custom_period_days: 30,
-      provision_mode: 'on_liquidation'
+      provision_mode: 'on_liquidation',
+      incapacity_policy: 'standard_2d_100_rest_66'
     };
   }
 }
