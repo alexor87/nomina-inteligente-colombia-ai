@@ -98,49 +98,53 @@ interface NovedadesTotalsResult {
   }>;
 }
 
-// ✅ NUEVA FUNCIÓN: Calcular valor de incapacidad según normativa colombiana
+// ✅ NUEVA VERSIÓN: Calcular valor de incapacidad con normalización de subtipo y soporte para "comun"
 function calculateIncapacityValue(
   baseSalary: number,
   days: number,
   subtipo: string = 'general'
 ): number {
   const dailySalary = baseSalary / 30;
-  
+
+  // Normalizar subtipo a minúsculas
+  const st = (subtipo || 'general').toLowerCase().trim();
+
   console.log('🏥 Calculating incapacity:', {
     baseSalary,
     days,
     subtipo,
+    normalizedSubtype: st,
     dailySalary
   });
 
-  switch (subtipo) {
+  switch (st) {
     case 'general':
-      // ✅ CORRECCIÓN NORMATIVA: Días 1-2 al 100%, día 3+ al 66.67%
+    case 'comun': // 👈 Tratar "comun" como incapacidad general
+      // ✅ Días 1-2 al 100%, día 3+ al 66.67%
       if (days <= 2) {
         const value = dailySalary * days; // 100% todos los días
-        console.log('🏥 General incapacity ≤2 days at 100%:', value);
+        console.log('🏥 General/common incapacity ≤2 days at 100%:', value);
         return value;
       } else {
-        // Días 1-2 al 100% + días 3+ al 66.67%
         const first2Days = dailySalary * 2; // 100%
         const remainingDays = dailySalary * (days - 2) * 0.6667; // 66.67%
         const value = first2Days + remainingDays;
-        console.log('🏥 General incapacity >2 days:', {
+        console.log('🏥 General/common incapacity >2 days:', {
           first2Days,
           remainingDays,
           total: value
         });
         return value;
       }
-    
+
     case 'laboral':
       // ARL paga desde día 1 al 100%
       const value = dailySalary * days;
       console.log('🏥 Labor incapacity at 100%:', value);
       return value;
-    
+
     default:
-      console.warn('🏥 Unknown incapacity subtype:', subtipo);
+      console.warn('🏥 Unknown incapacity subtype:', st);
       return 0;
   }
 }
