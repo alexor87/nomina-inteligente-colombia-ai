@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -14,7 +15,7 @@ import { Plus, Trash2, Copy } from 'lucide-react';
 
 export const ParametrosLegalesSettings = () => {
   const { toast } = useToast();
-  const { currentCompany } = useCurrentCompany();
+  const { companyId } = useCurrentCompany();
   const [availableYears, setAvailableYears] = useState<string[]>([]);
   const [selectedYear, setSelectedYear] = useState('2025');
   const [config, setConfig] = useState<PayrollConfiguration>({
@@ -71,10 +72,10 @@ export const ParametrosLegalesSettings = () => {
   }, [selectedYear]);
 
   const loadCompanyPolicies = async () => {
-    if (!currentCompany?.id) return;
+    if (!companyId) return;
     
     try {
-      const settings = await CompanySettingsService.getCompanySettings(currentCompany.id);
+      const settings = await CompanySettingsService.getCompanySettings(companyId);
       if (settings) {
         setIbcMode(settings.ibc_mode || 'proportional');
         setIncapacityPolicy(settings.incapacity_policy || 'standard_2d_100_rest_66');
@@ -234,7 +235,7 @@ export const ParametrosLegalesSettings = () => {
   };
 
   const handleSavePolicies = async () => {
-    if (!currentCompany?.id) {
+    if (!companyId) {
       toast({
         title: "Error",
         description: "No se pudo identificar la empresa.",
@@ -244,7 +245,7 @@ export const ParametrosLegalesSettings = () => {
     }
 
     try {
-      await CompanySettingsService.upsertCompanySettings(currentCompany.id, {
+      await CompanySettingsService.upsertCompanySettings(companyId, {
         periodicity: 'mensual', // Default value, this should come from existing settings
         ibc_mode: ibcMode,
         incapacity_policy: incapacityPolicy,
