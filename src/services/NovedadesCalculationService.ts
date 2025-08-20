@@ -1,6 +1,6 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollNovedad } from '@/types/novedades-enhanced';
+import { IncapacityCalculationService } from './IncapacityCalculationService';
 
 export interface NovedadesTotals {
   totalDevengos: number;
@@ -27,6 +27,25 @@ class NovedadesCalculationServiceClass {
     }
   }
 
+  // Nuevo: obtener salario base para poder estimar incapacidades con valor 0
+  private async getEmployeeSalary(employeeId: string): Promise<number> {
+    console.log('🔎 Fetching employee salary for incapacity estimation:', employeeId);
+    const { data, error } = await supabase
+      .from('employees')
+      .select('salario_base')
+      .eq('id', employeeId)
+      .single();
+
+    if (error) {
+      console.warn('⚠️ Could not fetch employee salary, incapacity estimation may be skipped:', error);
+      return 0;
+    }
+
+    const salary = Number(data?.salario_base || 0);
+    console.log('💰 Employee salary fetched:', salary);
+    return salary;
+  }
+
   async calculateEmployeeNovedadesTotals(employeeId: string, periodId: string): Promise<NovedadesTotals> {
     const cacheKey = this.generateCacheKey(employeeId, periodId);
 
@@ -42,9 +61,33 @@ class NovedadesCalculationServiceClass {
       let totalDevengos = 0;
       let totalDeducciones = 0;
 
+      // Obtener salario una sola vez para posibles estimaciones de incapacidad
+      const employeeSalary = await this.getEmployeeSalary(employeeId);
+
       novedades.forEach(novedad => {
-        const valor = Number(novedad.valor);
-        if (isNaN(valor)) return;
+        let valor = Number(novedad.valor);
+        if (isNaN(valor)) valor = 0;
+
+        // Estimación normativa: si es incapacidad y el valor almacenado es 0, intentar calcular
+        if (novedad.tipo_novedad === 'incapacidad' && valor === 0) {
+          const dias = Number((novedad as any).dias || 0);
+          const subtipo = (novedad as any).subtipo as string | undefined;
+
+          if (employeeSalary > 0 && dias > 0) {
+            const estimated = IncapacityCalculationService.computeIncapacityValue(employeeSalary, dias, subtipo);
+            if (estimated > 0) {
+              console.log('🩺 Estimating incapacity value for totals (UI only):', {
+                employeeId,
+                periodId,
+                dias,
+                subtipo,
+                employeeSalary,
+                estimated
+              });
+              valor = estimated; // solo para sumar en UI, no persiste
+            }
+          }
+        }
 
         switch (novedad.tipo_novedad) {
           case 'horas_extra':
@@ -144,9 +187,9 @@ class NovedadesCalculationServiceClass {
       // ✅ Transform the data to match PayrollNovedad interface
       const transformedData: PayrollNovedad[] = (data || []).map(item => ({
         ...item,
-        base_calculo: typeof item.base_calculo === 'string' 
-          ? JSON.parse(item.base_calculo || '{}') 
-          : item.base_calculo || undefined
+        base_calculo: typeof (item as any).base_calculo === 'string'
+          ? JSON.parse((item as any).base_calculo || '{}')
+          : (item as any).base_calculo || undefined
       }));
 
       console.log(`✅ Found ${transformedData.length} novedades for employee`);
