@@ -50,8 +50,6 @@ export const PayrollHistoryDetailPage = () => {
 
     setIsLoading(true);
     try {
-      // Since payroll_employees table doesn't exist in the schema, let's use a different approach
-      // We'll fetch from employees and filter by company
       const { data, error } = await supabase
         .from('employees')
         .select('*')
@@ -61,23 +59,29 @@ export const PayrollHistoryDetailPage = () => {
         throw new Error(error.message);
       }
 
-      // Transform the data to match PayrollEmployee interface
+      // Transform the data to match PayrollEmployee interface with correct field names
       const transformedEmployees: PayrollEmployee[] = (data || []).map(emp => ({
         id: emp.id,
-        name: emp.first_name + ' ' + emp.last_name,
-        position: emp.position || 'Sin cargo',
-        baseSalary: emp.salary || 0,
+        name: `${emp.nombre} ${emp.apellido}`,
+        position: emp.cargo || 'Sin cargo',
+        baseSalary: emp.salario_base || 0,
         workedDays: 30, // Default value
         extraHours: 0,
+        disabilities: 0, // Required field
         bonuses: 0,
-        grossPay: emp.salary || 0,
+        absences: 0, // Required field
+        grossPay: emp.salario_base || 0,
         deductions: 0,
-        netPay: emp.salary || 0,
+        netPay: emp.salario_base || 0,
         status: 'valid' as const,
-        healthDeduction: 0,
-        pensionDeduction: 0,
+        errors: [], // Required field
+        eps: emp.eps || '',
+        afp: emp.afp || '',
         transportAllowance: 0,
-        ibc: emp.salary || 0
+        employerContributions: (emp.salario_base || 0) * 0.205, // Required field - 20.5% aportes patronales
+        ibc: emp.salario_base || 0,
+        healthDeduction: 0,
+        pensionDeduction: 0
       }));
 
       setEmployees(transformedEmployees);
