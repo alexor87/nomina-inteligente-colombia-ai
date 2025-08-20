@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -71,15 +70,28 @@ export const ParametrosLegalesSettings = () => {
   }, [selectedYear]);
 
   const loadCompanyPolicies = async () => {
-    if (!companyId) return;
+    if (!companyId) {
+      console.log('⚠️ No companyId available for loading policies');
+      return;
+    }
     
     try {
+      console.log('🔄 Loading company policies for companyId:', companyId);
       const settings = await CompanySettingsService.getCompanySettings(companyId);
       if (settings) {
+        console.log('✅ Loaded company settings:', settings);
         setIncapacityPolicy(settings.incapacity_policy || 'standard_2d_100_rest_66');
+      } else {
+        console.log('⚠️ No existing company settings found, using defaults');
+        setIncapacityPolicy('standard_2d_100_rest_66');
       }
     } catch (error) {
-      console.error('Error loading company policies:', error);
+      console.error('❌ Error loading company policies:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar las políticas de la empresa",
+        variant: "destructive"
+      });
     }
   };
 
@@ -243,18 +255,30 @@ export const ParametrosLegalesSettings = () => {
     }
 
     try {
-      await CompanySettingsService.upsertCompanySettings(companyId, {
-        periodicity: 'mensual', // Default value, this should come from existing settings
-        incapacity_policy: incapacityPolicy,
-        provision_mode: 'on_liquidation' // Default value
-      });
+      console.log('💾 Saving incapacity policy:', incapacityPolicy);
+      
+      // First, load existing company settings to preserve all current values
+      const existingSettings = await CompanySettingsService.getCompanySettings(companyId);
+      
+      // Prepare settings object, preserving existing values or using sensible defaults
+      const settingsToSave = {
+        periodicity: existingSettings?.periodicity || 'mensual',
+        provision_mode: existingSettings?.provision_mode || 'on_liquidation',
+        custom_period_days: existingSettings?.custom_period_days,
+        incapacity_policy: incapacityPolicy // This is what we're actually updating
+      };
 
+      console.log('📋 Settings to save:', settingsToSave);
+
+      await CompanySettingsService.upsertCompanySettings(companyId, settingsToSave);
+
+      console.log('✅ Company policies saved successfully');
       toast({
         title: "Políticas de nómina guardadas",
         description: "Las políticas de cálculo han sido actualizadas correctamente.",
       });
     } catch (error) {
-      console.error('Error saving company policies:', error);
+      console.error('❌ Error saving company policies:', error);
       toast({
         title: "Error",
         description: "No se pudieron guardar las políticas de nómina.",
