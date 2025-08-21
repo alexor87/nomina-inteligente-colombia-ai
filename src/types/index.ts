@@ -1,3 +1,4 @@
+
 export interface ServiceResponse<T> {
   success: boolean;
   data: T;
@@ -24,7 +25,7 @@ export interface Employee {
   salarioBase: number;
   tipoContrato: 'indefinido' | 'fijo' | 'obra' | 'aprendizaje';
   fechaIngreso: string;
-  periodicidadPago: 'mensual' | 'quincenal';
+  periodicidadPago?: 'mensual' | 'quincenal';
   cargo?: string;
   codigoCIIU?: string;
   nivelRiesgoARL?: 'I' | 'II' | 'III' | 'IV' | 'V';
@@ -60,9 +61,9 @@ export interface DashboardMetrics {
   totalEmployees: number;
   activeEmployees: number;
   pendingPayrolls: number;
-  totalPayrollCost: number; // Required
-  employeeGrowth: number; // Required  
-  payrollTrend: number; // Required
+  totalPayrollCost: number;
+  employeeGrowth: number;
+  payrollTrend: number;
   monthlyPayrollTotal: number;
   complianceScore: number;
   alerts: number;
@@ -87,6 +88,7 @@ export interface PayrollCalculation {
   recargoNocturno?: number;
   recargoDominical?: number;
   bonificaciones?: number;
+  cesantias?: number;
 }
 
 export interface LegalValidation {

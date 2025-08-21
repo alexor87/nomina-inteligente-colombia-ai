@@ -14,9 +14,20 @@ export class PayrollUnifiedService {
         throw new Error(error.message);
       }
 
-      // Map to PayrollEmployee with required properties
+      // Map to PayrollEmployee with all required properties
       return data.map(employee => ({
         id: employee.id,
+        empresaId: employee.company_id,
+        tipoDocumento: (employee.tipo_documento || 'CC') as 'CC' | 'TI' | 'CE' | 'PA' | 'RC' | 'NIT' | 'PEP' | 'PPT',
+        nombre: employee.nombre,
+        apellido: employee.apellido,
+        cedula: employee.cedula,
+        salarioBase: employee.salario_base || 0,
+        fechaIngreso: employee.fecha_ingreso,
+        periodicidadPago: (employee.periodicidad_pago || 'mensual') as 'mensual' | 'quincenal',
+        tipoContrato: (employee.tipo_contrato || 'indefinido') as 'indefinido' | 'fijo' | 'obra' | 'aprendizaje',
+        tipoJornada: (employee.tipo_jornada || 'completa') as 'completa' | 'parcial' | 'horas',
+        estado: (employee.estado || 'activo') as 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad' | 'eliminado',
         name: `${employee.nombre} ${employee.apellido}`,
         position: employee.cargo || 'Sin cargo',
         baseSalary: employee.salario_base || 0,
@@ -42,7 +53,8 @@ export class PayrollUnifiedService {
         incapacityDays: 0,
         incapacityValue: 0,
         legalBasis: '',
-        cedula: employee.cedula
+        totalEarnings: employee.salario_base || 0,
+        totalDeductions: 0
       }));
     } catch (error: any) {
       console.error('Error fetching employees for period:', error);

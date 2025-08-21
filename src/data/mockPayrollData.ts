@@ -1,3 +1,4 @@
+
 import { PayrollEmployee, PayrollPeriod } from '@/types/payroll';
 
 export const mockPayrollPeriod: PayrollPeriod = {
@@ -14,6 +15,17 @@ export const mockPayrollPeriod: PayrollPeriod = {
 export const mockPayrollEmployees: PayrollEmployee[] = [
   {
     id: 'employee-1',
+    empresaId: 'company-1',
+    tipoDocumento: 'CC',
+    nombre: 'John',
+    apellido: 'Doe',
+    cedula: '12345678',
+    salarioBase: 3000000,
+    fechaIngreso: '2023-01-15',
+    periodicidadPago: 'quincenal',
+    tipoContrato: 'indefinido',
+    tipoJornada: 'completa',
+    estado: 'activo',
     name: 'John Doe',
     position: 'Software Engineer',
     baseSalary: 3000000,
@@ -40,6 +52,17 @@ export const mockPayrollEmployees: PayrollEmployee[] = [
   },
   {
     id: 'employee-2',
+    empresaId: 'company-1',
+    tipoDocumento: 'CC',
+    nombre: 'Jane',
+    apellido: 'Smith',
+    cedula: '87654321',
+    salarioBase: 4000000,
+    fechaIngreso: '2023-02-01',
+    periodicidadPago: 'quincenal',
+    tipoContrato: 'indefinido',
+    tipoJornada: 'completa',
+    estado: 'activo',
     name: 'Jane Smith',
     position: 'Data Scientist',
     baseSalary: 4000000,
@@ -66,6 +89,17 @@ export const mockPayrollEmployees: PayrollEmployee[] = [
   },
   {
     id: 'employee-3',
+    empresaId: 'company-1',
+    tipoDocumento: 'CC',
+    nombre: 'Mike',
+    apellido: 'Johnson',
+    cedula: '11223344',
+    salarioBase: 5000000,
+    fechaIngreso: '2023-03-01',
+    periodicidadPago: 'quincenal',
+    tipoContrato: 'indefinido',
+    tipoJornada: 'completa',
+    estado: 'activo',
     name: 'Mike Johnson',
     position: 'Project Manager',
     baseSalary: 5000000,

@@ -36,6 +36,11 @@ export interface SalaryDistribution {
   range: string;
   count: number;
   percentage: number;
+  position?: string;
+  employeeCount?: number;
+  averageSalary?: number;
+  minSalary?: number;
+  maxSalary?: number;
 }
 
 export class DashboardService {

@@ -416,6 +416,17 @@ export class EmployeeUnifiedService {
 
       const payrollEmployees: PayrollEmployee[] = data.map(employee => ({
         id: employee.id,
+        empresaId: employee.company_id,
+        tipoDocumento: (employee.tipo_documento || 'CC') as 'CC' | 'TI' | 'CE' | 'PA' | 'RC' | 'NIT' | 'PEP' | 'PPT',
+        nombre: employee.nombre,
+        apellido: employee.apellido,
+        cedula: employee.cedula,
+        salarioBase: employee.salario_base || 0,
+        fechaIngreso: employee.fecha_ingreso,
+        periodicidadPago: (employee.periodicidad_pago || 'mensual') as 'mensual' | 'quincenal',
+        tipoContrato: (employee.tipo_contrato || 'indefinido') as 'indefinido' | 'fijo' | 'obra' | 'aprendizaje',
+        tipoJornada: (employee.tipo_jornada || 'completa') as 'completa' | 'parcial' | 'horas',
+        estado: (employee.estado || 'activo') as 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad' | 'eliminado',
         name: `${employee.nombre} ${employee.apellido}`,
         position: employee.cargo || 'Sin cargo',
         baseSalary: employee.salario_base || 0,
@@ -441,10 +452,8 @@ export class EmployeeUnifiedService {
         incapacityDays: 0,
         incapacityValue: 0,
         legalBasis: '',
-        cedula: employee.cedula,
         totalEarnings: employee.salario_base || 0,
-        totalDeductions: 0,
-        estado: employee.estado
+        totalDeductions: 0
       }));
 
       return { success: true, data: payrollEmployees };
