@@ -149,7 +149,7 @@ const PayrollLiquidationPageSimplified = () => {
     // Ejecutar validación automática si está habilitada
     if (useExhaustiveValidation && loadedPeriodId) {
       console.log('🔍 Ejecutando validación automática...');
-      await performExhaustiveValidation();
+      await performExhaustiveValidation(loadedPeriodId);
     }
   };
 
