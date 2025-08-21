@@ -1,4 +1,3 @@
-
 // Import for Novedad type - using a more flexible approach
 export interface Novedad {
   id?: string;
@@ -20,12 +19,10 @@ export interface PayrollEmployee extends BaseEmployeeData {
   errors: string[];
   healthDeduction: number;
   pensionDeduction: number;
-  // ✅ NEW: Legal compliance fields for incapacity handling
   effectiveWorkedDays: number;
   incapacityDays: number;
   incapacityValue: number;
   legalBasis?: string;
-  // ✅ NEW: cedula field for vouchers
   cedula?: string;
 }
 
@@ -62,7 +59,6 @@ export interface NovedadForIBC {
   subtipo?: string;
 }
 
-// ✅ NEW: Missing PayrollPeriod type
 export interface PayrollPeriod {
   id: string;
   periodo: string;
@@ -76,5 +72,27 @@ export interface PayrollPeriod {
   year?: number;
 }
 
-// ✅ NEW: Missing PeriodStatus type
+export interface PeriodStatusInfo {
+  status: 'borrador' | 'cerrado' | 'procesada' | 'pagada' | 'con_errores' | 'editado' | 'reabierto';
+  action?: string;
+  suggestion?: string;
+  message?: string;
+  currentPeriod?: PayrollPeriod;
+  nextPeriod?: PayrollPeriod;
+}
+
 export type PeriodStatus = 'borrador' | 'cerrado' | 'procesada' | 'pagada' | 'con_errores' | 'editado' | 'reabierto';
+
+export interface PayrollCalculationResult {
+  grossPay: number;
+  deductions: number;
+  netPay: number;
+  transportAllowance: number;
+  employerContributions: number;
+  healthDeduction: number;
+  pensionDeduction: number;
+  effectiveWorkedDays: number;
+  incapacityDays: number;
+  incapacityValue: number;
+  legalBasis?: string;
+}

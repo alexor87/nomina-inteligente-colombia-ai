@@ -195,7 +195,6 @@ export const PayrollLiquidationPage: React.FC = () => {
       {/* Liquidation Action */}
       <div className="mb-6">
         <Button
-          variant="primary"
           onClick={handleLiquidatePayroll}
           disabled={isLiquidating || employees.length === 0}
         >
