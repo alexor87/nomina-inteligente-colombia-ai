@@ -25,6 +25,9 @@ export interface NovedadForIBC {
   // Campos adicionales para incapacidades y otras novedades que requieren detalle
   dias?: number;
   subtipo?: string;
+  // ✅ NUEVOS CAMPOS: Fechas para calcular intersección con el período
+  fecha_inicio?: string;
+  fecha_fin?: string;
 }
 
 export interface PayrollEmployee {

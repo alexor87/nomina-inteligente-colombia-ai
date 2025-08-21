@@ -1,3 +1,4 @@
+
 import { PayrollCalculationBackendService, PayrollCalculationInput } from '@/services/PayrollCalculationBackendService';
 import { PayrollEmployee, BaseEmployeeData, PayrollSummary, NovedadForIBC } from '@/types/payroll';
 import { NOVEDAD_CATEGORIES } from '@/types/novedades-enhanced';
@@ -262,7 +263,9 @@ export const convertNovedadesToIBC = (novedades: any[]): NovedadForIBC[] => {
       valor: novedad.valor,
       dias: novedad.dias,
       subtipoOriginal: novedad.subtipo,
-      subtipoNormalizado: normalizedSubtype
+      subtipoNormalizado: normalizedSubtype,
+      fecha_inicio: novedad.fecha_inicio,
+      fecha_fin: novedad.fecha_fin
     });
 
     const mapped: NovedadForIBC = {
@@ -270,7 +273,10 @@ export const convertNovedadesToIBC = (novedades: any[]): NovedadForIBC[] => {
       constitutivo_salario: constitutivo,
       tipo_novedad: novedad.tipo_novedad || 'otros',
       dias: typeof novedad.dias === 'number' ? novedad.dias : (novedad.dias ? Number(novedad.dias) : undefined),
-      subtipo: normalizedSubtype || undefined
+      subtipo: normalizedSubtype || undefined,
+      // ✅ Pasar fechas cuando existan para calcular intersecciones de incapacidad
+      fecha_inicio: novedad.fecha_inicio ? String(novedad.fecha_inicio) : undefined,
+      fecha_fin: novedad.fecha_fin ? String(novedad.fecha_fin) : undefined,
     };
 
     return mapped;
