@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -25,6 +26,97 @@ const getTransportAssistanceLimit = (year: string) => {
   const values = OFFICIAL_VALUES[year as keyof typeof OFFICIAL_VALUES] || OFFICIAL_VALUES['2025'];
   return values.salarioMinimo * 2; // 2 SMMLV
 };
+
+/**
+ * ===============================
+ *  JORNADA LEGAL (KISS, LEY 2101)
+ * ===============================
+ * - Jornada laboral: transiciones 15/jul (2023→47, 2024→46, 2025→44, 2026→42)
+ * - Recargos: divisor mensual 220h desde 01/jul/2025, antes usa jornada vigente
+ */
+
+// Fechas de vigencia de jornada semanal
+const JORNADAS_LEGALES = [
+  { fechaInicio: new Date('2026-07-15'), horasSemanales: 42, descripcion: 'Jornada final según Ley 2101 de 2021' },
+  { fechaInicio: new Date('2025-07-15'), horasSemanales: 44, descripcion: 'Cuarta fase de reducción - Ley 2101 de 2021' },
+  { fechaInicio: new Date('2024-07-15'), horasSemanales: 46, descripcion: 'Tercera fase de reducción - Ley 2101 de 2021' },
+  { fechaInicio: new Date('2023-07-15'), horasSemanales: 47, descripcion: 'Segunda fase de reducción - Ley 2101 de 2021' },
+  { fechaInicio: new Date('1950-01-01'), horasSemanales: 48, descripcion: 'Jornada máxima tradicional - Código Sustantivo del Trabajo' }
+];
+
+// Tabla fija de horas mensuales por jornada semanal
+const HORAS_MENSUALES_POR_JORNADA: Record<number, number> = {
+  48: 240,
+  47: 235,
+  46: 230,
+  44: 220,
+  42: 210
+};
+
+// Vigencia específica para RECARGOS (divisor mensual)
+const getHorasParaRecargos = (fecha: Date): number => {
+  if (fecha >= new Date('2025-07-01')) {
+    console.log(`🎯 RECARGOS: Desde 1 julio 2025 → usando 220h mensuales`);
+    return 220;
+  }
+  const j = getJornadaLegal(fecha);
+  console.log(`🎯 RECARGOS: Jornada anterior → ${j.horasMensuales}h mensuales`);
+  return j.horasMensuales;
+};
+
+// Jornada legal vigente para fecha dada
+const getJornadaLegal = (fecha: Date) => {
+  const vigente = [...JORNADAS_LEGALES]
+    .sort((a, b) => b.fechaInicio.getTime() - a.fechaInicio.getTime())
+    .find(j => fecha >= j.fechaInicio) || JORNADAS_LEGALES[JORNADAS_LEGALES.length - 1];
+
+  const horasMensuales = HORAS_MENSUALES_POR_JORNADA[vigente.horasSemanales];
+  console.log(`✅ Jornada LABORAL: ${vigente.horasSemanales}h/sem → ${horasMensuales}h/mes (fecha ${fecha.toISOString().slice(0,10)})`);
+
+  return {
+    horasSemanales: vigente.horasSemanales,
+    horasMensuales,
+    fechaVigencia: vigente.fechaInicio,
+    descripcion: vigente.descripcion,
+    ley: 'Ley 2101 de 2021'
+  };
+};
+
+// Horas por día (para horas extra): horasSemanales ÷ 6
+const getDailyHours = (fecha: Date): number => {
+  const j = getJornadaLegal(fecha);
+  const h = j.horasSemanales / 6;
+  console.log(`⏱️ Horas por día (extra): ${j.horasSemanales} ÷ 6 = ${h}`);
+  return h;
+};
+
+// Valor base de la hora para horas extra (fórmula legal)
+const calcularValorHoraExtraBase = (salarioMensual: number, fecha: Date): number => {
+  const valorDiario = salarioMensual / 30;
+  const horasPorDia = getDailyHours(fecha);
+  const valorHora = valorDiario / horasPorDia;
+  console.log(`💰 Valor hora base (EXTRA): salario/30=${Math.round(valorDiario)} ÷ horasPorDia=${horasPorDia.toFixed(3)} → ${Math.round(valorHora)}`);
+  return valorHora;
+};
+
+// Valor base de la hora para recargos (divisor mensual)
+const calcularValorHoraRecargoBase = (salarioMensual: number, fecha: Date): number => {
+  const divisor = getHorasParaRecargos(fecha);
+  const valorHora = salarioMensual / divisor;
+  console.log(`💰 Valor hora base (RECARGO): salario=${salarioMensual} ÷ divisor=${divisor} → ${Math.round(valorHora)}`);
+  return valorHora;
+};
+
+// Factor legal para horas extra (KISS: mantener dominical/festivo = 1.75 como venía en negocio)
+const getOvertimeFactor = (subtipoRaw?: string): number => {
+  const s = String(subtipoRaw || '').toLowerCase().trim();
+  if (s === 'nocturnas') return 1.75;           // Extra nocturna (75%)
+  if (s === 'dominicales' || s === 'festivas') return 1.75; // Mantener negocio actual
+  return 1.25; // Diurnas: 25%
+};
+
+// Normalizador simple
+const normalize = (v?: string) => String(v || '').toLowerCase().trim();
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -73,7 +165,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in payroll calculation:', error)
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ success: false, error: (error as any).message }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400
@@ -322,16 +414,17 @@ async function calculateNovedadesTotals(supabase: any, data: any) {
   let totalDevengos = 0;
   let totalDeducciones = 0;
 
-  // ✅ Calcular valor de hora base
+  // ✅ Bases de hora correctas según normativa
+  const fecha = fechaPeriodo ? new Date(fechaPeriodo) : new Date();
   const valorDiario = salarioBase / 30;
-  const horasPorDia = 8 * (23/30); // 7.67 horas efectivas
-  const valorHora = valorDiario / horasPorDia;
+  const valorHoraExtraBase = calcularValorHoraExtraBase(salarioBase, fecha);
+  const valorHoraRecargoBase = calcularValorHoraRecargoBase(salarioBase, fecha);
 
-  console.log('⏱️ Valor hora extra base:', {
+  console.log('⏱️ Bases de hora:', {
     salarioMensual: salarioBase,
     valorDiario,
-    horasPorDia,
-    valorHora
+    valorHoraExtraBase: Math.round(valorHoraExtraBase),
+    valorHoraRecargoBase: Math.round(valorHoraRecargoBase)
   });
 
   for (const novedad of novedades) {
@@ -352,28 +445,33 @@ async function calculateNovedadesTotals(supabase: any, data: any) {
       console.log('🏥 Totals incapacidad calculada:', {
         valorOriginal,
         valorCalculado,
-        detalleCalculo: `Incapacidad ${normalizeIncapacitySubtype(subtipo)} (política ${policy.incapacity_policy === 'from_day1_66_with_floor' ? 'día 1 con piso' : 'estándar'}): ${dias} días × ${policy.incapacity_policy === 'from_day1_66_with_floor' ? 'máx(66.67% diario, SMLDV=' + Math.round(config.salarioMinimo/30) + ')' : '2d 100% + resto 66.67%'} = ${valorCalculado.toLocaleString()}`
+        detalleCalculo: `Incapacidad ${normalizeIncapacitySubtype(subtipo)} (política ${policy.incapacity_policy === 'from_day1_66_with_floor' ? 'día 1 con piso' : 'estándar'}): ${dias} días`
       });
     } else if (tipo_novedad === 'horas_extra') {
-      // Calcular horas extra según subtipo
       const horasNum = Number(horas || 0);
       if (horasNum > 0) {
-        const s = String(subtipo || '').toLowerCase().trim();
+        const factor = getOvertimeFactor(subtipo);
+        valorCalculado = Math.round(valorHoraExtraBase * horasNum * factor);
 
-        // ✅ CORRECCIÓN: diurnas sin recargo (0%), mantener el resto
-        let recargo = 0; // diurnas = 0
-        if (s === 'nocturnas') recargo = 0.75;
-        else if (s === 'dominicales' || s === 'festivas') recargo = 0.75;
-
-        const factor = 1 + recargo;
-        valorCalculado = Math.round(valorHora * horasNum * factor);
-
-        console.log('🛠️ Horas extra calculadas:', {
+        console.log('🛠️ Horas extra (normativa):', {
           subtipo,
           horasNum,
-          valorHora: Math.round(valorHora),
-          recargo,
+          base: Math.round(valorHoraExtraBase),
           factor,
+          valorCalculado
+        });
+      }
+    } else if (tipo_novedad === 'recargo_nocturno') {
+      // Solo recargo (35%) sobre base de recargos
+      const horasNum = Number(horas || 0);
+      if (horasNum > 0) {
+        const recargo = 0.35;
+        valorCalculado = Math.round(valorHoraRecargoBase * horasNum * recargo);
+
+        console.log('🌙 Recargo nocturno:', {
+          horasNum,
+          base: Math.round(valorHoraRecargoBase),
+          recargo,
           valorCalculado
         });
       }
@@ -399,7 +497,7 @@ async function calculateNovedadesTotals(supabase: any, data: any) {
     itemsProcessed: novedades.length
   };
 
-  console.log('✅ BACKEND: Totales (policy-aware):', result);
+  console.log('✅ BACKEND: Totales (policy-aware + jornada legal):', result);
   return result;
 }
 
@@ -421,12 +519,11 @@ async function calculateSingleNovedad(supabase: any, data: any) {
     tipoNovedad, subtipo, salarioBase, horas, dias, fechaPeriodo, year, policy
   });
 
-  // Valores base para jornada
+  const fecha = fechaPeriodo ? new Date(fechaPeriodo) : new Date();
+  const j = getJornadaLegal(fecha);
   const valorDiario = salarioBase / 30;
-  const horasPorDia = 8 * (23/30); // 6.1333 h/día efectivos (consistente con totals)
-  const horasSemanales = 48;
-  const horasMensuales = Math.round(horasSemanales * 4);
-  const valorHora = valorDiario / horasPorDia;
+  const valorHoraExtraBase = calcularValorHoraExtraBase(salarioBase, fecha);
+  const valorHoraRecargoBase = calcularValorHoraRecargoBase(salarioBase, fecha);
 
   let valor = 0;
   let factorCalculo = 0;
@@ -465,26 +562,32 @@ async function calculateSingleNovedad(supabase: any, data: any) {
               return `Incapacidad general estándar: 2d×$${Math.round(valorDiario).toLocaleString()} + ${remaining}d×máx(66.67% diario=$${Math.round(appliedDailyRaw).toLocaleString()}, SMLDV=$${Math.round(smldv).toLocaleString()}) = $${(first2 + rest).toLocaleString()}`
             })();
 
-  } else if (tipoNovedad === 'horas_extra' || tipoNovedad === 'recargo_nocturno') {
+  } else if (tipoNovedad === 'horas_extra') {
     const horasNum = Number(horas || 0);
-    const s = String(subtipo || '').toLowerCase().trim();
-
-    // ✅ CORRECCIÓN: diurnas sin recargo (0%), mantener el resto
-    let recargo = 0; // diurnas = 0
-    if (s === 'nocturnas') recargo = 0.75;
-    else if (s === 'dominicales' || s === 'festivas') recargo = 0.75;
-
-    const factor = 1 + recargo;
-    valor = Math.round(valorHora * horasNum * factor);
+    const factor = getOvertimeFactor(subtipo);
+    valor = Math.round(valorHoraExtraBase * horasNum * factor);
     factorCalculo = factor;
-    detalleCalculo = `Horas ${subtipo || 'diurnas'}: ${horasNum} h × $${Math.round(valorHora).toLocaleString()} × ${factor} = $${valor.toLocaleString()}`;
+    detalleCalculo = `Horas extra ${subtipo || 'diurnas'}: ${horasNum} h × $${Math.round(valorHoraExtraBase).toLocaleString()} × ${factor} = $${valor.toLocaleString()}`;
 
-    console.log('🛠️ calculateSingleNovedad horas extra:', {
+    console.log('🛠️ calculateSingleNovedad horas extra (normativa):', {
       subtipo,
       horasNum,
-      valorHora: Math.round(valorHora),
-      recargo,
+      baseExtra: Math.round(valorHoraExtraBase),
       factor,
+      valor
+    });
+
+  } else if (tipoNovedad === 'recargo_nocturno') {
+    const horasNum = Number(horas || 0);
+    const recargo = 0.35;
+    valor = Math.round(valorHoraRecargoBase * horasNum * recargo);
+    factorCalculo = recargo;
+    detalleCalculo = `Recargo nocturno: ${horasNum} h × $${Math.round(valorHoraRecargoBase).toLocaleString()} × 0.35 = $${valor.toLocaleString()}`;
+
+    console.log('🌙 calculateSingleNovedad recargo nocturno:', {
+      horasNum,
+      baseRecargo: Math.round(valorHoraRecargoBase),
+      recargo,
       valor
     });
 
@@ -507,17 +610,20 @@ async function calculateSingleNovedad(supabase: any, data: any) {
     detalleCalculo = `Sin cálculo automático para tipo: ${tipoNovedad}`;
   }
 
+  const horasMensualesRecargos = getHorasParaRecargos(fecha);
   const result = {
     valor,
     factorCalculo,
     detalleCalculo,
     jornadaInfo: {
-      horasSemanales,
-      horasMensuales,
-      divisorHorario: horasPorDia,
-      valorHoraOrdinaria: Math.round(valorHora),
-      ley: 'Código Sustantivo del Trabajo',
-      descripcion: 'Cálculo basado en salario mensual con divisor horario estándar'
+      horasSemanales: j.horasSemanales,
+      horasMensuales: tipoNovedad === 'recargo_nocturno' ? horasMensualesRecargos : j.horasMensuales,
+      divisorHorario: tipoNovedad === 'recargo_nocturno' ? horasMensualesRecargos : (j.horasSemanales / 6),
+      valorHoraOrdinaria: Math.round(tipoNovedad === 'recargo_nocturno' ? valorHoraRecargoBase : valorHoraExtraBase),
+      ley: 'Ley 2101 de 2021',
+      descripcion: tipoNovedad === 'recargo_nocturno'
+        ? 'Cálculo de recargo con divisor mensual legal (220h desde 01/07/2025)'
+        : 'Cálculo de hora extra con horas por día (jornada legal vigente)'
     }
   };
 
