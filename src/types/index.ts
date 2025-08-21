@@ -1,4 +1,3 @@
-
 export interface ServiceResponse<T> {
   success: boolean;
   data: T;
@@ -9,31 +8,31 @@ export interface ServiceResponse<T> {
 export interface Employee {
   id: string;
   empresaId: string;
-  company_id?: string; // Added for compatibility
+  company_id?: string;
   cedula: string;
-  tipoDocumento?: 'CC' | 'TI' | 'CE' | 'PA' | 'RC' | 'NIT' | 'PEP' | 'PPT'; // Made optional and specific
+  tipoDocumento: 'CC' | 'TI' | 'CE' | 'PA' | 'RC' | 'NIT' | 'PEP' | 'PPT';
   nombre: string;
   segundoNombre?: string;
   apellido: string;
   email?: string;
   telefono?: string;
-  sexo?: 'M' | 'F'; // Made specific union type
+  sexo?: 'M' | 'F';
   fechaNacimiento?: string;
   direccion?: string;
   ciudad?: string;
   departamento?: string;
   salarioBase: number;
-  tipoContrato?: 'indefinido' | 'fijo' | 'obra' | 'aprendizaje'; // Made specific
+  tipoContrato: 'indefinido' | 'fijo' | 'obra' | 'aprendizaje';
   fechaIngreso: string;
-  periodicidadPago?: 'mensual' | 'quincenal'; // Made optional and specific
+  periodicidadPago: 'mensual' | 'quincenal';
   cargo?: string;
   codigoCIIU?: string;
   nivelRiesgoARL?: 'I' | 'II' | 'III' | 'IV' | 'V';
-  estado?: 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad' | 'eliminado'; // Made optional and added eliminado
+  estado: 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad' | 'eliminado';
   centroCostos?: string;
   fechaFirmaContrato?: string;
   fechaFinalizacionContrato?: string;
-  tipoJornada?: 'completa' | 'parcial' | 'horas';
+  tipoJornada: 'completa' | 'parcial' | 'horas';
   diasTrabajo?: number;
   horasTrabajo?: number;
   beneficiosExtralegales?: boolean;
@@ -81,7 +80,7 @@ export interface PayrollCalculation {
   netPay: number;
   transportAllowance: number;
   employerContributions: number;
-  // Add missing properties for PayrollService
+  auxilioTransporte?: number;
   salarioBase?: number;
   diasTrabajados?: number;
   horasExtra?: number;
@@ -94,7 +93,7 @@ export interface LegalValidation {
   isValid: boolean;
   violations: string[];
   warnings: string[];
-  errors?: string[]; // Add missing property
+  errors: string[];
 }
 
 export interface Payroll {

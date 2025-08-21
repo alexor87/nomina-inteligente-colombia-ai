@@ -6,6 +6,21 @@ import { PayrollEmployee } from '@/types/payroll';
 export type UnifiedEmployeeData = EmployeeUnified;
 
 export class EmployeeUnifiedService {
+  private static mapCustomFields(customFields: any): Record<string, any> {
+    if (!customFields) return {};
+    if (typeof customFields === 'string') {
+      try {
+        return JSON.parse(customFields);
+      } catch {
+        return {};
+      }
+    }
+    if (typeof customFields === 'object') {
+      return customFields as Record<string, any>;
+    }
+    return {};
+  }
+
   static async getAll(): Promise<ServiceResponse<EmployeeUnified[]>> {
     try {
       const { data: rows, error } = await supabase
@@ -36,7 +51,7 @@ export class EmployeeUnifiedService {
         salarioBase: row.salario_base,
         tipoContrato: (row.tipo_contrato || 'indefinido') as 'indefinido' | 'fijo' | 'obra' | 'aprendizaje',
         fechaIngreso: row.fecha_ingreso,
-        periodicidadPago: row.periodicidad_pago as 'mensual' | 'quincenal' | undefined,
+        periodicidadPago: (row.periodicidad_pago || 'mensual') as 'mensual' | 'quincenal',
         cargo: row.cargo,
         codigoCIIU: row.codigo_ciiu,
         nivelRiesgoARL: row.nivel_riesgo_arl as 'I' | 'II' | 'III' | 'IV' | 'V' | undefined,
@@ -62,7 +77,7 @@ export class EmployeeUnifiedService {
         subtipoCotizanteId: row.subtipo_cotizante_id,
         regimenSalud: row.regimen_salud as 'contributivo' | 'subsidiado' | undefined,
         estadoAfiliacion: row.estado_afiliacion as 'completa' | 'pendiente' | 'inconsistente' | undefined,
-        custom_fields: row.custom_fields,
+        custom_fields: this.mapCustomFields(row.custom_fields),
         createdAt: row.created_at,
         updatedAt: row.updated_at
       }));
@@ -110,7 +125,7 @@ export class EmployeeUnifiedService {
         salarioBase: row.salario_base,
         tipoContrato: (row.tipo_contrato || 'indefinido') as 'indefinido' | 'fijo' | 'obra' | 'aprendizaje',
         fechaIngreso: row.fecha_ingreso,
-        periodicidadPago: row.periodicidad_pago as 'mensual' | 'quincenal' | undefined,
+        periodicidadPago: (row.periodicidad_pago || 'mensual') as 'mensual' | 'quincenal',
         cargo: row.cargo,
         codigoCIIU: row.codigo_ciiu,
         nivelRiesgoARL: row.nivel_riesgo_arl as 'I' | 'II' | 'III' | 'IV' | 'V' | undefined,
@@ -136,7 +151,7 @@ export class EmployeeUnifiedService {
         subtipoCotizanteId: row.subtipo_cotizante_id,
         regimenSalud: row.regimen_salud as 'contributivo' | 'subsidiado' | undefined,
         estadoAfiliacion: row.estado_afiliacion as 'completa' | 'pendiente' | 'inconsistente' | undefined,
-        custom_fields: row.custom_fields,
+        custom_fields: this.mapCustomFields(row.custom_fields),
         createdAt: row.created_at,
         updatedAt: row.updated_at
       };
@@ -183,7 +198,7 @@ export class EmployeeUnifiedService {
         salarioBase: newEmployee.salario_base,
         tipoContrato: (newEmployee.tipo_contrato || 'indefinido') as 'indefinido' | 'fijo' | 'obra' | 'aprendizaje',
         fechaIngreso: newEmployee.fecha_ingreso,
-        periodicidadPago: newEmployee.periodicidad_pago as 'mensual' | 'quincenal' | undefined,
+        periodicidadPago: (newEmployee.periodicidad_pago || 'mensual') as 'mensual' | 'quincenal',
         cargo: newEmployee.cargo,
         codigoCIIU: newEmployee.codigo_ciiu,
         nivelRiesgoARL: newEmployee.nivel_riesgo_arl as 'I' | 'II' | 'III' | 'IV' | 'V' | undefined,
@@ -209,7 +224,7 @@ export class EmployeeUnifiedService {
         subtipoCotizanteId: newEmployee.subtipo_cotizante_id,
         regimenSalud: newEmployee.regimen_salud as 'contributivo' | 'subsidiado' | undefined,
         estadoAfiliacion: newEmployee.estado_afiliacion as 'completa' | 'pendiente' | 'inconsistente' | undefined,
-        custom_fields: newEmployee.custom_fields,
+        custom_fields: this.mapCustomFields(newEmployee.custom_fields),
         createdAt: newEmployee.created_at,
         updatedAt: newEmployee.updated_at
       };
@@ -258,7 +273,7 @@ export class EmployeeUnifiedService {
         salarioBase: updatedEmployee.salario_base,
         tipoContrato: (updatedEmployee.tipo_contrato || 'indefinido') as 'indefinido' | 'fijo' | 'obra' | 'aprendizaje',
         fechaIngreso: updatedEmployee.fecha_ingreso,
-        periodicidadPago: updatedEmployee.periodicidad_pago as 'mensual' | 'quincenal' | undefined,
+        periodicidadPago: (updatedEmployee.periodicidad_pago || 'mensual') as 'mensual' | 'quincenal',
         cargo: updatedEmployee.cargo,
         codigoCIIU: updatedEmployee.codigo_ciiu,
         nivelRiesgoARL: updatedEmployee.nivel_riesgo_arl as 'I' | 'II' | 'III' | 'IV' | 'V' | undefined,
@@ -284,7 +299,7 @@ export class EmployeeUnifiedService {
         subtipoCotizanteId: updatedEmployee.subtipo_cotizante_id,
         regimenSalud: updatedEmployee.regimen_salud as 'contributivo' | 'subsidiado' | undefined,
         estadoAfiliacion: updatedEmployee.estado_afiliacion as 'completa' | 'pendiente' | 'inconsistente' | undefined,
-        custom_fields: updatedEmployee.custom_fields,
+        custom_fields: this.mapCustomFields(updatedEmployee.custom_fields),
         createdAt: updatedEmployee.created_at,
         updatedAt: updatedEmployee.updated_at
       };
@@ -292,7 +307,7 @@ export class EmployeeUnifiedService {
       return { success: true, data: mappedEmployee, message: 'Employee updated successfully' };
     } catch (error: any) {
       console.error('Unexpected error updating employee:', error);
-      return { success: false, message: error.message, data: false };
+      return { success: false, message: error.message, data: null };
     }
   }
 
@@ -346,7 +361,7 @@ export class EmployeeUnifiedService {
         salarioBase: row.salario_base,
         tipoContrato: (row.tipo_contrato || 'indefinido') as 'indefinido' | 'fijo' | 'obra' | 'aprendizaje',
         fechaIngreso: row.fecha_ingreso,
-        periodicidadPago: row.periodicidad_pago as 'mensual' | 'quincenal' | undefined,
+        periodicidadPago: (row.periodicidad_pago || 'mensual') as 'mensual' | 'quincenal',
         cargo: row.cargo,
         codigoCIIU: row.codigo_ciiu,
         nivelRiesgoARL: row.nivel_riesgo_arl as 'I' | 'II' | 'III' | 'IV' | 'V' | undefined,
@@ -372,7 +387,7 @@ export class EmployeeUnifiedService {
         subtipoCotizanteId: row.subtipo_cotizante_id,
         regimenSalud: row.regimen_salud as 'contributivo' | 'subsidiado' | undefined,
         estadoAfiliacion: row.estado_afiliacion as 'completa' | 'pendiente' | 'inconsistente' | undefined,
-        custom_fields: row.custom_fields,
+        custom_fields: this.mapCustomFields(row.custom_fields),
         createdAt: row.created_at,
         updatedAt: row.updated_at
       }));

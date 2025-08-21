@@ -24,6 +24,8 @@ export interface BaseEmployeeData {
 }
 
 export interface PayrollEmployee extends BaseEmployeeData {
+  // Make name required as per BaseEmployeeData
+  name: string;
   grossPay: number;
   deductions: number;
   netPay: number;
@@ -43,13 +45,17 @@ export interface PayrollEmployee extends BaseEmployeeData {
   totalEarnings?: number;
   totalDeductions?: number;
   estado?: string;
-  // Make name required as per BaseEmployeeData
-  name: string; // Override to make required
+  
   // Add EmployeeUnified compatibility properties
-  empresaId?: string;
-  tipoDocumento?: 'CC' | 'TI' | 'CE' | 'PA' | 'RC' | 'NIT' | 'PEP' | 'PPT';
-  nombre?: string;
-  apellido?: string;
+  empresaId: string;
+  tipoDocumento: 'CC' | 'TI' | 'CE' | 'PA' | 'RC' | 'NIT' | 'PEP' | 'PPT';
+  nombre: string;
+  apellido: string;
+  salarioBase: number;
+  fechaIngreso: string;
+  periodicidadPago: 'mensual' | 'quincenal';
+  tipoContrato: 'indefinido' | 'fijo' | 'obra' | 'aprendizaje';
+  tipoJornada: 'completa' | 'parcial' | 'horas';
   email?: string;
   telefono?: string;
   sexo?: 'M' | 'F';
@@ -57,16 +63,12 @@ export interface PayrollEmployee extends BaseEmployeeData {
   direccion?: string;
   ciudad?: string;
   departamento?: string;
-  tipoContrato?: 'indefinido' | 'fijo' | 'obra' | 'aprendizaje';
-  fechaIngreso?: string;
-  periodicidadPago?: 'mensual' | 'quincenal';
   cargo?: string;
   codigoCIIU?: string;
   nivelRiesgoARL?: 'I' | 'II' | 'III' | 'IV' | 'V';
   centroCostos?: string;
   fechaFirmaContrato?: string;
   fechaFinalizacionContrato?: string;
-  tipoJornada?: 'completa' | 'parcial' | 'horas';
   diasTrabajo?: number;
   horasTrabajo?: number;
   beneficiosExtralegales?: boolean;

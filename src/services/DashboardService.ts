@@ -2,6 +2,42 @@ import { supabase } from '@/integrations/supabase/client';
 import { EmployeeUnifiedService } from './EmployeeUnifiedService';
 import { DashboardMetrics } from '@/types';
 
+export interface RecentEmployee {
+  id: string;
+  name: string;
+  position: string;
+  status: string;
+  joinDate: string;
+}
+
+export interface DashboardActivity {
+  id: string;
+  type: string;
+  action: string;
+  user: string;
+  timestamp: string;
+}
+
+export interface MonthlyPayrollTrend {
+  month: string;
+  amount: number;
+  employees: number;
+  change: number;
+}
+
+export interface EfficiencyMetric {
+  metric: string;
+  value: number;
+  unit: string;
+  change: number;
+}
+
+export interface SalaryDistribution {
+  range: string;
+  count: number;
+  percentage: number;
+}
+
 export class DashboardService {
   static async getDashboardMetrics(companyId: string): Promise<DashboardMetrics> {
     try {
@@ -27,9 +63,9 @@ export class DashboardService {
         totalEmployees,
         activeEmployees,
         pendingPayrolls,
-        totalPayrollCost: monthlyPayrollTotal, // Required property
-        employeeGrowth: Math.floor(Math.random() * 20) - 10, // Required property (-10 to +10)
-        payrollTrend: Math.floor(Math.random() * 20) - 10, // Required property (-10 to +10)
+        totalPayrollCost: monthlyPayrollTotal,
+        employeeGrowth: Math.floor(Math.random() * 20) - 10,
+        payrollTrend: Math.floor(Math.random() * 20) - 10,
         monthlyPayrollTotal,
         complianceScore,
         alerts,
@@ -47,9 +83,9 @@ export class DashboardService {
         totalEmployees: 0,
         activeEmployees: 0,
         pendingPayrolls: 0,
-        totalPayrollCost: 0, // Required property
-        employeeGrowth: 0, // Required property  
-        payrollTrend: 0, // Required property
+        totalPayrollCost: 0,
+        employeeGrowth: 0,
+        payrollTrend: 0,
         monthlyPayrollTotal: 0,
         complianceScore: 0,
         alerts: 0,
@@ -59,6 +95,93 @@ export class DashboardService {
         gastosNomina: 0,
         tendenciaMensual: 0
       };
+    }
+  }
+
+  static async getRecentEmployees(companyId: string = 'default'): Promise<RecentEmployee[]> {
+    try {
+      const employeesResponse = await EmployeeUnifiedService.getByCompanyId(companyId);
+      const employees = employeesResponse.data || [];
+      
+      return employees.slice(0, 5).map(emp => ({
+        id: emp.id,
+        name: `${emp.nombre} ${emp.apellido}`,
+        position: emp.cargo || 'Sin cargo',
+        status: emp.estado,
+        joinDate: emp.fechaIngreso
+      }));
+    } catch (error) {
+      console.error('Error fetching recent employees:', error);
+      return [];
+    }
+  }
+
+  static async getDashboardActivity(companyId: string = 'default'): Promise<DashboardActivity[]> {
+    try {
+      // Mock activity data - replace with actual data fetching
+      return [
+        {
+          id: '1',
+          type: 'payroll',
+          action: 'Nómina procesada para período 2024-01',
+          user: 'Admin',
+          timestamp: new Date().toISOString()
+        },
+        {
+          id: '2',
+          type: 'employee',
+          action: 'Nuevo empleado agregado',
+          user: 'RH Manager',
+          timestamp: new Date(Date.now() - 86400000).toISOString()
+        }
+      ];
+    } catch (error) {
+      console.error('Error fetching dashboard activity:', error);
+      return [];
+    }
+  }
+
+  static async getMonthlyPayrollTrends(companyId: string = 'default'): Promise<MonthlyPayrollTrend[]> {
+    try {
+      // Mock trend data - replace with actual data fetching
+      const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun'];
+      return months.map((month, index) => ({
+        month,
+        amount: 50000000 + Math.random() * 10000000,
+        employees: 25 + Math.floor(Math.random() * 10),
+        change: Math.floor(Math.random() * 20) - 10
+      }));
+    } catch (error) {
+      console.error('Error fetching payroll trends:', error);
+      return [];
+    }
+  }
+
+  static async getEfficiencyMetrics(companyId: string = 'default'): Promise<EfficiencyMetric[]> {
+    try {
+      return [
+        {
+          metric: 'Costo Total Nómina',
+          value: 75000000,
+          unit: 'COP',
+          change: 5.2
+        },
+        {
+          metric: 'Salario Promedio',
+          value: 3000000,
+          unit: 'COP',
+          change: -2.1
+        },
+        {
+          metric: 'Empleados Procesados',
+          value: 25,
+          unit: 'empleados',
+          change: 8.3
+        }
+      ];
+    } catch (error) {
+      console.error('Error fetching efficiency metrics:', error);
+      return [];
     }
   }
 

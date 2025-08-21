@@ -28,6 +28,8 @@ export const useDashboard = () => {
         setLoading(true);
       }
 
+      const companyId = 'default'; // Replace with actual company ID
+
       // Cargar datos en paralelo para mejor performance
       const [
         metricsData,
@@ -36,11 +38,11 @@ export const useDashboard = () => {
         trendsData,
         efficiencyData
       ] = await Promise.all([
-        DashboardService.getDashboardMetrics(),
-        DashboardService.getRecentEmployees(),
-        DashboardService.getDashboardActivity(),
-        DashboardService.getMonthlyPayrollTrends(),
-        DashboardService.getEfficiencyMetrics()
+        DashboardService.getDashboardMetrics(companyId),
+        DashboardService.getRecentEmployees(companyId),
+        DashboardService.getDashboardActivity(companyId),
+        DashboardService.getMonthlyPayrollTrends(companyId),
+        DashboardService.getEfficiencyMetrics(companyId)
       ]);
 
       setMetrics(metricsData);
