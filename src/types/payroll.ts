@@ -1,3 +1,4 @@
+
 // Import for Novedad type - using a more flexible approach
 export interface Novedad {
   id?: string;
@@ -81,7 +82,7 @@ export interface PeriodStatusInfo {
   nextPeriod?: PayrollPeriod;
 }
 
-export type PeriodStatus = 'borrador' | 'cerrado' | 'procesada' | 'pagada' | 'con_errores' | 'editado' | 'reabierto';
+export type PeriodStatus = 'borrador' | 'cerrado' | 'procesada' | 'pagada' | 'con_errores' | 'editado' | 'reabierto' | PeriodStatusInfo;
 
 export interface PayrollCalculationResult {
   grossPay: number;

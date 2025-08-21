@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback } from 'react';
 import {
   Table,
@@ -8,7 +9,6 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { MoreVertical, Edit, Trash2 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -71,11 +71,11 @@ export const PayrollLiquidationSimpleTable = ({
           {employees.map((employee) => (
             <TableRow key={employee.id}>
               <TableCell>{employee.nombre} {employee.apellido}</TableCell>
-              <TableCell>{employee.numero_documento}</TableCell>
+              <TableCell>{employee.cedula}</TableCell>
               <TableCell>{employee.cargo}</TableCell>
               <TableCell>${employee.salarioBase.toLocaleString()}</TableCell>
               <TableCell>
-                {employee.status === 'activo' ? (
+                {employee.estado === 'activo' ? (
                   <Badge variant="outline">Activo</Badge>
                 ) : (
                   <Badge>Inactivo</Badge>
@@ -115,7 +115,6 @@ export const PayrollLiquidationSimpleTable = ({
         periodId={currentPeriodId}
         startDate={startDate}
         endDate={endDate}
-        onNovedadChange={handleNovedadChange}
         year={year}
       />
     </div>

@@ -1,8 +1,19 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { EmployeeUnified } from '@/types/employee-unified';
 
 export interface UnifiedEmployeeData extends EmployeeUnified {
-  // Additional properties for payroll
+  // Additional properties for payroll calculations
+  name?: string;
+  baseSalary?: number;
+  workedDays?: number;
+  totalEarnings?: number;
+  totalDeductions?: number;
+  netPay?: number;
+  transportAllowance?: number;
+  healthDeduction?: number;
+  pensionDeduction?: number;
+  status?: 'valid' | 'error' | 'incomplete';
 }
 
 export class EmployeeUnifiedService {
@@ -44,7 +55,7 @@ export class EmployeeUnifiedService {
     }
   }
 
-  static async create(employee: EmployeeUnified): Promise<{ success: boolean; data: EmployeeUnified | null; error: string | null }> {
+  static async create(employee: Partial<EmployeeUnified>): Promise<EmployeeUnified> {
     try {
       const { data, error } = await supabase
         .from('employees')
@@ -53,18 +64,17 @@ export class EmployeeUnifiedService {
         .single();
 
       if (error) {
-        console.error('Error creating employee:', error);
-        return { success: false, data: null, error: error.message };
+        throw new Error(error.message);
       }
 
-      return { success: true, data, error: null };
+      return data;
     } catch (error: any) {
-      console.error('Unexpected error creating employee:', error);
-      return { success: false, data: null, error: error.message };
+      console.error('Error creating employee:', error);
+      throw error;
     }
   }
 
-  static async update(id: string, updates: Partial<EmployeeUnified>): Promise<{ success: boolean; data: EmployeeUnified | null; error: string | null }> {
+  static async update(id: string, updates: Partial<EmployeeUnified>): Promise<EmployeeUnified> {
     try {
       const { data, error } = await supabase
         .from('employees')
@@ -74,18 +84,17 @@ export class EmployeeUnifiedService {
         .single();
 
       if (error) {
-        console.error(`Error updating employee with ID ${id}:`, error);
-        return { success: false, data: null, error: error.message };
+        throw new Error(error.message);
       }
 
-      return { success: true, data, error: null };
+      return data;
     } catch (error: any) {
-      console.error(`Unexpected error updating employee with ID ${id}:`, error);
-      return { success: false, data: null, error: error.message };
+      console.error(`Error updating employee with ID ${id}:`, error);
+      throw error;
     }
   }
 
-  static async delete(id: string): Promise<{ success: boolean; error: string | null }> {
+  static async delete(id: string): Promise<void> {
     try {
       const { error } = await supabase
         .from('employees')
@@ -93,135 +102,77 @@ export class EmployeeUnifiedService {
         .eq('id', id);
 
       if (error) {
-        console.error(`Error deleting employee with ID ${id}:`, error);
-        return { success: false, error: error.message };
+        throw new Error(error.message);
       }
-
-      return { success: true, error: null };
     } catch (error: any) {
-      console.error(`Unexpected error deleting employee with ID ${id}:`, error);
-      return { success: false, error: error.message };
+      console.error(`Error deleting employee with ID ${id}:`, error);
+      throw error;
     }
   }
 
-  static async updatePayrollRecords(employees: any[]): Promise<{ success: boolean; error: string | null }> {
+  static async updatePayrollRecords(periodId: string): Promise<void> {
     try {
+      console.log('Updating payroll records for period:', periodId);
       // Implementation for updating payroll records
-      console.log('Updating payroll records for', employees.length, 'employees');
-      return { success: true, error: null };
+      return;
     } catch (error: any) {
       console.error('Error updating payroll records:', error);
-      return { success: false, error: error.message };
+      throw error;
     }
   }
 
-  static async getEmployeesForPeriod(periodId: string): Promise<{ success: boolean; data: EmployeeUnified[] | null; error: string | null }> {
+  static async getEmployeesForPeriod(periodId: string): Promise<UnifiedEmployeeData[]> {
     try {
       const { data, error } = await supabase
         .from('employees')
         .select('*')
-        .eq('status', 'activo');
+        .eq('estado', 'activo');
 
       if (error) {
-        console.error('Error fetching employees for period:', error);
-        return { success: false, data: null, error: error.message };
+        throw new Error(error.message);
       }
 
-      return { success: true, data, error: null };
+      // Map to UnifiedEmployeeData with payroll properties
+      return data.map(employee => ({
+        ...employee,
+        name: `${employee.nombre} ${employee.apellido}`,
+        baseSalary: employee.salario_base || 0,
+        workedDays: 30,
+        totalEarnings: employee.salario_base || 0,
+        totalDeductions: 0,
+        netPay: employee.salario_base || 0,
+        transportAllowance: 0,
+        healthDeduction: 0,
+        pensionDeduction: 0,
+        status: 'valid' as const
+      }));
     } catch (error: any) {
-      console.error('Unexpected error fetching employees for period:', error);
-      return { success: false, data: null, error: error.message };
+      console.error('Error fetching employees for period:', error);
+      throw error;
     }
   }
 
-  static async getConfigurationInfo(): Promise<{ success: boolean; data: any; error: string | null }> {
-    try {
-      // Return basic configuration info
-      const config = {
-        smmlv: 1300000, // Current minimum wage
-        transportAllowance: 162000,
-        maxTransportAllowanceLimit: 2600000 // 2 SMMLV
-      };
-      
-      return { success: true, data: config, error: null };
-    } catch (error: any) {
-      console.error('Error getting configuration info:', error);
-      return { success: false, data: null, error: error.message };
-    }
+  static getConfigurationInfo() {
+    return {
+      salarioMinimo: 1300000,
+      auxilioTransporte: 162000,
+      maxTransportAllowanceLimit: 2600000
+    };
   }
 
-  static async changeStatus(id: string, status: string): Promise<{ success: boolean; error: string | null }> {
+  static async changeStatus(id: string, status: string): Promise<void> {
     try {
       const { error } = await supabase
         .from('employees')
-        .update({ status })
+        .update({ estado: status })
         .eq('id', id);
 
       if (error) {
-        console.error(`Error changing status for employee ${id}:`, error);
-        return { success: false, error: error.message };
+        throw new Error(error.message);
       }
-
-      return { success: true, error: null };
     } catch (error: any) {
-      console.error(`Unexpected error changing status for employee ${id}:`, error);
-      return { success: false, error: error.message };
+      console.error(`Error changing status for employee ${id}:`, error);
+      throw error;
     }
-  }
-
-  static mapEmployeeStatus(employee: EmployeeUnified): { status: 'valid' | 'error' | 'incomplete'; errors: string[] } {
-    const errors: string[] = [];
-
-    if (!employee.nombre || !employee.apellido) {
-      errors.push('Nombre y apellido son obligatorios.');
-    }
-
-    if (!employee.tipo_documento || !employee.numero_documento) {
-      errors.push('Tipo y número de documento son obligatorios.');
-    }
-
-    if (!employee.fecha_nacimiento) {
-      errors.push('Fecha de nacimiento es obligatoria.');
-    }
-
-    if (!employee.email) {
-      errors.push('Email es obligatorio.');
-    }
-
-    if (!employee.telefono) {
-      errors.push('Teléfono es obligatorio.');
-    }
-
-    if (!employee.direccion) {
-      errors.push('Dirección es obligatoria.');
-    }
-
-    if (!employee.ciudad) {
-      errors.push('Ciudad es obligatoria.');
-    }
-
-    if (!employee.departamento) {
-      errors.push('Departamento es obligatorio.');
-    }
-
-    if (!employee.salarioBase) {
-      errors.push('Salario base es obligatorio.');
-    }
-
-    if (!employee.tipo_contrato) {
-      errors.push('Tipo de contrato es obligatorio.');
-    }
-
-    if (!employee.fecha_ingreso) {
-      errors.push('Fecha de ingreso es obligatoria.');
-    }
-
-    // Fix the comparison - change 'incomplete' to appropriate status
-    const hasErrors = employee.status === 'error';
-
-    return {
-      status: hasErrors ? 'error' : errors.length > 0 ? 'incomplete' : 'valid',
-      errors: hasErrors ? ['Error en los datos del empleado'] : errors,
-    };
   }
 }

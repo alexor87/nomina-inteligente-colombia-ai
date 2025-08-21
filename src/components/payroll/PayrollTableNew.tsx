@@ -92,10 +92,10 @@ export const PayrollTableNew: React.FC<PayrollTableNewProps> = ({ periodId, onRe
     }
   }, [periodId]);
 
-  const totalEarnings = employees.reduce((sum, emp) => sum + emp.totalEarnings, 0);
-  const totalDeductions = employees.reduce((sum, emp) => sum + emp.totalDeductions, 0);
-  const totalNetPay = employees.reduce((sum, emp) => sum + emp.netPay, 0);
-  const employeesWithTransport = employees.filter(emp => emp.transportAllowance > 0).length;
+  const totalEarnings = employees.reduce((sum, emp) => sum + (emp.totalEarnings || 0), 0);
+  const totalDeductions = employees.reduce((sum, emp) => sum + (emp.totalDeductions || 0), 0);
+  const totalNetPay = employees.reduce((sum, emp) => sum + (emp.netPay || 0), 0);
+  const employeesWithTransport = employees.filter(emp => (emp.transportAllowance || 0) > 0).length;
 
   const configInfo = EmployeeUnifiedService.getConfigurationInfo();
 
@@ -229,36 +229,36 @@ export const PayrollTableNew: React.FC<PayrollTableNewProps> = ({ periodId, onRe
               <tbody>
                 {employees.map((employee) => (
                   <tr key={employee.id} className="border-b hover:bg-gray-50">
-                    <td className="p-2 font-medium">{employee.name}</td>
-                    <td className="text-right p-2">{formatCurrency(employee.baseSalary)}</td>
-                    <td className="text-right p-2">{employee.workedDays}</td>
+                    <td className="p-2 font-medium">{employee.name || `${employee.nombre} ${employee.apellido}`}</td>
+                    <td className="text-right p-2">{formatCurrency(employee.baseSalary || employee.salarioBase || 0)}</td>
+                    <td className="text-right p-2">{employee.workedDays || 30}</td>
                     <td className="text-right p-2">
-                      <span className={employee.transportAllowance > 0 ? 'text-green-600' : 'text-gray-400'}>
-                        {formatCurrency(employee.transportAllowance)}
+                      <span className={(employee.transportAllowance || 0) > 0 ? 'text-green-600' : 'text-gray-400'}>
+                        {formatCurrency(employee.transportAllowance || 0)}
                       </span>
                     </td>
                     <td className="text-right p-2 font-medium">
-                      {formatCurrency(employee.totalEarnings)}
+                      {formatCurrency(employee.totalEarnings || 0)}
                     </td>
                     {showDetails && (
                       <>
                         <td className="text-right p-2 text-red-600">
-                          {formatCurrency(employee.healthDeduction)}
+                          {formatCurrency(employee.healthDeduction || 0)}
                         </td>
                         <td className="text-right p-2 text-red-600">
-                          {formatCurrency(employee.pensionDeduction)}
+                          {formatCurrency(employee.pensionDeduction || 0)}
                         </td>
                         <td className="text-right p-2 text-red-600">
-                          {formatCurrency(employee.totalDeductions)}
+                          {formatCurrency(employee.totalDeductions || 0)}
                         </td>
                       </>
                     )}
                     <td className="text-right p-2 font-bold text-blue-600">
-                      {formatCurrency(employee.netPay)}
+                      {formatCurrency(employee.netPay || 0)}
                     </td>
                     <td className="text-center p-2">
-                      <Badge variant={employee.status === 'valid' ? 'default' : 'destructive'}>
-                        {employee.status === 'valid' ? 'OK' : 'Error'}
+                      <Badge variant={(employee.status || employee.estado) === 'valid' || employee.estado === 'activo' ? 'default' : 'destructive'}>
+                        {(employee.status || employee.estado) === 'valid' || employee.estado === 'activo' ? 'OK' : 'Error'}
                       </Badge>
                     </td>
                   </tr>
