@@ -1,89 +1,114 @@
 
-import React from 'react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Trash2, Edit } from 'lucide-react';
 import { PayrollEmployee } from '@/types/payroll';
 
-interface PayrollLiquidationTableProps {
+export interface PayrollLiquidationTableProps {
   employees: PayrollEmployee[];
-  startDate?: string;
-  endDate?: string;
-  currentPeriodId?: string;
-  currentPeriod?: string;
-  onRemoveEmployee?: (employeeId: string) => void;
-  onEmployeeNovedadesChange?: (employeeId: string) => void;
-  updateEmployeeCalculationsInDB?: (employeeId: string) => void;
-  year?: string;
-  onEmployeeUpdate?: (employeeId: string) => void;
+  onUpdateEmployee: (employeeId: string, data: any) => void;
+  onRemoveEmployee: (employeeId: string) => void;
+  isLoading: boolean;
 }
 
-export const PayrollLiquidationTable: React.FC<PayrollLiquidationTableProps> = ({
-  employees,
-  startDate,
-  endDate,
-  currentPeriodId,
-  currentPeriod,
-  onRemoveEmployee,
-  onEmployeeNovedadesChange,
-  updateEmployeeCalculationsInDB,
-  year,
-  onEmployeeUpdate
-}) => {
-  return (
-    <div className="space-y-4">
-      <h3 className="text-lg font-semibold">Empleados en Liquidación</h3>
-      
-      <div className="overflow-x-auto">
-        <table className="min-w-full border-collapse border border-gray-200">
-          <thead>
-            <tr className="bg-gray-50">
-              <th className="border border-gray-200 px-4 py-2 text-left">Empleado</th>
-              <th className="border border-gray-200 px-4 py-2 text-right">Salario Base</th>
-              <th className="border border-gray-200 px-4 py-2 text-right">Devengado</th>
-              <th className="border border-gray-200 px-4 py-2 text-right">Deducciones</th>
-              <th className="border border-gray-200 px-4 py-2 text-right">Neto</th>
-              <th className="border border-gray-200 px-4 py-2 text-center">Estado</th>
-            </tr>
-          </thead>
-          <tbody>
-            {employees.map((employee) => (
-              <tr key={employee.id} className="hover:bg-gray-50">
-                <td className="border border-gray-200 px-4 py-2">
-                  <div>
-                    <div className="font-medium">{employee.name}</div>
-                    <div className="text-sm text-gray-500">{employee.position}</div>
-                  </div>
-                </td>
-                <td className="border border-gray-200 px-4 py-2 text-right">
-                  ${employee.baseSalary.toLocaleString()}
-                </td>
-                <td className="border border-gray-200 px-4 py-2 text-right">
-                  ${employee.grossPay.toLocaleString()}
-                </td>
-                <td className="border border-gray-200 px-4 py-2 text-right">
-                  ${employee.deductions.toLocaleString()}
-                </td>
-                <td className="border border-gray-200 px-4 py-2 text-right font-semibold">
-                  ${employee.netPay.toLocaleString()}
-                </td>
-                <td className="border border-gray-200 px-4 py-2 text-center">
-                  <span className={`px-2 py-1 rounded text-sm ${
-                    employee.status === 'valid' 
-                      ? 'bg-green-100 text-green-800' 
-                      : 'bg-red-100 text-red-800'
-                  }`}>
-                    {employee.status}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+export const PayrollLiquidationTable = ({ 
+  employees, 
+  onUpdateEmployee, 
+  onRemoveEmployee, 
+  isLoading 
+}: PayrollLiquidationTableProps) => {
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('es-CO', {
+      style: 'currency',
+      currency: 'COP',
+      minimumFractionDigits: 0
+    }).format(amount);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center py-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
       </div>
-      
-      {employees.length === 0 && (
-        <div className="text-center py-8 text-gray-500">
-          No hay empleados para mostrar
-        </div>
-      )}
+    );
+  }
+
+  if (!employees || employees.length === 0) {
+    return (
+      <div className="text-center py-8 text-gray-500">
+        No hay empleados para mostrar
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-md border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Empleado</TableHead>
+            <TableHead>Cédula</TableHead>
+            <TableHead>Cargo</TableHead>
+            <TableHead className="text-right">Salario Base</TableHead>
+            <TableHead className="text-right">Días Trabajados</TableHead>
+            <TableHead className="text-right">Total Devengado</TableHead>
+            <TableHead className="text-right">Deducciones</TableHead>
+            <TableHead className="text-right">Neto a Pagar</TableHead>
+            <TableHead>Estado</TableHead>
+            <TableHead>Acciones</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {employees.map((employee) => (
+            <TableRow key={employee.id}>
+              <TableCell className="font-medium">
+                {employee.name}
+              </TableCell>
+              <TableCell>{employee.cedula}</TableCell>
+              <TableCell>{employee.position}</TableCell>
+              <TableCell className="text-right">
+                {formatCurrency(employee.baseSalary)}
+              </TableCell>
+              <TableCell className="text-right">
+                {employee.effectiveWorkedDays}
+              </TableCell>
+              <TableCell className="text-right">
+                {formatCurrency(employee.grossPay)}
+              </TableCell>
+              <TableCell className="text-right">
+                {formatCurrency(employee.deductions)}
+              </TableCell>
+              <TableCell className="text-right font-semibold">
+                {formatCurrency(employee.netPay)}
+              </TableCell>
+              <TableCell>
+                <Badge variant={employee.status === 'valid' ? 'default' : 'destructive'}>
+                  {employee.status === 'valid' ? 'Válido' : 'Error'}
+                </Badge>
+              </TableCell>
+              <TableCell>
+                <div className="flex space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onUpdateEmployee(employee.id, employee)}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onRemoveEmployee(employee.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 };

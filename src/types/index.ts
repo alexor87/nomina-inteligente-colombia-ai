@@ -8,47 +8,49 @@ export interface ServiceResponse<T> {
 
 export interface Employee {
   id: string;
-  empresaId: string; // Added missing empresaId
+  empresaId: string;
+  company_id?: string; // Added for compatibility
   cedula: string;
-  tipoDocumento?: 'CC' | 'TI' | 'CE' | 'PA' | 'RC' | 'NIT' | 'PEP' | 'PPT'; // Made specific union type
+  tipoDocumento: 'CC' | 'TI' | 'CE' | 'PA' | 'RC' | 'NIT' | 'PEP' | 'PPT';
   nombre: string;
   segundoNombre?: string;
   apellido: string;
   email?: string;
   telefono?: string;
-  sexo?: string;
+  sexo?: 'M' | 'F'; // Made specific union type to match EmployeeUnified
   fechaNacimiento?: string;
   direccion?: string;
   ciudad?: string;
   departamento?: string;
   salarioBase: number;
-  tipoContrato: 'indefinido' | 'fijo' | 'obra' | 'aprendizaje'; // Made specific union type
+  tipoContrato: 'indefinido' | 'fijo' | 'obra' | 'aprendizaje';
   fechaIngreso: string;
-  periodicidadPago?: 'mensual' | 'quincenal'; // Made specific union type
+  periodicidadPago?: 'mensual' | 'quincenal';
   cargo?: string;
   codigoCIIU?: string;
-  nivelRiesgoARL?: 'I' | 'II' | 'III' | 'IV' | 'V'; // Made specific union type
-  estado: 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad'; // Made specific union type
+  nivelRiesgoARL?: 'I' | 'II' | 'III' | 'IV' | 'V';
+  estado: 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad' | 'eliminado'; // Added 'eliminado' for compatibility
   centroCostos?: string;
   fechaFirmaContrato?: string;
   fechaFinalizacionContrato?: string;
-  tipoJornada?: 'completa' | 'parcial' | 'horas'; // Made specific union type
+  tipoJornada?: 'completa' | 'parcial' | 'horas';
   diasTrabajo?: number;
   horasTrabajo?: number;
   beneficiosExtralegales?: boolean;
   clausulasEspeciales?: string;
   banco?: string;
-  tipoCuenta?: 'ahorros' | 'corriente'; // Made specific union type
+  tipoCuenta?: 'ahorros' | 'corriente';
   numeroCuenta?: string;
   titularCuenta?: string;
-  formaPago?: 'dispersion' | 'manual'; // Made specific union type
+  formaPago?: 'dispersion' | 'manual';
   eps?: string;
   afp?: string;
   arl?: string;
   cajaCompensacion?: string;
-  regimenSalud?: 'contributivo' | 'subsidiado'; // Made specific union type
+  regimenSalud?: 'contributivo' | 'subsidiado';
   tipoCotizanteId?: string;
   subtipoCotizanteId?: string;
+  estadoAfiliacion?: 'completa' | 'pendiente' | 'inconsistente'; // Added for compatibility
   custom_fields?: Record<string, any>;
   createdAt?: string;
   updatedAt?: string;
@@ -62,6 +64,14 @@ export interface DashboardMetrics {
   totalPayrollCost: number;
   employeeGrowth: number;
   payrollTrend: number;
+  monthlyPayrollTotal: number; // Added missing property
+  complianceScore: number;
+  alerts: number;
+  totalEmpleados: number; // Added missing property
+  nominasProcesadas: number; // Added missing property
+  alertasLegales: number;
+  gastosNomina: number; // Added missing property
+  tendenciaMensual: number; // Added missing property
 }
 
 // Payroll types

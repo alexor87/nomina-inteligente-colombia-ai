@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,22 +10,30 @@ import { EmployeeUnifiedService } from '@/services/EmployeeUnifiedService';
 import { Plus, Zap } from 'lucide-react';
 
 export default function PayrollLiquidationPageSimplified() {
+  const hookData = usePayrollLiquidationSimplified();
+  
+  // Destructure with proper fallbacks
   const {
-    activePeriod,
-    employees,
-    isLoading,
-    liquidationProgress,
-    error,
-    actions: {
-      processPayroll,
-      addEmployee,
-      updateEmployee,
-      removeEmployee,
-      calculatePayroll
-    }
-  } = usePayrollLiquidationSimplified();
+    employees = [],
+    isLoading = false,
+    liquidationProgress = 0,
+    error = null,
+    currentPeriod = null,
+    liquidationStep = 'idle',
+    liquidatePayroll,
+    removeEmployee,
+    updateEmployeeCalculationsInDB
+  } = hookData;
 
   const [showEmployeeModal, setShowEmployeeModal] = useState(false);
+
+  // Create a mock activePeriod for compatibility
+  const activePeriod = currentPeriod ? {
+    id: currentPeriod,
+    period: currentPeriod,
+    startDate: currentPeriod.split('-')[0] || '',
+    endDate: currentPeriod.split('-')[1] || ''
+  } : null;
 
   const handleAtomicLiquidation = async () => {
     console.log('🚀 Iniciando liquidación atómica...');
@@ -43,11 +52,20 @@ export default function PayrollLiquidationPageSimplified() {
         return;
       }
 
-      await processPayroll();
+      await liquidatePayroll(activePeriod.startDate, activePeriod.endDate);
       console.log('✅ Liquidación completada');
     } catch (error) {
       console.error('💥 Error en liquidación atómica:', error);
     }
+  };
+
+  // Create progress indicator props
+  const progressProps = {
+    currentStep: liquidationStep,
+    totalEmployees: employees.length,
+    processedEmployees: Math.floor(liquidationProgress / 100 * employees.length),
+    progress: liquidationProgress,
+    errors: []
   };
 
   return (
@@ -75,8 +93,8 @@ export default function PayrollLiquidationPageSimplified() {
 
           {/* Progreso de Liquidación */}
           <PayrollProgressIndicator 
-            progress={liquidationProgress} 
-            isVisible={liquidationProgress.currentStep > 0}
+            {...progressProps}
+            isVisible={liquidationStep !== 'idle'}
           />
 
           {/* Acciones */}
@@ -108,8 +126,7 @@ export default function PayrollLiquidationPageSimplified() {
           ) : (
             <PayrollLiquidationTable
               employees={employees}
-              period={activePeriod}
-              onUpdateEmployee={updateEmployee}
+              onUpdateEmployee={updateEmployeeCalculationsInDB}
               onRemoveEmployee={removeEmployee}
               isLoading={isLoading}
             />
