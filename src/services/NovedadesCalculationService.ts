@@ -89,7 +89,7 @@ class NovedadesCalculationServiceClass {
     return data.fecha_inicio;
   }
 
-  // ✅ PROFESIONAL: Calcular totales usando backend centralizado - NUEVA IMPLEMENTACIÓN
+  // ✅ PROFESIONAL: Calcular totales usando backend centralizado - NUEVA IMPLEMENTACIÓN (robustecida)
   async calculateEmployeeNovedadesTotals(employeeId: string, periodId: string): Promise<NovedadesTotals> {
     const cacheKey = this.generateCacheKey(employeeId, periodId);
 
@@ -102,20 +102,26 @@ class NovedadesCalculationServiceClass {
       console.log(`🧮 PROFESSIONAL: Calculating novedades totals via backend for employee ${employeeId} in period ${periodId}`);
       
       // Obtener datos necesarios
-      const [employeeSalary, fechaPeriodo, novedades] = await Promise.all([
+      const [employeeSalary, fechaPeriodo, novedadesRaw] = await Promise.all([
         this.getEmployeeSalary(employeeId),
         this.getPeriodDate(periodId),
         this.getEmployeeNovedades(employeeId, periodId)
       ]);
 
+      // Asegurar siempre un arreglo seguro
+      const novedades = Array.isArray(novedadesRaw) ? novedadesRaw : [];
+      console.log('📋 Novedades obtenidas (seguras):', { count: novedades.length });
+
       if (employeeSalary <= 0) {
         console.warn('⚠️ Invalid employee salary, returning zeros');
-        return {
+        const zeroTotals: NovedadesTotals = {
           totalDevengos: 0,
           totalDeducciones: 0,
           totalNeto: 0,
-          hasNovedades: false
+          hasNovedades: novedades.length > 0 // aún reflejamos si existen registros
         };
+        cache.set(cacheKey, zeroTotals);
+        return zeroTotals;
       }
 
       // ✅ BACKEND CALL: Usar el endpoint profesional con breakdown
@@ -150,16 +156,18 @@ class NovedadesCalculationServiceClass {
         throw new Error('Error en el cálculo backend de novedades');
       }
 
-      if (!backendResponse.success) {
-        throw new Error(backendResponse.error || 'Error desconocido en cálculo backend');
+      if (!backendResponse?.success) {
+        console.error('❌ Backend responded with success=false:', backendResponse);
+        throw new Error(backendResponse?.error || 'Error desconocido en cálculo backend');
       }
 
-      const backendResult = backendResponse.data as BackendNovedadesTotalsResult;
+      const backendResult = (backendResponse.data || {}) as Partial<BackendNovedadesTotalsResult>;
       
       // ✅ NUEVO: Log del breakdown para debugging
+      const breakdownSafe = Array.isArray(backendResult.breakdown) ? backendResult.breakdown : [];
       console.log('📊 BACKEND BREAKDOWN:', {
         employeeId,
-        breakdown: backendResult.breakdown?.map(item => ({
+        breakdown: breakdownSafe.map(item => ({
           tipo: item.tipo_novedad,
           subtipo: item.subtipo,
           valorOriginal: item.valorOriginal,
@@ -168,11 +176,13 @@ class NovedadesCalculationServiceClass {
         }))
       });
       
+      // Totales con defaults seguros
       const totals: NovedadesTotals = {
-        totalDevengos: backendResult.totalDevengos,
-        totalDeducciones: backendResult.totalDeducciones,
-        totalNeto: backendResult.totalNeto,
-        hasNovedades: novedades.length > 0
+        totalDevengos: Number(backendResult.totalDevengos ?? 0),
+        totalDeducciones: Number(backendResult.totalDeducciones ?? 0),
+        totalNeto: Number(backendResult.totalNeto ?? 0),
+        // ✅ NUEVO: hasNovedades robusto (usa lista original o breakdown del backend)
+        hasNovedades: (novedades.length > 0) || (breakdownSafe.length > 0)
       };
 
       console.log('✅ PROFESSIONAL: Backend totals calculated with normative values:', {
@@ -181,7 +191,7 @@ class NovedadesCalculationServiceClass {
         totalDeducciones: totals.totalDeducciones,
         totalNeto: totals.totalNeto,
         hasNovedades: totals.hasNovedades,
-        breakdownItems: backendResult.breakdown.length
+        breakdownItems: breakdownSafe.length
       });
 
       cache.set(cacheKey, totals);
@@ -189,12 +199,13 @@ class NovedadesCalculationServiceClass {
 
     } catch (error) {
       console.error('❌ Error calculating employee novedades totals via backend:', error);
-      return {
+      const failTotals: NovedadesTotals = {
         totalDevengos: 0,
         totalDeducciones: 0,
         totalNeto: 0,
         hasNovedades: false
       };
+      return failTotals;
     }
   }
 
