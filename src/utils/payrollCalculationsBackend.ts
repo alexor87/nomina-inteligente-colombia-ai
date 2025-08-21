@@ -1,4 +1,3 @@
-
 import { PayrollCalculationBackendService, PayrollCalculationInput } from '@/services/PayrollCalculationBackendService';
 import { PayrollEmployee, BaseEmployeeData, PayrollSummary, NovedadForIBC } from '@/types/payroll';
 import { NOVEDAD_CATEGORIES } from '@/types/novedades-enhanced';
@@ -7,9 +6,11 @@ export const calculateEmployeeBackend = async (
   baseEmployee: BaseEmployeeData, 
   periodType: 'quincenal' | 'mensual'
 ): Promise<PayrollEmployee> => {
-  console.log('🔍 calculateEmployeeBackend: Procesando empleado con novedades:', {
+  console.log('🔍 calculateEmployeeBackend: Procesando empleado con periodicidad y novedades:', {
     employeeId: baseEmployee.id,
     name: baseEmployee.name,
+    periodType,
+    workedDays: baseEmployee.workedDays,
     novedadesCount: baseEmployee.novedades?.length || 0,
     novedades: baseEmployee.novedades
   });
@@ -21,7 +22,7 @@ export const calculateEmployeeBackend = async (
     disabilities: baseEmployee.disabilities,
     bonuses: baseEmployee.bonuses, // Now includes all positive novedades
     absences: baseEmployee.absences,
-    periodType,
+    periodType, // ✅ CORRECCIÓN: Enviar periodicidad al backend
     // ✅ NUEVO: Incluir novedades para cálculo correcto de IBC automático
     novedades: baseEmployee.novedades || []
   };
@@ -32,11 +33,14 @@ export const calculateEmployeeBackend = async (
       PayrollCalculationBackendService.validateEmployee(input, baseEmployee.eps, baseEmployee.afp)
     ]);
 
-    console.log('✅ calculateEmployeeBackend: Cálculo completado con IBC automático:', {
+    console.log('✅ calculateEmployeeBackend: Cálculo completado con periodicidad y auxilio corregido:', {
       employeeId: baseEmployee.id,
+      periodType,
       ibc: calculation.ibc,
+      transportAllowance: calculation.transportAllowance,
       healthDeduction: calculation.healthDeduction,
-      pensionDeduction: calculation.pensionDeduction
+      pensionDeduction: calculation.pensionDeduction,
+      netPay: calculation.netPay
     });
 
     return {

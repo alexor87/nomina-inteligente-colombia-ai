@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -31,8 +30,6 @@ const getTransportAssistanceLimit = (year: string) => {
  * ===============================
  *  JORNADA LEGAL (KISS, LEY 2101)
  * ===============================
- * - Jornada laboral: transiciones 15/jul (2023→47, 2024→46, 2025→44, 2026→42)
- * - Recargos: divisor mensual 220h desde 01/jul/2025, antes usa jornada vigente
  */
 
 // Fechas de vigencia de jornada semanal
@@ -117,6 +114,45 @@ const getOvertimeFactor = (subtipoRaw?: string): number => {
 
 // Normalizador simple
 const normalize = (v?: string) => String(v || '').toLowerCase().trim();
+
+/**
+ * ✅ NUEVA FUNCIÓN KISS: Cálculo correcto de auxilio de transporte prorrateado
+ */
+const calculateTransportAllowance = (
+  baseSalary: number,
+  workedDays: number,
+  totalIncapacityDays: number,
+  year: string,
+  periodType: 'quincenal' | 'mensual'
+): number => {
+  const config = OFFICIAL_VALUES[year as keyof typeof OFFICIAL_VALUES] || OFFICIAL_VALUES['2025'];
+  const transportLimit = getTransportAssistanceLimit(year);
+  
+  // 🔍 VALIDACIÓN: Solo si salario base <= 2 SMMLV
+  if (baseSalary > transportLimit) {
+    console.log(`🚫 AUXILIO TRANSPORTE: Salario ${baseSalary.toLocaleString()} > límite ${transportLimit.toLocaleString()}`);
+    return 0;
+  }
+  
+  // 🧮 CÁLCULO LEGAL: Días elegibles = días trabajados - días de incapacidad
+  const eligibleDays = Math.max(workedDays - totalIncapacityDays, 0);
+  
+  // 🎯 FÓRMULA NORMATIVA: (auxilio_mensual / 30) × días_elegibles
+  const dailyAllowance = config.auxilioTransporte / 30;
+  const proratedAllowance = Math.round(dailyAllowance * eligibleDays);
+  
+  console.log(`🚌 AUXILIO TRANSPORTE PRORRATEADO (${periodType}):`, {
+    salario: baseSalary.toLocaleString(),
+    limite: transportLimit.toLocaleString(),
+    diasTrabajados: workedDays,
+    diasIncapacidad: totalIncapacityDays,
+    diasElegibles: eligibleDays,
+    auxilioDiario: Math.round(dailyAllowance).toLocaleString(),
+    auxilioCalculado: proratedAllowance.toLocaleString()
+  });
+  
+  return proratedAllowance;
+};
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -220,9 +256,16 @@ async function calculatePayroll(supabase: any, data: any) {
     disabilities = 0,
     bonuses = 0,
     absences = 0,
-    periodType,
+    periodType = 'mensual',
     novedades = []
   } = data;
+
+  console.log('📋 CÁLCULO NÓMINA CON PERIODICIDAD:', {
+    periodType,
+    baseSalary: baseSalary.toLocaleString(),
+    workedDays,
+    novedadesCount: novedades.length
+  });
 
   const dailySalary = baseSalary / 30;
   const regularPay = (dailySalary * workedDays) - absences;
@@ -278,9 +321,14 @@ async function calculatePayroll(supabase: any, data: any) {
   const pensionDeduction = Math.round(ibcSalud * 0.04);
   const totalDeductions = healthDeduction + pensionDeduction;
 
-  // ✅ AUXILIO DE TRANSPORTE CORREGIDO: Solo si salario ≤ 2 SMMLV
-  const transportLimit = getTransportAssistanceLimit(year);
-  const transportAllowance = baseSalary <= transportLimit ? config.auxilioTransporte : 0;
+  // ✅ CORRECCIÓN KISS: Auxilio de transporte prorrateado según periodicidad
+  const transportAllowance = calculateTransportAllowance(
+    baseSalary,
+    workedDays,
+    totalIncapacityDays,
+    year,
+    periodType
+  );
 
   const netPay = grossPay - totalDeductions + transportAllowance;
 
@@ -316,14 +364,16 @@ async function calculatePayroll(supabase: any, data: any) {
     ibc: ibcSalud
   };
 
-  console.log('✅ Calculation (automatic IBC) result:', {
+  console.log('✅ RESULTADO FINAL CON AUXILIO PRORRATEADO:', {
+    periodType,
     policy,
     totalIncapacityDays,
     totalIncapacityValue,
     ibcMode,
-    ibcSalud,
-    healthDeduction,
-    pensionDeduction
+    ibcSalud: ibcSalud.toLocaleString(),
+    transportAllowance: transportAllowance.toLocaleString(),
+    grossPay: result.grossPay.toLocaleString(),
+    netPay: result.netPay.toLocaleString()
   });
 
   return result;

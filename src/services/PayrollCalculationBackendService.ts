@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { NovedadForIBC } from '@/types/payroll';
 import { ConfigurationService } from './ConfigurationService';
@@ -47,8 +46,10 @@ export interface ValidationResult {
 export class PayrollCalculationBackendService {
   static async calculatePayroll(input: PayrollCalculationInput): Promise<PayrollCalculationResult> {
     try {
-      console.log('🔍 PayrollCalculationBackendService: Calculando nómina con novedades:', {
+      console.log('🔍 PayrollCalculationBackendService: Calculando nómina con periodicidad y novedades:', {
         baseSalary: input.baseSalary,
+        periodType: input.periodType,
+        workedDays: input.workedDays,
         novedadesCount: input.novedades?.length || 0,
         novedades: input.novedades
       });
@@ -69,10 +70,13 @@ export class PayrollCalculationBackendService {
         throw new Error(data.error || 'Error desconocido en el cálculo');
       }
 
-      console.log('✅ PayrollCalculationBackendService: Resultado del cálculo:', {
+      console.log('✅ PayrollCalculationBackendService: Resultado del cálculo con periodicidad:', {
+        periodType: input.periodType,
         ibc: data.data.ibc,
+        transportAllowance: data.data.transportAllowance,
         healthDeduction: data.data.healthDeduction,
-        pensionDeduction: data.data.pensionDeduction
+        pensionDeduction: data.data.pensionDeduction,
+        netPay: data.data.netPay
       });
 
       return data.data;
