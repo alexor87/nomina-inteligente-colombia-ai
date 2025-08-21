@@ -11,11 +11,11 @@ import { CompanyPayrollPoliciesService } from '@/services/CompanyPayrollPolicies
 import { useCurrentCompany } from '@/hooks/useCurrentCompany';
 import { PayrollPoliciesSettings } from '@/components/settings/PayrollPoliciesSettings';
 import { Plus, Trash2, Copy } from 'lucide-react';
-import { IncapacityPolicyTester } from '@/components/settings/IncapacityPolicyTester';
 
 export const ParametrosLegalesSettings = () => {
   const { toast } = useToast();
   const { companyId } = useCurrentCompany();
+
   const [availableYears, setAvailableYears] = useState<string[]>([]);
   const [selectedYear, setSelectedYear] = useState('2025');
   const [config, setConfig] = useState<PayrollConfiguration>({
@@ -316,7 +316,6 @@ export const ParametrosLegalesSettings = () => {
         </div>
       </div>
 
-      {/* Gestión de Años */}
       <Card className="p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-medium">Años Configurados</h3>
@@ -401,7 +400,6 @@ export const ParametrosLegalesSettings = () => {
         </div>
       </Card>
 
-      {/* Configuración del Año Seleccionado */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="p-6">
           <h3 className="text-lg font-medium mb-4">Valores Base {selectedYear}</h3>
@@ -706,10 +704,8 @@ export const ParametrosLegalesSettings = () => {
         </Button>
       </div>
 
-      {/* Separator between legal parameters and company policies */}
       <Separator className="my-8" />
 
-      {/* Company Payroll Policies Section */}
       <div className="space-y-4">
         <div>
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Políticas de Nómina de la Empresa</h2>
@@ -756,11 +752,6 @@ export const ParametrosLegalesSettings = () => {
           >
             🔍 Debug Estado
           </Button>
-        </div>
-
-        {/* 🆕 Policy Testing Component */}
-        <div className="pt-6">
-          <IncapacityPolicyTester currentPolicy={incapacityPolicy} />
         </div>
       </div>
     </div>
