@@ -72,13 +72,111 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
     return subtipo && tipo !== 'recargo_nocturno' ? `${base} (${subtipo})` : base;
   };
 
+  // ✅ NUEVO: Recalcular incapacidades con política antes de mostrar
+  const recalculateIncapacitiesIfNeeded = async (items: DisplayNovedad[]): Promise<DisplayNovedad[]> => {
+    try {
+      // Filtrar ítems de incapacidad
+      const incapItems = items.filter(i => i.tipo_novedad === 'incapacidad' && (i.dias || 0) > 0);
+      if (incapItems.length === 0) {
+        return items;
+      }
+
+      console.log('🔍 Recalculando incapacidades (policy-aware) para', incapItems.length, 'ítems');
+
+      // 1) Obtener fecha de inicio del período (año correcto para SMLV)
+      let periodStart: string | null = null;
+      const { data: periodRow } = await supabase
+        .from('payroll_periods_real')
+        .select('fecha_inicio')
+        .eq('id', periodId)
+        .single();
+      if (periodRow?.fecha_inicio) {
+        periodStart = periodRow.fecha_inicio;
+      }
+      console.log('📅 Period start for calculation:', periodStart);
+
+      // 2) Obtener salarios base de los empleados involucrados
+      const uniqueEmployeeIds = Array.from(new Set(items.map(i => i.empleado_id).filter(Boolean))) as string[];
+      let salaryMap = new Map<string, number>();
+      if (uniqueEmployeeIds.length > 0) {
+        const { data: employeesData, error: empErr } = await supabase
+          .from('employees')
+          .select('id, salario_base')
+          .in('id', uniqueEmployeeIds);
+        if (!empErr && employeesData) {
+          employeesData.forEach((e: any) => salaryMap.set(e.id, Number(e.salario_base || 0)));
+        }
+      }
+      console.log('💰 Salary map size:', salaryMap.size);
+
+      // 3) Recalcular cada incapacidad con la edge function
+      const adjusted = await Promise.all(items.map(async (item) => {
+        if (item.tipo_novedad !== 'incapacidad' || !item.empleado_id) {
+          return item;
+        }
+        const salarioBase = salaryMap.get(item.empleado_id) || 0;
+        const dias = Number(item.dias || 0);
+        if (salarioBase <= 0 || dias <= 0) {
+          return item;
+        }
+
+        try {
+          const { data, error } = await supabase.functions.invoke('payroll-calculations', {
+            body: {
+              action: 'calculate-novedad',
+              data: {
+                tipoNovedad: 'incapacidad',
+                subtipo: item.subtipo,            // 'comun'/'general'/'laboral'
+                salarioBase,
+                dias,
+                fechaPeriodo: periodStart || undefined
+              }
+            }
+          });
+
+          if (error) {
+            console.warn('⚠️ Edge function error (calculate-novedad):', error);
+            return item;
+          }
+          if (data?.success && typeof data.data?.valor === 'number') {
+            const nuevoValor = Number(data.data.valor);
+            // Reemplazar valor mostrado sin cambiar UX
+            const updated: DisplayNovedad = { ...item, valor: nuevoValor };
+            console.log('✅ Ajuste incapacidad:', {
+              empleado: item.empleado_id,
+              subtipo: item.subtipo,
+              dias,
+              old: item.valor,
+              new: nuevoValor
+            });
+            return updated;
+          }
+        } catch (e) {
+          console.error('❌ Error recalculando incapacidad:', e);
+        }
+
+        // Fallback: dejar el valor original
+        return item;
+      }));
+
+      return adjusted;
+    } catch (e) {
+      console.error('❌ Error en recalculateIncapacitiesIfNeeded:', e);
+      return items;
+    }
+  };
+
   const fetchIntegratedData = async () => {
     try {
       setLoading(true);
       console.log('📋 Cargando datos integrados para empleado:', employeeId, 'período:', periodId);
       const result = await loadIntegratedNovedades(employeeId);
-      setIntegratedData(result);
-      console.log('📊 Datos integrados cargados:', result.length, 'elementos');
+
+      // ✅ Ajuste KISS: recalcular incapacidades antes de setear el estado
+      const adjusted = await recalculateIncapacitiesIfNeeded(result);
+      setIntegratedData(adjusted);
+
+      console.log('📊 Datos integrados cargados (ajustados):', adjusted.length, 'elementos');
     } catch (error) {
       console.error('❌ Error cargando datos integrados:', error);
       toast({
@@ -86,6 +184,8 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
         description: "No se pudieron cargar los datos integrados",
         variant: "destructive",
       });
+      // Fallback en error: no romper UI
+      setIntegratedData([]);
     } finally {
       setLoading(false);
     }
