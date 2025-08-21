@@ -120,8 +120,7 @@ const normalize = (v?: string) => String(v || '').toLowerCase().trim();
  */
 const calculateTransportAllowance = (
   baseSalary: number,
-  workedDays: number,
-  totalIncapacityDays: number,
+  effectiveWorkedDays: number,
   year: string,
   periodType: 'quincenal' | 'mensual'
 ): number => {
@@ -134,19 +133,14 @@ const calculateTransportAllowance = (
     return 0;
   }
   
-  // 🧮 CÁLCULO LEGAL: Días elegibles = días trabajados - días de incapacidad
-  const eligibleDays = Math.max(workedDays - totalIncapacityDays, 0);
-  
-  // 🎯 FÓRMULA NORMATIVA: (auxilio_mensual / 30) × días_elegibles
+  // 🎯 FÓRMULA NORMATIVA: (auxilio_mensual / 30) × días_efectivos_trabajados
   const dailyAllowance = config.auxilioTransporte / 30;
-  const proratedAllowance = Math.round(dailyAllowance * eligibleDays);
+  const proratedAllowance = Math.round(dailyAllowance * effectiveWorkedDays);
   
   console.log(`🚌 AUXILIO TRANSPORTE PRORRATEADO (${periodType}):`, {
     salario: baseSalary.toLocaleString(),
     limite: transportLimit.toLocaleString(),
-    diasTrabajados: workedDays,
-    diasIncapacidad: totalIncapacityDays,
-    diasElegibles: eligibleDays,
+    diasEfectivosTrabajados: effectiveWorkedDays,
     auxilioDiario: Math.round(dailyAllowance).toLocaleString(),
     auxilioCalculado: proratedAllowance.toLocaleString()
   });
@@ -268,15 +262,14 @@ async function calculatePayroll(supabase: any, data: any) {
   });
 
   const dailySalary = baseSalary / 30;
-  const regularPay = (dailySalary * workedDays) - absences;
-  let extraPay = bonuses; // Legacy field compatibility
 
-  // ✅ PROCESAR NOVEDADES CON POLÍTICAS
+  // ✅ PROCESAR NOVEDADES CON POLÍTICAS - SEPARAR INCAPACIDADES
   console.log('📋 Processing novedades:', novedades.length);
   
   let totalIncapacityValue = 0;
   let totalIncapacityDays = 0;
-  let totalConstitutiveNovedades = 0;
+  let totalOtherConstitutiveNovedades = 0;
+  let extraPay = bonuses; // Legacy field compatibility
 
   for (const novedad of novedades) {
     if (novedad.tipo_novedad === 'incapacidad') {
@@ -289,16 +282,42 @@ async function calculatePayroll(supabase: any, data: any) {
       );
       totalIncapacityValue += incapacityValue;
       totalIncapacityDays += novedad.dias || 0;
+      
+      console.log('🏥 Incapacidad procesada:', {
+        dias: novedad.dias,
+        subtipo: novedad.subtipo,
+        valorCalculado: incapacityValue
+      });
+      
+      // ✅ NO agregar valor de incapacidad a extraPay - se suma directamente al gross
     } else if (novedad.constitutivo_salario) {
-      // Other constitutive novedades
-      totalConstitutiveNovedades += novedad.valor || 0;
+      // Other constitutive novedades (horas extra, bonos, etc.)
+      totalOtherConstitutiveNovedades += novedad.valor || 0;
+      extraPay += novedad.valor || 0;
+    } else {
+      // Non-constitutive novedades still go to extraPay for gross calculation
+      extraPay += novedad.valor || 0;
     }
-    
-    // Add to extraPay for gross calculation
-    extraPay += novedad.valor || 0;
   }
 
-  const grossPay = regularPay + extraPay;
+  // ✅ CÁLCULO CORREGIDO: Días efectivos trabajados
+  const effectiveWorkedDays = Math.max(workedDays - totalIncapacityDays, 0);
+  const salaryForWorkedDays = (dailySalary * effectiveWorkedDays);
+  
+  // ✅ GROSS PAY: Salario por días efectivos + incapacidad + otros devengados
+  const grossPay = salaryForWorkedDays + totalIncapacityValue + extraPay;
+
+  console.log('🧮 BREAKDOWN DETALLADO:', {
+    salarioBaseDiario: Math.round(dailySalary),
+    diasOriginales: workedDays,
+    diasIncapacidad: totalIncapacityDays,
+    diasEfectivosTrabajados: effectiveWorkedDays,
+    salarioPorDiasTrabajados: Math.round(salaryForWorkedDays),
+    valorIncapacidad: Math.round(totalIncapacityValue),
+    otrosConstitutivos: Math.round(totalOtherConstitutiveNovedades),
+    otrosDevengados: Math.round(extraPay),
+    grossTotal: Math.round(grossPay)
+  });
 
   // ✅ IBC AUTOMÁTICO: Incapacidad vs Proporcional
   let ibcSalud: number;
@@ -308,24 +327,28 @@ async function calculatePayroll(supabase: any, data: any) {
     // Con incapacidades: IBC = valor total de incapacidades
     ibcSalud = totalIncapacityValue;
     ibcMode = 'incapacity';
-    console.log('🧮 IBC automático (incapacidad):', { totalIncapacityValue, totalIncapacityDays });
+    console.log('🧮 IBC automático (incapacidad):', { 
+      totalIncapacityValue: totalIncapacityValue.toLocaleString(), 
+      totalIncapacityDays 
+    });
   } else {
     // Sin incapacidades: IBC proporcional
-    const effectiveWorkedDays = Math.min(workedDays, 30);
-    ibcSalud = Math.round((baseSalary / 30) * effectiveWorkedDays + totalConstitutiveNovedades);
+    ibcSalud = Math.round((baseSalary / 30) * effectiveWorkedDays + totalOtherConstitutiveNovedades);
     ibcMode = 'proportional';
-    console.log('🧮 IBC automático (proporcional):', { ibcSalud, effectiveWorkedDays });
+    console.log('🧮 IBC automático (proporcional):', { 
+      ibcSalud: ibcSalud.toLocaleString(), 
+      effectiveWorkedDays 
+    });
   }
 
   const healthDeduction = Math.round(ibcSalud * 0.04);
   const pensionDeduction = Math.round(ibcSalud * 0.04);
   const totalDeductions = healthDeduction + pensionDeduction;
 
-  // ✅ CORRECCIÓN KISS: Auxilio de transporte prorrateado según periodicidad
+  // ✅ CORRECCIÓN KISS: Auxilio de transporte prorrateado según días efectivos
   const transportAllowance = calculateTransportAllowance(
     baseSalary,
-    workedDays,
-    totalIncapacityDays,
+    effectiveWorkedDays,
     year,
     periodType
   );
@@ -344,7 +367,7 @@ async function calculatePayroll(supabase: any, data: any) {
                                employerCaja + employerIcbf + employerSena;
 
   const result = {
-    regularPay: Math.round(regularPay),
+    regularPay: Math.round(salaryForWorkedDays),
     extraPay: Math.round(extraPay),
     transportAllowance,
     grossPay: Math.round(grossPay),
@@ -361,19 +384,42 @@ async function calculatePayroll(supabase: any, data: any) {
     employerContributions,
     totalPayrollCost: Math.round(netPay + employerContributions),
     // ✅ IBC UNIFICADO
-    ibc: ibcSalud
+    ibc: ibcSalud,
+    // ✅ NUEVO: Breakdown detallado para frontend
+    breakdown: {
+      salaryForWorkedDays: Math.round(salaryForWorkedDays),
+      incapacityPay: Math.round(totalIncapacityValue),
+      otherConstitutive: Math.round(totalOtherConstitutiveNovedades),
+      nonConstitutive: Math.round(extraPay - totalOtherConstitutiveNovedades),
+      transportAllowance: transportAllowance,
+      totalGross: Math.round(grossPay),
+      totalDeductions: totalDeductions,
+      netPay: Math.round(netPay),
+      effectiveWorkedDays,
+      totalIncapacityDays,
+      ibcMode,
+      policy: policy.incapacity_policy
+    }
   };
 
-  console.log('✅ RESULTADO FINAL CON AUXILIO PRORRATEADO:', {
-    periodType,
-    policy,
-    totalIncapacityDays,
-    totalIncapacityValue,
-    ibcMode,
-    ibcSalud: ibcSalud.toLocaleString(),
+  console.log('✅ IBC_BREAKDOWN:', {
+    mode: ibcMode,
+    ibc: ibcSalud.toLocaleString(),
+    components: ibcMode === 'incapacity' 
+      ? { incapacityValue: totalIncapacityValue.toLocaleString() }
+      : { 
+          salarioProporcion: Math.round((baseSalary / 30) * effectiveWorkedDays).toLocaleString(),
+          otrosConstitutivos: totalOtherConstitutiveNovedades.toLocaleString()
+        }
+  });
+
+  console.log('✅ GROSS_BREAKDOWN:', {
+    salaryForWorkedDays: Math.round(salaryForWorkedDays).toLocaleString(),
+    incapacityPay: Math.round(totalIncapacityValue).toLocaleString(),
+    otherEarnings: Math.round(extraPay).toLocaleString(),
     transportAllowance: transportAllowance.toLocaleString(),
-    grossPay: result.grossPay.toLocaleString(),
-    netPay: result.netPay.toLocaleString()
+    totalGross: Math.round(grossPay).toLocaleString(),
+    netPay: Math.round(netPay).toLocaleString()
   });
 
   return result;
@@ -417,19 +463,17 @@ async function calculateIncapacityWithPolicy(
     console.log('🏥 General with floor (from day 1): daily66, smldv, applied, total', daily66, smldv, appliedDaily, total);
     return total;
   } else {
-    // Política estándar: 2 días 100%, resto 66.67% con piso
+    // ✅ Política estándar CORREGIDA: 2 días 100%, resto 66.67% SIN PISO SMLDV
     if (days <= 2) {
       return Math.round(dailySalary * days);
     } else {
       const first2Days = dailySalary * 2;
       const remainingDays = days - 2;
-      const daily66 = dailySalary * 0.6667;
-      const smldv = smlv / 30;
-      const appliedDaily = Math.max(daily66, smldv);
-      const total = Math.round(first2Days + (appliedDaily * remainingDays));
+      const daily66 = dailySalary * 0.6667; // ✅ SIN PISO SMLDV
+      const total = Math.round(first2Days + (daily66 * remainingDays));
       
-      console.log('🏥 Standard policy (2+rest): first2, remaining, daily66, smldv, applied, total', 
-        first2Days, remainingDays, daily66, smldv, appliedDaily, total);
+      console.log('🏥 Standard policy CORREGIDA (2+rest, SIN piso): first2, remaining, daily66, total', 
+        first2Days, remainingDays, daily66, total);
       return total;
     }
   }
@@ -495,7 +539,7 @@ async function calculateNovedadesTotals(supabase: any, data: any) {
       console.log('🏥 Totals incapacidad calculada:', {
         valorOriginal,
         valorCalculado,
-        detalleCalculo: `Incapacidad ${normalizeIncapacitySubtype(subtipo)} (política ${policy.incapacity_policy === 'from_day1_66_with_floor' ? 'día 1 con piso' : 'estándar'}): ${dias} días`
+        detalleCalculo: `Incapacidad ${normalizeIncapacitySubtype(subtipo)} (política ${policy.incapacity_policy === 'from_day1_66_with_floor' ? 'día 1 con piso' : 'estándar SIN piso'}): ${dias} días`
       });
     } else if (tipo_novedad === 'horas_extra') {
       const horasNum = Number(horas || 0);
@@ -596,7 +640,7 @@ async function calculateSingleNovedad(supabase: any, data: any) {
     valor = total;
     factorCalculo = normalized === 'laboral' 
       ? Math.round(valorDiario) 
-      : Math.round(Math.max(appliedDailyRaw, smldv));
+      : Math.round(appliedDailyRaw); // ✅ SIN piso SMLDV para política estándar
 
     detalleCalculo = normalized === 'laboral'
       ? `Incapacidad laboral (ARL): ${diasInt} días × $${Math.round(valorDiario).toLocaleString()} = $${valor.toLocaleString()}`
@@ -606,10 +650,9 @@ async function calculateSingleNovedad(supabase: any, data: any) {
           ? `Incapacidad general estándar: ${diasInt} días × $${Math.round(valorDiario).toLocaleString()} = $${valor.toLocaleString()}`
           : (() => {
               const remaining = diasInt - 2;
-              const appliedDaily = Math.max(appliedDailyRaw, smldv);
               const first2 = Math.round(valorDiario * 2);
-              const rest = Math.round(appliedDaily * remaining);
-              return `Incapacidad general estándar: 2d×$${Math.round(valorDiario).toLocaleString()} + ${remaining}d×máx(66.67% diario=$${Math.round(appliedDailyRaw).toLocaleString()}, SMLDV=$${Math.round(smldv).toLocaleString()}) = $${(first2 + rest).toLocaleString()}`
+              const rest = Math.round(appliedDailyRaw * remaining);
+              return `Incapacidad general estándar SIN piso: 2d×$${Math.round(valorDiario).toLocaleString()} + ${remaining}d×66.67%=$${Math.round(appliedDailyRaw).toLocaleString()} = $${(first2 + rest).toLocaleString()}`;
             })();
 
   } else if (tipoNovedad === 'horas_extra') {

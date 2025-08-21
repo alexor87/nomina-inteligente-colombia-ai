@@ -35,6 +35,21 @@ export interface PayrollCalculationResult {
   totalPayrollCost: number;
   // ✅ NUEVO CAMPO: IBC calculado incluyendo novedades constitutivas
   ibc: number;
+  // ✅ NUEVO CAMPO: Breakdown detallado del cálculo
+  breakdown?: {
+    salaryForWorkedDays: number;
+    incapacityPay: number;
+    otherConstitutive: number;
+    nonConstitutive: number;
+    transportAllowance: number;
+    totalGross: number;
+    totalDeductions: number;
+    netPay: number;
+    effectiveWorkedDays: number;
+    totalIncapacityDays: number;
+    ibcMode: string;
+    policy: string;
+  };
 }
 
 export interface ValidationResult {
@@ -70,12 +85,10 @@ export class PayrollCalculationBackendService {
         throw new Error(data.error || 'Error desconocido en el cálculo');
       }
 
-      console.log('✅ PayrollCalculationBackendService: Resultado del cálculo con periodicidad:', {
+      console.log('✅ PayrollCalculationBackendService: Resultado del cálculo con breakdown:', {
         periodType: input.periodType,
         ibc: data.data.ibc,
-        transportAllowance: data.data.transportAllowance,
-        healthDeduction: data.data.healthDeduction,
-        pensionDeduction: data.data.pensionDeduction,
+        breakdown: data.data.breakdown,
         netPay: data.data.netPay
       });
 

@@ -33,15 +33,16 @@ export const calculateEmployeeBackend = async (
       PayrollCalculationBackendService.validateEmployee(input, baseEmployee.eps, baseEmployee.afp)
     ]);
 
-    console.log('✅ calculateEmployeeBackend: Cálculo completado con periodicidad y auxilio corregido:', {
+    console.log('✅ calculateEmployeeBackend: Cálculo completado con breakdown detallado:', {
       employeeId: baseEmployee.id,
       periodType,
+      breakdown: calculation.breakdown,
       ibc: calculation.ibc,
-      transportAllowance: calculation.transportAllowance,
-      healthDeduction: calculation.healthDeduction,
-      pensionDeduction: calculation.pensionDeduction,
       netPay: calculation.netPay
     });
+
+    // ✅ NUEVO: Usar breakdown detallado del backend
+    const breakdown = calculation.breakdown || {};
 
     return {
       ...baseEmployee,
@@ -55,7 +56,22 @@ export const calculateEmployeeBackend = async (
       status: validation.isValid ? 'valid' : 'error',
       errors: [...validation.errors, ...validation.warnings],
       healthDeduction: calculation.healthDeduction || 0,
-      pensionDeduction: calculation.pensionDeduction || 0
+      pensionDeduction: calculation.pensionDeduction || 0,
+      // ✅ NUEVO: Breakdown detallado para mostrar en frontend
+      payrollBreakdown: {
+        salaryForWorkedDays: breakdown.salaryForWorkedDays || 0,
+        incapacityPay: breakdown.incapacityPay || 0,
+        otherConstitutive: breakdown.otherConstitutive || 0,
+        nonConstitutive: breakdown.nonConstitutive || 0,
+        transportAllowance: breakdown.transportAllowance || 0,
+        totalGross: breakdown.totalGross || calculation.grossPay,
+        totalDeductions: breakdown.totalDeductions || calculation.totalDeductions,
+        netPay: breakdown.netPay || calculation.netPay,
+        effectiveWorkedDays: breakdown.effectiveWorkedDays || baseEmployee.workedDays,
+        totalIncapacityDays: breakdown.totalIncapacityDays || 0,
+        ibcMode: breakdown.ibcMode || 'proportional',
+        policy: breakdown.policy || 'standard_2d_100_rest_66'
+      }
     };
   } catch (error) {
     console.error('Error calculating employee payroll:', error);
@@ -70,7 +86,21 @@ export const calculateEmployeeBackend = async (
       status: 'error',
       errors: ['Error en el cálculo de nómina: ' + (error instanceof Error ? error.message : 'Error desconocido')],
       healthDeduction: 0,
-      pensionDeduction: 0
+      pensionDeduction: 0,
+      payrollBreakdown: {
+        salaryForWorkedDays: 0,
+        incapacityPay: 0,
+        otherConstitutive: 0,
+        nonConstitutive: 0,
+        transportAllowance: 0,
+        totalGross: 0,
+        totalDeductions: 0,
+        netPay: 0,
+        effectiveWorkedDays: 0,
+        totalIncapacityDays: 0,
+        ibcMode: 'proportional',
+        policy: 'standard_2d_100_rest_66'
+      }
     };
   }
 };

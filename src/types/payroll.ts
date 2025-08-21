@@ -27,6 +27,22 @@ export interface NovedadForIBC {
   subtipo?: string;
 }
 
+// ✅ NUEVO: Breakdown detallado de nómina
+export interface PayrollBreakdown {
+  salaryForWorkedDays: number;
+  incapacityPay: number;
+  otherConstitutive: number;
+  nonConstitutive: number;
+  transportAllowance: number;
+  totalGross: number;
+  totalDeductions: number;
+  netPay: number;
+  effectiveWorkedDays: number;
+  totalIncapacityDays: number;
+  ibcMode: 'incapacity' | 'proportional';
+  policy: string;
+}
+
 export interface PayrollEmployee {
   id: string;
   name: string;
@@ -55,6 +71,8 @@ export interface PayrollEmployee {
   pensionDeduction: number;
   // ✅ NUEVO CAMPO: Cédula del empleado
   cedula?: string;
+  // ✅ NUEVO CAMPO: Breakdown detallado para frontend
+  payrollBreakdown?: PayrollBreakdown;
 }
 
 export interface PayrollSummary {
