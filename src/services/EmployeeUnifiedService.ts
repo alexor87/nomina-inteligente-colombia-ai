@@ -22,46 +22,46 @@ export class EmployeeUnifiedService {
         company_id: row.company_id,
         empresaId: row.company_id,
         cedula: row.cedula,
-        tipoDocumento: row.tipo_documento,
+        tipoDocumento: (row.tipo_documento || 'CC') as 'CC' | 'TI' | 'CE' | 'PA' | 'RC' | 'NIT' | 'PEP' | 'PPT',
         nombre: row.nombre,
         segundoNombre: row.segundo_nombre,
         apellido: row.apellido,
         email: row.email,
         telefono: row.telefono,
-        sexo: row.sexo,
+        sexo: row.sexo as 'M' | 'F' | undefined,
         fechaNacimiento: row.fecha_nacimiento,
         direccion: row.direccion,
         ciudad: row.ciudad,
         departamento: row.departamento,
         salarioBase: row.salario_base,
-        tipoContrato: row.tipo_contrato,
+        tipoContrato: (row.tipo_contrato || 'indefinido') as 'indefinido' | 'fijo' | 'obra' | 'aprendizaje',
         fechaIngreso: row.fecha_ingreso,
-        periodicidadPago: row.periodicidad_pago,
+        periodicidadPago: row.periodicidad_pago as 'mensual' | 'quincenal' | undefined,
         cargo: row.cargo,
         codigoCIIU: row.codigo_ciiu,
-        nivelRiesgoARL: row.nivel_riesgo_arl,
-        estado: row.estado,
+        nivelRiesgoARL: row.nivel_riesgo_arl as 'I' | 'II' | 'III' | 'IV' | 'V' | undefined,
+        estado: (row.estado || 'activo') as 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad' | 'eliminado',
         centroCostos: row.centro_costos,
         fechaFirmaContrato: row.fecha_firma_contrato,
         fechaFinalizacionContrato: row.fecha_finalizacion_contrato,
-        tipoJornada: row.tipo_jornada,
+        tipoJornada: (row.tipo_jornada || 'completa') as 'completa' | 'parcial' | 'horas',
         diasTrabajo: row.dias_trabajo,
         horasTrabajo: row.horas_trabajo,
         beneficiosExtralegales: row.beneficios_extralegales,
         clausulasEspeciales: row.clausulas_especiales,
         banco: row.banco,
-        tipoCuenta: row.tipo_cuenta,
+        tipoCuenta: row.tipo_cuenta as 'ahorros' | 'corriente' | undefined,
         numeroCuenta: row.numero_cuenta,
         titularCuenta: row.titular_cuenta,
-        formaPago: row.forma_pago,
+        formaPago: row.forma_pago as 'dispersion' | 'manual' | undefined,
         eps: row.eps,
         afp: row.afp,
         arl: row.arl,
         cajaCompensacion: row.caja_compensacion,
         tipoCotizanteId: row.tipo_cotizante_id,
         subtipoCotizanteId: row.subtipo_cotizante_id,
-        regimenSalud: row.regimen_salud,
-        estadoAfiliacion: row.estado_afiliacion,
+        regimenSalud: row.regimen_salud as 'contributivo' | 'subsidiado' | undefined,
+        estadoAfiliacion: row.estado_afiliacion as 'completa' | 'pendiente' | 'inconsistente' | undefined,
         custom_fields: row.custom_fields,
         createdAt: row.created_at,
         updatedAt: row.updated_at
@@ -76,7 +76,7 @@ export class EmployeeUnifiedService {
 
   static async getById(id: string): Promise<ServiceResponse<EmployeeUnified | null>> {
     try {
-      const { data: [row], error } = await supabase
+      const { data: rows, error } = await supabase
         .from('employees')
         .select('*')
         .eq('id', id);
@@ -86,55 +86,56 @@ export class EmployeeUnifiedService {
         return { success: false, message: error.message, data: null };
       }
 
+      const row = rows?.[0];
       if (!row) {
         return { success: true, data: null, message: 'Employee not found' };
       }
 
-      const unifiedOneResult = {
+      const unifiedOneResult: EmployeeUnified = {
         id: row.id,
         company_id: row.company_id,
         empresaId: row.company_id,
         cedula: row.cedula,
-        tipoDocumento: row.tipo_documento,
+        tipoDocumento: (row.tipo_documento || 'CC') as 'CC' | 'TI' | 'CE' | 'PA' | 'RC' | 'NIT' | 'PEP' | 'PPT',
         nombre: row.nombre,
         segundoNombre: row.segundo_nombre,
         apellido: row.apellido,
         email: row.email,
         telefono: row.telefono,
-        sexo: row.sexo,
+        sexo: row.sexo as 'M' | 'F' | undefined,
         fechaNacimiento: row.fecha_nacimiento,
         direccion: row.direccion,
         ciudad: row.ciudad,
         departamento: row.departamento,
         salarioBase: row.salario_base,
-        tipoContrato: row.tipo_contrato,
+        tipoContrato: (row.tipo_contrato || 'indefinido') as 'indefinido' | 'fijo' | 'obra' | 'aprendizaje',
         fechaIngreso: row.fecha_ingreso,
-        periodicidadPago: row.periodicidad_pago,
+        periodicidadPago: row.periodicidad_pago as 'mensual' | 'quincenal' | undefined,
         cargo: row.cargo,
         codigoCIIU: row.codigo_ciiu,
-        nivelRiesgoARL: row.nivel_riesgo_arl,
-        estado: row.estado,
+        nivelRiesgoARL: row.nivel_riesgo_arl as 'I' | 'II' | 'III' | 'IV' | 'V' | undefined,
+        estado: (row.estado || 'activo') as 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad' | 'eliminado',
         centroCostos: row.centro_costos,
         fechaFirmaContrato: row.fecha_firma_contrato,
         fechaFinalizacionContrato: row.fecha_finalizacion_contrato,
-        tipoJornada: row.tipo_jornada,
+        tipoJornada: (row.tipo_jornada || 'completa') as 'completa' | 'parcial' | 'horas',
         diasTrabajo: row.dias_trabajo,
         horasTrabajo: row.horas_trabajo,
         beneficiosExtralegales: row.beneficios_extralegales,
         clausulasEspeciales: row.clausulas_especiales,
         banco: row.banco,
-        tipoCuenta: row.tipo_cuenta,
+        tipoCuenta: row.tipo_cuenta as 'ahorros' | 'corriente' | undefined,
         numeroCuenta: row.numero_cuenta,
         titularCuenta: row.titular_cuenta,
-        formaPago: row.forma_pago,
+        formaPago: row.forma_pago as 'dispersion' | 'manual' | undefined,
         eps: row.eps,
         afp: row.afp,
         arl: row.arl,
         cajaCompensacion: row.caja_compensacion,
         tipoCotizanteId: row.tipo_cotizante_id,
         subtipoCotizanteId: row.subtipo_cotizante_id,
-        regimenSalud: row.regimen_salud,
-        estadoAfiliacion: row.estado_afiliacion,
+        regimenSalud: row.regimen_salud as 'contributivo' | 'subsidiado' | undefined,
+        estadoAfiliacion: row.estado_afiliacion as 'completa' | 'pendiente' | 'inconsistente' | undefined,
         custom_fields: row.custom_fields,
         createdAt: row.created_at,
         updatedAt: row.updated_at
@@ -148,7 +149,7 @@ export class EmployeeUnifiedService {
 
   static async create(values: Omit<EmployeeUnified, 'id'>): Promise<ServiceResponse<EmployeeUnified | null>> {
     try {
-      const { data: [newEmployee], error } = await supabase
+      const { data: newRows, error } = await supabase
         .from('employees')
         .insert([values] as any[])
         .select('*');
@@ -158,51 +159,56 @@ export class EmployeeUnifiedService {
         return { success: false, message: error.message, data: null };
       }
 
-      const mappedEmployee = {
+      const newEmployee = newRows?.[0];
+      if (!newEmployee) {
+        return { success: false, message: 'Failed to create employee', data: null };
+      }
+
+      const mappedEmployee: EmployeeUnified = {
         id: newEmployee.id,
         company_id: newEmployee.company_id,
         empresaId: newEmployee.company_id,
         cedula: newEmployee.cedula,
-        tipoDocumento: newEmployee.tipo_documento,
+        tipoDocumento: (newEmployee.tipo_documento || 'CC') as 'CC' | 'TI' | 'CE' | 'PA' | 'RC' | 'NIT' | 'PEP' | 'PPT',
         nombre: newEmployee.nombre,
         segundoNombre: newEmployee.segundo_nombre,
         apellido: newEmployee.apellido,
         email: newEmployee.email,
         telefono: newEmployee.telefono,
-        sexo: newEmployee.sexo,
+        sexo: newEmployee.sexo as 'M' | 'F' | undefined,
         fechaNacimiento: newEmployee.fecha_nacimiento,
         direccion: newEmployee.direccion,
         ciudad: newEmployee.ciudad,
         departamento: newEmployee.departamento,
         salarioBase: newEmployee.salario_base,
-        tipoContrato: newEmployee.tipo_contrato,
+        tipoContrato: (newEmployee.tipo_contrato || 'indefinido') as 'indefinido' | 'fijo' | 'obra' | 'aprendizaje',
         fechaIngreso: newEmployee.fecha_ingreso,
-        periodicidadPago: newEmployee.periodicidad_pago,
+        periodicidadPago: newEmployee.periodicidad_pago as 'mensual' | 'quincenal' | undefined,
         cargo: newEmployee.cargo,
         codigoCIIU: newEmployee.codigo_ciiu,
-        nivelRiesgoARL: newEmployee.nivel_riesgo_arl,
-        estado: newEmployee.estado,
+        nivelRiesgoARL: newEmployee.nivel_riesgo_arl as 'I' | 'II' | 'III' | 'IV' | 'V' | undefined,
+        estado: (newEmployee.estado || 'activo') as 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad' | 'eliminado',
         centroCostos: newEmployee.centro_costos,
         fechaFirmaContrato: newEmployee.fecha_firma_contrato,
         fechaFinalizacionContrato: newEmployee.fecha_finalizacion_contrato,
-        tipoJornada: newEmployee.tipo_jornada,
+        tipoJornada: (newEmployee.tipo_jornada || 'completa') as 'completa' | 'parcial' | 'horas',
         diasTrabajo: newEmployee.dias_trabajo,
         horasTrabajo: newEmployee.horas_trabajo,
         beneficiosExtralegales: newEmployee.beneficios_extralegales,
         clausulasEspeciales: newEmployee.clausulas_especiales,
         banco: newEmployee.banco,
-        tipoCuenta: newEmployee.tipo_cuenta,
+        tipoCuenta: newEmployee.tipo_cuenta as 'ahorros' | 'corriente' | undefined,
         numeroCuenta: newEmployee.numero_cuenta,
         titularCuenta: newEmployee.titular_cuenta,
-        formaPago: newEmployee.forma_pago,
+        formaPago: newEmployee.forma_pago as 'dispersion' | 'manual' | undefined,
         eps: newEmployee.eps,
         afp: newEmployee.afp,
         arl: newEmployee.arl,
         cajaCompensacion: newEmployee.caja_compensacion,
         tipoCotizanteId: newEmployee.tipo_cotizante_id,
         subtipoCotizanteId: newEmployee.subtipo_cotizante_id,
-        regimenSalud: newEmployee.regimen_salud,
-        estadoAfiliacion: newEmployee.estado_afiliacion,
+        regimenSalud: newEmployee.regimen_salud as 'contributivo' | 'subsidiado' | undefined,
+        estadoAfiliacion: newEmployee.estado_afiliacion as 'completa' | 'pendiente' | 'inconsistente' | undefined,
         custom_fields: newEmployee.custom_fields,
         createdAt: newEmployee.created_at,
         updatedAt: newEmployee.updated_at
@@ -217,7 +223,7 @@ export class EmployeeUnifiedService {
 
   static async update(id: string, values: Partial<EmployeeUnified>): Promise<ServiceResponse<EmployeeUnified | null>> {
     try {
-      const { data: [updatedEmployee], error } = await supabase
+      const { data: updatedRows, error } = await supabase
         .from('employees')
         .update(values)
         .eq('id', id)
@@ -228,55 +234,56 @@ export class EmployeeUnifiedService {
         return { success: false, message: error.message, data: null };
       }
 
+      const updatedEmployee = updatedRows?.[0];
       if (!updatedEmployee) {
         return { success: true, data: null, message: 'Employee not found' };
       }
 
-      const mappedEmployee = {
+      const mappedEmployee: EmployeeUnified = {
         id: updatedEmployee.id,
         company_id: updatedEmployee.company_id,
         empresaId: updatedEmployee.company_id,
         cedula: updatedEmployee.cedula,
-        tipoDocumento: updatedEmployee.tipo_documento,
+        tipoDocumento: (updatedEmployee.tipo_documento || 'CC') as 'CC' | 'TI' | 'CE' | 'PA' | 'RC' | 'NIT' | 'PEP' | 'PPT',
         nombre: updatedEmployee.nombre,
         segundoNombre: updatedEmployee.segundo_nombre,
         apellido: updatedEmployee.apellido,
         email: updatedEmployee.email,
         telefono: updatedEmployee.telefono,
-        sexo: updatedEmployee.sexo,
+        sexo: updatedEmployee.sexo as 'M' | 'F' | undefined,
         fechaNacimiento: updatedEmployee.fecha_nacimiento,
         direccion: updatedEmployee.direccion,
         ciudad: updatedEmployee.ciudad,
         departamento: updatedEmployee.departamento,
         salarioBase: updatedEmployee.salario_base,
-        tipoContrato: updatedEmployee.tipo_contrato,
+        tipoContrato: (updatedEmployee.tipo_contrato || 'indefinido') as 'indefinido' | 'fijo' | 'obra' | 'aprendizaje',
         fechaIngreso: updatedEmployee.fecha_ingreso,
-        periodicidadPago: updatedEmployee.periodicidad_pago,
+        periodicidadPago: updatedEmployee.periodicidad_pago as 'mensual' | 'quincenal' | undefined,
         cargo: updatedEmployee.cargo,
         codigoCIIU: updatedEmployee.codigo_ciiu,
-        nivelRiesgoARL: updatedEmployee.nivel_riesgo_arl,
-        estado: updatedEmployee.estado,
+        nivelRiesgoARL: updatedEmployee.nivel_riesgo_arl as 'I' | 'II' | 'III' | 'IV' | 'V' | undefined,
+        estado: (updatedEmployee.estado || 'activo') as 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad' | 'eliminado',
         centroCostos: updatedEmployee.centro_costos,
         fechaFirmaContrato: updatedEmployee.fecha_firma_contrato,
         fechaFinalizacionContrato: updatedEmployee.fecha_finalizacion_contrato,
-        tipoJornada: updatedEmployee.tipo_jornada,
+        tipoJornada: (updatedEmployee.tipo_jornada || 'completa') as 'completa' | 'parcial' | 'horas',
         diasTrabajo: updatedEmployee.dias_trabajo,
         horasTrabajo: updatedEmployee.horas_trabajo,
         beneficiosExtralegales: updatedEmployee.beneficios_extralegales,
         clausulasEspeciales: updatedEmployee.clausulas_especiales,
         banco: updatedEmployee.banco,
-        tipoCuenta: updatedEmployee.tipo_cuenta,
+        tipoCuenta: updatedEmployee.tipo_cuenta as 'ahorros' | 'corriente' | undefined,
         numeroCuenta: updatedEmployee.numero_cuenta,
         titularCuenta: updatedEmployee.titular_cuenta,
-        formaPago: updatedEmployee.forma_pago,
+        formaPago: updatedEmployee.forma_pago as 'dispersion' | 'manual' | undefined,
         eps: updatedEmployee.eps,
         afp: updatedEmployee.afp,
         arl: updatedEmployee.arl,
         cajaCompensacion: updatedEmployee.caja_compensacion,
         tipoCotizanteId: updatedEmployee.tipo_cotizante_id,
         subtipoCotizanteId: updatedEmployee.subtipo_cotizante_id,
-        regimenSalud: updatedEmployee.regimen_salud,
-        estadoAfiliacion: updatedEmployee.estado_afiliacion,
+        regimenSalud: updatedEmployee.regimen_salud as 'contributivo' | 'subsidiado' | undefined,
+        estadoAfiliacion: updatedEmployee.estado_afiliacion as 'completa' | 'pendiente' | 'inconsistente' | undefined,
         custom_fields: updatedEmployee.custom_fields,
         createdAt: updatedEmployee.created_at,
         updatedAt: updatedEmployee.updated_at
@@ -285,7 +292,7 @@ export class EmployeeUnifiedService {
       return { success: true, data: mappedEmployee, message: 'Employee updated successfully' };
     } catch (error: any) {
       console.error('Unexpected error updating employee:', error);
-      return { success: false, message: error.message, data: null };
+      return { success: false, message: error.message, data: false };
     }
   }
 
@@ -325,46 +332,46 @@ export class EmployeeUnifiedService {
         company_id: row.company_id,
         empresaId: row.company_id,
         cedula: row.cedula,
-        tipoDocumento: row.tipo_documento,
+        tipoDocumento: (row.tipo_documento || 'CC') as 'CC' | 'TI' | 'CE' | 'PA' | 'RC' | 'NIT' | 'PEP' | 'PPT',
         nombre: row.nombre,
         segundoNombre: row.segundo_nombre,
         apellido: row.apellido,
         email: row.email,
         telefono: row.telefono,
-        sexo: row.sexo,
+        sexo: row.sexo as 'M' | 'F' | undefined,
         fechaNacimiento: row.fecha_nacimiento,
         direccion: row.direccion,
         ciudad: row.ciudad,
         departamento: row.departamento,
         salarioBase: row.salario_base,
-        tipoContrato: row.tipo_contrato,
+        tipoContrato: (row.tipo_contrato || 'indefinido') as 'indefinido' | 'fijo' | 'obra' | 'aprendizaje',
         fechaIngreso: row.fecha_ingreso,
-        periodicidadPago: row.periodicidad_pago,
+        periodicidadPago: row.periodicidad_pago as 'mensual' | 'quincenal' | undefined,
         cargo: row.cargo,
         codigoCIIU: row.codigo_ciiu,
-        nivelRiesgoARL: row.nivel_riesgo_arl,
-        estado: row.estado,
+        nivelRiesgoARL: row.nivel_riesgo_arl as 'I' | 'II' | 'III' | 'IV' | 'V' | undefined,
+        estado: (row.estado || 'activo') as 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad' | 'eliminado',
         centroCostos: row.centro_costos,
         fechaFirmaContrato: row.fecha_firma_contrato,
         fechaFinalizacionContrato: row.fecha_finalizacion_contrato,
-        tipoJornada: row.tipo_jornada,
+        tipoJornada: (row.tipo_jornada || 'completa') as 'completa' | 'parcial' | 'horas',
         diasTrabajo: row.dias_trabajo,
         horasTrabajo: row.horas_trabajo,
         beneficiosExtralegales: row.beneficios_extralegales,
         clausulasEspeciales: row.clausulas_especiales,
         banco: row.banco,
-        tipoCuenta: row.tipo_cuenta,
+        tipoCuenta: row.tipo_cuenta as 'ahorros' | 'corriente' | undefined,
         numeroCuenta: row.numero_cuenta,
         titularCuenta: row.titular_cuenta,
-        formaPago: row.forma_pago,
+        formaPago: row.forma_pago as 'dispersion' | 'manual' | undefined,
         eps: row.eps,
         afp: row.afp,
         arl: row.arl,
         cajaCompensacion: row.caja_compensacion,
         tipoCotizanteId: row.tipo_cotizante_id,
         subtipoCotizanteId: row.subtipo_cotizante_id,
-        regimenSalud: row.regimen_salud,
-        estadoAfiliacion: row.estado_afiliacion,
+        regimenSalud: row.regimen_salud as 'contributivo' | 'subsidiado' | undefined,
+        estadoAfiliacion: row.estado_afiliacion as 'completa' | 'pendiente' | 'inconsistente' | undefined,
         custom_fields: row.custom_fields,
         createdAt: row.created_at,
         updatedAt: row.updated_at

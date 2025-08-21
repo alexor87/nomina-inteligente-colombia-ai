@@ -1,4 +1,3 @@
-
 // Import for Novedad type - using a more flexible approach
 export interface Novedad {
   id?: string;
@@ -7,6 +6,21 @@ export interface Novedad {
   constitutivo_salario?: boolean;
   dias?: number;
   subtipo?: string;
+}
+
+export interface BaseEmployeeData {
+  id: string;
+  name: string;
+  position: string;
+  baseSalary: number;
+  workedDays: number;
+  extraHours: number;
+  disabilities: number;
+  bonuses: number;
+  absences: number;
+  eps: string;
+  afp: string;
+  novedades?: Novedad[];
 }
 
 export interface PayrollEmployee extends BaseEmployeeData {
@@ -29,9 +43,48 @@ export interface PayrollEmployee extends BaseEmployeeData {
   totalEarnings?: number;
   totalDeductions?: number;
   estado?: string;
-  name?: string;
-  baseSalary?: number;
-  workedDays?: number;
+  // Make name required as per BaseEmployeeData
+  name: string; // Override to make required
+  // Add EmployeeUnified compatibility properties
+  empresaId?: string;
+  tipoDocumento?: 'CC' | 'TI' | 'CE' | 'PA' | 'RC' | 'NIT' | 'PEP' | 'PPT';
+  nombre?: string;
+  apellido?: string;
+  email?: string;
+  telefono?: string;
+  sexo?: 'M' | 'F';
+  fechaNacimiento?: string;
+  direccion?: string;
+  ciudad?: string;
+  departamento?: string;
+  tipoContrato?: 'indefinido' | 'fijo' | 'obra' | 'aprendizaje';
+  fechaIngreso?: string;
+  periodicidadPago?: 'mensual' | 'quincenal';
+  cargo?: string;
+  codigoCIIU?: string;
+  nivelRiesgoARL?: 'I' | 'II' | 'III' | 'IV' | 'V';
+  centroCostos?: string;
+  fechaFirmaContrato?: string;
+  fechaFinalizacionContrato?: string;
+  tipoJornada?: 'completa' | 'parcial' | 'horas';
+  diasTrabajo?: number;
+  horasTrabajo?: number;
+  beneficiosExtralegales?: boolean;
+  clausulasEspeciales?: string;
+  banco?: string;
+  tipoCuenta?: 'ahorros' | 'corriente';
+  numeroCuenta?: string;
+  titularCuenta?: string;
+  formaPago?: 'dispersion' | 'manual';
+  arl?: string;
+  cajaCompensacion?: string;
+  tipoCotizanteId?: string;
+  subtipoCotizanteId?: string;
+  regimenSalud?: 'contributivo' | 'subsidiado';
+  estadoAfiliacion?: 'completa' | 'pendiente' | 'inconsistente';
+  custom_fields?: Record<string, any>;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface PayrollSummary {
@@ -42,21 +95,6 @@ export interface PayrollSummary {
   totalNetPay: number;
   employerContributions: number;
   totalPayrollCost: number;
-}
-
-export interface BaseEmployeeData {
-  id: string;
-  name: string;
-  position: string;
-  baseSalary: number;
-  workedDays: number;
-  extraHours: number;
-  disabilities: number;
-  bonuses: number;
-  absences: number;
-  eps: string;
-  afp: string;
-  novedades?: Novedad[];
 }
 
 export interface NovedadForIBC {

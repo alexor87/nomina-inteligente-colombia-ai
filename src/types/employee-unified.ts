@@ -1,4 +1,3 @@
-
 export interface EmployeeUnified {
   id: string;
   company_id?: string;
@@ -22,7 +21,7 @@ export interface EmployeeUnified {
   salarioBase: number;
   tipoContrato: 'indefinido' | 'fijo' | 'obra' | 'aprendizaje';
   fechaIngreso: string;
-  periodicidadPago: 'mensual' | 'quincenal';
+  periodicidadPago?: 'mensual' | 'quincenal';
   cargo?: string;
   codigoCIIU?: string;
   nivelRiesgoARL?: 'I' | 'II' | 'III' | 'IV' | 'V';

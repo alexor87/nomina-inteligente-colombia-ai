@@ -11,25 +11,25 @@ export interface Employee {
   empresaId: string;
   company_id?: string; // Added for compatibility
   cedula: string;
-  tipoDocumento: 'CC' | 'TI' | 'CE' | 'PA' | 'RC' | 'NIT' | 'PEP' | 'PPT';
+  tipoDocumento?: 'CC' | 'TI' | 'CE' | 'PA' | 'RC' | 'NIT' | 'PEP' | 'PPT'; // Made optional and specific
   nombre: string;
   segundoNombre?: string;
   apellido: string;
   email?: string;
   telefono?: string;
-  sexo?: 'M' | 'F'; // Made specific union type to match EmployeeUnified
+  sexo?: 'M' | 'F'; // Made specific union type
   fechaNacimiento?: string;
   direccion?: string;
   ciudad?: string;
   departamento?: string;
   salarioBase: number;
-  tipoContrato: 'indefinido' | 'fijo' | 'obra' | 'aprendizaje';
+  tipoContrato?: 'indefinido' | 'fijo' | 'obra' | 'aprendizaje'; // Made specific
   fechaIngreso: string;
-  periodicidadPago?: 'mensual' | 'quincenal';
+  periodicidadPago?: 'mensual' | 'quincenal'; // Made optional and specific
   cargo?: string;
   codigoCIIU?: string;
   nivelRiesgoARL?: 'I' | 'II' | 'III' | 'IV' | 'V';
-  estado: 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad' | 'eliminado'; // Added 'eliminado' for compatibility
+  estado?: 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad' | 'eliminado'; // Made optional and added eliminado
   centroCostos?: string;
   fechaFirmaContrato?: string;
   fechaFinalizacionContrato?: string;
@@ -50,7 +50,7 @@ export interface Employee {
   regimenSalud?: 'contributivo' | 'subsidiado';
   tipoCotizanteId?: string;
   subtipoCotizanteId?: string;
-  estadoAfiliacion?: 'completa' | 'pendiente' | 'inconsistente'; // Added for compatibility
+  estadoAfiliacion?: 'completa' | 'pendiente' | 'inconsistente';
   custom_fields?: Record<string, any>;
   createdAt?: string;
   updatedAt?: string;
@@ -61,32 +61,40 @@ export interface DashboardMetrics {
   totalEmployees: number;
   activeEmployees: number;
   pendingPayrolls: number;
-  totalPayrollCost: number;
-  employeeGrowth: number;
-  payrollTrend: number;
-  monthlyPayrollTotal: number; // Added missing property
+  totalPayrollCost: number; // Required
+  employeeGrowth: number; // Required  
+  payrollTrend: number; // Required
+  monthlyPayrollTotal: number;
   complianceScore: number;
   alerts: number;
-  totalEmpleados: number; // Added missing property
-  nominasProcesadas: number; // Added missing property
+  totalEmpleados: number;
+  nominasProcesadas: number;
   alertasLegales: number;
-  gastosNomina: number; // Added missing property
-  tendenciaMensual: number; // Added missing property
+  gastosNomina: number;
+  tendenciaMensual: number;
 }
 
-// Payroll types
+// Enhanced Payroll types
 export interface PayrollCalculation {
   grossPay: number;
   deductions: number;
   netPay: number;
   transportAllowance: number;
   employerContributions: number;
+  // Add missing properties for PayrollService
+  salarioBase?: number;
+  diasTrabajados?: number;
+  horasExtra?: number;
+  recargoNocturno?: number;
+  recargoDominical?: number;
+  bonificaciones?: number;
 }
 
 export interface LegalValidation {
   isValid: boolean;
   violations: string[];
   warnings: string[];
+  errors?: string[]; // Add missing property
 }
 
 export interface Payroll {
