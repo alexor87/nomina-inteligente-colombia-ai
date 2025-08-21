@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { encode as base64Encode } from "https://deno.land/std@0.190.0/encoding/base64.ts"
@@ -41,6 +40,19 @@ function formatCurrency(amount: number): string {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(Math.round(amount));
+}
+
+// Helper: descargar imagen y convertirla a data URL base64 para jsPDF
+async function fetchImageAsBase64(url: string): Promise<{ dataUrl: string; imageType: 'PNG' | 'JPEG' }> {
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`No se pudo descargar el logo: ${res.status} ${res.statusText}`);
+  }
+  const contentType = res.headers.get('content-type') || 'image/png';
+  const buf = new Uint8Array(await res.arrayBuffer());
+  const b64 = base64Encode(buf);
+  const imageType = contentType.toLowerCase().includes('png') ? 'PNG' : 'JPEG';
+  return { dataUrl: `data:${contentType};base64,${b64}`, imageType };
 }
 
 serve(async (req) => {
@@ -273,6 +285,21 @@ async function generateProfessionalVoucherPDF(payrollData: any): Promise<Uint8Ar
     drawSeparator(yPos);
     yPos += 8;
   };
+
+  // Intentar dibujar el logo si existe
+  if (company?.logo_url) {
+    try {
+      const { dataUrl, imageType } = await fetchImageAsBase64(company.logo_url);
+      const logoWidth = 35;   // mm
+      const logoHeight = 14;  // mm aprox
+      // Posicionar el logo en la esquina superior izquierda
+      doc.addImage(dataUrl, imageType, margin, yPos - 4, logoWidth, logoHeight);
+      // Asegurar espacio vertical suficiente bajo el logo antes del título
+      yPos = Math.max(yPos, margin + logoHeight + 4);
+    } catch (e) {
+      console.log('ℹ️ Logo no disponible o falló la carga:', (e as Error).message);
+    }
+  }
 
   // Header simple (sin colores)
   doc.setTextColor(0, 0, 0);
