@@ -1,3 +1,4 @@
+
 // Import for Novedad type - using a more flexible approach
 export interface Novedad {
   id?: string;
@@ -24,6 +25,13 @@ export interface PayrollEmployee extends BaseEmployeeData {
   incapacityValue: number;
   legalBasis?: string;
   cedula?: string;
+  // Added missing properties to match usage
+  totalEarnings?: number;
+  totalDeductions?: number;
+  estado?: string;
+  name?: string;
+  baseSalary?: number;
+  workedDays?: number;
 }
 
 export interface PayrollSummary {

@@ -1,9 +1,9 @@
-
 import { Employee } from '@/types';
 
 export interface EmployeeWithStatus {
   // Core identification
   id: string;
+  company_id: string;
   cedula: string;
   tipoDocumento?: string;
   
