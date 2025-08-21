@@ -5,13 +5,15 @@ import { NOVEDAD_CATEGORIES } from '@/types/novedades-enhanced';
 
 export const calculateEmployeeBackend = async (
   baseEmployee: BaseEmployeeData, 
-  periodType: 'quincenal' | 'mensual'
+  periodType: 'quincenal' | 'mensual',
+  year?: string
 ): Promise<PayrollEmployee> => {
   console.log('🔍 calculateEmployeeBackend: Procesando empleado con novedades:', {
     employeeId: baseEmployee.id,
     name: baseEmployee.name,
     novedadesCount: baseEmployee.novedades?.length || 0,
-    novedades: baseEmployee.novedades
+    novedades: baseEmployee.novedades,
+    year
   });
 
   const input: PayrollCalculationInput = {
@@ -23,7 +25,9 @@ export const calculateEmployeeBackend = async (
     absences: baseEmployee.absences,
     periodType,
     // ✅ NUEVO: Incluir novedades para cálculo correcto de IBC automático
-    novedades: baseEmployee.novedades || []
+    novedades: baseEmployee.novedades || [],
+    // ✅ NUEVO: año para configuración específica
+    year: year || '2025'
   };
 
   try {
@@ -32,26 +36,33 @@ export const calculateEmployeeBackend = async (
       PayrollCalculationBackendService.validateEmployee(input, baseEmployee.eps, baseEmployee.afp)
     ]);
 
-    console.log('✅ calculateEmployeeBackend: Cálculo completado con IBC automático:', {
+    console.log('✅ calculateEmployeeBackend: Cálculo completado con corrección legal:', {
       employeeId: baseEmployee.id,
       ibc: calculation.ibc,
-      healthDeduction: calculation.healthDeduction,
-      pensionDeduction: calculation.pensionDeduction
+      netPay: calculation.netPay,
+      effectiveWorkedDays: calculation.effectiveWorkedDays,
+      incapacityDays: calculation.incapacityDays,
+      transportAllowance: calculation.transportAllowance,
+      legalBasis: calculation.legalBasis
     });
 
     return {
       ...baseEmployee,
       grossPay: calculation.grossPay,
       deductions: calculation.totalDeductions,
-      netPay: calculation.netPay,
+      netPay: calculation.netPay, // ✅ USAR NETO CORRECTO DEL BACKEND
       transportAllowance: calculation.transportAllowance,
       employerContributions: calculation.employerContributions,
-      // ✅ NUEVO: Incluir IBC calculado automáticamente
       ibc: calculation.ibc,
       status: validation.isValid ? 'valid' : 'error',
       errors: [...validation.errors, ...validation.warnings],
       healthDeduction: calculation.healthDeduction || 0,
-      pensionDeduction: calculation.pensionDeduction || 0
+      pensionDeduction: calculation.pensionDeduction || 0,
+      // ✅ NUEVOS CAMPOS PARA AUDITORÍA LEGAL
+      effectiveWorkedDays: calculation.effectiveWorkedDays,
+      incapacityDays: calculation.incapacityDays,
+      incapacityValue: calculation.incapacityValue,
+      legalBasis: calculation.legalBasis
     };
   } catch (error) {
     console.error('Error calculating employee payroll:', error);
@@ -66,7 +77,10 @@ export const calculateEmployeeBackend = async (
       status: 'error',
       errors: ['Error en el cálculo de nómina: ' + (error instanceof Error ? error.message : 'Error desconocido')],
       healthDeduction: 0,
-      pensionDeduction: 0
+      pensionDeduction: 0,
+      effectiveWorkedDays: 0,
+      incapacityDays: 0,
+      incapacityValue: 0
     };
   }
 };
@@ -76,7 +90,7 @@ export const calculatePayrollSummary = (employees: PayrollEmployee[]): PayrollSu
   const validEmployees = employees.filter(emp => emp.status === 'valid').length;
   const totalGrossPay = employees.reduce((sum, emp) => sum + emp.grossPay, 0);
   const totalDeductions = employees.reduce((sum, emp) => sum + emp.deductions, 0);
-  const totalNetPay = employees.reduce((sum, emp) => sum + emp.netPay, 0);
+  const totalNetPay = employees.reduce((sum, emp) => sum + emp.netPay, 0); // ✅ USAR NETO CORRECTO
   const employerContributions = employees.reduce((sum, emp) => sum + emp.employerContributions, 0);
   const totalPayrollCost = totalNetPay + employerContributions;
 

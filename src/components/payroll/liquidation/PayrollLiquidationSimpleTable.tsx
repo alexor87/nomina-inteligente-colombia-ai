@@ -1,28 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
+
+import React, { useState, useMemo } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Trash2, Loader2 } from 'lucide-react';
-import { PayrollEmployee, NovedadForIBC } from '@/types/payroll';
-import { NovedadUnifiedModal } from '@/components/payroll/novedades/NovedadUnifiedModal';
-import { usePayrollNovedadesUnified } from '@/hooks/usePayrollNovedadesUnified';
-import { useCurrentCompany } from '@/hooks/useCurrentCompany';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Eye, Calculator, Trash2, FileText } from 'lucide-react';
+import { PayrollEmployee } from '@/types/payroll';
 import { formatCurrency } from '@/lib/utils';
-import { ConfigurationService } from '@/services/ConfigurationService';
-import { CreateNovedadData } from '@/types/novedades-enhanced';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { useToast } from '@/hooks/use-toast';
-import { PayrollCalculationBackendService } from '@/services/PayrollCalculationBackendService';
-import { convertNovedadesToIBC } from '@/utils/payrollCalculationsBackend';
-import { PayrollCalculationService } from '@/services/PayrollCalculationService';
+import { EmployeeLiquidationModal } from '../modals/EmployeeLiquidationModal';
+import { EmployeeCalculationModal } from '../modals/EmployeeCalculationModal';
+import { NovedadUnifiedModal } from '../novedades/NovedadUnifiedModal';
+import { LegalInfoTooltip } from '../LegalInfoTooltip';
 
 interface PayrollLiquidationSimpleTableProps {
   employees: PayrollEmployee[];
@@ -30,8 +17,8 @@ interface PayrollLiquidationSimpleTableProps {
   endDate: string;
   currentPeriodId: string | undefined;
   currentPeriod?: { tipo_periodo?: string } | null;
+  onRemoveEmployee: (employeeId: string) => void;
   onEmployeeNovedadesChange: (employeeId: string) => Promise<void>;
-  onRemoveEmployee?: (employeeId: string) => void;
   updateEmployeeCalculationsInDB?: (calculations: Record<string, {
     totalToPay: number; 
     ibc: number; 
@@ -50,368 +37,181 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
   endDate,
   currentPeriodId,
   currentPeriod,
-  onEmployeeNovedadesChange,
   onRemoveEmployee,
+  onEmployeeNovedadesChange,
   updateEmployeeCalculationsInDB,
   year
 }) => {
   const [selectedEmployee, setSelectedEmployee] = useState<PayrollEmployee | null>(null);
-  const [novedadModalOpen, setNovedadModalOpen] = useState(false);
-  const [employeeToDelete, setEmployeeToDelete] = useState<PayrollEmployee | null>(null);
-  const [employeeCalculations, setEmployeeCalculations] = useState<Record<string, { 
-    totalToPay: number; 
-    ibc: number; 
-    grossPay: number; 
-    deductions: number; 
-    healthDeduction: number; 
-    pensionDeduction: number; 
-    transportAllowance: number; 
-  }>>({});
-  const { toast } = useToast();
-  const { companyId } = useCurrentCompany();
+  const [showLiquidationModal, setShowLiquidationModal] = useState(false);
+  const [showCalculationModal, setShowCalculationModal] = useState(false);
+  const [showNovedadModal, setShowNovedadModal] = useState(false);
 
-  // ✅ NUEVO: Calcular fecha del período para usar en cálculos de jornada legal
-  const getPeriodDate = () => {
-    if (startDate) {
-      return new Date(startDate);
-    }
-    return new Date();
-  };
+  // ✅ CÁLCULO CORRECTO DE TOTALES usando valores del backend
+  const totals = useMemo(() => {
+    return employees.reduce((acc, emp) => ({
+      totalEmployees: acc.totalEmployees + 1,
+      totalGrossPay: acc.totalGrossPay + (emp.grossPay || 0),
+      totalDeductions: acc.totalDeductions + (emp.deductions || 0),
+      totalNetPay: acc.totalNetPay + (emp.netPay || 0), // ✅ Usar netPay del backend
+      totalTransportAllowance: acc.totalTransportAllowance + (emp.transportAllowance || 0),
+      totalIBC: acc.totalIBC + (emp.ibc || 0)
+    }), {
+      totalEmployees: 0,
+      totalGrossPay: 0,
+      totalDeductions: 0,
+      totalNetPay: 0,
+      totalTransportAllowance: 0,
+      totalIBC: 0
+    });
+  }, [employees]);
 
-  const {
-    loadNovedadesTotals,
-    createNovedad,
-    getEmployeeNovedades,
-    refreshEmployeeNovedades,
-    isCreating,
-    lastRefreshTime,
-    getEmployeeNovedadesList
-  } = usePayrollNovedadesUnified(currentPeriodId || '');
-
-  // Cargar novedades cuando se monten los empleados o cambie el período
-  useEffect(() => {
-    if (employees.length > 0 && currentPeriodId) {
-      console.log('📊 Cargando novedades para empleados, período:', currentPeriodId);
-      const employeeIds = employees.map(emp => emp.id);
-      loadNovedadesTotals(employeeIds);
-    }
-  }, [employees, currentPeriodId, loadNovedadesTotals]);
-
-  // ✅ NUEVO: Recalcular totales cuando cambien las novedades
-  useEffect(() => {
-    const recalculateAllEmployees = async () => {
-      if (!currentPeriodId || employees.length === 0) return;
-
-      console.log('🔄 Recalculando empleados con IBC correcto...');
-      const newCalculations: Record<string, { 
-        totalToPay: number; 
-        ibc: number; 
-        grossPay: number; 
-        deductions: number; 
-        healthDeduction: number; 
-        pensionDeduction: number; 
-        transportAllowance: number; 
-      }> = {};
-
-      for (const employee of employees) {
-        try {
-          // Obtener novedades del empleado
-          const novedadesList = await getEmployeeNovedadesList(employee.id);
-          const novedadesForIBC: NovedadForIBC[] = convertNovedadesToIBC(novedadesList);
-
-          // ✅ INFORMACIÓN NORMATIVA DE NOVEDADES
-          const constitutivas = novedadesForIBC.filter(n => n.constitutivo_salario);
-          const noConstitutivas = novedadesForIBC.filter(n => !n.constitutivo_salario);
-          
-          console.log('📊 Análisis normativo de novedades:', employee.name, {
-            totalNovedades: novedadesForIBC.length,
-            constitutivas: constitutivas.length,
-            noConstitutivas: noConstitutivas.length,
-            impactoIBC: constitutivas.reduce((sum, n) => sum + n.valor, 0),
-            detalleConstitutivas: constitutivas.map(n => `${n.tipo_novedad}: $${n.valor}`),
-            detalleNoConstitutivas: noConstitutivas.map(n => `${n.tipo_novedad}: $${n.valor}`)
-          });
-
-          // ✅ CORRECCIÓN CRÍTICA: Usar servicio centralizado para días trabajados
-          const currentWorkedDays = workedDays;
-          const periodType = periodForCalculation.tipo_periodo;
-          
-          console.log('🎯 Calculando empleado con período correcto:', {
-            employee: employee.name,
-            workedDays: currentWorkedDays,
-            periodType,
-            baseSalary: employee.baseSalary
-          });
-
-          console.log('💰 ENVIANDO AL BACKEND - IBC NORMATIVO:', {
-            employee: employee.name,
-            salarioOriginal: employee.baseSalary,
-            periodType,
-            novedadesCount: novedadesForIBC.length
-          });
-
-          // ✅ CORRECCIÓN CRÍTICA: Enviar salario mensual completo - el edge function hará la proporcionalidad
-          const calculation = await PayrollCalculationBackendService.calculatePayroll({
-            baseSalary: employee.baseSalary, // ✅ ENVIAR SALARIO MENSUAL COMPLETO
-            workedDays: currentWorkedDays,
-            extraHours: 0,
-            disabilities: 0,
-            bonuses: 0,
-            absences: 0,
-            periodType: periodType, // ✅ Usar tipo de período correcto
-            novedades: novedadesForIBC,
-            year: year // ✅ AGREGAR EL AÑO PARA CÁLCULOS ESPECÍFICOS
-          });
-
-          newCalculations[employee.id] = {
-            totalToPay: calculation.netPay,
-            ibc: calculation.ibc,
-            grossPay: calculation.grossPay,
-            deductions: calculation.totalDeductions,
-            healthDeduction: calculation.healthDeduction,
-            pensionDeduction: calculation.pensionDeduction,
-            transportAllowance: calculation.transportAllowance
-          };
-
-          console.log('✅ Empleado calculado:', employee.name, {
-            ibc: calculation.ibc,
-            netPay: calculation.netPay,
-            healthDeduction: calculation.healthDeduction,
-            pensionDeduction: calculation.pensionDeduction
-          });
-
-        } catch (error) {
-          console.error('❌ Error calculando empleado:', employee.name, error);
-          newCalculations[employee.id] = {
-            totalToPay: 0,
-            ibc: employee.baseSalary,
-            grossPay: 0,
-            deductions: 0,
-            healthDeduction: 0,
-            pensionDeduction: 0,
-            transportAllowance: 0
-          };
-        }
-      }
-
-      setEmployeeCalculations(newCalculations);
-
-      // ✅ NUEVA FUNCIONALIDAD: Persistir automáticamente en la BD
-      if (updateEmployeeCalculationsInDB && Object.keys(newCalculations).length > 0) {
-        console.log('💾 Activando persistencia automática de cálculos...');
-        try {
-          await updateEmployeeCalculationsInDB(newCalculations);
-          console.log('✅ Cálculos persistidos automáticamente en BD');
-        } catch (error) {
-          console.error('❌ Error persistiendo cálculos:', error);
-        }
-      }
-    };
-
-    recalculateAllEmployees();
-  }, [employees, currentPeriodId, lastRefreshTime, getEmployeeNovedadesList, updateEmployeeCalculationsInDB]);
-
-  // USAR SERVICIO CENTRALIZADO: Fuente única de verdad para días trabajados
-  // Usar el tipo de período desde el hook (datos de BD)
-  const periodForCalculation = {
-    tipo_periodo: (currentPeriod?.tipo_periodo || 'quincenal') as 'quincenal' | 'mensual',
-    fecha_inicio: startDate,
-    fecha_fin: endDate
-  };
-  
-  const daysInfo = PayrollCalculationService.getDaysInfo(periodForCalculation);
-  const workedDays = daysInfo.legalDays;
-  
-  console.log('🎯 SERVICIO CENTRALIZADO - DÍAS TRABAJADOS:', {
-    startDate,
-    endDate,
-    periodType: periodForCalculation.tipo_periodo,
-    legalDays: daysInfo.legalDays,
-    realDays: daysInfo.realDays
-  });
-
-  // Obtener configuración legal por año seleccionado
-  const getCurrentYearConfig = () => {
-    return ConfigurationService.getConfiguration(year);
-  };
-
-  const handleOpenNovedadModal = (employee: PayrollEmployee) => {
-    console.log('📝 Abriendo modal de novedades para:', employee.name);
-    console.log('📅 Fecha del período:', startDate);
+  const handleViewCalculation = (employee: PayrollEmployee) => {
     setSelectedEmployee(employee);
-    setNovedadModalOpen(true);
+    setShowCalculationModal(true);
   };
 
-  const handleCloseNovedadModal = async () => {
+  const handleViewLiquidation = (employee: PayrollEmployee) => {
+    setSelectedEmployee(employee);
+    setShowLiquidationModal(true);
+  };
+
+  const handleViewNovedades = (employee: PayrollEmployee) => {
+    setSelectedEmployee(employee);
+    setShowNovedadModal(true);
+  };
+
+  const handleNovedadChange = async () => {
     if (selectedEmployee) {
-      // ✅ CORRECCIÓN CRÍTICA: Delay antes de sincronización final para asegurar que BD esté lista
-      console.log('⏳ Esperando sincronización final de BD antes de cerrar modal...');
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      // Asegurar sincronización final al cerrar el modal
-      console.log('🔄 Sincronización final al cerrar modal para:', selectedEmployee.name);
       await onEmployeeNovedadesChange(selectedEmployee.id);
     }
-    setNovedadModalOpen(false);
-    setSelectedEmployee(null);
-  };
-
-  const handleNovedadSubmit = async (data: CreateNovedadData) => {
-    if (!selectedEmployee || !currentPeriodId) {
-      console.warn('⚠️ Faltan datos necesarios para crear novedad');
-      return;
-    }
-
-    console.log('💾 Creando novedad:', data);
-    
-    try {
-      const result = await createNovedad({
-        ...data,
-        empleado_id: selectedEmployee.id,
-        periodo_id: currentPeriodId
-      });
-      
-      if (result) {
-        // Cerrar modal
-        handleCloseNovedadModal();
-        
-        console.log('✅ Novedad creada y sincronizada exitosamente');
-      }
-    } catch (error) {
-      console.error('❌ Error en creación de novedad:', error);
-    }
-  };
-
-  // Callback para manejar cambios desde el modal (eliminaciones, etc.)
-  const handleNovedadChange = async (employeeId: string) => {
-    console.log('🔄 Novedad modificada para empleado:', employeeId);
-    await onEmployeeNovedadesChange(employeeId);
-  };
-
-  const handleDeleteEmployee = (employee: PayrollEmployee) => {
-    setEmployeeToDelete(employee);
-  };
-
-  const confirmDeleteEmployee = () => {
-    if (employeeToDelete && onRemoveEmployee) {
-      onRemoveEmployee(employeeToDelete.id);
-      toast({
-        title: "✅ Empleado removido",
-        description: `${employeeToDelete.name} ha sido removido de esta liquidación`,
-        className: "border-orange-200 bg-orange-50"
-      });
-      setEmployeeToDelete(null);
-    }
-  };
-
-  const cancelDeleteEmployee = () => {
-    setEmployeeToDelete(null);
-  };
-
-  // ✅ MEJORADO: Usar cálculos con IBC correcto
-  const getTotalToPay = (employee: PayrollEmployee) => {
-    const calculation = employeeCalculations[employee.id];
-    return calculation ? calculation.totalToPay : 0;
-  };
-
-  const getEmployeeIBC = (employee: PayrollEmployee) => {
-    const calculation = employeeCalculations[employee.id];
-    return calculation ? calculation.ibc : employee.baseSalary;
   };
 
   return (
-    <>
-      <div className="w-full overflow-x-auto">
-        <Table className="min-w-max">
+    <div className="space-y-4">
+      {/* Tabla de empleados */}
+      <div className="border rounded-lg overflow-hidden">
+        <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead className="sticky left-0 bg-background z-10 min-w-[200px]">Nombre Empleado</TableHead>
-              <TableHead className="text-right min-w-[120px]">Salario Base</TableHead>
-              <TableHead className="text-right min-w-[120px]">IBC</TableHead>
-              <TableHead className="text-center min-w-[100px]">Días Trabajados</TableHead>
-              <TableHead className="text-right min-w-[140px] bg-green-100 font-semibold">Total Devengado</TableHead>
-              <TableHead className="text-right min-w-[140px] bg-red-100 font-semibold">Total Deducciones</TableHead>
-              <TableHead className="text-center min-w-[100px]">Novedades</TableHead>
-              <TableHead className="text-right min-w-[140px] bg-blue-100 font-bold">Neto Pagado</TableHead>
-              <TableHead className="text-center min-w-[100px] sticky right-0 bg-background z-10">Acciones</TableHead>
+            <TableRow className="bg-gray-50">
+              <TableHead className="font-semibold">Empleado</TableHead>
+              <TableHead className="text-center font-semibold">Cargo</TableHead>
+              <TableHead className="text-center font-semibold">Salario Base</TableHead>
+              <TableHead className="text-center font-semibold">
+                Días Efectivos
+                <LegalInfoTooltip type="incapacity" />
+              </TableHead>
+              <TableHead className="text-center font-semibold">Total Devengado</TableHead>
+              <TableHead className="text-center font-semibold">
+                Aux. Transporte
+                <LegalInfoTooltip type="transport" />
+              </TableHead>
+              <TableHead className="text-center font-semibold">Novedades</TableHead>
+              <TableHead className="text-center font-semibold">Total Deducciones</TableHead>
+              <TableHead className="text-center font-semibold">
+                Neto a Pagar
+                <LegalInfoTooltip type="net_pay" />
+              </TableHead>
+              <TableHead className="text-center font-semibold">Estado</TableHead>
+              <TableHead className="text-center font-semibold">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {employees.map((employee) => {
-              const novedades = getEmployeeNovedades(employee.id);
-              const totalToPay = getTotalToPay(employee);
-              const ibc = getEmployeeIBC(employee);
-              const calc = employeeCalculations[employee.id];
-
+              // ✅ MOSTRAR DÍAS EFECTIVOS (corregido desde el backend)
+              const effectiveWorkedDays = employee.effectiveWorkedDays || employee.workedDays;
+              const hasIncapacity = (employee.incapacityDays || 0) > 0;
+              
               return (
-                <TableRow key={employee.id}>
-                  {/* Empleado (Fijo) */}
-                  <TableCell className="sticky left-0 bg-background z-10">
-                    <div className="font-medium">{employee.name}</div>
-                    <div className="text-sm text-gray-500">{employee.position}</div>
+                <TableRow key={employee.id} className="hover:bg-gray-50">
+                  <TableCell className="font-medium">
+                    <div>
+                      <div>{employee.name}</div>
+                      <div className="text-sm text-gray-500">{employee.eps} | {employee.afp}</div>
+                    </div>
                   </TableCell>
-                  
-                  {/* Básicos */}
-                  <TableCell className="text-right font-medium">
+                  <TableCell className="text-center">{employee.position}</TableCell>
+                  <TableCell className="text-center font-mono">
                     {formatCurrency(employee.baseSalary)}
                   </TableCell>
-
-                  <TableCell className="text-right">
-                    <div className="font-medium text-gray-600">
-                      {formatCurrency(ibc)}
-                    </div>
-                  </TableCell>
-                  
-                  <TableCell className="text-center font-medium">
-                    {workedDays} días
-                  </TableCell>
-                  
-                  {/* Total Devengado */}
-                  <TableCell className="text-right bg-green-100 font-semibold">
-                    {formatCurrency(calc?.grossPay || 0)}
-                  </TableCell>
-                  
-                  {/* Total Deducciones */}
-                  <TableCell className="text-right bg-red-100 font-semibold">
-                    {formatCurrency(calc?.deductions || 0)}
-                  </TableCell>
-                  
-                  {/* NOVEDADES Y TOTALES - FIXED: Always show the net value */}
                   <TableCell className="text-center">
-                    <div className="flex items-center justify-center space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleOpenNovedadModal(employee)}
-                        disabled={isCreating}
-                        className="h-8 w-8 p-0 rounded-full border-dashed border-2 border-blue-300 text-blue-600 hover:border-blue-500 hover:text-blue-700 hover:bg-blue-50"
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                      <div className={`text-sm font-medium ${
-                        novedades.totalNeto >= 0 ? 'text-green-600' : 'text-red-600'
-                      }`}>
-                        {novedades.totalNeto >= 0 ? '+' : ''}{formatCurrency(novedades.totalNeto)}
-                      </div>
+                    <div className="flex flex-col items-center">
+                      <span className={hasIncapacity ? 'text-orange-600 font-semibold' : ''}>
+                        {effectiveWorkedDays}
+                      </span>
+                      {hasIncapacity && (
+                        <span className="text-xs text-red-500">
+                          ({employee.incapacityDays} inc.)
+                        </span>
+                      )}
                     </div>
                   </TableCell>
-                  
-                  <TableCell className="text-right bg-blue-100 font-semibold text-blue-600">
-                    {formatCurrency(totalToPay)}
+                  <TableCell className="text-center font-mono">
+                    {formatCurrency(employee.grossPay)}
                   </TableCell>
-
-                  {/* Acciones (Fijo) */}
-                  <TableCell className="text-center sticky right-0 bg-background z-10">
-                    {onRemoveEmployee && (
+                  <TableCell className="text-center font-mono">
+                    <span className={employee.transportAllowance > 0 ? 'text-green-600' : 'text-gray-400'}>
+                      {formatCurrency(employee.transportAllowance || 0)}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleViewNovedades(employee)}
+                      className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                    >
+                      <FileText className="h-3 w-3 mr-1" />
+                      Ver
+                    </Button>
+                  </TableCell>
+                  <TableCell className="text-center font-mono text-red-600">
+                    {formatCurrency(employee.deductions)}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {/* ✅ MOSTRAR NETO CORRECTO DEL BACKEND */}
+                    <div className="font-mono font-semibold text-green-700 bg-green-50 px-2 py-1 rounded">
+                      {formatCurrency(employee.netPay)}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Badge 
+                      variant={employee.status === 'valid' ? 'default' : 'destructive'}
+                      className={employee.status === 'valid' ? 'bg-green-100 text-green-800' : ''}
+                    >
+                      {employee.status === 'valid' ? 'Válido' : 'Error'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex space-x-1 justify-center">
                       <Button
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
-                        onClick={() => handleDeleteEmployee(employee)}
-                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 hover:border-red-300"
+                        onClick={() => handleViewCalculation(employee)}
+                        className="h-8 w-8 p-0 text-blue-600 hover:bg-blue-100"
+                        title="Ver cálculos"
+                      >
+                        <Calculator className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleViewLiquidation(employee)}
+                        className="h-8 w-8 p-0 text-green-600 hover:bg-green-100"
+                        title="Editar liquidación"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onRemoveEmployee(employee.id)}
+                        className="h-8 w-8 p-0 text-red-600 hover:bg-red-100"
+                        title="Remover empleado"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
-                    )}
+                    </div>
                   </TableCell>
                 </TableRow>
               );
@@ -420,47 +220,67 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
         </Table>
       </div>
 
-      {/* Modal de novedades */}
-      {selectedEmployee && currentPeriodId && (
-        <NovedadUnifiedModal
-          open={novedadModalOpen}
-          setOpen={setNovedadModalOpen}
-          employeeId={selectedEmployee.id}
-          employeeSalary={selectedEmployee.baseSalary}
-          periodId={currentPeriodId}
-          companyId={companyId || ''}
-          onSubmit={handleNovedadSubmit}
-          selectedNovedadType={null}
-          onClose={handleCloseNovedadModal}
-          onEmployeeNovedadesChange={handleNovedadChange}
-          startDate={startDate}
-          endDate={endDate}
-        />
-      )}
+      {/* Totales */}
+      <div className="bg-gray-50 p-4 rounded-lg">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="text-center">
+            <div className="text-sm text-gray-600">Total Empleados</div>
+            <div className="text-xl font-bold text-gray-900">{totals.totalEmployees}</div>
+          </div>
+          <div className="text-center">
+            <div className="text-sm text-gray-600">Total Devengado</div>
+            <div className="text-xl font-bold text-blue-600">{formatCurrency(totals.totalGrossPay)}</div>
+          </div>
+          <div className="text-center">
+            <div className="text-sm text-gray-600">Aux. Transporte</div>
+            <div className="text-xl font-bold text-green-600">{formatCurrency(totals.totalTransportAllowance)}</div>
+          </div>
+          <div className="text-center">
+            <div className="text-sm text-gray-600">Total Deducciones</div>
+            <div className="text-xl font-bold text-red-600">{formatCurrency(totals.totalDeductions)}</div>
+          </div>
+          <div className="text-center">
+            <div className="text-sm text-gray-600">
+              Neto Total a Pagar
+              <LegalInfoTooltip type="net_pay" />
+            </div>
+            {/* ✅ TOTAL NETO CORRECTO */}
+            <div className="text-2xl font-bold text-green-700 bg-green-100 px-3 py-1 rounded-lg">
+              {formatCurrency(totals.totalNetPay)}
+            </div>
+          </div>
+        </div>
+      </div>
 
-      {/* Confirmation Dialog for Delete */}
-      <AlertDialog open={!!employeeToDelete} onOpenChange={cancelDeleteEmployee}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Remover empleado de la liquidación?</AlertDialogTitle>
-            <AlertDialogDescription>
-              ¿Estás seguro de que deseas remover a <strong>{employeeToDelete?.name}</strong> de esta liquidación? 
-              Esta acción no afectará el registro del empleado en el módulo de empleados.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={cancelDeleteEmployee}>
-              Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDeleteEmployee}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              Remover
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
+      {/* Modales */}
+      {selectedEmployee && (
+        <>
+          <EmployeeLiquidationModal
+            isOpen={showLiquidationModal}
+            onClose={() => setShowLiquidationModal(false)}
+            employee={selectedEmployee}
+            periodId={currentPeriodId || ''}
+          />
+          
+          <EmployeeCalculationModal
+            isOpen={showCalculationModal}
+            onClose={() => setShowCalculationModal(false)}
+            employee={selectedEmployee}
+          />
+
+          <NovedadUnifiedModal
+            isOpen={showNovedadModal}
+            onClose={() => setShowNovedadModal(false)}
+            employeeId={selectedEmployee.id}
+            employeeName={selectedEmployee.name}
+            periodId={currentPeriodId}
+            startDate={startDate}
+            endDate={endDate}
+            onNovedadChange={handleNovedadChange}
+            year={year}
+          />
+        </>
+      )}
+    </div>
   );
 };
