@@ -266,12 +266,12 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     }
   }, [employeeSalary, getPeriodDate, calculateNovedad]);
 
-  // ✅ NUEVO: Handler para envío de ausencias
+  // ✅ NUEVO: Handler para envío de ausencias CON CÁLCULO DE INCAPACIDAD
   const handleAbsenceSubmit = async (formData: VacationAbsenceFormData, periodInfo?: any) => {
-    if (!employeeId || !periodId || !companyId) {
+    if (!employeeId || !periodId || !companyId || !employeeSalary) {
       toast({
         title: "Error",
-        description: "Faltan datos del empleado, período o empresa",
+        description: "Faltan datos del empleado, período, empresa o salario",
         variant: "destructive",
       });
       return;
@@ -287,6 +287,47 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
         companyId
       });
 
+      // ✅ CALCULAR DÍAS DE AUSENCIA
+      const dias = formData.start_date && formData.end_date 
+        ? Math.ceil((new Date(formData.end_date).getTime() - new Date(formData.start_date).getTime()) / (1000 * 60 * 60 * 24)) + 1
+        : 0;
+
+      let valorCalculado = 0;
+
+      // ✅ NUEVO: Si es incapacidad, usar backend para calcular valor
+      if (formData.type === 'incapacidad' && dias > 0) {
+        console.log('🏥 Calculando valor de incapacidad usando backend:', {
+          tipo: formData.type,
+          subtipo: formData.subtipo,
+          salario: employeeSalary,
+          dias,
+          fechaPeriodo: startDate
+        });
+
+        try {
+          const calculationResult = await calculateNovedad({
+            tipoNovedad: formData.type as NovedadType,
+            subtipo: formData.subtipo,
+            salarioBase: employeeSalary,
+            dias: dias,
+            fechaPeriodo: startDate
+          });
+
+          if (calculationResult) {
+            valorCalculado = calculationResult.valor;
+            console.log('✅ Valor de incapacidad calculado por backend:', {
+              valorOriginal: valorCalculado,
+              detalle: calculationResult.detalleCalculo
+            });
+          } else {
+            console.warn('⚠️ Backend no devolvió resultado para incapacidad');
+          }
+        } catch (error) {
+          console.error('❌ Error calculando incapacidad en backend:', error);
+          // Continuar con valor 0 si falla el cálculo
+        }
+      }
+
       // ✅ Convertir datos de ausencia al formato de novedad
       const novedadData: CreateNovedadData = {
         empleado_id: employeeId,
@@ -294,16 +335,18 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
         company_id: companyId,
         tipo_novedad: formData.type as NovedadType,
         subtipo: formData.subtipo,
-        valor: 0, // Se calculará automáticamente en el backend
-        dias: formData.start_date && formData.end_date 
-          ? Math.ceil((new Date(formData.end_date).getTime() - new Date(formData.start_date).getTime()) / (1000 * 60 * 60 * 24)) + 1
-          : undefined,
+        valor: valorCalculado, // ✅ CAMBIO CLAVE: usar valor calculado en lugar de 0
+        dias: dias,
         fecha_inicio: formData.start_date,
         fecha_fin: formData.end_date,
         observacion: formData.observations
       };
 
-      console.log('💾 Creando novedad desde ausencia:', novedadData);
+      console.log('💾 Creando novedad desde ausencia con valor calculado:', {
+        ...novedadData,
+        valorCalculado: valorCalculado > 0 ? `$${valorCalculado.toLocaleString()}` : 'No calculado'
+      });
+      
       await onSubmit(novedadData);
 
       // ✅ CORRECCIÓN CRÍTICA: Delay antes de cambiar estado para asegurar sincronización con BD
@@ -321,7 +364,9 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
 
       toast({
         title: "✅ Éxito",
-        description: "Ausencia registrada correctamente en el módulo de novedades",
+        description: `${formData.type === 'incapacidad' && valorCalculado > 0 
+          ? `Incapacidad calculada correctamente ($${valorCalculado.toLocaleString()})` 
+          : 'Ausencia registrada correctamente'} en el módulo de novedades`,
         className: "border-green-200 bg-green-50"
       });
 
