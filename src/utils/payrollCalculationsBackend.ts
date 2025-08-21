@@ -2,30 +2,124 @@ import { PayrollCalculationBackendService, PayrollCalculationInput } from '@/ser
 import { PayrollEmployee, BaseEmployeeData, PayrollSummary, NovedadForIBC } from '@/types/payroll';
 import { NOVEDAD_CATEGORIES } from '@/types/novedades-enhanced';
 
+// ✅ NUEVA FUNCIÓN: Calcular días de intersección de incapacidad con período
+const calculateIncapacityDaysInPeriod = (
+  novedad: any,
+  periodStart: string,
+  periodEnd: string
+): number => {
+  if (novedad.tipo_novedad !== 'incapacidad' || !novedad.fecha_inicio || !novedad.fecha_fin) {
+    return 0;
+  }
+
+  const incapacityStart = new Date(novedad.fecha_inicio);
+  const incapacityEnd = new Date(novedad.fecha_fin);
+  const periodStartDate = new Date(periodStart);
+  const periodEndDate = new Date(periodEnd);
+
+  // Calcular intersección
+  const intersectionStart = new Date(Math.max(incapacityStart.getTime(), periodStartDate.getTime()));
+  const intersectionEnd = new Date(Math.min(incapacityEnd.getTime(), periodEndDate.getTime()));
+
+  // Si no hay intersección, retornar 0
+  if (intersectionStart > intersectionEnd) {
+    return 0;
+  }
+
+  // Calcular días de intersección (inclusive)
+  const diffTime = intersectionEnd.getTime() - intersectionStart.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+  return Math.max(0, diffDays);
+};
+
+// ✅ NUEVA FUNCIÓN: Calcular días trabajados efectivos
+const calculateEffectiveWorkedDays = (
+  legalDays: number,
+  novedades: any[],
+  periodStart: string,
+  periodEnd: string
+): number => {
+  let totalIncapacityDaysInPeriod = 0;
+
+  for (const novedad of novedades) {
+    if (novedad.tipo_novedad === 'incapacidad') {
+      const incapacityDays = calculateIncapacityDaysInPeriod(novedad, periodStart, periodEnd);
+      totalIncapacityDaysInPeriod += incapacityDays;
+    }
+  }
+
+  // Días efectivos = días legales del período - días de incapacidad en el período
+  const effectiveWorkedDays = Math.max(0, Math.min(legalDays - totalIncapacityDaysInPeriod, legalDays));
+
+  console.log('🧮 Cálculo días efectivos:', {
+    legalDays,
+    totalIncapacityDaysInPeriod,
+    effectiveWorkedDays
+  });
+
+  return effectiveWorkedDays;
+};
+
 export const calculateEmployeeBackend = async (
   baseEmployee: BaseEmployeeData, 
-  periodType: 'quincenal' | 'mensual'
+  periodType: 'quincenal' | 'mensual',
+  periodStart?: string,
+  periodEnd?: string
 ): Promise<PayrollEmployee> => {
   console.log('🔍 calculateEmployeeBackend: Procesando empleado con periodicidad y novedades:', {
     employeeId: baseEmployee.id,
     name: baseEmployee.name,
     periodType,
-    workedDays: baseEmployee.workedDays,
+    originalWorkedDays: baseEmployee.workedDays,
     novedadesCount: baseEmployee.novedades?.length || 0,
-    novedades: baseEmployee.novedades
+    novedades: baseEmployee.novedades,
+    periodStart,
+    periodEnd
   });
+
+  // ✅ PASO 1: Calcular días trabajados efectivos (descontando incapacidades del período)
+  const legalDays = periodType === 'quincenal' ? 15 : 30;
+  let effectiveWorkedDays = baseEmployee.workedDays;
+
+  if (periodStart && periodEnd && baseEmployee.novedades?.length) {
+    effectiveWorkedDays = calculateEffectiveWorkedDays(
+      legalDays,
+      baseEmployee.novedades,
+      periodStart,
+      periodEnd
+    );
+  }
+
+  // ✅ PASO 2: Ajustar novedades para que solo incluyan días del período actual
+  const adjustedNovedades = baseEmployee.novedades?.map(novedad => {
+    if (novedad.tipo_novedad === 'incapacidad' && novedad.fecha_inicio && novedad.fecha_fin && periodStart && periodEnd) {
+      const daysInPeriod = calculateIncapacityDaysInPeriod(novedad, periodStart, periodEnd);
+      return {
+        ...novedad,
+        dias: daysInPeriod // ✅ Ajustar días al período actual
+      };
+    }
+    return novedad;
+  }) || [];
 
   const input: PayrollCalculationInput = {
     baseSalary: baseEmployee.baseSalary,
-    workedDays: baseEmployee.workedDays,
-    extraHours: 0, // No longer used directly
+    workedDays: effectiveWorkedDays, // ✅ CORRECCIÓN: Usar días efectivos
+    extraHours: 0,
     disabilities: baseEmployee.disabilities,
-    bonuses: baseEmployee.bonuses, // Now includes all positive novedades
+    bonuses: baseEmployee.bonuses,
     absences: baseEmployee.absences,
-    periodType, // ✅ CORRECCIÓN: Enviar periodicidad al backend
-    // ✅ NUEVO: Incluir novedades para cálculo correcto de IBC automático
-    novedades: baseEmployee.novedades || []
+    periodType,
+    novedades: adjustedNovedades // ✅ Novedades ajustadas al período
   };
+
+  console.log('🎯 Input al backend con días efectivos:', {
+    employeeId: baseEmployee.id,
+    originalWorkedDays: baseEmployee.workedDays,
+    effectiveWorkedDays,
+    adjustedNovedadesCount: adjustedNovedades.length
+  });
 
   try {
     const [calculation, validation] = await Promise.all([
@@ -33,9 +127,10 @@ export const calculateEmployeeBackend = async (
       PayrollCalculationBackendService.validateEmployee(input, baseEmployee.eps, baseEmployee.afp)
     ]);
 
-    console.log('✅ calculateEmployeeBackend: Cálculo completado con periodicidad y auxilio corregido:', {
+    console.log('✅ calculateEmployeeBackend: Cálculo completado con días efectivos:', {
       employeeId: baseEmployee.id,
       periodType,
+      effectiveWorkedDays,
       ibc: calculation.ibc,
       transportAllowance: calculation.transportAllowance,
       healthDeduction: calculation.healthDeduction,
@@ -45,17 +140,19 @@ export const calculateEmployeeBackend = async (
 
     return {
       ...baseEmployee,
+      workedDays: effectiveWorkedDays, // ✅ Actualizar con días efectivos
       grossPay: calculation.grossPay,
       deductions: calculation.totalDeductions,
       netPay: calculation.netPay,
       transportAllowance: calculation.transportAllowance,
       employerContributions: calculation.employerContributions,
-      // ✅ NUEVO: Incluir IBC calculado automáticamente
       ibc: calculation.ibc,
       status: validation.isValid ? 'valid' : 'error',
       errors: [...validation.errors, ...validation.warnings],
       healthDeduction: calculation.healthDeduction || 0,
-      pensionDeduction: calculation.pensionDeduction || 0
+      pensionDeduction: calculation.pensionDeduction || 0,
+      // ✅ Conservar novedades ajustadas
+      novedades: adjustedNovedades
     };
   } catch (error) {
     console.error('Error calculating employee payroll:', error);
@@ -108,19 +205,15 @@ export const convertToBaseEmployeeData = (employee: PayrollEmployee): BaseEmploy
     absences: employee.absences,
     eps: employee.eps,
     afp: employee.afp,
-    // ✅ CONSERVAR: novedades si existen
     novedades: employee.novedades || []
   };
 };
 
-// ✅ FUNCIÓN NORMATIVA CORREGIDA: Determinar si una novedad es constitutiva según normas laborales
 export const isNovedadConstitutiva = (tipoNovedad: string, valorExplícito?: boolean): boolean => {
-  // Si hay valor explícito, usarlo (usuario ha decidido conscientemente)
   if (valorExplícito !== null && valorExplícito !== undefined) {
     return Boolean(valorExplícito);
   }
 
-  // ✅ CORREGIDO: Buscar en categorías de devengados con nuevos defaults
   const categoria = Object.entries(NOVEDAD_CATEGORIES.devengados.types).find(
     ([key]) => key === tipoNovedad
   );
@@ -128,7 +221,6 @@ export const isNovedadConstitutiva = (tipoNovedad: string, valorExplícito?: boo
   if (categoria) {
     const constitutivo = categoria[1].constitutivo_default ?? false;
     
-    // ✅ LOG para verificar la corrección
     if (tipoNovedad === 'horas_extra' || tipoNovedad === 'recargo_nocturno') {
       console.log(`🔧 CONSTITUTIVIDAD CORREGIDA: ${tipoNovedad} = ${constitutivo} (antes era false)`);
     }
@@ -136,35 +228,29 @@ export const isNovedadConstitutiva = (tipoNovedad: string, valorExplícito?: boo
     return constitutivo;
   }
 
-  // Por defecto, no constitutivo (conservador)
   return false;
 };
 
-// ✅ NUEVO: Normalizador de subtipos de incapacidad para que el backend no reciba "comun"
 const normalizeIncapacitySubtype = (subtipo?: string): 'general' | 'laboral' | undefined => {
   if (!subtipo) return undefined;
   const s = subtipo.toLowerCase().trim();
 
-  // Mapear variantes comunes a los subtipos esperados por el backend
   if (['comun', 'común', 'enfermedad_general', 'eg', 'general'].includes(s)) {
     return 'general';
   }
   if (['laboral', 'arl', 'accidente_laboral', 'riesgo_laboral', 'at'].includes(s)) {
     return 'laboral';
   }
-  return undefined; // si no es conocido, no forzar
+  return undefined;
 };
 
-// ✅ FUNCIÓN NORMATIVA: Convertir novedades aplicando reglas constitutivas CORREGIDAS
 export const convertNovedadesToIBC = (novedades: any[]): NovedadForIBC[] => {
   return novedades.map(novedad => {
-    // ✅ USAR FUNCIÓN NORMATIVA CENTRALIZADA CORREGIDA
     const constitutivo = isNovedadConstitutiva(
       novedad.tipo_novedad, 
       novedad.constitutivo_salario
     );
 
-    // Normalizar solo para incapacidades
     const normalizedSubtype = novedad.tipo_novedad === 'incapacidad'
       ? normalizeIncapacitySubtype(novedad.subtipo) ?? novedad.subtipo
       : novedad.subtipo;
@@ -183,7 +269,6 @@ export const convertNovedadesToIBC = (novedades: any[]): NovedadForIBC[] => {
       valor: Number(novedad.valor || 0),
       constitutivo_salario: constitutivo,
       tipo_novedad: novedad.tipo_novedad || 'otros',
-      // ✅ Pasar detalles necesarios para incapacidades y otros cálculos en backend
       dias: typeof novedad.dias === 'number' ? novedad.dias : (novedad.dias ? Number(novedad.dias) : undefined),
       subtipo: normalizedSubtype || undefined
     };
