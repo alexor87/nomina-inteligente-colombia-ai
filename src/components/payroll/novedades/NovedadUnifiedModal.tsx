@@ -21,6 +21,7 @@ import { useNovedadBackendCalculation } from '@/hooks/useNovedadBackendCalculati
 import { VacationAbsenceForm } from '@/components/vacations/VacationAbsenceForm';
 import { VacationAbsenceFormData, VacationAbsenceType } from '@/types/vacations';
 import { useVacationEmployees } from '@/hooks/useVacationEmployees';
+import { usePayrollNovedadesUnified } from '@/hooks/usePayrollNovedadesUnified';
 
 interface NovedadUnifiedModalProps {
   open: boolean;
@@ -52,7 +53,6 @@ const categoryToNovedadType: Record<NovedadCategory, NovedadType> = {
   'retefuente': 'retencion_fuente'
 };
 
-// ✅ NUEVO: Mapeo de categorías que abren el modal de ausencias
 const categoryToAbsenceType: Record<string, VacationAbsenceType> = {
   'vacaciones': 'vacaciones',
   'incapacidades': 'incapacidad',
@@ -88,8 +88,9 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   const { toast } = useToast();
   
   const { calculateNovedad } = useNovedadBackendCalculation();
+  
+  const { deleteNovedad: deleteNovedadUnified } = usePayrollNovedadesUnified(periodId || '');
 
-  // ✅ KISS: Fecha del período sin complejidad
   const getPeriodDate = useCallback(() => {
     if (startDate) {
       const date = new Date(startDate + 'T00:00:00');
@@ -99,7 +100,6 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     return new Date();
   }, [startDate]);
 
-  // ✅ Obtener fechas del período para validación
   useEffect(() => {
     const loadPeriodDates = async () => {
       if (!periodId) return;
@@ -128,7 +128,6 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       setSelectedType(selectedNovedadType);
       setCurrentStep('form');
     } else {
-      // En modo ajustes, ir directamente al selector
       if (mode === 'ajustes') {
         setCurrentStep('selector');
       } else {
@@ -169,8 +168,37 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     loadEmployeeName();
   }, [employeeId]);
 
+  const handleUnifiedDelete = useCallback(async (novedadId: string, employeeId: string) => {
+    if (!employeeId) {
+      console.error('❌ Employee ID no definido para eliminación');
+      return;
+    }
+
+    console.log('🗑️ UNIFICADO: Eliminando novedad con sincronización de totales:', { novedadId, employeeId });
+    
+    try {
+      await deleteNovedadUnified(novedadId, employeeId);
+      
+      setRefreshTrigger(Date.now());
+      
+      if (onEmployeeNovedadesChange) {
+        console.log('📡 Notificando cambio al componente padre...');
+        await onEmployeeNovedadesChange(employeeId);
+      }
+      
+      console.log('✅ UNIFICADO: Eliminación completada con sincronización exitosa');
+      
+    } catch (error) {
+      console.error('❌ Error en eliminación unificada:', error);
+      toast({
+        title: "❌ Error",
+        description: "No se pudo eliminar la novedad",
+        variant: "destructive"
+      });
+    }
+  }, [deleteNovedadUnified, onEmployeeNovedadesChange, toast]);
+
   const handleClose = () => {
-    // Reset all states before closing
     setIsSubmitting(false);
     setCurrentStep('list');
     setSelectedType(null);
@@ -181,7 +209,6 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   };
 
   const handleCategorySelect = (category: NovedadCategory) => {
-    // ✅ NUEVO: Verificar si es una categoría que abre el modal de ausencias
     if (ABSENCE_CATEGORIES.includes(category)) {
       const absenceType = categoryToAbsenceType[category];
       setSelectedAbsenceType(absenceType);
@@ -190,7 +217,6 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       return;
     }
 
-    // ✅ Comportamiento normal para otras categorías
     const novedadType = categoryToNovedadType[category];
     setSelectedType(novedadType);
     setCurrentStep('form');
@@ -203,7 +229,6 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   };
 
   const handleBackToList = () => {
-    // En modo ajustes, cerrar el modal en lugar de ir a la lista
     if (mode === 'ajustes') {
       handleClose();
     } else {
@@ -266,7 +291,6 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     }
   }, [employeeSalary, getPeriodDate, calculateNovedad]);
 
-  // ✅ NUEVO: Handler para envío de ausencias CON CÁLCULO DE INCAPACIDAD
   const handleAbsenceSubmit = async (formData: VacationAbsenceFormData, periodInfo?: any) => {
     if (!employeeId || !periodId || !companyId || !employeeSalary) {
       toast({
@@ -287,14 +311,12 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
         companyId
       });
 
-      // ✅ CALCULAR DÍAS DE AUSENCIA
       const dias = formData.start_date && formData.end_date 
         ? Math.ceil((new Date(formData.end_date).getTime() - new Date(formData.start_date).getTime()) / (1000 * 60 * 60 * 24)) + 1
         : 0;
 
       let valorCalculado = 0;
 
-      // ✅ NUEVO: Si es incapacidad, usar backend para calcular valor
       if (formData.type === 'incapacidad' && dias > 0) {
         console.log('🏥 Calculando valor de incapacidad usando backend:', {
           tipo: formData.type,
@@ -324,18 +346,16 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
           }
         } catch (error) {
           console.error('❌ Error calculando incapacidad en backend:', error);
-          // Continuar con valor 0 si falla el cálculo
         }
       }
 
-      // ✅ Convertir datos de ausencia al formato de novedad
       const novedadData: CreateNovedadData = {
         empleado_id: employeeId,
         periodo_id: periodId,
         company_id: companyId,
         tipo_novedad: formData.type as NovedadType,
         subtipo: formData.subtipo,
-        valor: valorCalculado, // ✅ CAMBIO CLAVE: usar valor calculado en lugar de 0
+        valor: valorCalculado,
         dias: dias,
         fecha_inicio: formData.start_date,
         fecha_fin: formData.end_date,
@@ -349,11 +369,9 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       
       await onSubmit(novedadData);
 
-      // ✅ CORRECCIÓN CRÍTICA: Delay antes de cambiar estado para asegurar sincronización con BD
       console.log('⏳ Esperando sincronización de BD antes de actualizar vista...');
       await new Promise(resolve => setTimeout(resolve, 300));
 
-      // ✅ Volver al módulo de novedades después de crear
       if (mode === 'ajustes') {
         handleClose();
       } else {
@@ -423,11 +441,9 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       
       console.log('✅ All novelty entries processed successfully');
       
-      // ✅ CORRECCIÓN CRÍTICA: Delay antes de cambiar estado para asegurar sincronización con BD
       console.log('⏳ Esperando sincronización de BD antes de actualizar vista...');
       await new Promise(resolve => setTimeout(resolve, 300));
       
-      // En modo ajustes, cerrar el modal directamente
       if (mode === 'ajustes') {
         handleClose();
       } else {
@@ -524,6 +540,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
           onClose={handleClose}
           refreshTrigger={refreshTrigger}
           onEmployeeNovedadesChange={onEmployeeNovedadesChange}
+          onUnifiedDelete={handleUnifiedDelete}
         />
       );
     }
@@ -543,7 +560,6 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       return renderNovedadForm();
     }
 
-    // ✅ MODIFICADO: Pasar hideEmployeeSelection={true} para ocultar dropdown
     if (currentStep === 'absence' && selectedAbsenceType && employeeId) {
       console.log('🎯 DEBUG: Renderizando VacationAbsenceForm con:', { 
         employeeId, 
@@ -578,7 +594,6 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       <DialogContent 
         className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto"
         onInteractOutside={(event) => {
-          // Prevenir cierre al hacer clic fuera del modal
           event.preventDefault();
         }}
       >
