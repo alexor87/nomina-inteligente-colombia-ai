@@ -341,7 +341,6 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
               const novedades = getEmployeeNovedades(employee.id);
               const totalToPay = getTotalToPay(employee);
               const ibc = getEmployeeIBC(employee);
-              const hasNovedades = novedades.hasNovedades;
               const calc = employeeCalculations[employee.id];
 
               return (
@@ -377,7 +376,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
                     {formatCurrency(calc?.deductions || 0)}
                   </TableCell>
                   
-                  {/* NOVEDADES Y TOTALES */}
+                  {/* NOVEDADES Y TOTALES - FIXED: Always show the net value */}
                   <TableCell className="text-center">
                     <div className="flex items-center justify-center space-x-2">
                       <Button
@@ -389,13 +388,11 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
                       >
                         <Plus className="h-4 w-4" />
                       </Button>
-                      {hasNovedades && (
-                        <div className={`text-sm font-medium ${
-                          novedades.totalNeto >= 0 ? 'text-green-600' : 'text-red-600'
-                        }`}>
-                          {novedades.totalNeto >= 0 ? '+' : ''}{formatCurrency(novedades.totalNeto)}
-                        </div>
-                      )}
+                      <div className={`text-sm font-medium ${
+                        novedades.totalNeto >= 0 ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                        {novedades.totalNeto >= 0 ? '+' : ''}{formatCurrency(novedades.totalNeto)}
+                      </div>
                     </div>
                   </TableCell>
                   
