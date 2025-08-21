@@ -27,11 +27,20 @@ export const usePayrollCorrection = () => {
       console.log('📊 Período encontrado:', periodData.periodo);
 
       // Ejecutar corrección usando el servicio unificado
-      await EmployeeUnifiedService.updatePayrollRecords(periodId);
+      const updateResult = await EmployeeUnifiedService.updatePayrollRecords(periodId);
+      
+      if (!updateResult.success) {
+        throw new Error(updateResult.error || 'Error updating payroll records');
+      }
 
       // Obtener empleados corregidos para mostrar resumen
-      const correctedEmployees = await EmployeeUnifiedService.getEmployeesForPeriod(periodId);
+      const employeesResult = await EmployeeUnifiedService.getEmployeesForPeriod(periodId);
       
+      if (!employeesResult.success || !employeesResult.data) {
+        throw new Error(employeesResult.error || 'Error fetching corrected employees');
+      }
+
+      const correctedEmployees = employeesResult.data;
       const employeesWithTransport = correctedEmployees.filter(emp => (emp.transportAllowance || 0) > 0);
       const totalNetPay = correctedEmployees.reduce((sum, emp) => sum + (emp.netPay || 0), 0);
 
@@ -76,7 +85,13 @@ export const usePayrollCorrection = () => {
 
   const validatePayrollCalculations = useCallback(async (periodId: string) => {
     try {
-      const employees = await EmployeeUnifiedService.getEmployeesForPeriod(periodId);
+      const employeesResult = await EmployeeUnifiedService.getEmployeesForPeriod(periodId);
+      
+      if (!employeesResult.success || !employeesResult.data) {
+        throw new Error(employeesResult.error || 'Error fetching employees');
+      }
+
+      const employees = employeesResult.data;
       
       const validation = {
         totalEmployees: employees.length,

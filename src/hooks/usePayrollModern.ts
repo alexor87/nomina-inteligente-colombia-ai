@@ -32,16 +32,26 @@ export const usePayrollModern = (periodId: string) => {
       console.log('🔄 Cargando empleados del período:', periodId);
       
       // 1. Obtener empleados con cálculos correctos
-      const employeesData = await EmployeeUnifiedService.getEmployeesForPeriod(periodId);
-      console.log('✅ Empleados calculados:', employeesData.length);
+      const employeesResult = await EmployeeUnifiedService.getEmployeesForPeriod(periodId);
+      
+      if (!employeesResult.success || !employeesResult.data) {
+        throw new Error(employeesResult.error || 'Error loading employees');
+      }
+
+      console.log('✅ Empleados calculados:', employeesResult.data.length);
       
       // 2. Automáticamente actualizar registros en BD
       console.log('🔄 Actualizando automáticamente registros en BD...');
-      await EmployeeUnifiedService.updatePayrollRecords(periodId);
+      const updateResult = await EmployeeUnifiedService.updatePayrollRecords(periodId);
+      
+      if (!updateResult.success) {
+        console.warn('⚠️ Error updating records, but continuing:', updateResult.error);
+      }
+      
       console.log('✅ Registros actualizados automáticamente');
       
-      // 3. Cargar datos actualizados de la BD
-      const updatedEmployees = await EmployeeUnifiedService.getEmployeesForPeriod(periodId);
+      // 3. Usar los datos ya obtenidos
+      const updatedEmployees = employeesResult.data;
       
       setEmployees(updatedEmployees);
       
@@ -82,7 +92,12 @@ export const usePayrollModern = (periodId: string) => {
 
   const updateEmployee = useCallback(async (employeeId: string, data: any) => {
     try {
-      await EmployeeUnifiedService.update(employeeId, data);
+      const result = await EmployeeUnifiedService.update(employeeId, data);
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Error updating employee');
+      }
+      
       await loadEmployees(); // Recargar para mostrar cambios
       toast({
         title: "Empleado actualizado",
@@ -100,7 +115,12 @@ export const usePayrollModern = (periodId: string) => {
   const bulkUpdateEmployees = useCallback(async (employeeIds: string[]) => {
     try {
       // Recalcular automáticamente
-      await EmployeeUnifiedService.updatePayrollRecords(periodId);
+      const result = await EmployeeUnifiedService.updatePayrollRecords(periodId);
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Error in bulk update');
+      }
+      
       await loadEmployees();
       toast({
         title: "Recálculo completado",

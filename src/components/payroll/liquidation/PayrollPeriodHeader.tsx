@@ -1,167 +1,101 @@
 
 import React from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { CalendarDays, Users, DollarSign, AlertTriangle } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { CalendarDays, RefreshCw, Save, Calculator, Users, Plus } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils';
-import { PeriodStatus } from '@/types/payroll';
+import { PeriodStatus, PeriodStatusInfo } from '@/types/payroll';
 
 interface PayrollPeriodHeaderProps {
-  period: any | null;
   periodStatus: PeriodStatus | null;
-  onCreateNewPeriod: () => Promise<void>;
-  onRefreshPeriod: () => Promise<void>;
-  canClosePeriod?: boolean;
-  isProcessing?: boolean;
-  onClosePeriod?: () => Promise<void>;
-  onRecalculateAll?: () => Promise<void>;
-  selectedCount?: number;
-  totalCount?: number;
+  employeeCount: number;
+  totalNetPay: number;
 }
 
+const isPeriodStatusInfo = (status: PeriodStatus): status is PeriodStatusInfo => {
+  return typeof status === 'object' && status !== null && 'status' in status;
+};
+
 export const PayrollPeriodHeader: React.FC<PayrollPeriodHeaderProps> = ({
-  period,
   periodStatus,
-  onCreateNewPeriod,
-  onRefreshPeriod,
-  canClosePeriod = false,
-  isProcessing = false,
-  onClosePeriod,
-  onRecalculateAll,
-  selectedCount = 0,
-  totalCount = 0
+  employeeCount,
+  totalNetPay
 }) => {
-  const getStatusBadge = (estado: string) => {
-    const statusConfig = {
-      'borrador': { label: 'Borrador', className: 'bg-gray-100 text-gray-800' },
-      'cerrado': { label: 'Cerrado', className: 'bg-green-100 text-green-800' },
-      'procesado': { label: 'Procesado', className: 'bg-blue-100 text-blue-800' },
-      'aprobado': { label: 'Aprobado', className: 'bg-emerald-100 text-emerald-800' }
+  const statusInfo = periodStatus && isPeriodStatusInfo(periodStatus) ? periodStatus : null;
+  const currentPeriod = statusInfo?.currentPeriod;
+  const status = statusInfo?.status || (typeof periodStatus === 'string' ? periodStatus : 'borrador');
+
+  const getStatusBadge = (status: string) => {
+    const variants = {
+      'borrador': { variant: 'secondary' as const, label: 'Borrador' },
+      'cerrado': { variant: 'default' as const, label: 'Cerrado' },
+      'procesada': { variant: 'default' as const, label: 'Procesada' },
+      'pagada': { variant: 'default' as const, label: 'Pagada' },
+      'con_errores': { variant: 'destructive' as const, label: 'Con Errores' }
     };
     
-    const config = statusConfig[estado as keyof typeof statusConfig] || statusConfig.borrador;
-    return <Badge className={config.className}>{config.label}</Badge>;
+    return variants[status as keyof typeof variants] || { variant: 'secondary' as const, label: status };
   };
 
-  // Si no hay período, mostrar opción para crear
-  if (!period) {
-    return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="text-center space-y-4">
-            <div className="flex items-center justify-center space-x-2 text-muted-foreground">
-              <CalendarDays className="h-5 w-5" />
-              <span>No hay período activo</span>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              {periodStatus?.message || 'Crea un nuevo período para comenzar la liquidación'}
-            </p>
-            <div className="flex items-center justify-center space-x-3">
-              <Button 
-                onClick={onCreateNewPeriod}
-                disabled={isProcessing}
-                variant="default"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                {periodStatus?.suggestion || 'Crear Período'}
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={onRefreshPeriod}
-                disabled={isProcessing}
-              >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Actualizar
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+  const statusBadge = getStatusBadge(status);
 
   return (
-    <Card>
-      <CardContent className="p-6">
-        <div className="flex items-center justify-between">
-          <div className="space-y-2">
-            <div className="flex items-center space-x-3">
-              <h2 className="text-xl font-semibold">
-                Período: {period.periodo}
-              </h2>
-              {getStatusBadge(period.estado)}
-            </div>
-            
-            <div className="flex items-center space-x-6 text-sm text-muted-foreground">
-              <div className="flex items-center space-x-1">
-                <CalendarDays className="h-4 w-4" />
-                <span>{period.fecha_inicio} - {period.fecha_fin}</span>
-              </div>
-              <div className="flex items-center space-x-1">
-                <Users className="h-4 w-4" />
-                <span>{totalCount} empleados</span>
-              </div>
-              {selectedCount > 0 && (
-                <span className="text-blue-600 font-medium">
-                  {selectedCount} seleccionados
-                </span>
-              )}
-            </div>
-
-            {/* Totales del período */}
-            {period.total_devengado > 0 && (
-              <div className="flex items-center space-x-6 text-sm">
-                <span>
-                  <strong>Devengado:</strong> {formatCurrency(period.total_devengado)}
-                </span>
-                <span>
-                  <strong>Deducciones:</strong> {formatCurrency(period.total_deducciones)}
-                </span>
-                <span>
-                  <strong>Neto:</strong> {formatCurrency(period.total_neto)}
-                </span>
-              </div>
+    <Card className="mb-6">
+      <CardHeader>
+        <div className="flex justify-between items-start">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <CalendarDays className="h-5 w-5" />
+              {currentPeriod?.periodo || 'Período de Liquidación'}
+            </CardTitle>
+            {currentPeriod && (
+              <p className="text-sm text-muted-foreground mt-1">
+                {currentPeriod.fecha_inicio} - {currentPeriod.fecha_fin}
+              </p>
             )}
           </div>
-
-          <div className="flex items-center space-x-3">
-            {period.estado === 'borrador' && (
-              <>
-                {onRecalculateAll && (
-                  <Button 
-                    variant="outline" 
-                    onClick={onRecalculateAll}
-                    disabled={isProcessing}
-                  >
-                    <Calculator className="h-4 w-4 mr-2" />
-                    Recalcular Todo
-                  </Button>
-                )}
-
-                {onClosePeriod && (
-                  <Button 
-                    onClick={onClosePeriod}
-                    disabled={!canClosePeriod || isProcessing}
-                    variant="default"
-                  >
-                    <Save className="h-4 w-4 mr-2" />
-                    {isProcessing ? 'Cerrando...' : 'Cerrar Período'}
-                  </Button>
-                )}
-              </>
-            )}
-
-            <Button 
-              variant="outline" 
-              onClick={onRefreshPeriod}
-              disabled={isProcessing}
-            >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Actualizar
-            </Button>
+          <Badge {...statusBadge}>{statusBadge.label}</Badge>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="flex items-center gap-3">
+            <Users className="h-8 w-8 text-blue-500" />
+            <div>
+              <p className="text-sm text-muted-foreground">Empleados</p>
+              <p className="text-2xl font-bold">{employeeCount}</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            <DollarSign className="h-8 w-8 text-green-500" />
+            <div>
+              <p className="text-sm text-muted-foreground">Total Neto</p>
+              <p className="text-2xl font-bold">${totalNetPay.toLocaleString()}</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="h-8 w-8 text-yellow-500" />
+            <div>
+              <p className="text-sm text-muted-foreground">Estado</p>
+              <p className="text-lg font-medium">{statusBadge.label}</p>
+            </div>
           </div>
         </div>
+
+        {statusInfo?.message && (
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+            <p className="text-sm text-blue-700">{statusInfo.message}</p>
+          </div>
+        )}
+
+        {statusInfo?.suggestion && (
+          <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+            <p className="text-sm text-yellow-700">
+              <strong>Sugerencia:</strong> {statusInfo.suggestion}
+            </p>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
