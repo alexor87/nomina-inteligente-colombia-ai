@@ -61,6 +61,12 @@ serve(async (req) => {
       return new Response(JSON.stringify({ success: true, data: result }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
+    } else if (action === 'calculate-novedad') {
+      // ✅ NUEVO: cálculo unitario de una novedad (incapacidad, horas extra, etc.)
+      const result = await calculateSingleNovedad(supabase, data)
+      return new Response(JSON.stringify({ success: true, data: result }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     } else {
       throw new Error(`Acción no válida: ${action}`)
     }
@@ -383,6 +389,116 @@ async function calculateNovedadesTotals(supabase: any, data: any) {
   };
 
   console.log('✅ BACKEND: Totales (policy-aware):', result);
+  return result;
+}
+
+async function calculateSingleNovedad(supabase: any, data: any) {
+  const {
+    tipoNovedad,
+    subtipo,
+    salarioBase,
+    horas,
+    dias,
+    fechaPeriodo
+  } = data;
+
+  const year = fechaPeriodo ? new Date(fechaPeriodo).getFullYear().toString() : '2025';
+  const config = OFFICIAL_VALUES[year as keyof typeof OFFICIAL_VALUES] || OFFICIAL_VALUES['2025'];
+  const policy = await getCompanyPolicy(supabase);
+
+  console.log('🧩 calculateSingleNovedad:', {
+    tipoNovedad, subtipo, salarioBase, horas, dias, fechaPeriodo, year, policy
+  });
+
+  // Valores base para jornada
+  const valorDiario = salarioBase / 30;
+  const horasPorDia = 8 * (23/30); // 6.1333 h/día efectivos (consistente con totals)
+  const horasSemanales = 48;
+  const horasMensuales = Math.round(horasSemanales * 4);
+  const valorHora = valorDiario / horasPorDia;
+
+  let valor = 0;
+  let factorCalculo = 0;
+  let detalleCalculo = '';
+
+  if (tipoNovedad === 'incapacidad') {
+    const diasInt = Number(dias || 0);
+    const appliedDailyRaw = valorDiario * 0.6667;
+    const smldv = config.salarioMinimo / 30;
+    const normalized = normalizeIncapacitySubtype(subtipo);
+
+    const total = await calculateIncapacityWithPolicy(
+      salarioBase, 
+      diasInt, 
+      subtipo, 
+      policy,
+      config.salarioMinimo
+    );
+
+    valor = total;
+    factorCalculo = normalized === 'laboral' 
+      ? Math.round(valorDiario) 
+      : Math.round(Math.max(appliedDailyRaw, smldv));
+
+    detalleCalculo = normalized === 'laboral'
+      ? `Incapacidad laboral (ARL): ${diasInt} días × $${Math.round(valorDiario).toLocaleString()} = $${valor.toLocaleString()}`
+      : policy.incapacity_policy === 'from_day1_66_with_floor'
+        ? `Incapacidad general (política día 1 con piso): ${diasInt} días × máx(66.67% diario=$${Math.round(appliedDailyRaw).toLocaleString()}, SMLDV=$${Math.round(smldv).toLocaleString()}) = $${valor.toLocaleString()}`
+        : diasInt <= 2
+          ? `Incapacidad general estándar: ${diasInt} días × $${Math.round(valorDiario).toLocaleString()} = $${valor.toLocaleString()}`
+          : (() => {
+              const remaining = diasInt - 2;
+              const appliedDaily = Math.max(appliedDailyRaw, smldv);
+              const first2 = Math.round(valorDiario * 2);
+              const rest = Math.round(appliedDaily * remaining);
+              return `Incapacidad general estándar: 2d×$${Math.round(valorDiario).toLocaleString()} + ${remaining}d×máx(66.67% diario=$${Math.round(appliedDailyRaw).toLocaleString()}, SMLDV=$${Math.round(smldv).toLocaleString()}) = $${(first2 + rest).toLocaleString()}`
+            })();
+
+  } else if (tipoNovedad === 'horas_extra' || tipoNovedad === 'recargo_nocturno') {
+    const horasNum = Number(horas || 0);
+    let recargo = 0.25; // diurnas
+
+    if (subtipo === 'nocturnas') recargo = 0.75;
+    else if (subtipo === 'dominicales' || subtipo === 'festivas') recargo = 0.75;
+
+    valor = Math.round(valorHora * horasNum * (1 + recargo));
+    factorCalculo = 1 + recargo;
+    detalleCalculo = `Horas ${subtipo || 'diurnas'}: ${horasNum} h × $${Math.round(valorHora).toLocaleString()} × ${(1 + recargo)} = $${valor.toLocaleString()}`;
+
+  } else if (tipoNovedad === 'vacaciones' || tipoNovedad === 'licencia_remunerada') {
+    const diasNum = Number(dias || 0);
+    valor = Math.round(valorDiario * diasNum);
+    factorCalculo = Math.round(valorDiario);
+    detalleCalculo = `${tipoNovedad}: ${diasNum} días × $${Math.round(valorDiario).toLocaleString()} = $${valor.toLocaleString()}`;
+
+  } else if (tipoNovedad === 'ausencia' || tipoNovedad === 'licencia_no_remunerada') {
+    const diasNum = Number(dias || 0);
+    valor = -Math.round(valorDiario * diasNum);
+    factorCalculo = Math.round(valorDiario);
+    detalleCalculo = `${tipoNovedad}: ${diasNum} días × $${Math.round(valorDiario).toLocaleString()} = $${valor.toLocaleString()}`;
+
+  } else {
+    // Fallback: valor manual o 0
+    valor = 0;
+    factorCalculo = 0;
+    detalleCalculo = `Sin cálculo automático para tipo: ${tipoNovedad}`;
+  }
+
+  const result = {
+    valor,
+    factorCalculo,
+    detalleCalculo,
+    jornadaInfo: {
+      horasSemanales,
+      horasMensuales,
+      divisorHorario: horasPorDia,
+      valorHoraOrdinaria: Math.round(valorHora),
+      ley: 'Código Sustantivo del Trabajo',
+      descripcion: 'Cálculo basado en salario mensual con divisor horario estándar'
+    }
+  };
+
+  console.log('✅ calculateSingleNovedad result:', result);
   return result;
 }
 
