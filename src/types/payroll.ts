@@ -1,4 +1,3 @@
-
 // Import for Novedad type - using a more flexible approach
 export interface Novedad {
   id?: string;
@@ -102,3 +101,16 @@ export interface PayrollCalculationResult {
   incapacityValue: number;
   legalBasis?: string;
 }
+
+// ✅ Add LiquidationStep type
+export type LiquidationStep = 
+  | 'idle'
+  | 'initializing'
+  | 'loading_employees' 
+  | 'validating_period'
+  | 'calculating_payroll'
+  | 'processing_payments'
+  | 'generating_reports'
+  | 'finalizing'
+  | 'completed'
+  | 'error';

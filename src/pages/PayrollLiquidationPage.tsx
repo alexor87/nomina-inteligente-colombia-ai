@@ -179,7 +179,7 @@ export const PayrollLiquidationPage: React.FC = () => {
         {/* Employee Table */}
         {employees && employees.length > 0 ? (
           <PayrollLiquidationSimpleTable
-            employees={employees}
+            employees={employees as any}
             startDate={startDate ? format(startDate, 'yyyy-MM-dd') : ''}
             endDate={endDate ? format(endDate, 'yyyy-MM-dd') : ''}
             currentPeriodId={currentPeriodId}

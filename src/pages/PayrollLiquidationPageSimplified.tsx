@@ -43,7 +43,6 @@ const PayrollLiquidationPageSimplified = () => {
   const { companyId } = useCurrentCompany();
   const { selectedYear } = useYear();
   
-  // ✅ USAR HOOK SIMPLIFICADO
   const {
     employees,
     isLoading,
@@ -76,14 +75,14 @@ const PayrollLiquidationPageSimplified = () => {
     isValidating,
     performExhaustiveValidation,
     autoRepairValidationIssues
-  } = usePayrollLiquidationSimplified(companyId || '');
+  } = usePayrollLiquidationSimplified();
 
   const {
     selectedPeriod,
     handlePeriodSelect,
     resetSelection,
     markCurrentPeriodAsLiquidated
-  } = useSimplePeriodSelection(companyId || '');
+  } = useSimplePeriodSelection();
 
   // Helper: sumar directamente desde payrolls por periodId, con pequeño retry para evitar carrera
   const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
@@ -145,12 +144,12 @@ const PayrollLiquidationPageSimplified = () => {
     setPeriodSelected(true);
     
     // Cargar empleados con el método simplificado
-    const loadedPeriodId: string | undefined = await loadEmployees(period.startDate, period.endDate);
+    const loadedPeriodId: string = await loadEmployees(period.startDate, period.endDate);
     
     // Ejecutar validación automática si está habilitada
     if (useExhaustiveValidation && loadedPeriodId) {
       console.log('🔍 Ejecutando validación automática...');
-      await performExhaustiveValidation(loadedPeriodId);
+      await performExhaustiveValidation();
     }
   };
 
