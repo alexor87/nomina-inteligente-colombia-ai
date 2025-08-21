@@ -270,7 +270,6 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
             open={showNovedadModal}
             onClose={() => setShowNovedadModal(false)}
             employeeId={selectedEmployee.id}
-            employeeName={selectedEmployee.name}
             periodId={currentPeriodId}
             startDate={startDate}
             endDate={endDate}
