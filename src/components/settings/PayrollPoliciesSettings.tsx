@@ -4,9 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { AlertTriangle, Shield } from 'lucide-react';
-import { NovedadPolicyManager } from '@/components/settings/NovedadPolicyManager';
-import { IncapacityPolicyTester } from '@/components/settings/IncapacityPolicyTester';
-import { useCurrentCompany } from '@/hooks/useCurrentCompany';
 
 interface PayrollPoliciesSettingsProps {
   incapacityPolicy: 'standard_2d_100_rest_66' | 'from_day1_66_with_floor';
@@ -17,15 +14,13 @@ export const PayrollPoliciesSettings: React.FC<PayrollPoliciesSettingsProps> = (
   incapacityPolicy,
   onIncapacityPolicyChange
 }) => {
-  const { companyId } = useCurrentCompany();
-
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Shield className="h-5 w-5" />
-            Políticas de Cálculo de Incapacidades
+            Políticas de Nómina de la Empresa
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -40,20 +35,10 @@ export const PayrollPoliciesSettings: React.FC<PayrollPoliciesSettingsProps> = (
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="standard_2d_100_rest_66">
-                  <div className="flex flex-col">
-                    <span className="font-medium">Estándar (Ley 1562/2012)</span>
-                    <span className="text-sm text-gray-500">
-                      Primeros 2 días: 100% empleador, resto: 66.67% EPS
-                    </span>
-                  </div>
+                  Estándar primeros dos días al 100% y el resto al 66.67%
                 </SelectItem>
                 <SelectItem value="from_day1_66_with_floor">
-                  <div className="flex flex-col">
-                    <span className="font-medium">Modificado con Piso</span>
-                    <span className="text-sm text-gray-500">
-                      Desde día 1: 66.67% EPS con piso SMLDV
-                    </span>
-                  </div>
+                  Al 66.67% desde el día 1
                 </SelectItem>
               </SelectContent>
             </Select>
@@ -65,46 +50,13 @@ export const PayrollPoliciesSettings: React.FC<PayrollPoliciesSettingsProps> = (
               <div className="text-sm text-amber-800">
                 <p className="font-medium">Importante:</p>
                 <p>
-                  La política seleccionada afectará todos los nuevos cálculos de incapacidades. 
-                  Las incapacidades ya procesadas mantendrán su valor original.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <h4 className="font-medium">Explicación de las Políticas:</h4>
-            <div className="grid gap-3">
-              <div className="p-3 border rounded-lg">
-                <h5 className="font-medium text-sm">Política Estándar (Ley 1562/2012)</h5>
-                <p className="text-sm text-gray-600 mt-1">
-                  Los primeros 2 días de incapacidad están a cargo del empleador (100% del salario).
-                  A partir del día 3, la EPS paga el 66.67% del IBC.
-                </p>
-              </div>
-              <div className="p-3 border rounded-lg">
-                <h5 className="font-medium text-sm">Política con Piso SMLDV</h5>
-                <p className="text-sm text-gray-600 mt-1">
-                  Desde el primer día, la EPS paga el 66.67% del IBC, pero garantizando
-                  un mínimo equivalente al Salario Mínimo Legal Diario Vigente.
+                  La política seleccionada afectará todos los nuevos cálculos de incapacidades.
                 </p>
               </div>
             </div>
           </div>
         </CardContent>
       </Card>
-
-      {/* Policy Management Component */}
-      {companyId && (
-        <NovedadPolicyManager
-          incapacityPolicy={incapacityPolicy}
-          onIncapacityPolicyChange={onIncapacityPolicyChange}
-          companyId={companyId}
-        />
-      )}
-
-      {/* Policy Testing Component */}
-      <IncapacityPolicyTester currentPolicy={incapacityPolicy} />
     </div>
   );
 };
