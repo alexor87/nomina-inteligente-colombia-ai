@@ -358,13 +358,24 @@ async function calculateNovedadesTotals(supabase: any, data: any) {
       // Calcular horas extra según subtipo
       const horasNum = Number(horas || 0);
       if (horasNum > 0) {
-        let recargo = 0.25; // Diurnas por defecto
-        
-        if (subtipo === 'nocturnas') recargo = 0.75;
-        else if (subtipo === 'dominicales') recargo = 0.75;
-        else if (subtipo === 'festivas') recargo = 0.75;
-        
-        valorCalculado = Math.round(valorHora * horasNum * (1 + recargo));
+        const s = String(subtipo || '').toLowerCase().trim();
+
+        // ✅ CORRECCIÓN: diurnas sin recargo (0%), mantener el resto
+        let recargo = 0; // diurnas = 0
+        if (s === 'nocturnas') recargo = 0.75;
+        else if (s === 'dominicales' || s === 'festivas') recargo = 0.75;
+
+        const factor = 1 + recargo;
+        valorCalculado = Math.round(valorHora * horasNum * factor);
+
+        console.log('🛠️ Horas extra calculadas:', {
+          subtipo,
+          horasNum,
+          valorHora: Math.round(valorHora),
+          recargo,
+          factor,
+          valorCalculado
+        });
       }
     }
 
@@ -456,14 +467,26 @@ async function calculateSingleNovedad(supabase: any, data: any) {
 
   } else if (tipoNovedad === 'horas_extra' || tipoNovedad === 'recargo_nocturno') {
     const horasNum = Number(horas || 0);
-    let recargo = 0.25; // diurnas
+    const s = String(subtipo || '').toLowerCase().trim();
 
-    if (subtipo === 'nocturnas') recargo = 0.75;
-    else if (subtipo === 'dominicales' || subtipo === 'festivas') recargo = 0.75;
+    // ✅ CORRECCIÓN: diurnas sin recargo (0%), mantener el resto
+    let recargo = 0; // diurnas = 0
+    if (s === 'nocturnas') recargo = 0.75;
+    else if (s === 'dominicales' || s === 'festivas') recargo = 0.75;
 
-    valor = Math.round(valorHora * horasNum * (1 + recargo));
-    factorCalculo = 1 + recargo;
-    detalleCalculo = `Horas ${subtipo || 'diurnas'}: ${horasNum} h × $${Math.round(valorHora).toLocaleString()} × ${(1 + recargo)} = $${valor.toLocaleString()}`;
+    const factor = 1 + recargo;
+    valor = Math.round(valorHora * horasNum * factor);
+    factorCalculo = factor;
+    detalleCalculo = `Horas ${subtipo || 'diurnas'}: ${horasNum} h × $${Math.round(valorHora).toLocaleString()} × ${factor} = $${valor.toLocaleString()}`;
+
+    console.log('🛠️ calculateSingleNovedad horas extra:', {
+      subtipo,
+      horasNum,
+      valorHora: Math.round(valorHora),
+      recargo,
+      factor,
+      valor
+    });
 
   } else if (tipoNovedad === 'vacaciones' || tipoNovedad === 'licencia_remunerada') {
     const diasNum = Number(dias || 0);
