@@ -1,74 +1,9 @@
+
 import { Employee } from '@/types';
 
-export interface EmployeeWithStatus {
-  // Core identification
-  id: string;
-  company_id: string;
-  cedula: string;
-  tipoDocumento?: string;
-  
-  // Personal information
-  nombre: string;
-  segundoNombre?: string;
-  apellido: string;
-  email?: string;
-  telefono?: string;
-  avatar?: string;
-  sexo?: string;
-  fechaNacimiento?: string;
-  direccion?: string;
-  ciudad?: string;
-  departamento?: string;
-  
-  // Employment information
-  cargo?: string;
-  salarioBase: number;
-  tipoContrato: string;
-  fechaIngreso: string;
-  estado: string;
-  periodicidadPago?: string;
-  codigoCIIU?: string;
-  centroCostos?: string;
-  centrosocial?: string;
-  
-  // Contract details
-  fechaFirmaContrato?: string;
-  fechaFinalizacionContrato?: string;
-  contratoVencimiento?: string;
-  tipoJornada?: string;
-  diasTrabajo?: number;
-  horasTrabajo?: number;
-  beneficiosExtralegales?: boolean;
-  clausulasEspeciales?: string;
-  
-  // Affiliations
-  eps?: string;
-  afp?: string;
-  arl?: string;
-  cajaCompensacion?: string;
-  estadoAfiliacion: string;
-  nivelRiesgoARL?: string;
-  regimenSalud?: string;
-  
-  // Banking information
-  banco?: string;
-  tipoCuenta?: string;
-  numeroCuenta?: string;
-  titularCuenta?: string;
-  formaPago?: string;
-  
-  // Types de cotizante
-  tipoCotizanteId?: string;
-  subtipoCotizanteId?: string;
-  
-  // Audit fields
-  empresaId?: string;
-  createdAt?: string;
-  updatedAt?: string;
-  ultimaLiquidacion?: string;
-  
-  // Custom fields
-  custom_fields?: Record<string, any>;
+export interface EmployeeWithStatus extends Employee {
+  // All properties are inherited from Employee
+  // This ensures compatibility with existing code
 }
 
 export interface EmployeeComplianceIndicators {

@@ -1,3 +1,4 @@
+
 export interface EmployeeUnified {
   id: string;
   company_id?: string;
@@ -21,11 +22,11 @@ export interface EmployeeUnified {
   salarioBase: number;
   tipoContrato: 'indefinido' | 'fijo' | 'obra' | 'aprendizaje';
   fechaIngreso: string;
-  periodicidadPago?: 'mensual' | 'quincenal';
+  periodicidadPago: 'mensual' | 'quincenal';
   cargo?: string;
   codigoCIIU?: string;
   nivelRiesgoARL?: 'I' | 'II' | 'III' | 'IV' | 'V';
-  estado: 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad' | 'eliminado';
+  estado: 'activo' | 'inactivo' | 'vacaciones' | 'incapacidad' | 'eliminado'; // ✅ ADDED eliminado
   centroCostos?: string;
   fechaFirmaContrato?: string;
   fechaFinalizacionContrato?: string;
@@ -51,19 +52,6 @@ export interface EmployeeUnified {
   subtipoCotizanteId?: string;
   regimenSalud?: 'contributivo' | 'subsidiado';
   estadoAfiliacion?: 'completa' | 'pendiente' | 'inconsistente';
-  
-  // Payroll calculation properties (added for compatibility)
-  name?: string;
-  position?: string;
-  baseSalary?: number;
-  workedDays?: number;
-  totalEarnings?: number;
-  totalDeductions?: number;
-  netPay?: number;
-  transportAllowance?: number;
-  healthDeduction?: number;
-  pensionDeduction?: number;
-  status?: 'valid' | 'error';
   
   // Custom fields
   custom_fields?: Record<string, any>;

@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -223,16 +224,19 @@ async function calculatePayroll(supabase: any, data: any) {
     novedades = []
   } = data;
 
-  // ✅ CORRECCIÓN LEGAL: Calcular días efectivos trabajados y auxilio proporcional
-  let effectiveWorkedDays = workedDays;
-  let totalIncapacityDays = 0;
-  let totalIncapacityValue = 0;
-  let totalConstitutiveNovedades = 0;
+  const dailySalary = baseSalary / 30;
+  const regularPay = (dailySalary * workedDays) - absences;
+  let extraPay = bonuses; // Legacy field compatibility
+
+  // ✅ PROCESAR NOVEDADES CON POLÍTICAS
+  console.log('📋 Processing novedades:', novedades.length);
   
-  // Procesar incapacidades para calcular días efectivos
+  let totalIncapacityValue = 0;
+  let totalIncapacityDays = 0;
+  let totalConstitutiveNovedades = 0;
+
   for (const novedad of novedades) {
     if (novedad.tipo_novedad === 'incapacidad') {
-      totalIncapacityDays += novedad.dias || 0;
       const incapacityValue = await calculateIncapacityWithPolicy(
         baseSalary, 
         novedad.dias || 0, 
@@ -241,60 +245,19 @@ async function calculatePayroll(supabase: any, data: any) {
         config.salarioMinimo
       );
       totalIncapacityValue += incapacityValue;
+      totalIncapacityDays += novedad.dias || 0;
     } else if (novedad.constitutivo_salario) {
+      // Other constitutive novedades
       totalConstitutiveNovedades += novedad.valor || 0;
     }
+    
+    // Add to extraPay for gross calculation
+    extraPay += novedad.valor || 0;
   }
 
-  // ✅ DÍAS EFECTIVOS: Restar días de incapacidad de días trabajados
-  effectiveWorkedDays = Math.max(0, workedDays - totalIncapacityDays);
-  
-  console.log('⚖️ CÁLCULO LEGAL - Días efectivos:', {
-    diasTrabajados: workedDays,
-    diasIncapacidad: totalIncapacityDays,
-    diasEfectivos: effectiveWorkedDays,
-    valorIncapacidad: totalIncapacityValue
-  });
+  const grossPay = regularPay + extraPay;
 
-  // ✅ SALARIO ORDINARIO: Solo por días efectivos trabajados
-  const dailySalary = baseSalary / 30;
-  const ordinarySalary = dailySalary * effectiveWorkedDays;
-  
-  // ✅ AUXILIO DE TRANSPORTE CORREGIDO: Proporcional a días efectivos Y límite 2 SMMLV
-  const transportLimit = getTransportAssistanceLimit(year);
-  const isEligibleForTransport = baseSalary <= transportLimit;
-  let transportAllowance = 0;
-  
-  if (isEligibleForTransport) {
-    // Auxilio proporcional a días efectivos trabajados (NO incluye incapacidades)
-    if (periodType === 'quincenal') {
-      transportAllowance = (config.auxilioTransporte / 30) * effectiveWorkedDays;
-    } else {
-      transportAllowance = (config.auxilioTransporte / 30) * effectiveWorkedDays;
-    }
-  }
-
-  console.log('🚌 AUXILIO TRANSPORTE LEGAL:', {
-    salarioBase: baseSalary,
-    limite2SMMLV: transportLimit,
-    esElegible: isEligibleForTransport,
-    diasEfectivos: effectiveWorkedDays,
-    auxilioCalculado: Math.round(transportAllowance),
-    base: `${config.auxilioTransporte}/30 * ${effectiveWorkedDays} días`
-  });
-
-  // Calcular otros conceptos
-  let extraPay = bonuses;
-  for (const novedad of novedades) {
-    if (novedad.tipo_novedad !== 'incapacidad') {
-      extraPay += novedad.valor || 0;
-    }
-  }
-
-  // ✅ TOTAL DEVENGADO LEGAL: Salario ordinario + Incapacidades + Extras + Auxilio
-  const grossPay = ordinarySalary + totalIncapacityValue + extraPay + transportAllowance;
-
-  // ✅ IBC CORRECTO según tipo de período
+  // ✅ IBC AUTOMÁTICO: Incapacidad vs Proporcional
   let ibcSalud: number;
   let ibcMode: string;
 
@@ -302,20 +265,24 @@ async function calculatePayroll(supabase: any, data: any) {
     // Con incapacidades: IBC = valor total de incapacidades
     ibcSalud = totalIncapacityValue;
     ibcMode = 'incapacity';
-    console.log('🧮 IBC LEGAL (incapacidad):', { totalIncapacityValue, totalIncapacityDays });
+    console.log('🧮 IBC automático (incapacidad):', { totalIncapacityValue, totalIncapacityDays });
   } else {
-    // Sin incapacidades: IBC proporcional a días efectivos
+    // Sin incapacidades: IBC proporcional
+    const effectiveWorkedDays = Math.min(workedDays, 30);
     ibcSalud = Math.round((baseSalary / 30) * effectiveWorkedDays + totalConstitutiveNovedades);
     ibcMode = 'proportional';
-    console.log('🧮 IBC LEGAL (proporcional):', { ibcSalud, effectiveWorkedDays });
+    console.log('🧮 IBC automático (proporcional):', { ibcSalud, effectiveWorkedDays });
   }
 
   const healthDeduction = Math.round(ibcSalud * 0.04);
   const pensionDeduction = Math.round(ibcSalud * 0.04);
   const totalDeductions = healthDeduction + pensionDeduction;
 
-  // ✅ NETO LEGAL: Devengado - Deducciones (auxilio YA incluido en devengado)
-  const netPay = grossPay - totalDeductions;
+  // ✅ AUXILIO DE TRANSPORTE CORREGIDO: Solo si salario ≤ 2 SMMLV
+  const transportLimit = getTransportAssistanceLimit(year);
+  const transportAllowance = baseSalary <= transportLimit ? config.auxilioTransporte : 0;
+
+  const netPay = grossPay - totalDeductions + transportAllowance;
 
   // Employer contributions (not affected by IBC mode)
   const employerHealth = Math.round(ibcSalud * 0.085);
@@ -329,9 +296,9 @@ async function calculatePayroll(supabase: any, data: any) {
                                employerCaja + employerIcbf + employerSena;
 
   const result = {
-    regularPay: Math.round(ordinarySalary),
-    extraPay: Math.round(extraPay + totalIncapacityValue), // Incluye incapacidades en extra
-    transportAllowance: Math.round(transportAllowance),
+    regularPay: Math.round(regularPay),
+    extraPay: Math.round(extraPay),
+    transportAllowance,
     grossPay: Math.round(grossPay),
     healthDeduction,
     pensionDeduction,
@@ -345,30 +312,18 @@ async function calculatePayroll(supabase: any, data: any) {
     employerSena,
     employerContributions,
     totalPayrollCost: Math.round(netPay + employerContributions),
-    ibc: ibcSalud,
-    // ✅ NUEVOS CAMPOS PARA AUDITORÍA LEGAL
-    effectiveWorkedDays,
-    incapacityDays: totalIncapacityDays,
-    incapacityValue: totalIncapacityValue,
-    legalBasis: {
-      transportEligible: isEligibleForTransport,
-      transportLimit,
-      ibcMode,
-      salarySubstitution: totalIncapacityDays > 0 ? 'CST Art. 227 - Sustitución salarial' : null
-    }
+    // ✅ IBC UNIFICADO
+    ibc: ibcSalud
   };
 
-  console.log('✅ CÁLCULO LEGAL COMPLETADO:', {
+  console.log('✅ Calculation (automatic IBC) result:', {
     policy,
-    diasEfectivos: effectiveWorkedDays,
-    diasIncapacidad: totalIncapacityDays,
-    salarioOrdinario: Math.round(ordinarySalary),
-    valorIncapacidad: totalIncapacityValue,
-    auxilioTransporte: Math.round(transportAllowance),
-    totalDevengado: Math.round(grossPay),
-    totalDeducciones: totalDeductions,
-    netoLegal: Math.round(netPay),
-    baseJuridica: result.legalBasis
+    totalIncapacityDays,
+    totalIncapacityValue,
+    ibcMode,
+    ibcSalud,
+    healthDeduction,
+    pensionDeduction
   });
 
   return result;

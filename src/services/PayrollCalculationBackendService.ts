@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { NovedadForIBC } from '@/types/payroll';
 import { ConfigurationService } from './ConfigurationService';
@@ -33,12 +34,8 @@ export interface PayrollCalculationResult {
   employerSena: number;
   employerContributions: number;
   totalPayrollCost: number;
+  // ✅ NUEVO CAMPO: IBC calculado incluyendo novedades constitutivas
   ibc: number;
-  // ✅ NEW: Legal compliance fields
-  effectiveWorkedDays: number;
-  incapacityDays: number;
-  incapacityValue: number;
-  legalBasis?: string;
 }
 
 export interface ValidationResult {

@@ -1,4 +1,5 @@
-import { PayrollEmployee, BaseEmployeeData, PayrollSummary, Novedad } from '@/types/payroll';
+
+import { PayrollEmployee, BaseEmployeeData, PayrollSummary } from '@/types/payroll';
 
 export const calculateEmployee = async (
   baseEmployee: BaseEmployeeData, 
@@ -19,15 +20,10 @@ export const calculateEmployee = async (
     netPay: salarioNeto,
     transportAllowance: 0,
     employerContributions: salarioBruto * 0.205, // Aproximado
-    ibc: salarioBruto,
     status: 'valid' as const,
     errors: [],
     healthDeduction: salarioBruto * 0.04,
-    pensionDeduction: salarioBruto * 0.04,
-    effectiveWorkedDays: diasTrabajados,
-    incapacityDays: 0,
-    incapacityValue: 0,
-    legalBasis: 'Cálculo estándar'
+    pensionDeduction: salarioBruto * 0.04
   };
 };
 

@@ -2,20 +2,14 @@
 import React from 'react';
 import { Calendar, Users, DollarSign } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { PeriodStatus, PeriodStatusInfo } from '@/types/payroll';
+import { PeriodStatus } from '@/types/payroll';
 
 interface PeriodInfoProps {
   periodStatus: PeriodStatus | null;
 }
 
-const isPeriodStatusInfo = (status: PeriodStatus): status is PeriodStatusInfo => {
-  return typeof status === 'object' && status !== null && 'status' in status;
-};
-
 export const PeriodInfo: React.FC<PeriodInfoProps> = ({ periodStatus }) => {
-  const statusInfo = periodStatus && isPeriodStatusInfo(periodStatus) ? periodStatus : null;
-  
-  if (!statusInfo?.currentPeriod && !statusInfo?.nextPeriod) {
+  if (!periodStatus?.currentPeriod && !periodStatus?.nextPeriod) {
     return (
       <Card className="border-dashed">
         <CardContent className="p-4 text-center text-gray-500">
@@ -26,8 +20,8 @@ export const PeriodInfo: React.FC<PeriodInfoProps> = ({ periodStatus }) => {
     );
   }
 
-  const period = statusInfo.currentPeriod || statusInfo.nextPeriod;
-  const isExisting = !!statusInfo.currentPeriod;
+  const period = periodStatus.currentPeriod || periodStatus.nextPeriod;
+  const isExisting = !!periodStatus.currentPeriod;
 
   return (
     <Card className={isExisting ? "border-green-200 bg-green-50" : "border-blue-200 bg-blue-50"}>
@@ -36,11 +30,11 @@ export const PeriodInfo: React.FC<PeriodInfoProps> = ({ periodStatus }) => {
           <div className="flex items-center space-x-2">
             <Calendar className="h-4 w-4 text-gray-600" />
             <span className="font-medium">
-              {period?.periodo || period?.periodName}
+              {period.periodo || period.periodName}
             </span>
           </div>
           
-          {(period?.fecha_inicio || period?.startDate) && (
+          {(period.fecha_inicio || period.startDate) && (
             <div className="flex items-center space-x-2 text-sm text-gray-600">
               <span>Fechas:</span>
               <span>
@@ -49,14 +43,14 @@ export const PeriodInfo: React.FC<PeriodInfoProps> = ({ periodStatus }) => {
             </div>
           )}
           
-          {period?.empleados_count && (
+          {period.empleados_count && (
             <div className="flex items-center space-x-2 text-sm text-gray-600">
               <Users className="h-4 w-4" />
               <span>{period.empleados_count} empleados</span>
             </div>
           )}
           
-          {period?.total_neto && (
+          {period.total_neto && (
             <div className="flex items-center space-x-2 text-sm text-gray-600">
               <DollarSign className="h-4 w-4" />
               <span>Total: ${period.total_neto.toLocaleString()}</span>

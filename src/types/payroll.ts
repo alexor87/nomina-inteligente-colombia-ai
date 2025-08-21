@@ -1,14 +1,33 @@
-// Import for Novedad type - using a more flexible approach
-export interface Novedad {
-  id?: string;
-  tipo_novedad: string;
+export interface PayrollPeriod {
+  id: string;
+  company_id: string;
+  fecha_inicio: string;
+  fecha_fin: string;
+  estado: 'borrador' | 'en_proceso' | 'cerrado' | 'aprobado';
+  tipo_periodo: 'quincenal' | 'mensual' | 'semanal' | 'personalizado';
+  periodo: string;
+  empleados_count: number;
+  total_devengado: number;
+  total_deducciones: number;
+  total_neto: number;
+  created_at: string;
+  updated_at: string;
+  modificado_por?: string;
+  modificado_en?: string;
+  numero_periodo_anual?: number;
+}
+
+// ✅ Ampliamos el tipo para soportar cálculo correcto de incapacidades en backend
+export interface NovedadForIBC {
   valor: number;
-  constitutivo_salario?: boolean;
+  constitutivo_salario: boolean;
+  tipo_novedad: string;
+  // Campos adicionales para incapacidades y otras novedades que requieren detalle
   dias?: number;
   subtipo?: string;
 }
 
-export interface BaseEmployeeData {
+export interface PayrollEmployee {
   id: string;
   name: string;
   position: string;
@@ -18,75 +37,24 @@ export interface BaseEmployeeData {
   disabilities: number;
   bonuses: number;
   absences: number;
-  eps: string;
-  afp: string;
-  novedades?: Novedad[];
-}
-
-export interface PayrollEmployee extends BaseEmployeeData {
-  // Make name required as per BaseEmployeeData
-  name: string;
   grossPay: number;
   deductions: number;
   netPay: number;
+  status: 'valid' | 'error' | 'incomplete';
+  errors: string[];
+  eps?: string;
+  afp?: string;
   transportAllowance: number;
   employerContributions: number;
-  ibc: number;
-  status: 'valid' | 'error';
-  errors: string[];
+  // ✅ NUEVO CAMPO: IBC calculado incluyendo novedades
+  ibc?: number;
+  // ✅ NUEVO CAMPO: novedades para cálculo de IBC
+  novedades?: NovedadForIBC[];
+  // ✅ NUEVOS CAMPOS: Deducciones separadas para persistencia correcta
   healthDeduction: number;
   pensionDeduction: number;
-  effectiveWorkedDays: number;
-  incapacityDays: number;
-  incapacityValue: number;
-  legalBasis?: string;
+  // ✅ NUEVO CAMPO: Cédula del empleado
   cedula?: string;
-  // Added missing properties to match usage
-  totalEarnings?: number;
-  totalDeductions?: number;
-  estado?: string;
-  
-  // Add EmployeeUnified compatibility properties
-  empresaId: string;
-  tipoDocumento: 'CC' | 'TI' | 'CE' | 'PA' | 'RC' | 'NIT' | 'PEP' | 'PPT';
-  nombre: string;
-  apellido: string;
-  salarioBase: number;
-  fechaIngreso: string;
-  periodicidadPago: 'mensual' | 'quincenal';
-  tipoContrato: 'indefinido' | 'fijo' | 'obra' | 'aprendizaje';
-  tipoJornada: 'completa' | 'parcial' | 'horas';
-  email?: string;
-  telefono?: string;
-  sexo?: 'M' | 'F';
-  fechaNacimiento?: string;
-  direccion?: string;
-  ciudad?: string;
-  departamento?: string;
-  cargo?: string;
-  codigoCIIU?: string;
-  nivelRiesgoARL?: 'I' | 'II' | 'III' | 'IV' | 'V';
-  centroCostos?: string;
-  fechaFirmaContrato?: string;
-  fechaFinalizacionContrato?: string;
-  diasTrabajo?: number;
-  horasTrabajo?: number;
-  beneficiosExtralegales?: boolean;
-  clausulasEspeciales?: string;
-  banco?: string;
-  tipoCuenta?: 'ahorros' | 'corriente';
-  numeroCuenta?: string;
-  titularCuenta?: string;
-  formaPago?: 'dispersion' | 'manual';
-  arl?: string;
-  cajaCompensacion?: string;
-  tipoCotizanteId?: string;
-  subtipoCotizanteId?: string;
-  regimenSalud?: 'contributivo' | 'subsidiado';
-  estadoAfiliacion?: 'completa' | 'pendiente' | 'inconsistente';
-  custom_fields?: Record<string, any>;
-  createdAt?: string;
-  updatedAt?: string;
 }
 
 export interface PayrollSummary {
@@ -99,68 +67,62 @@ export interface PayrollSummary {
   totalPayrollCost: number;
 }
 
-export interface NovedadForIBC {
-  valor: number;
-  constitutivo_salario: boolean;
-  tipo_novedad: string;
-  dias?: number;
-  subtipo?: string;
+export interface BaseEmployeeData {
+  id: string;
+  name: string;
+  position: string;
+  baseSalary: number;
+  workedDays: number;
+  extraHours: number;
+  disabilities: number;
+  bonuses: number;
+  absences: number;
+  eps?: string;
+  afp?: string;
+  additionalDeductions?: number;
+  // ✅ NUEVO CAMPO: novedades para cálculo de IBC
+  novedades?: NovedadForIBC[];
 }
 
-export interface PayrollPeriod {
+// ✅ UNIFICACIÓN: Interfaces consolidadas para detección de períodos
+export interface PeriodStatus {
+  currentPeriod: any | null;
+  needsCreation: boolean;
+  canContinue: boolean;
+  message: string;
+  suggestion: string;
+  action?: 'create' | 'resume' | 'wait';
+  nextPeriod?: {
+    startDate: string;
+    endDate: string;
+    periodName: string;
+    type: 'semanal' | 'quincenal' | 'mensual';
+  };
+}
+
+export interface CompanySettings {
   id: string;
-  periodo: string;
+  company_id: string;
+  periodicity: 'mensual' | 'quincenal' | 'semanal' | 'personalizado';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DBPayrollPeriod {
+  id: string;
+  company_id: string;
   fecha_inicio: string;
   fecha_fin: string;
-  estado: 'borrador' | 'cerrado' | 'procesada' | 'pagada' | 'con_errores' | 'editado' | 'reabierto';
-  tipo_periodo: 'quincenal' | 'mensual' | 'semanal';
-  company_id: string;
-  created_at?: string;
-  updated_at?: string;
-  year?: number;
-  empleados_count?: number;
-  total_neto?: number;
-  periodName?: string;
-  startDate?: string;
-  endDate?: string;
+  estado: 'borrador' | 'en_proceso' | 'cerrado' | 'aprobado';
+  tipo_periodo: 'mensual' | 'quincenal' | 'semanal' | 'personalizado';
+  periodo: string;
+  empleados_count: number;
+  total_devengado: number;
+  total_deducciones: number;
+  total_neto: number;
+  modificado_por?: string;
+  modificado_en?: string;
+  created_at: string;
+  updated_at: string;
+  numero_periodo_anual?: number;
 }
-
-export interface PeriodStatusInfo {
-  status: 'borrador' | 'cerrado' | 'procesada' | 'pagada' | 'con_errores' | 'editado' | 'reabierto';
-  action?: 'resume' | 'create' | 'wait';
-  suggestion?: string;
-  message?: string;
-  currentPeriod?: PayrollPeriod;
-  nextPeriod?: PayrollPeriod;
-}
-
-export type PeriodStatus = 'borrador' | 'cerrado' | 'procesada' | 'pagada' | 'con_errores' | 'editado' | 'reabierto' | PeriodStatusInfo;
-
-export interface PayrollCalculationResult {
-  grossPay: number;
-  deductions: number;
-  netPay: number;
-  transportAllowance: number;
-  employerContributions: number;
-  healthDeduction: number;
-  pensionDeduction: number;
-  effectiveWorkedDays: number;
-  incapacityDays: number;
-  incapacityValue: number;
-  legalBasis?: string;
-}
-
-// ✅ Add LiquidationStep type
-export type LiquidationStep = 
-  | 'idle'
-  | 'initializing'
-  | 'loading_employees' 
-  | 'validating_period'
-  | 'calculating_payroll'
-  | 'processing_payments'
-  | 'generating_reports'
-  | 'finalizing'
-  | 'completed'
-  | 'error'
-  // Allow literal strings already used in UI without breaking types
-  | (string & {});

@@ -27,22 +27,13 @@ export const usePayrollCorrection = () => {
       console.log('📊 Período encontrado:', periodData.periodo);
 
       // Ejecutar corrección usando el servicio unificado
-      const updateResult = await EmployeeUnifiedService.updatePayrollRecords(periodId);
-      
-      if (!updateResult.success) {
-        throw new Error(updateResult.error || 'Error updating payroll records');
-      }
+      await EmployeeUnifiedService.updatePayrollRecords(periodId);
 
       // Obtener empleados corregidos para mostrar resumen
-      const employeesResult = await EmployeeUnifiedService.getEmployeesForPeriod(periodId);
+      const correctedEmployees = await EmployeeUnifiedService.getEmployeesForPeriod(periodId);
       
-      if (!employeesResult.success || !employeesResult.data) {
-        throw new Error(employeesResult.error || 'Error fetching corrected employees');
-      }
-
-      const correctedEmployees = employeesResult.data;
-      const employeesWithTransport = correctedEmployees.filter(emp => (emp.transportAllowance || 0) > 0);
-      const totalNetPay = correctedEmployees.reduce((sum, emp) => sum + (emp.netPay || 0), 0);
+      const employeesWithTransport = correctedEmployees.filter(emp => emp.transportAllowance > 0);
+      const totalNetPay = correctedEmployees.reduce((sum, emp) => sum + emp.netPay, 0);
 
       console.log('✅ Corrección completada:', {
         totalEmployees: correctedEmployees.length,
@@ -85,20 +76,14 @@ export const usePayrollCorrection = () => {
 
   const validatePayrollCalculations = useCallback(async (periodId: string) => {
     try {
-      const employeesResult = await EmployeeUnifiedService.getEmployeesForPeriod(periodId);
-      
-      if (!employeesResult.success || !employeesResult.data) {
-        throw new Error(employeesResult.error || 'Error fetching employees');
-      }
-
-      const employees = employeesResult.data;
+      const employees = await EmployeeUnifiedService.getEmployeesForPeriod(periodId);
       
       const validation = {
         totalEmployees: employees.length,
-        employeesWithErrors: employees.filter(emp => (emp.status || emp.estado) === 'error').length,
-        employeesWithTransport: employees.filter(emp => (emp.transportAllowance || 0) > 0).length,
-        totalNetPay: employees.reduce((sum, emp) => sum + (emp.netPay || 0), 0),
-        averageNetPay: employees.length > 0 ? employees.reduce((sum, emp) => sum + (emp.netPay || 0), 0) / employees.length : 0
+        employeesWithErrors: employees.filter(emp => emp.status === 'error').length,
+        employeesWithTransport: employees.filter(emp => emp.transportAllowance > 0).length,
+        totalNetPay: employees.reduce((sum, emp) => sum + emp.netPay, 0),
+        averageNetPay: employees.length > 0 ? employees.reduce((sum, emp) => sum + emp.netPay, 0) / employees.length : 0
       };
 
       return validation;

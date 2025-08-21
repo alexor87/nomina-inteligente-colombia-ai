@@ -2,7 +2,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Plus, RefreshCw, AlertTriangle, Settings } from 'lucide-react';
-import { PeriodStatus, PeriodStatusInfo } from '@/types/payroll';
+import { PeriodStatus } from '@/types/payroll';
 
 interface DialogActionsProps {
   periodStatus: PeriodStatus | null;
@@ -11,10 +11,6 @@ interface DialogActionsProps {
   onDiagnose?: () => Promise<void>;
   isProcessing: boolean;
 }
-
-const isPeriodStatusInfo = (status: PeriodStatus): status is PeriodStatusInfo => {
-  return typeof status === 'object' && status !== null && 'status' in status;
-};
 
 export const DialogActions: React.FC<DialogActionsProps> = ({
   periodStatus,
@@ -34,22 +30,20 @@ export const DialogActions: React.FC<DialogActionsProps> = ({
     );
   }
 
-  const statusInfo = isPeriodStatusInfo(periodStatus) ? periodStatus : null;
-
   return (
     <div className="flex items-center justify-center space-x-3">
-      {statusInfo?.action === 'create' && (
+      {periodStatus.action === 'create' && (
         <Button 
           onClick={onCreatePeriod}
           disabled={isProcessing}
           variant="default"
         >
           <Plus className="h-4 w-4 mr-2" />
-          {statusInfo.suggestion || 'Crear Período'}
+          {periodStatus.suggestion || 'Crear Período'}
         </Button>
       )}
       
-      {statusInfo?.action === 'wait' && onDiagnose && (
+      {periodStatus.action === 'wait' && onDiagnose && (
         <Button 
           onClick={onDiagnose}
           disabled={isProcessing}

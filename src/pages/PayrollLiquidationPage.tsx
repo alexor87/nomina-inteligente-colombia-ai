@@ -1,27 +1,33 @@
-import React, { useState, useCallback } from 'react';
+
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { PayrollLiquidationSimpleTable } from '@/components/payroll/liquidation/PayrollLiquidationSimpleTable';
-import { EmployeeSelectionModal } from '@/components/payroll/modals/EmployeeSelectionModal';
-import { SuccessModal } from '@/components/payroll/modals/SuccessModal';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Calculator, Users, Loader2, Settings, Bug } from 'lucide-react';
+import { PayrollLiquidationTable } from '@/components/payroll/liquidation/PayrollLiquidationTable';
+import { SimplePeriodSelector } from '@/components/payroll/SimplePeriodSelector';
+import { AutoSaveIndicator } from '@/components/payroll/AutoSaveIndicator';
+import { PayrollDiagnosticPanel } from '@/components/payroll/diagnostic/PayrollDiagnosticPanel';
 import { usePayrollLiquidation } from '@/hooks/usePayrollLiquidation';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { cn } from "@/lib/utils"
-import { format } from 'date-fns';
-import { CalendarIcon } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { useSimplePeriodSelection } from '@/hooks/useSimplePeriodSelection';
+import { EmployeeAddModal } from '@/components/payroll/modals/EmployeeAddModal';
+import { useCurrentCompany } from '@/hooks/useCurrentCompany';
+import { PayrollCleanupService } from '@/services/PayrollCleanupService';
+import { PeriodCleanupDialog } from '@/components/payroll/PeriodCleanupDialog';
+import { PayrollSuccessModal } from '@/components/payroll/modals/PayrollSuccessModal';
+import { SelectablePeriod } from '@/services/payroll/SimplePeriodService';
+import { useNavigate } from 'react-router-dom';
 import { useYear } from '@/contexts/YearContext';
 
-export const PayrollLiquidationPage: React.FC = () => {
-  const [isEmployeeSelectionModalOpen, setIsEmployeeSelectionModalOpen] = useState(false);
-  const [date, setDate] = useState<Date | undefined>(new Date());
-  const [startDate, setStartDate] = useState<Date | undefined>();
-  const [endDate, setEndDate] = useState<Date | undefined>();
-  const { toast } = useToast();
+const PayrollLiquidationPage = () => {
+  const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false);
+  const [showCleanupDialog, setShowCleanupDialog] = useState(false);
+  const [periodSelected, setPeriodSelected] = useState(false);
+  
+  const { companyId } = useCurrentCompany();
+  const navigate = useNavigate();
   const { selectedYear } = useYear();
-
+  
   const {
     employees,
     isLoading,
@@ -32,191 +38,226 @@ export const PayrollLiquidationPage: React.FC = () => {
     removeEmployee,
     liquidatePayroll,
     refreshEmployeeNovedades,
+    isAutoSaving,
+    lastAutoSaveTime,
+    isRemovingEmployee,
+    // ✅ NUEVO: Estado del modal de éxito
     showSuccessModal,
     liquidationResult,
     closeSuccessModal
   } = usePayrollLiquidation();
 
-  const handleOpenEmployeeSelectionModal = () => {
-    setIsEmployeeSelectionModalOpen(true);
+  const {
+    selectedPeriod,
+    handlePeriodSelect,
+    resetSelection,
+    markCurrentPeriodAsLiquidated
+  } = useSimplePeriodSelection(companyId || '');
+
+  // Limpiar períodos abandonados al montar
+  useEffect(() => {
+    PayrollCleanupService.cleanupAbandonedPeriods();
+  }, []);
+
+  const handlePeriodSelection = async (period: SelectablePeriod) => {
+    console.log('🎯 Período seleccionado desde UI:', period.label);
+    handlePeriodSelect(period);
+    setPeriodSelected(true);
+    
+    // Cargar empleados automáticamente
+    await loadEmployees(period.startDate, period.endDate);
   };
 
-  const handleCloseEmployeeSelectionModal = () => {
-    setIsEmployeeSelectionModalOpen(false);
-  };
-
-  const handleAddSelectedEmployees = useCallback((employeeIds: string[]) => {
-    addEmployees(employeeIds);
-    handleCloseEmployeeSelectionModal();
-  }, [addEmployees]);
-
-  const handleRemoveEmployee = useCallback((employeeId: string) => {
-    removeEmployee(employeeId);
-  }, [removeEmployee]);
-
-  const handleDateChange = useCallback((newDate: Date | undefined) => {
-    setDate(newDate);
-  }, []);
-
-  const handleStartDateChange = useCallback((newDate: Date | undefined) => {
-    setStartDate(newDate);
-  }, []);
-
-  const handleEndDateChange = useCallback((newDate: Date | undefined) => {
-    setEndDate(newDate);
-  }, []);
-
-  const handleLoadEmployees = useCallback(async () => {
-    if (!startDate || !endDate) {
-      toast({
-        title: "Error",
-        description: "Por favor, selecciona un rango de fechas válido.",
-        variant: "destructive"
-      });
+  const handleLiquidate = async () => {
+    if (!selectedPeriod || employees.length === 0) {
       return;
     }
 
-    const formattedStartDate = format(startDate, 'yyyy-MM-dd');
-    const formattedEndDate = format(endDate, 'yyyy-MM-dd');
-
-    await loadEmployees(formattedStartDate, formattedEndDate, selectedYear);
-  }, [startDate, endDate, loadEmployees, toast, selectedYear]);
-
-  const handleLiquidatePayroll = useCallback(async () => {
-    if (!startDate || !endDate) {
-      toast({
-        title: "Error",
-        description: "Por favor, selecciona un rango de fechas válido.",
-        variant: "destructive"
-      });
-      return;
+    const confirmMessage = `¿Deseas cerrar este periodo de nómina y generar los comprobantes de pago?\n\nPeríodo: ${selectedPeriod.label}\nEmpleados: ${employees.length}`;
+    
+    if (window.confirm(confirmMessage)) {
+      await liquidatePayroll(selectedPeriod.startDate, selectedPeriod.endDate);
+      await markCurrentPeriodAsLiquidated();
     }
+  };
 
-    const formattedStartDate = format(startDate, 'yyyy-MM-dd');
-    const formattedEndDate = format(endDate, 'yyyy-MM-dd');
+  const handleAddEmployees = async (employeeIds: string[]) => {
+    try {
+      await addEmployees(employeeIds);
+      setShowAddEmployeeModal(false);
+    } catch (error) {
+      console.error('Error adding employees:', error);
+    }
+  };
 
-    await liquidatePayroll(formattedStartDate, formattedEndDate);
-  }, [startDate, endDate, liquidatePayroll, toast]);
+  const handleReset = () => {
+    resetSelection();
+    setPeriodSelected(false);
+  };
+
+  const handleSuccessModalClose = () => {
+    closeSuccessModal();
+    navigate('/app/dashboard');
+  };
 
   return (
-    <div className="container mx-auto py-10">
-      <h1 className="text-3xl font-bold mb-6">Liquidación de Nómina</h1>
-
-      {/* Date Range Picker */}
-      <div className="mb-6 flex items-center space-x-4">
-        <div>
-          <Label htmlFor="start-date">Fecha de Inicio</Label>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant={"outline"}
-                className={cn(
-                  "w-[240px] justify-start text-left font-normal",
-                  !startDate && "text-muted-foreground"
-                )}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {startDate ? format(startDate, "PPP") : <span>Seleccionar fecha</span>}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={startDate}
-                onSelect={handleStartDateChange}
-                disabled={(date) =>
-                  date > new Date()
-                }
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
+    <div className="px-6 py-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-2">
+          <Calculator className="h-6 w-6 text-blue-600" />
+          <h1 className="text-2xl font-bold">Liquidación de Nómina</h1>
+          {isRemovingEmployee && (
+            <div className="flex items-center space-x-1 text-blue-600">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span className="text-sm font-medium">Eliminando empleado...</span>
+            </div>
+          )}
         </div>
-
-        <div>
-          <Label htmlFor="end-date">Fecha de Fin</Label>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant={"outline"}
-                className={cn(
-                  "w-[240px] justify-start text-left font-normal",
-                  !endDate && "text-muted-foreground"
-                )}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {endDate ? format(endDate, "PPP") : <span>Seleccionar fecha</span>}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={endDate}
-                onSelect={handleEndDateChange}
-                disabled={(date) =>
-                  date > new Date()
-                }
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
-
-        <Button onClick={handleLoadEmployees} disabled={isLoading}>
-          {isLoading ? 'Cargando...' : 'Cargar Empleados'}
-        </Button>
-      </div>
-
-      {/* Employee List and Actions */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold">Lista de Empleados</h2>
-          <Button onClick={handleOpenEmployeeSelectionModal}>
-            Agregar Empleados
+        
+        <div className="flex items-center space-x-4">
+          {employees.length > 0 && (
+            <AutoSaveIndicator 
+              isSaving={isAutoSaving}
+              lastSaveTime={lastAutoSaveTime}
+            />
+          )}
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowCleanupDialog(true)}
+            className="flex items-center gap-2"
+          >
+            <Settings className="h-4 w-4" />
+            Limpiar Períodos
           </Button>
         </div>
-
-        {/* Employee Table */}
-        {employees && employees.length > 0 ? (
-          <PayrollLiquidationSimpleTable
-            employees={
-              (employees as unknown as any[])
-            }
-            startDate={startDate ? format(startDate, 'yyyy-MM-dd') : ''}
-            endDate={endDate ? format(endDate, 'yyyy-MM-dd') : ''}
-            currentPeriodId={currentPeriodId}
-            onRemoveEmployee={handleRemoveEmployee}
-            onEmployeeNovedadesChange={refreshEmployeeNovedades}
-            year={selectedYear}
-          />
-        ) : (
-          <p>No hay empleados cargados para la liquidación.</p>
-        )}
       </div>
 
-      {/* Liquidation Action */}
-      <div className="mb-6">
-        <Button
-          onClick={handleLiquidatePayroll}
-          disabled={isLiquidating || employees.length === 0}
-        >
-          {isLiquidating ? 'Liquidando...' : 'Liquidar Nómina'}
-        </Button>
-      </div>
+      <Tabs defaultValue="liquidation" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="liquidation" className="flex items-center gap-2">
+            <Calculator className="h-4 w-4" />
+            Liquidación
+          </TabsTrigger>
+          <TabsTrigger value="diagnostic" className="flex items-center gap-2">
+            <Bug className="h-4 w-4" />
+            Diagnóstico
+          </TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="liquidation" className="space-y-6">
+          {/* Selector de Período Simplificado */}
+          {companyId && !periodSelected && (
+            <SimplePeriodSelector
+              companyId={companyId}
+              onPeriodSelected={handlePeriodSelection}
+              disabled={isRemovingEmployee}
+            />
+          )}
 
-      {/* Modals */}
-      <EmployeeSelectionModal
-        isOpen={isEmployeeSelectionModalOpen}
-        onClose={handleCloseEmployeeSelectionModal}
-        onAddEmployees={handleAddSelectedEmployees}
+          {/* Información del Período Seleccionado */}
+          {selectedPeriod && periodSelected && (
+            <Card className="border-green-200 bg-green-50">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-medium text-green-800">Período Activo</h3>
+                    <p className="text-green-700">{selectedPeriod.label}</p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleReset}
+                    className="text-green-700 border-green-200 hover:bg-green-100"
+                  >
+                    Cambiar Período
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Tabla de Empleados */}
+          {employees.length > 0 && selectedPeriod && (
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center space-x-4">
+                    <CardTitle>Empleados a Liquidar ({employees.length})</CardTitle>
+                    <AutoSaveIndicator 
+                      isSaving={isAutoSaving}
+                      lastSaveTime={lastAutoSaveTime}
+                    />
+                  </div>
+                  <div className="flex space-x-2">
+                    <Button 
+                      onClick={() => setShowAddEmployeeModal(true)}
+                      variant="outline"
+                      disabled={isLoading || !currentPeriodId || isRemovingEmployee}
+                    >
+                      <Users className="h-4 w-4 mr-2" />
+                      Agregar Empleado
+                    </Button>
+                    <Button 
+                      onClick={handleLiquidate}
+                      disabled={isLiquidating || employees.length === 0 || isRemovingEmployee}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      {isLiquidating ? 'Liquidando...' : 'Liquidar Nómina'}
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                <PayrollLiquidationTable
+                  employees={employees}
+                  startDate={selectedPeriod.startDate}
+                  endDate={selectedPeriod.endDate}
+                  currentPeriodId={currentPeriodId}
+                  onRemoveEmployee={removeEmployee}
+                  onEmployeeNovedadesChange={refreshEmployeeNovedades}
+                  year={selectedYear}
+                />
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+        
+        <TabsContent value="diagnostic">
+          <PayrollDiagnosticPanel />
+        </TabsContent>
+      </Tabs>
+
+      {/* Period Cleanup Dialog */}
+      <PeriodCleanupDialog
+        isOpen={showCleanupDialog}
+        onClose={() => setShowCleanupDialog(false)}
+        onCleanupComplete={() => {
+          // Opcional: recargar períodos si es necesario
+        }}
       />
 
-      <SuccessModal
-        isOpen={showSuccessModal}
-        onClose={closeSuccessModal}
-        periodData={liquidationResult?.periodData}
-        summary={liquidationResult?.summary}
+      {/* Add Employee Modal */}
+      <EmployeeAddModal
+        isOpen={showAddEmployeeModal}
+        onClose={() => setShowAddEmployeeModal(false)}
+        onAddEmployees={handleAddEmployees}
+        currentEmployeeIds={employees.map(emp => emp.id)}
+        companyId={companyId || ''}
       />
+
+      {/* Success Modal */}
+      {showSuccessModal && liquidationResult && (
+        <PayrollSuccessModal
+          isOpen={showSuccessModal}
+          onClose={handleSuccessModalClose}
+          periodData={liquidationResult.periodData}
+          summary={liquidationResult.summary}
+        />
+      )}
     </div>
   );
 };
+
+export default PayrollLiquidationPage;
