@@ -1,3 +1,4 @@
+
 import { ConfigurationService } from './ConfigurationService';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -42,27 +43,30 @@ export class DeductionCalculationService {
       const salarioBaseParaIBC = input;
       const config = ConfigurationService.getConfigurationSync(year);
       
+      // ✅ CORRECCIÓN: Priorizar valores del backend siempre
       const ibcFinal = backendResult?.ibc || salarioBaseParaIBC;
       
-      console.log('🧮 DeductionCalculationService - IBC unificado:', {
+      console.log('🧮 DeductionCalculationService - IBC unificado (corregido):', {
         salarioBaseParaIBC,
         backendIBC: backendResult?.ibc,
         ibcFinal,
         backendHealthDeduction: backendResult?.healthDeduction,
-        backendPensionDeduction: backendResult?.pensionDeduction
+        backendPensionDeduction: backendResult?.pensionDeduction,
+        source: backendResult?.healthDeduction ? 'backend-authoritative' : 'frontend-fallback'
       });
 
+      // ✅ CORRECCIÓN: Usar SIEMPRE valores del backend si están disponibles
       const saludEmpleado = backendResult?.healthDeduction ?? Math.round(ibcFinal * config.porcentajes.saludEmpleado);
       const pensionEmpleado = backendResult?.pensionDeduction ?? Math.round(ibcFinal * config.porcentajes.pensionEmpleado);
 
       const totalDeducciones = saludEmpleado + pensionEmpleado;
 
-      console.log('✅ DeductionCalculationService - Resultado final:', {
+      console.log('✅ DeductionCalculationService - Resultado final (backend priority):', {
         ibcUsado: ibcFinal,
         saludEmpleado,
         pensionEmpleado,
         totalDeducciones,
-        fuenteDatos: backendResult?.healthDeduction ? 'backend' : 'frontend-fallback'
+        fuenteDatos: backendResult?.healthDeduction ? 'backend-authoritative' : 'frontend-fallback'
       });
 
       return {

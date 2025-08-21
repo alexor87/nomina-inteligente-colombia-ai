@@ -224,18 +224,33 @@ async function calculatePayroll(supabase: any, data: any) {
     novedades = []
   } = data;
 
+  console.log('🔍 DIAGNÓSTICO - Input data:', {
+    baseSalary,
+    workedDays,
+    bonuses,
+    novedadesCount: novedades.length
+  });
+
   const dailySalary = baseSalary / 30;
   const regularPay = (dailySalary * workedDays) - absences;
-  let extraPay = bonuses; // Legacy field compatibility
+  console.log('🔍 DIAGNÓSTICO - Regular pay calculation:', {
+    dailySalary: Math.round(dailySalary),
+    workedDays,
+    regularPay: Math.round(regularPay)
+  });
 
-  // ✅ PROCESAR NOVEDADES CON POLÍTICAS
-  console.log('📋 Processing novedades:', novedades.length);
-  
+  // ✅ CORRECCIÓN: Procesar novedades SIN duplicar en extraPay
+  let totalNovedadesValue = 0;
   let totalIncapacityValue = 0;
   let totalIncapacityDays = 0;
   let totalConstitutiveNovedades = 0;
 
+  console.log('📋 Processing novedades:', novedades.length);
+  
   for (const novedad of novedades) {
+    const novedadValue = novedad.valor || 0;
+    totalNovedadesValue += novedadValue;
+
     if (novedad.tipo_novedad === 'incapacidad') {
       const incapacityValue = await calculateIncapacityWithPolicy(
         baseSalary, 
@@ -247,15 +262,24 @@ async function calculatePayroll(supabase: any, data: any) {
       totalIncapacityValue += incapacityValue;
       totalIncapacityDays += novedad.dias || 0;
     } else if (novedad.constitutivo_salario) {
-      // Other constitutive novedades
-      totalConstitutiveNovedades += novedad.valor || 0;
+      totalConstitutiveNovedades += novedadValue;
     }
-    
-    // Add to extraPay for gross calculation
-    extraPay += novedad.valor || 0;
   }
 
-  const grossPay = regularPay + extraPay;
+  console.log('🔍 DIAGNÓSTICO - Novedades processed:', {
+    totalNovedadesValue: Math.round(totalNovedadesValue),
+    totalConstitutiveNovedades: Math.round(totalConstitutiveNovedades),
+    totalIncapacityValue: Math.round(totalIncapacityValue),
+    totalIncapacityDays
+  });
+
+  // ✅ CORRECCIÓN: Gross pay = regular pay + novedades (NO bonuses legacy)
+  const grossPay = regularPay + totalNovedadesValue;
+  console.log('🔍 DIAGNÓSTICO - Gross pay calculation:', {
+    regularPay: Math.round(regularPay),
+    totalNovedadesValue: Math.round(totalNovedadesValue),
+    grossPay: Math.round(grossPay)
+  });
 
   // ✅ IBC AUTOMÁTICO: Incapacidad vs Proporcional
   let ibcSalud: number;
@@ -278,11 +302,34 @@ async function calculatePayroll(supabase: any, data: any) {
   const pensionDeduction = Math.round(ibcSalud * 0.04);
   const totalDeductions = healthDeduction + pensionDeduction;
 
+  console.log('🔍 DIAGNÓSTICO - Deductions:', {
+    ibcSalud: Math.round(ibcSalud),
+    healthDeduction,
+    pensionDeduction,
+    totalDeductions
+  });
+
   // ✅ AUXILIO DE TRANSPORTE CORREGIDO: Solo si salario ≤ 2 SMMLV
   const transportLimit = getTransportAssistanceLimit(year);
   const transportAllowance = baseSalary <= transportLimit ? config.auxilioTransporte : 0;
 
+  console.log('🔍 DIAGNÓSTICO - Transport allowance:', {
+    baseSalary,
+    transportLimit,
+    transportAllowance,
+    applies: baseSalary <= transportLimit
+  });
+
+  // ✅ CORRECCIÓN CRÍTICA: Net pay = gross pay - deductions + transport (NO doble conteo)
   const netPay = grossPay - totalDeductions + transportAllowance;
+
+  console.log('🔍 DIAGNÓSTICO - Net pay calculation:', {
+    grossPay: Math.round(grossPay),
+    totalDeductions,
+    transportAllowance,
+    netPay: Math.round(netPay),
+    formula: `${Math.round(grossPay)} - ${totalDeductions} + ${transportAllowance} = ${Math.round(netPay)}`
+  });
 
   // Employer contributions (not affected by IBC mode)
   const employerHealth = Math.round(ibcSalud * 0.085);
@@ -297,7 +344,7 @@ async function calculatePayroll(supabase: any, data: any) {
 
   const result = {
     regularPay: Math.round(regularPay),
-    extraPay: Math.round(extraPay),
+    extraPay: Math.round(totalNovedadesValue), // ✅ CORRECCIÓN: usar totalNovedadesValue en lugar de bonuses
     transportAllowance,
     grossPay: Math.round(grossPay),
     healthDeduction,
@@ -316,14 +363,17 @@ async function calculatePayroll(supabase: any, data: any) {
     ibc: ibcSalud
   };
 
-  console.log('✅ Calculation (automatic IBC) result:', {
+  console.log('✅ RESULTADO FINAL (corregido):', {
     policy,
     totalIncapacityDays,
     totalIncapacityValue,
     ibcMode,
     ibcSalud,
-    healthDeduction,
-    pensionDeduction
+    grossPay: result.grossPay,
+    totalDeductions: result.totalDeductions,
+    transportAllowance: result.transportAllowance,
+    netPay: result.netPay,
+    validation: `netPay(${result.netPay}) = grossPay(${result.grossPay}) - deductions(${result.totalDeductions}) + transport(${result.transportAllowance})`
   });
 
   return result;
