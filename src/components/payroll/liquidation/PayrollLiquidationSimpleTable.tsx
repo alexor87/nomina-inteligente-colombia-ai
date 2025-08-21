@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -118,7 +117,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
           </TableHeader>
           <TableBody>
             {employees.map((employee) => {
-              // ✅ MOSTRAR DÍAS EFECTIVOS (corregido desde el backend)
+              // ✅ FIXED: Now these properties exist in PayrollEmployee type
               const effectiveWorkedDays = employee.effectiveWorkedDays || employee.workedDays;
               const hasIncapacity = (employee.incapacityDays || 0) > 0;
               
@@ -169,7 +168,6 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
                     {formatCurrency(employee.deductions)}
                   </TableCell>
                   <TableCell className="text-center">
-                    {/* ✅ MOSTRAR NETO CORRECTO DEL BACKEND */}
                     <div className="font-mono font-semibold text-green-700 bg-green-50 px-2 py-1 rounded">
                       {formatCurrency(employee.netPay)}
                     </div>
@@ -269,7 +267,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
           />
 
           <NovedadUnifiedModal
-            isOpen={showNovedadModal}
+            open={showNovedadModal}
             onClose={() => setShowNovedadModal(false)}
             employeeId={selectedEmployee.id}
             employeeName={selectedEmployee.name}

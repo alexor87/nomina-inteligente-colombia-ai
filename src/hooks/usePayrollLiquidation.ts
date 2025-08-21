@@ -3,7 +3,7 @@ import { PayrollEmployee, BaseEmployeeData } from '@/types/payroll';
 import { useToast } from '@/hooks/use-toast';
 import { calculateEmployeeBackend } from '@/utils/payrollCalculationsBackend';
 import { useEmployeeData } from './useEmployeeData';
-import { PayrollLiquidationService } from '@/services/payroll/PayrollLiquidationService';
+import { PayrollLiquidationService } from '@/services/PayrollLiquidationService';
 
 interface LiquidationResult {
   periodData: any;
@@ -34,27 +34,24 @@ export const usePayrollLiquidation = () => {
         return;
       }
 
-      // ✅ USAR AÑO CORRECTO en cálculos backend
       const currentYear = year || new Date().getFullYear().toString();
       console.log('📅 Usando año para cálculos:', currentYear);
 
-      // Crear datos base y calcular con backend
       const baseEmployeesData: BaseEmployeeData[] = allEmployees.map(emp => ({
         id: emp.id,
         name: `${emp.nombre} ${emp.apellido}`.trim(),
         position: emp.cargo || 'No especificado',
-        baseSalary: emp.salario_base || 0,
-        workedDays: 15, // Default para quincenal
+        baseSalary: emp.salarioBase || 0,
+        workedDays: 15,
         extraHours: 0,
         disabilities: 0,
         bonuses: 0,
         absences: 0,
         eps: emp.eps || 'No asignada',
         afp: emp.afp || 'No asignada',
-        novedades: [] // Se cargarán después con las novedades
+        novedades: []
       }));
 
-      // ✅ CALCULAR CON BACKEND CORREGIDO incluyendo año
       const calculatedEmployees = await Promise.all(
         baseEmployeesData.map(emp => calculateEmployeeBackend(emp, 'quincenal', currentYear))
       );
@@ -92,7 +89,7 @@ export const usePayrollLiquidation = () => {
         id: emp.id,
         name: `${emp.nombre} ${emp.apellido}`.trim(),
         position: emp.cargo || 'No especificado',
-        baseSalary: emp.salario_base || 0,
+        baseSalary: emp.salarioBase || 0,
         workedDays: 15,
         extraHours: 0,
         disabilities: 0,
@@ -166,7 +163,6 @@ export const usePayrollLiquidation = () => {
       const employee = employees.find(emp => emp.id === employeeId);
       if (!employee) return;
 
-      // Recalcular empleado con novedades actualizadas
       const baseData: BaseEmployeeData = {
         id: employee.id,
         name: employee.name,

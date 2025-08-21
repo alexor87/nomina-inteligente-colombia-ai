@@ -1,60 +1,21 @@
-export interface PayrollPeriod {
-  id: string;
-  company_id: string;
-  fecha_inicio: string;
-  fecha_fin: string;
-  estado: 'borrador' | 'en_proceso' | 'cerrado' | 'aprobado';
-  tipo_periodo: 'quincenal' | 'mensual' | 'semanal' | 'personalizado';
-  periodo: string;
-  empleados_count: number;
-  total_devengado: number;
-  total_deducciones: number;
-  total_neto: number;
-  created_at: string;
-  updated_at: string;
-  modificado_por?: string;
-  modificado_en?: string;
-  numero_periodo_anual?: number;
-}
+import { Novedad } from "./novedades-enhanced";
 
-// ✅ Ampliamos el tipo para soportar cálculo correcto de incapacidades en backend
-export interface NovedadForIBC {
-  valor: number;
-  constitutivo_salario: boolean;
-  tipo_novedad: string;
-  // Campos adicionales para incapacidades y otras novedades que requieren detalle
-  dias?: number;
-  subtipo?: string;
-}
-
-export interface PayrollEmployee {
-  id: string;
-  name: string;
-  position: string;
-  baseSalary: number;
-  workedDays: number;
-  extraHours: number;
-  disabilities: number;
-  bonuses: number;
-  absences: number;
+export interface PayrollEmployee extends BaseEmployeeData {
   grossPay: number;
   deductions: number;
   netPay: number;
-  status: 'valid' | 'error' | 'incomplete';
-  errors: string[];
-  eps?: string;
-  afp?: string;
   transportAllowance: number;
   employerContributions: number;
-  // ✅ NUEVO CAMPO: IBC calculado incluyendo novedades
-  ibc?: number;
-  // ✅ NUEVO CAMPO: novedades para cálculo de IBC
-  novedades?: NovedadForIBC[];
-  // ✅ NUEVOS CAMPOS: Deducciones separadas para persistencia correcta
+  ibc: number;
+  status: 'valid' | 'error';
+  errors: string[];
   healthDeduction: number;
   pensionDeduction: number;
-  // ✅ NUEVO CAMPO: Cédula del empleado
-  cedula?: string;
+  // ✅ NEW: Legal compliance fields for incapacity handling
+  effectiveWorkedDays: number;
+  incapacityDays: number;
+  incapacityValue: number;
+  legalBasis?: string;
 }
 
 export interface PayrollSummary {
@@ -77,52 +38,15 @@ export interface BaseEmployeeData {
   disabilities: number;
   bonuses: number;
   absences: number;
-  eps?: string;
-  afp?: string;
-  additionalDeductions?: number;
-  // ✅ NUEVO CAMPO: novedades para cálculo de IBC
-  novedades?: NovedadForIBC[];
+  eps: string;
+  afp: string;
+  novedades?: Novedad[];
 }
 
-// ✅ UNIFICACIÓN: Interfaces consolidadas para detección de períodos
-export interface PeriodStatus {
-  currentPeriod: any | null;
-  needsCreation: boolean;
-  canContinue: boolean;
-  message: string;
-  suggestion: string;
-  action?: 'create' | 'resume' | 'wait';
-  nextPeriod?: {
-    startDate: string;
-    endDate: string;
-    periodName: string;
-    type: 'semanal' | 'quincenal' | 'mensual';
-  };
-}
-
-export interface CompanySettings {
-  id: string;
-  company_id: string;
-  periodicity: 'mensual' | 'quincenal' | 'semanal' | 'personalizado';
-  created_at: string;
-  updated_at: string;
-}
-
-export interface DBPayrollPeriod {
-  id: string;
-  company_id: string;
-  fecha_inicio: string;
-  fecha_fin: string;
-  estado: 'borrador' | 'en_proceso' | 'cerrado' | 'aprobado';
-  tipo_periodo: 'mensual' | 'quincenal' | 'semanal' | 'personalizado';
-  periodo: string;
-  empleados_count: number;
-  total_devengado: number;
-  total_deducciones: number;
-  total_neto: number;
-  modificado_por?: string;
-  modificado_en?: string;
-  created_at: string;
-  updated_at: string;
-  numero_periodo_anual?: number;
+export interface NovedadForIBC {
+  valor: number;
+  constitutivo_salario: boolean;
+  tipo_novedad: string;
+  dias?: number;
+  subtipo?: string;
 }
