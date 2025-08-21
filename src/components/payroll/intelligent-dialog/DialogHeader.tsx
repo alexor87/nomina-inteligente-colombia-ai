@@ -2,17 +2,23 @@
 import React from 'react';
 import { Calendar, CheckCircle, AlertCircle, Clock, Wrench } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { PeriodStatus } from '@/types/payroll';
+import { PeriodStatus, PeriodStatusInfo } from '@/types/payroll';
 
 interface DialogHeaderProps {
   periodStatus: PeriodStatus | null;
 }
 
+const isPeriodStatusInfo = (status: PeriodStatus): status is PeriodStatusInfo => {
+  return typeof status === 'object' && status !== null && 'status' in status;
+};
+
 export const DialogHeader: React.FC<DialogHeaderProps> = ({ periodStatus }) => {
+  const statusInfo = periodStatus && isPeriodStatusInfo(periodStatus) ? periodStatus : null;
+
   const getStatusIcon = () => {
-    if (!periodStatus) return <Clock className="h-5 w-5 text-gray-500" />;
+    if (!statusInfo) return <Clock className="h-5 w-5 text-gray-500" />;
     
-    switch (periodStatus.action) {
+    switch (statusInfo.action) {
       case 'resume':
         return <CheckCircle className="h-5 w-5 text-green-600" />;
       case 'create':
@@ -25,7 +31,7 @@ export const DialogHeader: React.FC<DialogHeaderProps> = ({ periodStatus }) => {
   };
 
   const getStatusBadge = () => {
-    if (!periodStatus) return null;
+    if (!statusInfo) return null;
     
     const badgeConfig = {
       resume: { text: 'Continuar', className: 'bg-green-100 text-green-800' },
@@ -33,7 +39,7 @@ export const DialogHeader: React.FC<DialogHeaderProps> = ({ periodStatus }) => {
       wait: { text: 'Revisar', className: 'bg-orange-100 text-orange-800' }
     };
     
-    const config = badgeConfig[periodStatus.action as keyof typeof badgeConfig];
+    const config = badgeConfig[statusInfo.action as keyof typeof badgeConfig];
     if (!config) return null;
     
     return <Badge className={config.className}>{config.text}</Badge>;
@@ -44,7 +50,7 @@ export const DialogHeader: React.FC<DialogHeaderProps> = ({ periodStatus }) => {
       {getStatusIcon()}
       <div className="flex-1">
         <h3 className="text-lg font-semibold">
-          {periodStatus?.message || 'Cargando estado del período...'}
+          {statusInfo?.message || 'Cargando estado del período...'}
         </h3>
       </div>
       {getStatusBadge()}

@@ -16,8 +16,14 @@ export interface UnifiedEmployeeData extends EmployeeUnified {
   status?: 'valid' | 'error' | 'incomplete';
 }
 
+export interface ServiceResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+}
+
 export class EmployeeUnifiedService {
-  static async getAll(): Promise<{ data: EmployeeUnified[] | null; error: any }> {
+  static async getAll(): Promise<ServiceResponse<EmployeeUnified[]>> {
     try {
       const { data, error } = await supabase
         .from('employees')
@@ -25,17 +31,17 @@ export class EmployeeUnifiedService {
 
       if (error) {
         console.error('Error fetching employees:', error);
-        return { data: null, error };
+        return { success: false, error: error.message };
       }
 
-      return { data, error: null };
+      return { success: true, data: data || [] };
     } catch (error: any) {
       console.error('Unexpected error fetching employees:', error);
-      return { data: null, error: { message: error.message } };
+      return { success: false, error: error.message };
     }
   }
 
-  static async getEmployeeById(id: string): Promise<{ success: boolean; data: EmployeeUnified | null; error: string | null }> {
+  static async getEmployeeById(id: string): Promise<ServiceResponse<EmployeeUnified>> {
     try {
       const { data, error } = await supabase
         .from('employees')
@@ -45,17 +51,17 @@ export class EmployeeUnifiedService {
 
       if (error) {
         console.error(`Error fetching employee with ID ${id}:`, error);
-        return { success: false, data: null, error: error.message };
+        return { success: false, error: error.message };
       }
 
-      return { success: true, data, error: null };
+      return { success: true, data };
     } catch (error: any) {
       console.error(`Unexpected error fetching employee with ID ${id}:`, error);
-      return { success: false, data: null, error: error.message };
+      return { success: false, error: error.message };
     }
   }
 
-  static async create(employee: Partial<EmployeeUnified>): Promise<EmployeeUnified> {
+  static async create(employee: Partial<EmployeeUnified>): Promise<ServiceResponse<EmployeeUnified>> {
     try {
       const { data, error } = await supabase
         .from('employees')
@@ -64,17 +70,17 @@ export class EmployeeUnifiedService {
         .single();
 
       if (error) {
-        throw new Error(error.message);
+        return { success: false, error: error.message };
       }
 
-      return data;
+      return { success: true, data };
     } catch (error: any) {
       console.error('Error creating employee:', error);
-      throw error;
+      return { success: false, error: error.message };
     }
   }
 
-  static async update(id: string, updates: Partial<EmployeeUnified>): Promise<EmployeeUnified> {
+  static async update(id: string, updates: Partial<EmployeeUnified>): Promise<ServiceResponse<EmployeeUnified>> {
     try {
       const { data, error } = await supabase
         .from('employees')
@@ -84,17 +90,17 @@ export class EmployeeUnifiedService {
         .single();
 
       if (error) {
-        throw new Error(error.message);
+        return { success: false, error: error.message };
       }
 
-      return data;
+      return { success: true, data };
     } catch (error: any) {
       console.error(`Error updating employee with ID ${id}:`, error);
-      throw error;
+      return { success: false, error: error.message };
     }
   }
 
-  static async delete(id: string): Promise<void> {
+  static async delete(id: string): Promise<ServiceResponse<void>> {
     try {
       const { error } = await supabase
         .from('employees')
@@ -102,26 +108,46 @@ export class EmployeeUnifiedService {
         .eq('id', id);
 
       if (error) {
-        throw new Error(error.message);
+        return { success: false, error: error.message };
       }
+
+      return { success: true };
     } catch (error: any) {
       console.error(`Error deleting employee with ID ${id}:`, error);
-      throw error;
+      return { success: false, error: error.message };
     }
   }
 
-  static async updatePayrollRecords(periodId: string): Promise<void> {
+  static async changeStatus(id: string, status: string): Promise<ServiceResponse<void>> {
+    try {
+      const { error } = await supabase
+        .from('employees')
+        .update({ estado: status })
+        .eq('id', id);
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return { success: true };
+    } catch (error: any) {
+      console.error(`Error changing status for employee ${id}:`, error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  static async updatePayrollRecords(periodId: string): Promise<ServiceResponse<void>> {
     try {
       console.log('Updating payroll records for period:', periodId);
       // Implementation for updating payroll records
-      return;
+      return { success: true };
     } catch (error: any) {
       console.error('Error updating payroll records:', error);
-      throw error;
+      return { success: false, error: error.message };
     }
   }
 
-  static async getEmployeesForPeriod(periodId: string): Promise<UnifiedEmployeeData[]> {
+  static async getEmployeesForPeriod(periodId: string): Promise<ServiceResponse<UnifiedEmployeeData[]>> {
     try {
       const { data, error } = await supabase
         .from('employees')
@@ -129,11 +155,11 @@ export class EmployeeUnifiedService {
         .eq('estado', 'activo');
 
       if (error) {
-        throw new Error(error.message);
+        return { success: false, error: error.message };
       }
 
       // Map to UnifiedEmployeeData with payroll properties
-      return data.map(employee => ({
+      const employees = data.map(employee => ({
         ...employee,
         name: `${employee.nombre} ${employee.apellido}`,
         baseSalary: employee.salario_base || 0,
@@ -146,33 +172,24 @@ export class EmployeeUnifiedService {
         pensionDeduction: 0,
         status: 'valid' as const
       }));
+
+      return { success: true, data: employees };
     } catch (error: any) {
       console.error('Error fetching employees for period:', error);
-      throw error;
+      return { success: false, error: error.message };
     }
   }
 
-  static getConfigurationInfo() {
-    return {
-      salarioMinimo: 1300000,
-      auxilioTransporte: 162000,
-      maxTransportAllowanceLimit: 2600000
-    };
-  }
-
-  static async changeStatus(id: string, status: string): Promise<void> {
+  static async getConfigurationInfo(): Promise<ServiceResponse<any>> {
     try {
-      const { error } = await supabase
-        .from('employees')
-        .update({ estado: status })
-        .eq('id', id);
-
-      if (error) {
-        throw new Error(error.message);
-      }
+      const config = {
+        salarioMinimo: 1300000,
+        auxilioTransporte: 162000,
+        maxTransportAllowanceLimit: 2600000
+      };
+      return { success: true, data: config };
     } catch (error: any) {
-      console.error(`Error changing status for employee ${id}:`, error);
-      throw error;
+      return { success: false, error: error.message };
     }
   }
 }

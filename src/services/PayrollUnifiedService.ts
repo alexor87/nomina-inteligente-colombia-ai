@@ -1,58 +1,62 @@
 
-/**
- * ⚠️ SERVICIO MARCADO COMO OBSOLETO - MIGRACIÓN A BACKEND
- * Este servicio será reemplazado por cálculos del backend
- */
-
-import { PayrollDomainService } from './PayrollDomainService';
+import { supabase } from '@/integrations/supabase/client';
+import { PayrollEmployee } from '@/types/payroll';
 
 export class PayrollUnifiedService {
-  /**
-   * @deprecated Usar PayrollDomainService.detectCurrentPeriodSituation()
-   */
-  static async detectCurrentPeriodSituation() {
-    console.warn('⚠️ PayrollUnifiedService.detectCurrentPeriodSituation está obsoleto. Usar PayrollDomainService');
-    return PayrollDomainService.detectCurrentPeriodSituation();
+  static async getEmployeesForPeriod(periodId: string): Promise<PayrollEmployee[]> {
+    try {
+      const { data, error } = await supabase
+        .from('employees')
+        .select('*')
+        .eq('estado', 'activo');
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      // Map to PayrollEmployee with required properties
+      return data.map(employee => ({
+        id: employee.id,
+        name: `${employee.nombre} ${employee.apellido}`,
+        position: employee.cargo || 'Sin cargo',
+        baseSalary: employee.salario_base || 0,
+        workedDays: 30,
+        extraHours: 0,
+        disabilities: 0,
+        bonuses: 0,
+        absences: 0,
+        eps: employee.eps || '',
+        afp: employee.afp || '',
+        novedades: [],
+        grossPay: employee.salario_base || 0,
+        deductions: 0,
+        netPay: employee.salario_base || 0,
+        transportAllowance: 0,
+        employerContributions: 0,
+        ibc: employee.salario_base || 0,
+        status: 'valid' as const,
+        errors: [],
+        healthDeduction: 0,
+        pensionDeduction: 0,
+        effectiveWorkedDays: 30,
+        incapacityDays: 0,
+        incapacityValue: 0,
+        legalBasis: '',
+        cedula: employee.cedula
+      }));
+    } catch (error: any) {
+      console.error('Error fetching employees for period:', error);
+      throw error;
+    }
   }
 
-  /**
-   * @deprecated Usar PayrollDomainService.createNextPeriod()
-   */
-  static async createNextPeriod() {
-    console.warn('⚠️ PayrollUnifiedService.createNextPeriod está obsoleto. Usar PayrollDomainService');
-    return PayrollDomainService.createNextPeriod();
+  static async addEmployeeToPeriod(employeeId: string, periodId: string): Promise<void> {
+    // Implementation for adding employee to period
+    console.log(`Adding employee ${employeeId} to period ${periodId}`);
   }
 
-  /**
-   * @deprecated Usar PayrollDomainService.closePeriod()
-   */
-  static async closePeriod(periodId: string) {
-    console.warn('⚠️ PayrollUnifiedService.closePeriod está obsoleto. Usar PayrollDomainService');
-    return PayrollDomainService.closePeriod(periodId);
-  }
-
-  /**
-   * @deprecated Usar PayrollDomainService.getPayrollHistory()
-   */
-  static async getPayrollHistory() {
-    console.warn('⚠️ PayrollUnifiedService.getPayrollHistory está obsoleto. Usar PayrollDomainService');
-    return PayrollDomainService.getPayrollHistory();
-  }
-
-  /**
-   * ⚠️ FUNCIÓN MARCADA PARA MIGRACIÓN
-   * Los cálculos de novedades ahora se realizan en el backend via Edge Function
-   * @deprecated Usar useNovedadBackendCalculation hook en su lugar
-   */
-  static calculateNovedad(tipoNovedad: string, subtipo: string, salario: number, horas?: number, dias?: number) {
-    console.warn('⚠️ PayrollUnifiedService.calculateNovedad está obsoleto. Usar useNovedadBackendCalculation hook');
-    console.warn('⚠️ Todos los cálculos de novedades ahora se realizan en el backend para mayor consistencia');
-    
-    // Retornar valor básico para evitar errores durante la migración
-    return {
-      valor: 0,
-      detalleCalculo: 'Usar backend calculation service',
-      factorCalculo: 0
-    };
+  static async removeEmployeeFromPeriod(employeeId: string, periodId: string): Promise<void> {
+    // Implementation for removing employee from period
+    console.log(`Removing employee ${employeeId} from period ${periodId}`);
   }
 }

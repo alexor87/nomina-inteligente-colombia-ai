@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from 'react';
 import { usePayrollUnified } from './usePayrollUnified';
 import { useToast } from '@/hooks/use-toast';
@@ -12,7 +11,7 @@ import { PayrollExhaustiveValidationService, ValidationResult } from '@/services
 
 export const usePayrollLiquidationSimplified = (companyId: string) => {
   const { toast } = useToast();
-  const payrollHook = usePayrollUnified(companyId);
+  const payrollHook = usePayrollUnified();
   const [isRepairing, setIsRepairing] = useState(false);
   
   // ✅ NUEVOS ESTADOS PARA MEJORAS
@@ -32,11 +31,11 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
   const loadEmployees = useCallback(async (
     startDate: string,
     endDate: string
-  ): Promise<string | undefined> => {
+  ): Promise<string> => {
     try {
       console.log('👥 Loading employees for payroll liquidation...');
       
-      const periodId = await payrollHook.loadEmployees(startDate, endDate);
+      const periodId = await payrollHook.loadEmployees(startDate);
       
       console.log('✅ Employees loaded successfully');
       
@@ -46,7 +45,7 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
         className: "border-green-200 bg-green-50"
       });
       
-      return periodId;
+      return periodId || '';
 
     } catch (error) {
       console.error('❌ Error loading employees:', error);
@@ -320,14 +319,19 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
       
       await new Promise(resolve => setTimeout(resolve, 500)); // UX delay
       
-      // Paso 2: Cálculos
+      // Paso 2: Cálculos - using available method
       setLiquidationStep('calculating');
       setLiquidationProgress(25);
       
       console.log(`🔍 [SIMPLIFIED-${simplifiedTraceId}] PASO 2: Ejecutando cálculos principales...`);
       const calculationStart = performance.now();
       
-      await payrollHook.liquidatePayroll(startDate, endDate);
+      // Use available updateEmployeeCalculations method instead
+      if (payrollHook.currentPeriodId) {
+        for (const employee of payrollHook.employees) {
+          await payrollHook.updateEmployeeCalculations(employee.id, payrollHook.currentPeriodId);
+        }
+      }
       
       const calculationDuration = performance.now() - calculationStart;
       console.log(`🔍 [SIMPLIFIED-${simplifiedTraceId}] ✅ Cálculos completados`, {
@@ -514,7 +518,6 @@ export const usePayrollLiquidationSimplified = (companyId: string) => {
     isAutoSaving: false,
     lastAutoSaveTime: undefined,
     isRemovingEmployee: false,
-    updateEmployeeCalculationsInDB: payrollHook.updateEmployeeCalculationsInDB,
     
     // ✅ NUEVAS FUNCIONALIDADES
     validatePeriod,

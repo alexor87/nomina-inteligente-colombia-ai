@@ -65,17 +65,22 @@ export interface PayrollPeriod {
   periodo: string;
   fecha_inicio: string;
   fecha_fin: string;
-  estado: PeriodStatus;
+  estado: 'borrador' | 'cerrado' | 'procesada' | 'pagada' | 'con_errores' | 'editado' | 'reabierto';
   tipo_periodo: 'quincenal' | 'mensual' | 'semanal';
   company_id: string;
   created_at?: string;
   updated_at?: string;
   year?: number;
+  empleados_count?: number;
+  total_neto?: number;
+  periodName?: string;
+  startDate?: string;
+  endDate?: string;
 }
 
 export interface PeriodStatusInfo {
   status: 'borrador' | 'cerrado' | 'procesada' | 'pagada' | 'con_errores' | 'editado' | 'reabierto';
-  action?: string;
+  action?: 'resume' | 'create' | 'wait';
   suggestion?: string;
   message?: string;
   currentPeriod?: PayrollPeriod;
