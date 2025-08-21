@@ -10,7 +10,7 @@ export const usePayrollLiquidationWithVacations = (companyId: string) => {
   const [conflictDetectionStep, setConflictDetectionStep] = useState<'idle' | 'detecting' | 'resolving' | 'completed'>('idle');
   const { toast } = useToast();
 
-  const payrollHook = usePayrollUnified(companyId);
+  const payrollHook = usePayrollUnified();
   const conflictHook = useVacationConflictDetection();
   const integrationHook = useVacationIntegration();
 
@@ -62,7 +62,8 @@ export const usePayrollLiquidationWithVacations = (companyId: string) => {
       setConflictDetectionStep('completed');
       
       // ✅ USAR EL NUEVO MÉTODO CON INTEGRACIÓN AUTOMÁTICA
-      await payrollHook.loadEmployees(startDate, endDate);
+      const periodId = `${startDate}-${endDate}`;
+      await payrollHook.loadEmployees(periodId);
       
       console.log('✅ Employees loaded successfully with vacation integration');
       
@@ -81,7 +82,8 @@ export const usePayrollLiquidationWithVacations = (companyId: string) => {
       // En caso de error, intentar cargar empleados sin detección de conflictos
       try {
         console.log('🔄 Fallback: Loading employees without conflict detection...');
-        await payrollHook.loadEmployees(startDate, endDate);
+        const periodId = `${startDate}-${endDate}`;
+        await payrollHook.loadEmployees(periodId);
         
         toast({
           title: "⚠️ Carga con Advertencia",
@@ -117,7 +119,8 @@ export const usePayrollLiquidationWithVacations = (companyId: string) => {
 
       // 2. Continuar con la carga de empleados + integración automática
       setConflictDetectionStep('completed');
-      await payrollHook.loadEmployees(startDate, endDate);
+      const periodId = `${startDate}-${endDate}`;
+      await payrollHook.loadEmployees(periodId);
 
       toast({
         title: "✅ Liquidación Lista",

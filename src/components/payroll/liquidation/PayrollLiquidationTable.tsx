@@ -4,16 +4,29 @@ import { PayrollEmployee } from '@/types/payroll';
 
 interface PayrollLiquidationTableProps {
   employees: PayrollEmployee[];
+  startDate?: string;
+  endDate?: string;
+  currentPeriodId?: string;
+  currentPeriod?: string;
+  onRemoveEmployee?: (employeeId: string) => void;
+  onEmployeeNovedadesChange?: (employeeId: string) => void;
+  updateEmployeeCalculationsInDB?: (employeeId: string) => void;
+  year?: string;
   onEmployeeUpdate?: (employeeId: string) => void;
 }
 
 export const PayrollLiquidationTable: React.FC<PayrollLiquidationTableProps> = ({
   employees,
+  startDate,
+  endDate,
+  currentPeriodId,
+  currentPeriod,
+  onRemoveEmployee,
+  onEmployeeNovedadesChange,
+  updateEmployeeCalculationsInDB,
+  year,
   onEmployeeUpdate
 }) => {
-  // Convert PayrollEmployee to display format if needed
-  const displayEmployees = employees;
-
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-semibold">Empleados en Liquidación</h3>
@@ -31,7 +44,7 @@ export const PayrollLiquidationTable: React.FC<PayrollLiquidationTableProps> = (
             </tr>
           </thead>
           <tbody>
-            {displayEmployees.map((employee) => (
+            {employees.map((employee) => (
               <tr key={employee.id} className="hover:bg-gray-50">
                 <td className="border border-gray-200 px-4 py-2">
                   <div>
@@ -66,7 +79,7 @@ export const PayrollLiquidationTable: React.FC<PayrollLiquidationTableProps> = (
         </table>
       </div>
       
-      {displayEmployees.length === 0 && (
+      {employees.length === 0 && (
         <div className="text-center py-8 text-gray-500">
           No hay empleados para mostrar
         </div>
