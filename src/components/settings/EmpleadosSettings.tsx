@@ -1,4 +1,3 @@
-
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -82,7 +81,6 @@ export const EmpleadosSettings = () => {
         <p className="text-gray-600">Configure campos personalizados, reglas de validación y valores por defecto para el módulo de empleados</p>
       </div>
 
-      {/* Campos Personalizados */}
       <CustomFieldsGlobalSection
         customFields={configuration.custom_fields}
         onAdd={addCustomField}
@@ -90,22 +88,19 @@ export const EmpleadosSettings = () => {
         onRemove={removeCustomField}
       />
 
-      {/* Reglas de Validación */}
       <ValidationRulesSection
         validationRules={configuration.validation_rules}
       />
 
-      {/* Parámetros por Defecto */}
       <DefaultParametersSection
         parameters={configuration.default_parameters}
         onUpdate={updateDefaultParameters}
       />
 
-      {/* Controles inferiores */}
       <Card className="p-6">
         <div className="flex gap-4 justify-between">
           <div className="flex gap-4">
-            <Button onClick={handleSave} disabled={!hasChanges} className="bg-blue-600 hover:bg-blue-700">
+            <Button onClick={handleSave} disabled={!hasChanges} variant="info">
               Guardar Configuración
             </Button>
             <Button onClick={handleReset} variant="outline" disabled={!hasChanges}>

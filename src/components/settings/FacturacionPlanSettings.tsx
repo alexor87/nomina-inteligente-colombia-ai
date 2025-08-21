@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -27,7 +26,7 @@ export const FacturacionPlanSettings = () => {
       </Card>
 
       <div className="flex gap-4">
-        <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700">
+        <Button onClick={handleSave} variant="info">
           Guardar Configuración
         </Button>
       </div>

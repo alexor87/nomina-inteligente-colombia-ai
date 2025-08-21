@@ -58,7 +58,6 @@ export const ParametrosLegalesSettings = () => {
   const [showNewYearForm, setShowNewYearForm] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Company policies state
   const [incapacityPolicy, setIncapacityPolicy] = useState<'standard_2d_100_rest_66' | 'from_day1_66_with_floor'>('standard_2d_100_rest_66');
 
   useEffect(() => {
@@ -83,7 +82,6 @@ export const ParametrosLegalesSettings = () => {
         console.log('✅ Loaded payroll policies:', policies);
         setIncapacityPolicy(policies.incapacity_policy || 'standard_2d_100_rest_66');
         
-        // 🆕 DEBUG: Log policy loading for UI verification
         toast({
           title: "📋 Políticas Cargadas",
           description: `Política de incapacidades: ${policies.incapacity_policy === 'standard_2d_100_rest_66' ? 'Estándar (2 días 100%)' : 'Desde día 1 (66.67%)'}`,
@@ -681,7 +679,7 @@ export const ParametrosLegalesSettings = () => {
       </Card>
 
       <div className="flex gap-4">
-        <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700">
+        <Button onClick={handleSave} variant="info">
           Guardar Parámetros {selectedYear}
         </Button>
       </div>
@@ -702,7 +700,7 @@ export const ParametrosLegalesSettings = () => {
         />
 
         <div className="flex gap-4">
-          <Button onClick={handleSavePolicies} className="bg-green-600 hover:bg-green-700">
+          <Button onClick={handleSavePolicies} variant="success">
             💾 Guardar Políticas de Nómina
           </Button>
         </div>
