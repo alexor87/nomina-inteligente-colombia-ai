@@ -285,14 +285,12 @@ export const ParametrosLegalesSettings = () => {
 
       console.log('✅ Company payroll policies saved successfully');
       
-      // 🆕 Enhanced success message with verification
       toast({
         title: "✅ Políticas Guardadas",
         description: `Política de incapacidades actualizada: ${incapacityPolicy === 'standard_2d_100_rest_66' ? 'Estándar (2 días 100% + resto 66.67%)' : 'Desde día 1 al 66.67% con piso SMLDV'}`,
         className: "border-green-200 bg-green-50"
       });
 
-      // 🆕 Reload policies to verify persistence
       setTimeout(() => {
         loadCompanyPolicies();
       }, 1000);
@@ -686,22 +684,6 @@ export const ParametrosLegalesSettings = () => {
         <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700">
           Guardar Parámetros {selectedYear}
         </Button>
-        <Button 
-          variant="outline"
-          onClick={async () => {
-            const yearConfig = await ConfigurationService.getConfigurationAsync(selectedYear);
-            setConfig(yearConfig);
-            toast({
-              title: "Cambios revertidos",
-              description: `Se han restaurado los valores guardados para ${selectedYear}.`,
-            });
-          }}
-        >
-          Revertir Cambios
-        </Button>
-        <Button variant="secondary" onClick={loadRecommendedValues}>
-          Cargar Valores Oficiales {selectedYear}
-        </Button>
       </div>
 
       <Separator className="my-8" />
@@ -722,35 +704,6 @@ export const ParametrosLegalesSettings = () => {
         <div className="flex gap-4">
           <Button onClick={handleSavePolicies} className="bg-green-600 hover:bg-green-700">
             💾 Guardar Políticas de Nómina
-          </Button>
-          <Button 
-            variant="outline"
-            onClick={() => {
-              loadCompanyPolicies();
-              toast({
-                title: "🔄 Políticas Revertidas",
-                description: "Se han restaurado las políticas guardadas.",
-              });
-            }}
-          >
-            ↩️ Revertir Políticas
-          </Button>
-          <Button 
-            variant="secondary"
-            onClick={() => {
-              console.log('🔍 Current state debug:', {
-                companyId,
-                currentIncapacityPolicy: incapacityPolicy,
-                timestamp: new Date().toISOString()
-              });
-              toast({
-                title: "🔍 Debug Info",
-                description: `Política actual: ${incapacityPolicy}. Ver consola para más detalles.`,
-                className: "border-gray-200 bg-gray-50"
-              });
-            }}
-          >
-            🔍 Debug Estado
           </Button>
         </div>
       </div>
