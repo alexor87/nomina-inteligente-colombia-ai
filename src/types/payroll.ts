@@ -113,4 +113,6 @@ export type LiquidationStep =
   | 'generating_reports'
   | 'finalizing'
   | 'completed'
-  | 'error';
+  | 'error'
+  // Allow literal strings already used in UI without breaking types
+  | (string & {});

@@ -2,6 +2,7 @@
 import { useState, useCallback } from 'react';
 import { usePayrollUnified } from './usePayrollUnified';
 import { useToast } from '@/hooks/use-toast';
+import { LiquidationStep } from '@/types/payroll';
 
 export const usePayrollLiquidationSimplified = () => {
   const [isLiquidating, setIsLiquidating] = useState(false);
@@ -11,7 +12,7 @@ export const usePayrollLiquidationSimplified = () => {
   const [isRemovingEmployee, setIsRemovingEmployee] = useState(false);
   const [isLoadingEmployees, setIsLoadingEmployees] = useState(false);
   const [showProgress, setShowProgress] = useState(false);
-  const [liquidationStep, setLiquidationStep] = useState('');
+  const [liquidationStep, setLiquidationStep] = useState<LiquidationStep>('idle');
   const [liquidationProgress, setLiquidationProgress] = useState(0);
   const [processedEmployees, setProcessedEmployees] = useState(0);
   const [liquidationErrors, setLiquidationErrors] = useState<string[]>([]);
@@ -23,17 +24,29 @@ export const usePayrollLiquidationSimplified = () => {
 
   const payrollHook = usePayrollUnified();
 
-  const loadEmployees = useCallback(async (startDate: string, endDate: string): Promise<string> => {
+  const getDefaultPeriod = () => {
+    const start = new Date();
+    const end = new Date();
+    end.setDate(start.getDate() + 14);
+    const startDate = start.toISOString().slice(0, 10);
+    const endDate = end.toISOString().slice(0, 10);
+    return { startDate, endDate };
+  };
+
+  const loadEmployees = useCallback(async (startDate?: string, endDate?: string): Promise<string> => {
     try {
       setIsLoadingEmployees(true);
       setIsLiquidating(true);
-      
-      // Create a period ID from the dates
-      const periodId = `${startDate}-${endDate}`;
+
+      const s = startDate;
+      const e = endDate;
+      const period = s && e ? { startDate: s, endDate: e } : getDefaultPeriod();
+
+      const periodId = `${period.startDate}-${period.endDate}`;
       setCurrentPeriod(periodId);
-      
+
       await payrollHook.loadEmployees(periodId);
-      
+
       toast({
         title: "Empleados cargados",
         description: "Los empleados han sido cargados correctamente",
@@ -63,20 +76,20 @@ export const usePayrollLiquidationSimplified = () => {
     try {
       setIsLiquidating(true);
       setShowProgress(true);
-      setLiquidationStep('Iniciando liquidación...');
+      setLiquidationStep('initializing');
       setLiquidationProgress(0);
       
       const periodId = `${startDate}-${endDate}`;
       
-      setLiquidationStep('Cargando empleados...');
+      setLiquidationStep('loading_employees');
       setLiquidationProgress(25);
       await payrollHook.loadEmployees(periodId);
       
-      setLiquidationStep('Procesando cálculos...');
+      setLiquidationStep('calculating_payroll');
       setLiquidationProgress(50);
       // Additional processing logic here
       
-      setLiquidationStep('Finalizando...');
+      setLiquidationStep('finalizing');
       setLiquidationProgress(100);
       
       toast({
@@ -84,8 +97,11 @@ export const usePayrollLiquidationSimplified = () => {
         description: "La nómina ha sido procesada correctamente",
         className: "border-green-200 bg-green-50"
       });
+
+      setLiquidationStep('completed');
     } catch (error) {
       console.error('Error in liquidation:', error);
+      setLiquidationStep('error');
       toast({
         title: "Error en liquidación",
         description: "No se pudo completar la liquidación",
