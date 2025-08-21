@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { EmployeeUnified } from '@/types/employee-unified';
 import { ServiceResponse } from '@/types';
@@ -14,8 +15,7 @@ export class EmployeeUnifiedService {
         return { success: false, message: error.message, data: [] };
       }
 
-      const unified: any[] = [] // placeholder to satisfy TS; actual mapping remains below
-      const mappedArray = rows.map(row => ({
+      const mappedArray = (rows ?? []).map(row => ({
         id: row.id,
         company_id: row.company_id,
         cedula: row.cedula,
@@ -58,7 +58,8 @@ export class EmployeeUnifiedService {
         tipoCotizanteId: row.tipo_cotizante_id,
         subtipoCotizanteId: row.subtipo_cotizante_id,
         custom_fields: row.custom_fields
-      });
+      }));
+
       return { success: true, data: mappedArray as any[] };
     } catch (error: any) {
       console.error('Unexpected error fetching employees:', error);
@@ -82,7 +83,6 @@ export class EmployeeUnifiedService {
         return { success: true, data: null, message: 'Employee not found' };
       }
 
-      const unifiedOne: any = {} // placeholder; actual mapping remains below
       const unifiedOneResult = {
         id: row.id,
         company_id: row.company_id,
@@ -123,8 +123,8 @@ export class EmployeeUnifiedService {
         afp: row.afp,
         arl: row.arl,
         cajaCompensacion: row.caja_compensacion,
-		tipoCotizanteId: row.tipo_cotizante_id,
-		subtipoCotizanteId: row.subtipo_cotizante_id,
+        tipoCotizanteId: row.tipo_cotizante_id,
+        subtipoCotizanteId: row.subtipo_cotizante_id,
         custom_fields: row.custom_fields
       };
       return { success: true, data: unifiedOneResult as any, message: 'Employee found' };
@@ -208,7 +208,7 @@ export class EmployeeUnifiedService {
         return { success: false, message: error.message, data: [] };
       }
 
-      const mappedArray = rows.map(row => ({
+      const mappedArray = (rows ?? []).map(row => ({
         id: row.id,
         company_id: row.company_id,
         cedula: row.cedula,
@@ -248,10 +248,11 @@ export class EmployeeUnifiedService {
         afp: row.afp,
         arl: row.arl,
         cajaCompensacion: row.caja_compensacion,
-		tipoCotizanteId: row.tipo_cotizante_id,
-		subtipoCotizanteId: row.subtipo_cotizante_id,
+        tipoCotizanteId: row.tipo_cotizante_id,
+        subtipoCotizanteId: row.subtipo_cotizante_id,
         custom_fields: row.custom_fields
-      });
+      }));
+
       return { success: true, data: mappedArray as any[] };
     } catch (error: any) {
       console.error('Unexpected error fetching employees by company ID:', error);
