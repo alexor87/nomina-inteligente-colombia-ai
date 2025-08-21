@@ -85,7 +85,7 @@ export const EmpresaSettings = () => {
               <Button 
                 onClick={handleSave} 
                 disabled={isLoading}
-                className="bg-blue-600 hover:bg-blue-700"
+                variant="default"
               >
                 {isLoading ? 'Guardando...' : 'Guardar Configuración'}
               </Button>

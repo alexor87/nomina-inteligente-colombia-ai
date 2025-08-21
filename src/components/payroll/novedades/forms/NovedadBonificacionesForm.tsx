@@ -185,7 +185,8 @@ export const NovedadBonificacionesForm: React.FC<NovedadBonificacionesFormProps>
         <Button 
           onClick={handleSubmit}
           disabled={!isValid || validationMessage?.type === 'error'}
-          className="bg-blue-600 hover:bg-blue-700 min-w-[120px]"
+          variant="default"
+          className="min-w-[120px]"
         >
           Guardar Bonificación
         </Button>

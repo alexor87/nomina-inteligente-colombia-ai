@@ -61,7 +61,7 @@ export const PayrollPeriodHeader: React.FC<PayrollPeriodHeaderProps> = ({
               <Button 
                 onClick={onCreateNewPeriod}
                 disabled={isProcessing}
-                className="bg-blue-600 hover:bg-blue-700"
+                variant="default"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 {periodStatus?.suggestion || 'Crear Período'}
@@ -143,7 +143,7 @@ export const PayrollPeriodHeader: React.FC<PayrollPeriodHeaderProps> = ({
                   <Button 
                     onClick={onClosePeriod}
                     disabled={!canClosePeriod || isProcessing}
-                    className="bg-green-600 hover:bg-green-700"
+                    variant="default"
                   >
                     <Save className="h-4 w-4 mr-2" />
                     {isProcessing ? 'Cerrando...' : 'Cerrar Período'}

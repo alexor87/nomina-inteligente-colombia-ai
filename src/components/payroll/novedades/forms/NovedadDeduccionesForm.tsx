@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -195,7 +194,8 @@ export const NovedadDeduccionesForm: React.FC<NovedadDeduccionesFormProps> = ({
         <Button 
           onClick={handleSubmit}
           disabled={!isValid}
-          className="bg-blue-600 hover:bg-blue-700 min-w-[120px]"
+          variant="default"
+          className="min-w-[120px]"
         >
           Guardar Deducción
         </Button>
