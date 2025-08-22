@@ -105,53 +105,58 @@ const calcularValorHoraRecargoBase = (salarioMensual: number, fecha: Date): numb
 };
 
 // Factor legal para horas extra (KISS: mantener dominical/festivo = 1.75 como venía en negocio)
-const getOvertimeFactor = (subtipoRaw?: string): number => {
-  const s = String(subtipoRaw || '').toLowerCase().trim();
-  if (s === 'nocturnas') return 1.75;           // Extra nocturna (75%)
-  if (s === 'dominicales' || s === 'festivas') return 1.75; // Mantener negocio actual
-  return 1.25; // Diurnas: 25%
-};
-
-// Normalizador simple
 const normalize = (v?: string) => String(v || '').toLowerCase().trim();
 
-/**
- * ✅ NUEVA FUNCIÓN KISS: Cálculo correcto de auxilio de transporte prorrateado
- */
-const calculateTransportAllowance = (
-  baseSalary: number,
-  workedDays: number,
-  totalIncapacityDays: number,
-  year: string,
-  periodType: 'quincenal' | 'mensual'
-): number => {
-  const config = OFFICIAL_VALUES[year as keyof typeof OFFICIAL_VALUES] || OFFICIAL_VALUES['2025'];
-  const transportLimit = getTransportAssistanceLimit(year);
-  
-  // 🔍 VALIDACIÓN: Solo si salario base <= 2 SMMLV
-  if (baseSalary > transportLimit) {
-    console.log(`🚫 AUXILIO TRANSPORTE: Salario ${baseSalary.toLocaleString()} > límite ${transportLimit.toLocaleString()}`);
-    return 0;
+// ✅ NUEVO: recargo dominical/festivo dinámico por fecha (Ley 2466 de 2025)
+const getRecargoDominicalFestivoPct = (fecha: Date): number => {
+  // 75% hasta 30-jun-2025
+  if (fecha < new Date('2025-07-01')) return 0.75;
+  // 80% 01-jul-2025 a 30-jun-2026
+  if (fecha < new Date('2026-07-01')) return 0.80;
+  // 90% 01-jul-2026 a 30-jun-2027
+  if (fecha < new Date('2027-07-01')) return 0.90;
+  // 100% desde 01-jul-2027
+  return 1.00;
+};
+
+// ❌ Reemplazamos la versión anterior por una con fecha y subtipos detallados
+const getOvertimeFactor = (subtipoRaw?: string, fechaPeriodo?: Date): number => {
+  const s = String(subtipoRaw || '').toLowerCase().trim();
+  const fecha = fechaPeriodo || new Date();
+  const recargoDom = getRecargoDominicalFestivoPct(fecha);
+
+  // Base: extras simples
+  if (s === 'diurnas' || s === 'diurna' || s === 'extra_diurna') {
+    console.log('⏫ Factor HE diurna = 1.25');
+    return 1.25;
   }
-  
-  // 🧮 CÁLCULO LEGAL: Días elegibles = días trabajados - días de incapacidad
-  const eligibleDays = Math.max(workedDays - totalIncapacityDays, 0);
-  
-  // 🎯 FÓRMULA NORMATIVA: (auxilio_mensual / 30) × días_elegibles
-  const dailyAllowance = config.auxilioTransporte / 30;
-  const proratedAllowance = Math.round(dailyAllowance * eligibleDays);
-  
-  console.log(`🚌 AUXILIO TRANSPORTE PRORRATEADO (${periodType}):`, {
-    salario: baseSalary.toLocaleString(),
-    limite: transportLimit.toLocaleString(),
-    diasTrabajados: workedDays,
-    diasIncapacidad: totalIncapacityDays,
-    diasElegibles: eligibleDays,
-    auxilioDiario: Math.round(dailyAllowance).toLocaleString(),
-    auxilioCalculado: proratedAllowance.toLocaleString()
-  });
-  
-  return proratedAllowance;
+  if (s === 'nocturnas' || s === 'nocturna' || s === 'extra_nocturna') {
+    console.log('⏫ Factor HE nocturna = 1.75');
+    return 1.75;
+  }
+
+  // Combinadas con dominical/festivo (acumulables)
+  if (['dominicales_diurnas','festivas_diurnas','dominical_diurna','festiva_diurna','domingo_diurna'].includes(s)) {
+    const factor = 1 + 0.25 + recargoDom;
+    console.log(`⏫ Factor HE dominical/festivo diurna = 1 + 0.25 + ${recargoDom} = ${factor} (fecha ${fecha.toISOString().slice(0,10)})`);
+    return factor;
+  }
+  if (['dominicales_nocturnas','festivas_nocturnas','dominical_nocturna','festiva_nocturna','domingo_nocturna'].includes(s)) {
+    const factor = 1 + 0.75 + recargoDom;
+    console.log(`⏫ Factor HE dominical/festivo nocturna = 1 + 0.75 + ${recargoDom} = ${factor} (fecha ${fecha.toISOString().slice(0,10)})`);
+    return factor;
+  }
+
+  // Genérico "dominicales"/"festivas" (asumir diurna por defecto)
+  if (['dominicales','dominical','festivas','festiva','domingo','festivo'].includes(s)) {
+    const factor = 1 + 0.25 + recargoDom;
+    console.log(`⏫ Factor HE dominical/festivo (genérico → diurna) = 1 + 0.25 + ${recargoDom} = ${factor} (fecha ${fecha.toISOString().slice(0,10)})`);
+    return factor;
+  }
+
+  // Default: diurna
+  console.log('ℹ️ Subtipo HE no reconocido, usando diurna = 1.25. Subtipo recibido:', s);
+  return 1.25;
 };
 
 serve(async (req) => {
@@ -532,15 +537,16 @@ async function calculateNovedadesTotals(supabase: any, data: any) {
     } else if (tipo_novedad === 'horas_extra') {
       const horasNum = Number(horas || 0);
       if (horasNum > 0) {
-        const factor = getOvertimeFactor(subtipo);
+        const factor = getOvertimeFactor(subtipo, fecha); // ✅ PASAMOS FECHA
         valorCalculado = Math.round(valorHoraExtraBase * horasNum * factor);
 
-        console.log('🛠️ Horas extra (normativa):', {
+        console.log('🛠️ Horas extra (normativa dinámica):', {
           subtipo,
           horasNum,
           base: Math.round(valorHoraExtraBase),
           factor,
-          valorCalculado
+          fecha: fecha.toISOString().slice(0,10),
+          detalle: 'Factor incluye recargo dominical/festivo dinámico cuando aplica'
         });
       }
     } else if (tipo_novedad === 'recargo_nocturno') {
@@ -646,17 +652,17 @@ async function calculateSingleNovedad(supabase: any, data: any) {
 
   } else if (tipoNovedad === 'horas_extra') {
     const horasNum = Number(horas || 0);
-    const factor = getOvertimeFactor(subtipo);
+    const factor = getOvertimeFactor(subtipo, fecha); // ✅ PASAMOS FECHA
     valor = Math.round(valorHoraExtraBase * horasNum * factor);
     factorCalculo = factor;
     detalleCalculo = `Horas extra ${subtipo || 'diurnas'}: ${horasNum} h × $${Math.round(valorHoraExtraBase).toLocaleString()} × ${factor} = $${valor.toLocaleString()}`;
 
-    console.log('🛠️ calculateSingleNovedad horas extra (normativa):', {
+    console.log('🛠️ calculateSingleNovedad horas extra (normativa dinámica):', {
       subtipo,
       horasNum,
       baseExtra: Math.round(valorHoraExtraBase),
       factor,
-      valor
+      fecha: fecha.toISOString().slice(0,10)
     });
 
   } else if (tipoNovedad === 'recargo_nocturno') {
@@ -743,3 +749,42 @@ async function validateEmployee(data: any) {
     warnings
   };
 }
+
+/**
+ * ✅ NUEVA FUNCIÓN KISS: Cálculo correcto de auxilio de transporte prorrateado
+ */
+const calculateTransportAllowance = (
+  baseSalary: number,
+  workedDays: number,
+  totalIncapacityDays: number,
+  year: string,
+  periodType: 'quincenal' | 'mensual'
+): number => {
+  const config = OFFICIAL_VALUES[year as keyof typeof OFFICIAL_VALUES] || OFFICIAL_VALUES['2025'];
+  const transportLimit = getTransportAssistanceLimit(year);
+  
+  // 🔍 VALIDACIÓN: Solo si salario base <= 2 SMMLV
+  if (baseSalary > transportLimit) {
+    console.log(`🚫 AUXILIO TRANSPORTE: Salario ${baseSalary.toLocaleString()} > límite ${transportLimit.toLocaleString()}`);
+    return 0;
+  }
+  
+  // 🧮 CÁLCULO LEGAL: Días elegibles = días trabajados - días de incapacidad
+  const eligibleDays = Math.max(workedDays - totalIncapacityDays, 0);
+  
+  // 🎯 FÓRMULA NORMATIVA: (auxilio_mensual / 30) × días_elegibles
+  const dailyAllowance = config.auxilioTransporte / 30;
+  const proratedAllowance = Math.round(dailyAllowance * eligibleDays);
+  
+  console.log(`🚌 AUXILIO TRANSPORTE PRORRATEADO (${periodType}):`, {
+    salario: baseSalary.toLocaleString(),
+    limite: transportLimit.toLocaleString(),
+    diasTrabajados: workedDays,
+    diasIncapacidad: totalIncapacityDays,
+    diasElegibles: eligibleDays,
+    auxilioDiario: Math.round(dailyAllowance).toLocaleString(),
+    auxilioCalculado: proratedAllowance.toLocaleString()
+  });
+  
+  return proratedAllowance;
+};
