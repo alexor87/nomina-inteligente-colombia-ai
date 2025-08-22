@@ -13,31 +13,48 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 
-interface DatePickerProps {
-  mode?: "single" | "range"
-  selected?: Date | DateRange
-  onSelect?: (date: Date | DateRange | undefined) => void
+interface DatePickerSingleProps {
+  mode: "single"
+  selected?: Date
+  onSelect?: (date: Date | undefined) => void
   onClose?: () => void
   defaultMonth?: Date
   className?: string
 }
 
-export function DatePicker({
-  mode = "single",
-  selected,
-  onSelect,
-  onClose,
-  defaultMonth,
-  className
-}: DatePickerProps) {
+interface DatePickerRangeProps {
+  mode: "range"
+  selected?: DateRange
+  onSelect?: (range: DateRange | undefined) => void
+  onClose?: () => void
+  defaultMonth?: Date
+  className?: string
+}
+
+type DatePickerProps = DatePickerSingleProps | DatePickerRangeProps
+
+export function DatePicker(props: DatePickerProps) {
+  if (props.mode === "single") {
+    return (
+      <Calendar
+        mode="single"
+        defaultMonth={props.defaultMonth}
+        selected={props.selected}
+        onSelect={props.onSelect}
+        initialFocus
+        className={cn("p-3 pointer-events-auto", props.className)}
+      />
+    )
+  }
+
   return (
     <Calendar
-      mode={mode}
-      defaultMonth={defaultMonth}
-      selected={selected}
-      onSelect={onSelect}
+      mode="range"
+      defaultMonth={props.defaultMonth}
+      selected={props.selected}
+      onSelect={props.onSelect}
       initialFocus
-      className={cn("p-3 pointer-events-auto", className)}
+      className={cn("p-3 pointer-events-auto", props.className)}
     />
   )
 }
