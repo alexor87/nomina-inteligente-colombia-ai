@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -265,7 +264,7 @@ const PayrollLiquidationPageSimple = () => {
           onClose={handleSuccessModalClose}
           periodData={liquidationResult.periodData}
           summary={liquidationResult.summary}
-          periodId={liquidationResult.periodId} {/* ✅ AGREGADO: Pasar periodId */}
+          periodId={liquidationResult.periodId}
         />
       )}
     </div>
