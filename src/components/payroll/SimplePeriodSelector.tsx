@@ -277,7 +277,6 @@ export const SimplePeriodSelector: React.FC<SimplePeriodSelectorProps> = ({
                       <Calendar className="h-4 w-4 text-blue-600" />
                       <span className="font-medium text-blue-800">Período Seleccionado</span>
                     </div>
-                    <p className="text-blue-700">del 16 - 28 o 29 si es año bisiesto</p>
                     <p className="text-sm text-blue-600">
                       {selectedPeriod.startDate} al {selectedPeriod.endDate}
                     </p>
