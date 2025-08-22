@@ -13,6 +13,20 @@ export class VacationNovedadSyncService {
     
     console.log('📋 Using processed_in_period_id:', processed_in_period_id);
     
+    // 🎯 VALIDACIÓN PREVIA: Verificar duplicados antes de crear
+    const companyId = await VacationNovedadSyncService.getCurrentCompanyId();
+    const existingDuplicate = await this.checkForDuplicate(
+      companyId,
+      formData.employee_id,
+      formData.type,
+      formData.start_date,
+      formData.end_date
+    );
+
+    if (existingDuplicate) {
+      throw new Error('Ya existe un registro idéntico para este empleado en las mismas fechas');
+    }
+    
     // 🎯 CORRECCIÓN BOOLEAN: Valores seguros para todos los campos
     const insertData = {
       employee_id: formData.employee_id,
@@ -24,7 +38,7 @@ export class VacationNovedadSyncService {
       observations: formData.observations || '',
       status: 'pendiente',
       created_by: (await supabase.auth.getUser()).data.user?.id,
-      company_id: await VacationNovedadSyncService.getCurrentCompanyId(),
+      company_id: companyId,
       processed_in_period_id: processed_in_period_id
     };
     
@@ -46,6 +60,34 @@ export class VacationNovedadSyncService {
     
     console.log('✅ Vacation created successfully:', data);
     return data;
+  }
+
+  /**
+   * 🔍 VALIDACIÓN: Verificar duplicados exactos
+   */
+  private static async checkForDuplicate(
+    companyId: string,
+    employeeId: string,
+    type: string,
+    startDate: string,
+    endDate: string
+  ): Promise<boolean> {
+    const { data, error } = await supabase
+      .from('employee_vacation_periods')
+      .select('id')
+      .eq('company_id', companyId)
+      .eq('employee_id', employeeId)
+      .eq('type', type)
+      .eq('start_date', startDate)
+      .eq('end_date', endDate)
+      .limit(1);
+
+    if (error) {
+      console.warn('⚠️ Error checking duplicates:', error);
+      return false;
+    }
+
+    return (data && data.length > 0) || false;
   }
 
   /**
@@ -124,30 +166,66 @@ export class VacationNovedadSyncService {
   }
 
   /**
-   * ✅ SOLUCIÓN KISS: Deduplicar registros unificados por ID
+   * ✅ SOLUCIÓN MEJORADA: Deduplicar registros unificados con lógica robusta
    */
   private static deduplicateUnifiedData(unifiedData: any[]): any[] {
     const deduplicatedMap = new Map();
+    const contentMap = new Map(); // Para detectar duplicados por contenido
     let duplicatesDetected = 0;
 
     unifiedData.forEach(item => {
-      const existingItem = deduplicatedMap.get(item.id);
+      // Clave primaria por ID
+      const existingById = deduplicatedMap.get(item.id);
       
-      if (existingItem) {
+      // Clave secundaria por contenido (empleado + fechas + tipo)
+      const contentKey = `${item.empleado_id}_${item.tipo_novedad}_${item.fecha_inicio}_${item.fecha_fin}`;
+      const existingByContent = contentMap.get(contentKey);
+      
+      if (existingById) {
         duplicatesDetected++;
-        console.log(`🔄 Duplicado detectado ID: ${item.id}, priorizando fuente: ${existingItem.source_type}`);
+        console.log(`🔄 Duplicado por ID detectado: ${item.id}, priorizando fuente: ${existingById.source_type}`);
         
-        if (item.source_type === 'vacation' && existingItem.source_type === 'novedad') {
+        // Priorizar vacation sobre novedad si hay conflicto por ID
+        if (item.source_type === 'vacation' && existingById.source_type === 'novedad') {
           deduplicatedMap.set(item.id, item);
           console.log(`✅ Reemplazado por fuente vacation: ${item.id}`);
         }
+      } else if (existingByContent && existingByContent.length > 0) {
+        // Duplicado por contenido - mantener solo uno
+        const existing = existingByContent[0];
+        duplicatesDetected++;
+        console.log(`🔄 Duplicado por contenido detectado para empleado: ${item.empleado_id}`);
+        
+        // Si el existente es del mismo módulo, mantener el más reciente
+        if (existing.source_type === item.source_type) {
+          if (new Date(item.created_at) > new Date(existing.created_at)) {
+            // Remover el anterior y agregar el nuevo
+            deduplicatedMap.delete(existing.id);
+            contentMap.get(contentKey).splice(0, 1, item);
+            deduplicatedMap.set(item.id, item);
+            console.log(`✅ Reemplazado por versión más reciente: ${item.id}`);
+          }
+        } else {
+          // Diferentes módulos, priorizar vacation
+          if (item.source_type === 'vacation') {
+            deduplicatedMap.delete(existing.id);
+            contentMap.get(contentKey).splice(0, 1, item);
+            deduplicatedMap.set(item.id, item);
+            console.log(`✅ Reemplazado por fuente vacation: ${item.id}`);
+          }
+        }
       } else {
+        // Registro único
         deduplicatedMap.set(item.id, item);
+        if (!contentMap.has(contentKey)) {
+          contentMap.set(contentKey, []);
+        }
+        contentMap.get(contentKey).push(item);
       }
     });
 
     if (duplicatesDetected > 0) {
-      console.log(`🎯 DEDUPLICACIÓN KISS: ${duplicatesDetected} duplicados eliminados de vista`);
+      console.log(`🎯 DEDUPLICACIÓN MEJORADA: ${duplicatesDetected} duplicados eliminados de vista`);
     }
 
     return Array.from(deduplicatedMap.values());
@@ -328,7 +406,8 @@ export class VacationNovedadSyncService {
     }
 
     console.log('✅ DATOS DEDUPLICADOS Y FILTRADOS:', {
-      total: filteredData.length,
+      totalOriginal: unifiedData.length,
+      totalFiltrado: filteredData.length,
       pendientes: filteredData.filter(item => item.status === 'pendiente').length,
       liquidadas: filteredData.filter(item => item.status === 'liquidada').length,
       periodStatusMap

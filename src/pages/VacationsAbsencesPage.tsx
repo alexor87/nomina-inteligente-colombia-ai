@@ -2,13 +2,15 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { VacationAbsenceFiltersComponent } from '@/components/vacations/VacationAbsenceFilters';
 import { VacationAbsenceTable } from '@/components/vacations/VacationAbsenceTable';
 import { VacationAbsenceForm } from '@/components/vacations/VacationAbsenceForm';
 import { VacationAbsenceDetailModal } from '@/components/vacations/VacationAbsenceDetailModal';
+import { VacationDuplicatesMonitor } from '@/components/vacations/VacationDuplicatesMonitor';
 import { useUnifiedVacationsAbsences } from '@/hooks/useUnifiedVacationsAbsences';
 import { VacationAbsence, VacationAbsenceFilters } from '@/types/vacations';
-import { Plus, Calendar, Users, Clock, CheckCircle, RefreshCw } from 'lucide-react';
+import { Plus, Calendar, Users, Clock, CheckCircle, RefreshCw, Settings } from 'lucide-react';
 
 const VacationsAbsencesPage = () => {
   const [filters, setFilters] = useState<VacationAbsenceFilters>({});
@@ -16,6 +18,7 @@ const VacationsAbsencesPage = () => {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [editingVacation, setEditingVacation] = useState<VacationAbsence | null>(null);
   const [selectedVacation, setSelectedVacation] = useState<VacationAbsence | null>(null);
+  const [activeTab, setActiveTab] = useState<string>('vacations'); // 'vacations' o 'duplicates'
 
   console.log('🏖️ VacationsAbsencesPage rendered');
 
@@ -140,96 +143,116 @@ const VacationsAbsencesPage = () => {
         </Button>
       </div>
 
-      {/* Estadísticas Unificadas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Registros</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
-            <div className="flex items-center space-x-2 text-xs text-muted-foreground mt-1">
-              <Badge variant="secondary" className="text-xs px-1 bg-blue-100">
-                {stats.fromVacations} vacaciones
-              </Badge>
-              <Badge variant="secondary" className="text-xs px-1 bg-green-100">
-                {stats.fromNovedades} novedades
-              </Badge>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Tabs para navegar entre vacaciones y monitoreo de duplicados */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="vacations" className="flex items-center space-x-2">
+            <Calendar className="h-4 w-4" />
+            <span>Vacaciones y Ausencias</span>
+          </TabsTrigger>
+          <TabsTrigger value="duplicates" className="flex items-center space-x-2">
+            <Settings className="h-4 w-4" />
+            <span>Monitor de Duplicados</span>
+          </TabsTrigger>
+        </TabsList>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pendientes</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{stats.pendientes}</div>
-            <p className="text-xs text-muted-foreground">
-              Por liquidar en nómina
-            </p>
-          </CardContent>
-        </Card>
+        <TabsContent value="vacations" className="space-y-6">
+          {/* Estadísticas Unificadas */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Registros</CardTitle>
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.total}</div>
+                <div className="flex items-center space-x-2 text-xs text-muted-foreground mt-1">
+                  <Badge variant="secondary" className="text-xs px-1 bg-blue-100">
+                    {stats.fromVacations} vacaciones
+                  </Badge>
+                  <Badge variant="secondary" className="text-xs px-1 bg-green-100">
+                    {stats.fromNovedades} novedades
+                  </Badge>
+                </div>
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Liquidadas</CardTitle>
-            <CheckCircle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats.liquidadas}</div>
-            <p className="text-xs text-muted-foreground">
-              Procesadas en nómina
-            </p>
-          </CardContent>
-        </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Pendientes</CardTitle>
+                <Clock className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-yellow-600">{stats.pendientes}</div>
+                <p className="text-xs text-muted-foreground">
+                  Por liquidar en nómina
+                </p>
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Días</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalDays}</div>
-            <p className="text-xs text-muted-foreground">
-              Días acumulados
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Liquidadas</CardTitle>
+                <CheckCircle className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600">{stats.liquidadas}</div>
+                <p className="text-xs text-muted-foreground">
+                  Procesadas en nómina
+                </p>
+              </CardContent>
+            </Card>
 
-      <VacationAbsenceFiltersComponent
-        filters={filters}
-        onFiltersChange={setFilters}
-        onClearFilters={clearFilters}
-      />
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Días</CardTitle>
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.totalDays}</div>
+                <p className="text-xs text-muted-foreground">
+                  Días acumulados
+                </p>
+              </CardContent>
+            </Card>
+          </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Registros de Vacaciones y Ausencias</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Vista unificada de registros del módulo de vacaciones y novedades
-          </p>
-        </CardHeader>
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="p-8 text-center text-muted-foreground">
-              <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2" />
-              Cargando datos unificados...
-            </div>
-          ) : (
-              <VacationAbsenceTable
-                vacationsAbsences={vacationsAbsences}
-                onView={handleViewVacation}
-                onEdit={handleEditVacation}
-                onDelete={handleDeleteVacation}
-                isLoading={isLoading}
-              />
-          )}
-        </CardContent>
-      </Card>
+          <VacationAbsenceFiltersComponent
+            filters={filters}
+            onFiltersChange={setFilters}
+            onClearFilters={clearFilters}
+          />
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Registros de Vacaciones y Ausencias</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Vista unificada de registros del módulo de vacaciones y novedades
+              </p>
+            </CardHeader>
+            <CardContent className="p-0">
+              {isLoading ? (
+                <div className="p-8 text-center text-muted-foreground">
+                  <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2" />
+                  Cargando datos unificados...
+                </div>
+              ) : (
+                  <VacationAbsenceTable
+                    vacationsAbsences={vacationsAbsences}
+                    onView={handleViewVacation}
+                    onEdit={handleEditVacation}
+                    onDelete={handleDeleteVacation}
+                    isLoading={isLoading}
+                  />
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="duplicates">
+          <VacationDuplicatesMonitor />
+        </TabsContent>
+      </Tabs>
 
       {/* Modales */}
       <VacationAbsenceForm
