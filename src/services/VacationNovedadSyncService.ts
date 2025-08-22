@@ -20,7 +20,7 @@ export class VacationNovedadSyncService {
     const existingDuplicate = await this.checkForDuplicate(
       companyId,
       formData.employee_id,
-      formData.type,
+      formData.type as NovedadType,
       formData.start_date,
       formData.end_date
     );
@@ -70,7 +70,7 @@ export class VacationNovedadSyncService {
   private static async checkForDuplicate(
     companyId: string,
     employeeId: string,
-    type: string,
+    type: NovedadType,
     startDate: string,
     endDate: string
   ): Promise<boolean> {
