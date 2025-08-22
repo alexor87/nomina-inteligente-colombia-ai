@@ -1,7 +1,7 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { VacationAbsenceFormData } from '@/types/vacations';
 import type { NovedadType } from '@/types/novedades';
+import { VacationStatusValidationService } from './VacationStatusValidationService';
 
 export class VacationNovedadSyncService {
   
@@ -234,10 +234,10 @@ export class VacationNovedadSyncService {
   }
 
   /**
-   * 🎯 CORRECCIÓN BOOLEAN: Obtener datos unificados con manejo seguro de campos
+   * 🎯 CORRECCIÓN BOOLEAN: Obtener datos unificados con validación de estado mejorada
    */
   static async getUnifiedVacationData(filters: any = {}) {
-    console.log('🔍 Loading unified vacation data with filters:', filters);
+    console.log('🔍 Loading unified vacation data with improved status validation:', filters);
     
     const companyId = await VacationNovedadSyncService.getCurrentCompanyId();
     
@@ -303,17 +303,14 @@ export class VacationNovedadSyncService {
 
     console.log('🔍 Period status map:', periodStatusMap);
 
-    // 🎯 CORRECCIÓN BOOLEAN: Transformación segura con valores por defecto
+    // 🎯 VALIDACIÓN MEJORADA: Transformación con estado correcto calculado
     const unifiedData = [
-      ...(vacationsData || []).map(item => {
-        let calculatedStatus: 'pendiente' | 'liquidada' | 'cancelada' = 'pendiente';
-        
-        if (item.processed_in_period_id) {
-          const periodStatus = periodStatusMap[item.processed_in_period_id];
-          if (periodStatus === 'cerrado') {
-            calculatedStatus = 'liquidada';
-          }
-        }
+      ...(await Promise.all((vacationsData || []).map(async item => {
+        // 🎯 NUEVA LÓGICA: Calcular estado correcto usando validación
+        const calculatedStatus = await VacationStatusValidationService.calculateCorrectStatus(
+          item, 
+          periodStatusMap
+        );
 
         return {
           source_type: 'vacation' as const,
@@ -328,7 +325,7 @@ export class VacationNovedadSyncService {
           dias: item.days_count || 0,
           valor: 0,
           observacion: item.observations || '',
-          status: calculatedStatus,
+          status: calculatedStatus, // 🎯 ESTADO VALIDADO
           creado_por: item.created_by,
           created_at: item.created_at,
           updated_at: item.updated_at,
@@ -345,7 +342,7 @@ export class VacationNovedadSyncService {
           created_by: item.created_by,
           processed_in_period_id: item.processed_in_period_id
         };
-      }),
+      }))),
       
       ...(novedadesData || []).map(item => {
         let calculatedStatus: 'pendiente' | 'liquidada' | 'cancelada' = 'pendiente';
@@ -416,7 +413,7 @@ export class VacationNovedadSyncService {
       filteredData = filteredData.filter(item => item.fecha_fin && item.fecha_fin <= filters.date_to);
     }
 
-    console.log('✅ DATOS DEDUPLICADOS Y FILTRADOS:', {
+    console.log('✅ DATOS CON VALIDACIÓN DE ESTADO MEJORADA:', {
       totalOriginal: unifiedData.length,
       totalFiltrado: filteredData.length,
       pendientes: filteredData.filter(item => item.status === 'pendiente').length,
@@ -485,4 +482,3 @@ export class VacationNovedadSyncService {
     return data.company_id;
   }
 }
-
