@@ -3,7 +3,7 @@ import { SecureBaseService } from './SecureBaseService';
 import { NovedadesCalculationService } from './NovedadesCalculationService';
 import { ConfigurationService } from './ConfigurationService';
 import { DeductionCalculationService } from './DeductionCalculationService';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 
 interface Employee {
   id: string;
@@ -49,7 +49,9 @@ export class PayrollLiquidationService extends SecureBaseService {
   static async ensurePeriodExists(startDate: string, endDate: string): Promise<string> {
     try {
       console.log('🔒 Ensuring period exists securely (KISS)');
-      const periodName = `${format(new Date(startDate), 'dd/MM/yyyy')} - ${format(new Date(endDate), 'dd/MM/yyyy')}`;
+      
+      // ✅ KISS FIX: Formateo directo sin Date objects para evitar timezone shift
+      const periodName = `${format(parseISO(startDate), 'dd/MM/yyyy')} - ${format(parseISO(endDate), 'dd/MM/yyyy')}`;
 
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) {
