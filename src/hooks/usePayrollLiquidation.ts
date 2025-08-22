@@ -72,32 +72,40 @@ export const usePayrollLiquidation = () => {
       const periodId = await PayrollLiquidationService.ensurePeriodExists(startDate, endDate);
       setCurrentPeriodId(periodId);
 
-      // ✅ CORREGIDO: Mapear datos con valores ya calculados correctamente
+      // ✅ MAPEO MEJORADO: Crear datos consistentes con claves españolas
       const mappedEmployees = employeesData.map(employee => ({
         id: employee.id,
         name: `${employee.nombre} ${employee.apellido}`,
-        position: 'Empleado', // Posición por defecto
+        position: 'Empleado',
+        // ✅ CLAVES EN ESPAÑOL para compatibilidad con servicio
+        salario_base: employee.salario_base,
+        dias_trabajados: employee.dias_trabajados,
+        auxilio_transporte: employee.auxilio_transporte,
+        deducciones_novedades: employee.deducciones_novedades,
+        // También mantener claves en inglés para compatibilidad con UI
         baseSalary: employee.salario_base,
-        worked_days: employee.dias_trabajados, // Ya calculado proporcionalmente
+        worked_days: employee.dias_trabajados,
+        transport_allowance: employee.auxilio_transporte,
+        additional_deductions: employee.deducciones_novedades,
+        // Campos calculados
         extra_hours: 0,
         disabilities: 0,
         bonuses: 0,
         absences: 0,
-        transport_allowance: employee.auxilio_transporte, // Ya calculado
-        additional_deductions: employee.deducciones_novedades,
         eps: '',
         afp: '',
-        // ✅ VALORES YA CALCULADOS CORRECTAMENTE POR EL SERVICIO
+        devengos: employee.devengos,
+        deducciones: employee.deducciones,
         total_devengado: employee.devengos + (employee.salario_base / 30) * employee.dias_trabajados + employee.auxilio_transporte,
         total_deducciones: employee.deducciones,
         neto_pagado: employee.total_pagar,
-        payrollId: null, // Se asignará al crear el registro
+        payrollId: null,
         periodId: periodId
       }));
 
       setEmployees(mappedEmployees);
       
-      console.log('✅ Empleados cargados con cálculos correctos:', mappedEmployees.length);
+      console.log('✅ Empleados cargados con mapeo mejorado:', mappedEmployees.length);
       console.log('📊 Ejemplo - Primer empleado:', mappedEmployees[0]);
 
     } catch (error) {
@@ -306,10 +314,30 @@ export const usePayrollLiquidation = () => {
     try {
       setIsLiquidating(true);
       
-      console.log('🚀 Iniciando liquidación con datos correctos...');
+      console.log('🚀 Iniciando liquidación con validación previa...');
+      
+      // ✅ VALIDACIÓN PREVIA: Verificar datos antes de enviar
+      const employeesWithValidation = employees.map(employee => {
+        const validationErrors = [];
+        
+        if (!employee.salario_base && !employee.baseSalary) {
+          validationErrors.push(`${employee.name}: Salario base faltante`);
+        }
+        if (!employee.dias_trabajados && !employee.worked_days) {
+          validationErrors.push(`${employee.name}: Días trabajados faltante`);
+        }
+        
+        if (validationErrors.length > 0) {
+          throw new Error(`❌ Errores de validación:\n${validationErrors.join('\n')}`);
+        }
+        
+        return employee;
+      });
+
+      console.log('✅ Validación previa exitosa');
 
       const result = await PayrollLiquidationService.liquidatePayroll(
-        employees, 
+        employeesWithValidation, 
         startDate, 
         endDate
       );

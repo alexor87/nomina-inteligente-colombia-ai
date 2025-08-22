@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,19 +7,25 @@ import { PayrollLiquidationTable } from '@/components/payroll/liquidation/Payrol
 import { SimplePeriodSelector } from '@/components/payroll/SimplePeriodSelector';
 import { EmployeeAddModal } from '@/components/payroll/modals/EmployeeAddModal';
 import { PayrollSuccessModal } from '@/components/payroll/modals/PayrollSuccessModal';
+import { PayrollPeriodGuard } from '@/components/payroll/PayrollPeriodGuard';
 import { useCurrentCompany } from '@/hooks/useCurrentCompany';
 import { usePayrollLiquidation } from '@/hooks/usePayrollLiquidation';
 import { SelectablePeriod } from '@/services/payroll/SimplePeriodService';
 import { useNavigate } from 'react-router-dom';
 import { useYear } from '@/contexts/YearContext';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 const PayrollLiquidationPageSimple = () => {
   const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState<SelectablePeriod | null>(null);
+  const [hideZeroNetPeriods, setHideZeroNetPeriods] = useState(false);
+  const [periods, setPeriods] = useState<any[]>([]);
   
   const { companyId } = useCurrentCompany();
   const navigate = useNavigate();
   const { selectedYear } = useYear();
+  const { toast } = useToast();
   
   const {
     employees,
@@ -35,6 +42,67 @@ const PayrollLiquidationPageSimple = () => {
     closeSuccessModal
   } = usePayrollLiquidation();
 
+  // ✅ NUEVA FUNCIÓN: Limpiar borradores vacíos
+  const handleCleanupEmptyDrafts = async () => {
+    if (!companyId) return;
+    
+    try {
+      console.log('🧹 Limpiando borradores vacíos...');
+      
+      // Buscar borradores vacíos
+      const { data: emptyDrafts, error: fetchError } = await supabase
+        .from('payroll_periods_real')
+        .select('id, periodo')
+        .eq('company_id', companyId)
+        .eq('estado', 'borrador')
+        .or('total_neto.eq.0,empleados_count.eq.0');
+      
+      if (fetchError) throw fetchError;
+      
+      if (!emptyDrafts || emptyDrafts.length === 0) {
+        toast({
+          title: "No hay borradores vacíos",
+          description: "No se encontraron períodos en borrador para limpiar",
+          className: "border-blue-200 bg-blue-50"
+        });
+        return;
+      }
+      
+      const confirmed = window.confirm(
+        `¿Deseas eliminar ${emptyDrafts.length} borradores vacíos?\n\n` +
+        emptyDrafts.slice(0, 3).map(p => `• ${p.periodo}`).join('\n') +
+        (emptyDrafts.length > 3 ? `\n... y ${emptyDrafts.length - 3} más` : '')
+      );
+      
+      if (!confirmed) return;
+      
+      // Eliminar borradores vacíos
+      const { error: deleteError } = await supabase
+        .from('payroll_periods_real')
+        .delete()
+        .in('id', emptyDrafts.map(p => p.id));
+      
+      if (deleteError) throw deleteError;
+      
+      toast({
+        title: "✅ Limpieza Completada",
+        description: `Se eliminaron ${emptyDrafts.length} borradores vacíos`,
+        className: "border-green-200 bg-green-50"
+      });
+      
+      // Recargar períodos si es necesario
+      // (esto se puede mejorar con un callback desde SimplePeriodSelector)
+      
+    } catch (error) {
+      console.error('❌ Error limpiando borradores:', error);
+      toast({
+        title: "❌ Error",
+        description: "No se pudieron limpiar los borradores vacíos",
+        variant: "destructive"
+      });
+    }
+  };
+
   const handlePeriodSelection = async (period: SelectablePeriod & { year?: string }) => {
     console.log('🎯 Período seleccionado:', period.label, 'Año:', period.year);
     setSelectedPeriod(period);
@@ -44,6 +112,21 @@ const PayrollLiquidationPageSimple = () => {
 
   const handleLiquidate = async () => {
     if (!selectedPeriod || employees.length === 0) {
+      return;
+    }
+
+    // ✅ VALIDACIÓN MEJORADA: Verificar datos antes de confirmar
+    const employeesWithErrors = employees.filter(emp => 
+      !emp.salario_base && !emp.baseSalary ||
+      !emp.dias_trabajados && !emp.worked_days
+    );
+    
+    if (employeesWithErrors.length > 0) {
+      toast({
+        title: "❌ Datos Incompletos",
+        description: `${employeesWithErrors.length} empleados tienen datos faltantes. Revisa los salarios base y días trabajados.`,
+        variant: "destructive"
+      });
       return;
     }
 
@@ -80,6 +163,16 @@ const PayrollLiquidationPageSimple = () => {
           <h1 className="text-2xl font-bold">Liquidación de Nómina</h1>
         </div>
       </div>
+
+      {/* ✅ NUEVO: Componente de guardia para períodos */}
+      {companyId && (
+        <PayrollPeriodGuard
+          periods={periods}
+          onCleanupEmptyDrafts={handleCleanupEmptyDrafts}
+          hideZeroNetPeriods={hideZeroNetPeriods}
+          onToggleZeroNetFilter={setHideZeroNetPeriods}
+        />
+      )}
 
       {companyId && !selectedPeriod && (
         <SimplePeriodSelector

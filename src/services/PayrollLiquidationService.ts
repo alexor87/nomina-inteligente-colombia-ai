@@ -22,11 +22,98 @@ interface Employee {
   deducciones_novedades: number;
 }
 
+// ✅ NUEVA INTERFAZ: Para validar datos de empleado antes de liquidar
+interface EmployeeInputData {
+  id: string;
+  name?: string;
+  baseSalary?: number;
+  salario_base?: number;
+  worked_days?: number;
+  dias_trabajados?: number;
+  transport_allowance?: number;
+  auxilio_transporte?: number;
+  additional_deductions?: number;
+  deducciones_novedades?: number;
+  [key: string]: any;
+}
+
 /**
  * 🔒 SECURITY MIGRATION: PayrollLiquidationService now extends SecureBaseService
  * All database operations are automatically secured with company_id filtering
  */
 export class PayrollLiquidationService extends SecureBaseService {
+
+  // ✅ NUEVA FUNCIÓN: Normalizar datos de empleado (inglés → español)
+  static normalizeEmployeeData(employee: EmployeeInputData): any {
+    console.log('🔄 Normalizando datos del empleado:', employee.id);
+    
+    const normalized = {
+      id: employee.id,
+      // ✅ MAPEO CLAVE: inglés → español con fallbacks
+      salario_base: employee.salario_base ?? employee.baseSalary ?? 0,
+      dias_trabajados: employee.dias_trabajados ?? employee.worked_days ?? 15,
+      auxilio_transporte: employee.auxilio_transporte ?? employee.transport_allowance ?? 0,
+      deducciones_novedades: employee.deducciones_novedades ?? employee.additional_deductions ?? 0,
+      // Conservar otros campos
+      devengos: employee.devengos ?? 0,
+      deducciones: employee.deducciones ?? 0,
+      total_pagar: employee.total_pagar ?? 0,
+      salud_empleado: employee.salud_empleado ?? 0,
+      pension_empleado: employee.pension_empleado ?? 0,
+      fondo_solidaridad: employee.fondo_solidaridad ?? 0,
+      retencion_fuente: employee.retencion_fuente ?? 0
+    };
+
+    // ✅ VALIDACIÓN: Verificar campos críticos
+    if (!normalized.salario_base || normalized.salario_base <= 0) {
+      throw new Error(`❌ Empleado ${employee.id}: salario_base inválido (${normalized.salario_base})`);
+    }
+    if (!normalized.dias_trabajados || normalized.dias_trabajados <= 0) {
+      throw new Error(`❌ Empleado ${employee.id}: dias_trabajados inválido (${normalized.dias_trabajados})`);
+    }
+
+    console.log('✅ Datos normalizados:', {
+      id: normalized.id,
+      salario_base: normalized.salario_base,
+      dias_trabajados: normalized.dias_trabajados,
+      auxilio_transporte: normalized.auxilio_transporte
+    });
+
+    return normalized;
+  }
+
+  // ✅ NUEVA FUNCIÓN: Validar lista de empleados antes de liquidar
+  static validateEmployeesForLiquidation(employees: EmployeeInputData[]): void {
+    console.log('🔍 Validando empleados para liquidación...');
+    
+    if (!employees || employees.length === 0) {
+      throw new Error('❌ No hay empleados para liquidar');
+    }
+
+    const errors: string[] = [];
+    
+    employees.forEach((employee, index) => {
+      if (!employee.id) {
+        errors.push(`Empleado ${index + 1}: ID faltante`);
+      }
+      
+      const salario = employee.salario_base ?? employee.baseSalary;
+      if (!salario || salario <= 0) {
+        errors.push(`Empleado ${employee.id || index + 1}: salario_base inválido`);
+      }
+      
+      const dias = employee.dias_trabajados ?? employee.worked_days;
+      if (!dias || dias <= 0) {
+        errors.push(`Empleado ${employee.id || index + 1}: dias_trabajados inválido`);
+      }
+    });
+
+    if (errors.length > 0) {
+      throw new Error(`❌ Errores de validación:\n${errors.join('\n')}`);
+    }
+
+    console.log('✅ Validación exitosa:', employees.length, 'empleados');
+  }
 
   static calculateWorkingDays(startDate: string, endDate: string): number {
     const start = new Date(startDate);
@@ -233,10 +320,15 @@ export class PayrollLiquidationService extends SecureBaseService {
   }
 
   /**
-   * ✅ CORREGIDO: Liquidación con cálculo único de totales
+   * ✅ CORREGIDO: Liquidación con normalización de datos y validación previa
    */
-  static async liquidatePayroll(employees: any[], startDate: string, endDate: string) {
+  static async liquidatePayroll(employees: EmployeeInputData[], startDate: string, endDate: string) {
     try {
+      console.log('🚀 Iniciando liquidación con validación y normalización...');
+      
+      // ✅ PASO 1: Validar datos de entrada
+      this.validateEmployeesForLiquidation(employees);
+      
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) {
         throw new Error('No se pudo obtener la empresa del usuario');
@@ -257,30 +349,39 @@ export class PayrollLiquidationService extends SecureBaseService {
       const periodName = periodData.periodo;
 
       const payrollInserts = [];
-      for (const employee of employees) {
-        const salarioProporcional = (employee.salario_base / 30) * employee.dias_trabajados;
-        const totalDevengadoFinal = salarioProporcional + employee.auxilio_transporte + employee.devengos;
-        const totalDeduccionesFinal = employee.deducciones + employee.deducciones_novedades;
-        const netoPagadoFinal = totalDevengadoFinal - totalDeduccionesFinal;
+      
+      // ✅ PASO 2: Normalizar y procesar cada empleado
+      for (const employeeInput of employees) {
+        try {
+          const employee = this.normalizeEmployeeData(employeeInput);
+          
+          const salarioProporcional = (employee.salario_base / 30) * employee.dias_trabajados;
+          const totalDevengadoFinal = salarioProporcional + employee.auxilio_transporte + employee.devengos;
+          const totalDeduccionesFinal = employee.deducciones + employee.deducciones_novedades;
+          const netoPagadoFinal = totalDevengadoFinal - totalDeduccionesFinal;
 
-        payrollInserts.push({
-          company_id: companyId,
-          employee_id: employee.id,
-          periodo: periodName,
-          period_id: periodId,
-          salario_base: employee.salario_base,
-          dias_trabajados: employee.dias_trabajados,
-          auxilio_transporte: employee.auxilio_transporte,
-          total_devengado: totalDevengadoFinal,
-          salud_empleado: employee.salud_empleado,
-          pension_empleado: employee.pension_empleado,
-          fondo_solidaridad: employee.fondo_solidaridad,
-          retencion_fuente: employee.retencion_fuente,
-          otras_deducciones: employee.deducciones_novedades,
-          total_deducciones: totalDeduccionesFinal,
-          neto_pagado: netoPagadoFinal,
-          estado: 'procesada',
-        });
+          payrollInserts.push({
+            company_id: companyId,
+            employee_id: employee.id,
+            periodo: periodName,
+            period_id: periodId,
+            salario_base: employee.salario_base, // ✅ GARANTIZADO: no null
+            dias_trabajados: employee.dias_trabajados,
+            auxilio_transporte: employee.auxilio_transporte,
+            total_devengado: totalDevengadoFinal,
+            salud_empleado: employee.salud_empleado,
+            pension_empleado: employee.pension_empleado,
+            fondo_solidaridad: employee.fondo_solidaridad,
+            retencion_fuente: employee.retencion_fuente,
+            otras_deducciones: employee.deducciones_novedades,
+            total_deducciones: totalDeduccionesFinal,
+            neto_pagado: netoPagadoFinal,
+            estado: 'procesada',
+          });
+        } catch (employeeError) {
+          console.error(`❌ Error procesando empleado ${employeeInput.id}:`, employeeError);
+          throw new Error(`Error en empleado ${employeeInput.id}: ${employeeError.message}`);
+        }
       }
 
       if (payrollInserts.length > 0) {
@@ -339,7 +440,7 @@ export class PayrollLiquidationService extends SecureBaseService {
         throw updateError;
       }
 
-      console.log('✅ LIQUIDACIÓN COMPLETADA (KISS) CON TOTALES ÚNICOS:', {
+      console.log('✅ LIQUIDACIÓN COMPLETADA CON NORMALIZACIÓN:', {
         totalDevengado: finalTotalDevengado,
         totalDeducciones: finalTotalDeducciones,
         totalNeto: finalTotalNeto,
@@ -347,7 +448,7 @@ export class PayrollLiquidationService extends SecureBaseService {
 
       return {
         success: true,
-        message: `Liquidación completada para ${employees.length} empleados con cálculo único de totales`,
+        message: `Liquidación completada para ${employees.length} empleados con normalización de datos`,
         periodId: periodId,
         summary: {
           totalEmployees: employees.length,
@@ -360,7 +461,7 @@ export class PayrollLiquidationService extends SecureBaseService {
         },
       };
     } catch (error: any) {
-      console.error('Error liquidating payroll:', error);
+      console.error('❌ Error liquidating payroll:', error);
       return {
         success: false,
         message: error?.message || String(error) || 'Error desconocido',
