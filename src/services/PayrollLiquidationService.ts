@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { SecureBaseService } from './SecureBaseService';
 import { NovedadesCalculationService } from './NovedadesCalculationService';
@@ -40,56 +39,63 @@ export class PayrollLiquidationService extends SecureBaseService {
   static calculateTransportAllowance(baseSalary: number, workedDays: number, year?: string): number {
     const configYear = year || new Date().getFullYear().toString();
     const config = ConfigurationService.getConfiguration(configYear);
-    
     const dosSmmlv = config.salarioMinimo * 2;
-    
     if (baseSalary <= dosSmmlv) {
       return Math.round((config.auxilioTransporte / 30) * workedDays);
     }
-    
     return 0;
   }
 
   static async ensurePeriodExists(startDate: string, endDate: string): Promise<string> {
     try {
-      console.log('🔒 Ensuring period exists securely');
+      console.log('🔒 Ensuring period exists securely (KISS)');
       const periodName = `${format(new Date(startDate), 'dd/MM/yyyy')} - ${format(new Date(endDate), 'dd/MM/yyyy')}`;
-      
-      // Use secure query to check for existing period
+
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) {
         throw new Error('🔒 [SECURITY] Access denied: No company context');
       }
-      
-      const existingQuery = this.secureQuery('payroll_periods_real', companyId, 'id', {
-        fecha_inicio: startDate,
-        fecha_fin: endDate
-      });
-      
-      const { data: existingPeriod } = await existingQuery.single();
 
-      if (existingPeriod) {
+      // Buscar por fechas + empresa SIN lanzar error cuando no existe
+      const { data: existingPeriod, error: existingErr } = await supabase
+        .from('payroll_periods_real')
+        .select('id, periodo')
+        .eq('company_id', companyId)
+        .eq('fecha_inicio', startDate)
+        .eq('fecha_fin', endDate)
+        .maybeSingle();
+
+      if (existingErr) {
+        console.warn('⚠️ Error buscando período (non-fatal):', existingErr.message);
+      }
+
+      if (existingPeriod?.id) {
         return existingPeriod.id;
       }
 
-      // Use secure insert to create new period
-      const { data: newPeriod, error } = await this.secureInsert('payroll_periods_real', {
-        periodo: periodName,
-        fecha_inicio: startDate,
-        fecha_fin: endDate,
-        tipo_periodo: 'personalizado',
-        estado: 'borrador',
-        empleados_count: 0,
-        total_devengado: 0,
-        total_deducciones: 0,
-        total_neto: 0
-      });
+      // Crear período como borrador y devolver su id en una sola operación
+      const { data: newPeriod, error: insertErr } = await supabase
+        .from('payroll_periods_real')
+        .insert({
+          company_id: companyId,
+          periodo: periodName,
+          fecha_inicio: startDate,
+          fecha_fin: endDate,
+          tipo_periodo: 'personalizado',
+          estado: 'borrador',
+          empleados_count: 0,
+          total_devengado: 0,
+          total_deducciones: 0,
+          total_neto: 0
+        })
+        .select('id, periodo')
+        .single();
 
-      if (error) {
-        throw error;
+      if (insertErr) {
+        throw insertErr;
       }
 
-      return newPeriod[0].id;
+      return newPeriod.id;
     } catch (error) {
       console.error('Error ensuring period exists:', error);
       throw error;
@@ -100,7 +106,6 @@ export class PayrollLiquidationService extends SecureBaseService {
     try {
       console.log('🔒 Loading employees for period securely');
 
-      // Use secure query to get active employees
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) {
         throw new Error('🔒 [SECURITY] Access denied: No company context');
@@ -121,7 +126,6 @@ export class PayrollLiquidationService extends SecureBaseService {
       }
 
       const diasTrabajados = this.calculateWorkingDays(startDate, endDate);
-
       const configYear = year || new Date().getFullYear().toString();
       
       const processedEmployees: Employee[] = await Promise.all(employees.map(async (employee) => {
@@ -166,7 +170,6 @@ export class PayrollLiquidationService extends SecureBaseService {
     try {
       console.log('🔒 Loading specific employees for period securely');
 
-      // Use secure query with IN filter for specific employees
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) {
         throw new Error('🔒 [SECURITY] Access denied: No company context');
@@ -187,7 +190,6 @@ export class PayrollLiquidationService extends SecureBaseService {
       }
 
       const diasTrabajados = this.calculateWorkingDays(startDate, endDate);
-
       const configYear = year || new Date().getFullYear().toString();
       
       const processedEmployees: Employee[] = await Promise.all(employees.map(async (employee) => {
@@ -238,32 +240,23 @@ export class PayrollLiquidationService extends SecureBaseService {
         throw new Error('No se pudo obtener la empresa del usuario');
       }
 
-      const periodName = `${format(new Date(startDate), 'dd/MM/yyyy')} - ${format(new Date(endDate), 'dd/MM/yyyy')}`;
+      // Usar SIEMPRE ensurePeriodExists para evitar duplicados
+      const periodId = await this.ensurePeriodExists(startDate, endDate);
 
-      // ✅ CORREGIDO: Crear período SIN totales iniciales
-      const { data: period, error: periodError } = await supabase
+      // Obtener nombre del período (periodo) para registrar en payrolls
+      const { data: periodData, error: periodFetchErr } = await supabase
         .from('payroll_periods_real')
-        .insert({
-          company_id: companyId,
-          periodo: periodName,
-          fecha_inicio: startDate,
-          fecha_fin: endDate,
-          tipo_periodo: 'personalizado',
-          estado: 'cerrado',
-          empleados_count: employees.length,
-          // ✅ CORREGIDO: NO escribir totales iniciales
-          total_devengado: 0,
-          total_deducciones: 0,
-          total_neto: 0
-        })
-        .select()
-        .single();
+        .select('id, periodo')
+        .eq('id', periodId)
+        .maybeSingle();
 
-      if (periodError) {
-        throw periodError;
+      if (periodFetchErr || !periodData) {
+        throw new Error(`No se pudo cargar el período generado (${periodFetchErr?.message || 'sin datos'})`);
       }
 
-      // ✅ CORREGIDO: Crear registros de payroll
+      const periodName = periodData.periodo;
+
+      // Crear registros de payroll referenciando el período existente
       const payrollInserts = [];
       for (const employee of employees) {
         const salarioProporcional = (employee.salario_base / 30) * employee.dias_trabajados;
@@ -275,7 +268,7 @@ export class PayrollLiquidationService extends SecureBaseService {
           company_id: companyId,
           employee_id: employee.id,
           periodo: periodName,
-          period_id: period.id,
+          period_id: periodId,
           salario_base: employee.salario_base,
           dias_trabajados: employee.dias_trabajados,
           auxilio_transporte: employee.auxilio_transporte,
@@ -291,18 +284,18 @@ export class PayrollLiquidationService extends SecureBaseService {
         });
       }
 
-      const { error: payrollError } = await supabase
-        .from('payrolls')
-        .insert(payrollInserts);
+      if (payrollInserts.length > 0) {
+        const { error: payrollError } = await supabase
+          .from('payrolls')
+          .insert(payrollInserts);
 
-      if (payrollError) {
-        throw payrollError;
+        if (payrollError) {
+          throw payrollError;
+        }
       }
 
-      // ✅ CORREGIDO: Calcular totales CORRECTOS una sola vez con validación
+      // Calcular totales una sola vez
       console.log('🧮 Calculando totales. Registros:', payrollInserts.length);
-      
-      // Log valores para debugging
       payrollInserts.forEach((p, index) => {
         if (!Number.isFinite(p.neto_pagado) || p.neto_pagado == null) {
           console.warn(`⚠️ Valor inválido en empleado ${index}:`, {
@@ -312,39 +305,40 @@ export class PayrollLiquidationService extends SecureBaseService {
           });
         }
       });
-      
+
       const finalTotalDevengado = payrollInserts.reduce((sum, p) => sum + (Number(p.total_devengado) || 0), 0);
       const finalTotalDeducciones = payrollInserts.reduce((sum, p) => sum + (Number(p.total_deducciones) || 0), 0);
       const finalTotalNeto = payrollInserts.reduce((sum, p) => sum + (Number(p.neto_pagado) || 0), 0);
-      
+
       console.log('💰 Totales calculados:', {
         devengado: finalTotalDevengado,
         deducciones: finalTotalDeducciones,
         neto: finalTotalNeto,
         neto_valid: Number.isFinite(finalTotalNeto)
       });
-      
-      // Validación adicional
+
       if (!Number.isFinite(finalTotalNeto) || finalTotalNeto < 0) {
         console.error('❌ Error en cálculo de neto total:', finalTotalNeto);
         throw new Error(`Error en cálculo de neto total: ${finalTotalNeto}`);
       }
 
-      // ✅ CORREGIDO: Actualizar totales UNA SOLA VEZ
+      // Actualizar período existente con totales y estado final
       const { error: updateError } = await supabase
         .from('payroll_periods_real')
         .update({
+          empleados_count: employees.length,
           total_devengado: finalTotalDevengado,
           total_deducciones: finalTotalDeducciones,
-          total_neto: finalTotalNeto
+          total_neto: finalTotalNeto,
+          estado: 'cerrado'
         })
-        .eq('id', period.id);
+        .eq('id', periodId);
 
       if (updateError) {
         throw updateError;
       }
 
-      console.log('✅ LIQUIDACIÓN COMPLETADA CON TOTALES ÚNICOS:', {
+      console.log('✅ LIQUIDACIÓN COMPLETADA (KISS) CON TOTALES ÚNICOS:', {
         totalDevengado: finalTotalDevengado,
         totalDeducciones: finalTotalDeducciones,
         totalNeto: finalTotalNeto
@@ -353,7 +347,7 @@ export class PayrollLiquidationService extends SecureBaseService {
       return {
         success: true,
         message: `Liquidación completada para ${employees.length} empleados con cálculo único de totales`,
-        periodId: period.id,
+        periodId: periodId,
         summary: {
           totalEmployees: employees.length,
           validEmployees: employees.length,
