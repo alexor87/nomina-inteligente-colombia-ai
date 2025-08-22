@@ -35,33 +35,25 @@ export const usePayrollLiquidation = () => {
     onSave: async () => {
       if (!currentPeriodId || employees.length === 0) return;
       console.log('💾 Auto-guardando datos de nómina...');
-      try {
-        for (const employee of employees) {
-          await supabase
-            .from('payrolls')
-            .update({
-              dias_trabajados: employee.worked_days,
-              horas_extra: employee.extra_hours,
-              incapacidades: employee.disabilities,
-              bonificaciones: employee.bonuses,
-              vacaciones: employee.absences,
-              auxilio_transporte: employee.transport_allowance,
-              otros_descuentos: employee.additional_deductions,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', employee.payrollId);
+      // Only persist fields that exist in payrolls: dias_trabajados, auxilio_transporte, otras_deducciones, updated_at
+      for (const employee of employees) {
+        if (!employee?.payrollId) {
+          console.log('⏭️ Omitiendo auto-guardado: empleado sin payrollId', employee?.id);
+          continue;
         }
-        console.log('✅ Auto-guardado exitoso');
-      } catch (error) {
-        console.error('Error auto-guardando:', error);
-        toast({
-          title: "Error auto-guardando",
-          description: "Hubo un problema al guardar automáticamente los datos.",
-          variant: "destructive",
-        });
+        await supabase
+          .from('payrolls')
+          .update({
+            dias_trabajados: employee.worked_days,
+            auxilio_transporte: employee.transport_allowance,
+            otras_deducciones: employee.additional_deductions,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', employee.payrollId);
       }
+      console.log('✅ Auto-guardado exitoso');
     },
-    delay: 15000, // 15 segundos
+    delay: 15000,
   });
 
   const triggerManualSave = useCallback(() => {

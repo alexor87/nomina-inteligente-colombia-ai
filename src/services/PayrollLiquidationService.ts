@@ -233,17 +233,15 @@ export class PayrollLiquidationService extends SecureBaseService {
   /**
    * ✅ CORREGIDO: Liquidación con cálculo único de totales
    */
-  static async liquidatePayroll(employees: Employee[], startDate: string, endDate: string) {
+  static async liquidatePayroll(employees: any[], startDate: string, endDate: string) {
     try {
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) {
         throw new Error('No se pudo obtener la empresa del usuario');
       }
 
-      // Usar SIEMPRE ensurePeriodExists para evitar duplicados
       const periodId = await this.ensurePeriodExists(startDate, endDate);
 
-      // Obtener nombre del período (periodo) para registrar en payrolls
       const { data: periodData, error: periodFetchErr } = await supabase
         .from('payroll_periods_real')
         .select('id, periodo')
@@ -256,7 +254,6 @@ export class PayrollLiquidationService extends SecureBaseService {
 
       const periodName = periodData.periodo;
 
-      // Crear registros de payroll referenciando el período existente
       const payrollInserts = [];
       for (const employee of employees) {
         const salarioProporcional = (employee.salario_base / 30) * employee.dias_trabajados;
@@ -280,28 +277,32 @@ export class PayrollLiquidationService extends SecureBaseService {
           otras_deducciones: employee.deducciones_novedades,
           total_deducciones: totalDeduccionesFinal,
           neto_pagado: netoPagadoFinal,
-          estado: 'procesada'
+          estado: 'procesada',
         });
       }
 
       if (payrollInserts.length > 0) {
+        // Use upsert to avoid unique_violation on existing payrolls for the same employee/period/company
         const { error: payrollError } = await supabase
           .from('payrolls')
-          .insert(payrollInserts);
-
+          .upsert(
+            payrollInserts.map((p) => ({ ...p, updated_at: new Date().toISOString() })),
+            { onConflict: 'company_id,employee_id,period_id' }
+          )
+          .select('id');
         if (payrollError) {
           throw payrollError;
         }
       }
 
-      // Calcular totales una sola vez
+      // Calculate totals from the values we just wrote
       console.log('🧮 Calculando totales. Registros:', payrollInserts.length);
       payrollInserts.forEach((p, index) => {
         if (!Number.isFinite(p.neto_pagado) || p.neto_pagado == null) {
           console.warn(`⚠️ Valor inválido en empleado ${index}:`, {
             employee_id: p.employee_id,
             neto_pagado: p.neto_pagado,
-            tipo: typeof p.neto_pagado
+            tipo: typeof p.neto_pagado,
           });
         }
       });
@@ -314,7 +315,7 @@ export class PayrollLiquidationService extends SecureBaseService {
         devengado: finalTotalDevengado,
         deducciones: finalTotalDeducciones,
         neto: finalTotalNeto,
-        neto_valid: Number.isFinite(finalTotalNeto)
+        neto_valid: Number.isFinite(finalTotalNeto),
       });
 
       if (!Number.isFinite(finalTotalNeto) || finalTotalNeto < 0) {
@@ -322,7 +323,6 @@ export class PayrollLiquidationService extends SecureBaseService {
         throw new Error(`Error en cálculo de neto total: ${finalTotalNeto}`);
       }
 
-      // Actualizar período existente con totales y estado final
       const { error: updateError } = await supabase
         .from('payroll_periods_real')
         .update({
@@ -330,10 +330,9 @@ export class PayrollLiquidationService extends SecureBaseService {
           total_devengado: finalTotalDevengado,
           total_deducciones: finalTotalDeducciones,
           total_neto: finalTotalNeto,
-          estado: 'cerrado'
+          estado: 'cerrado',
         })
         .eq('id', periodId);
-
       if (updateError) {
         throw updateError;
       }
@@ -341,7 +340,7 @@ export class PayrollLiquidationService extends SecureBaseService {
       console.log('✅ LIQUIDACIÓN COMPLETADA (KISS) CON TOTALES ÚNICOS:', {
         totalDevengado: finalTotalDevengado,
         totalDeducciones: finalTotalDeducciones,
-        totalNeto: finalTotalNeto
+        totalNeto: finalTotalNeto,
       });
 
       return {
@@ -355,14 +354,14 @@ export class PayrollLiquidationService extends SecureBaseService {
           totalDeductions: Number.isFinite(finalTotalDeducciones) ? finalTotalDeducciones : 0,
           totalNetPay: Number.isFinite(finalTotalNeto) ? finalTotalNeto : 0,
           employerContributions: finalTotalDevengado * 0.205,
-          totalPayrollCost: finalTotalDevengado + (finalTotalDevengado * 0.205)
-        }
+          totalPayrollCost: finalTotalDevengado + finalTotalDevengado * 0.205,
+        },
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error liquidating payroll:', error);
       return {
         success: false,
-        message: error instanceof Error ? error.message : 'Error desconocido'
+        message: error?.message || String(error) || 'Error desconocido',
       };
     }
   }
