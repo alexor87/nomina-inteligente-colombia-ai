@@ -3,10 +3,9 @@ import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { VacationsAbsencesList } from '@/components/vacations/VacationsAbsencesList';
 import { VacationForm } from '@/components/vacations/VacationForm';
-import { VacationDuplicateMonitor } from '@/components/vacations/VacationDuplicateMonitor';
 import { VacationStatusAuditTool } from '@/components/vacations/VacationStatusAuditTool';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CalendarDays, Plus, AlertTriangle, Shield } from 'lucide-react';
+import { CalendarDays, Plus, Shield } from 'lucide-react';
 
 const VacationsAbsences: React.FC = () => {
   const [activeTab, setActiveTab] = useState('list');
@@ -29,7 +28,7 @@ const VacationsAbsences: React.FC = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="list" className="flex items-center gap-2">
             <CalendarDays className="h-4 w-4" />
             Listado
@@ -37,10 +36,6 @@ const VacationsAbsences: React.FC = () => {
           <TabsTrigger value="new" className="flex items-center gap-2">
             <Plus className="h-4 w-4" />
             Nueva Ausencia
-          </TabsTrigger>
-          <TabsTrigger value="duplicates" className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4" />
-            Monitor de Duplicados
           </TabsTrigger>
           <TabsTrigger value="audit" className="flex items-center gap-2">
             <Shield className="h-4 w-4" />
@@ -68,10 +63,6 @@ const VacationsAbsences: React.FC = () => {
               <VacationForm onSuccess={handleFormSuccess} />
             </CardContent>
           </Card>
-        </TabsContent>
-
-        <TabsContent value="duplicates">
-          <VacationDuplicateMonitor />
         </TabsContent>
 
         <TabsContent value="audit">

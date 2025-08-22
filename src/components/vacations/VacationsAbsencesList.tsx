@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Table,
@@ -29,18 +30,9 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
-import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { MoreHorizontal, Pencil, Trash2, Calendar } from 'lucide-react';
 import { useVacationsAbsences } from '@/hooks/useVacationsAbsences';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination"
-import { Link } from 'react-router-dom';
-import { cn } from '@/lib/utils';
 import { CSVLink } from 'react-csv';
 import { DatePicker } from '@/components/ui/date-picker';
 import { format } from 'date-fns';
@@ -50,9 +42,9 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { CalendarIcon } from "@radix-ui/react-icons"
 import { ReloadData } from '@/components/shared/ReloadData';
 import { UnifiedVacationData } from '@/types/unifiedVacations';
+import { VacationAbsenceType, VacationAbsenceStatus } from '@/types/vacations';
 
 interface VacationsAbsencesListProps {
   onEdit?: (id: string) => void;
@@ -83,8 +75,8 @@ export const VacationsAbsencesList: React.FC<VacationsAbsencesListProps> = ({
     deleteVacationAbsence,
   } = useVacationsAbsences({
     employee_search: search,
-    type: typeFilter,
-    status: statusFilter,
+    type: typeFilter as VacationAbsenceType,
+    status: statusFilter as VacationAbsenceStatus,
     date_from: dateFrom ? format(dateFrom, 'yyyy-MM-dd') : undefined,
     date_to: dateTo ? format(dateTo, 'yyyy-MM-dd') : undefined,
   });
@@ -207,14 +199,8 @@ export const VacationsAbsencesList: React.FC<VacationsAbsencesListProps> = ({
 
           <Popover open={isDateRangeOpen} onOpenChange={setDateRangeOpen}>
             <PopoverTrigger asChild>
-              <Button
-                variant={"outline"}
-                className={cn(
-                  "w-[220px] justify-start text-left font-normal",
-                  !dateFrom || !dateTo ? "text-muted-foreground" : undefined
-                )}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
+              <Button variant="outline" className="w-[220px] justify-start text-left font-normal">
+                <Calendar className="mr-2 h-4 w-4" />
                 {dateFrom && dateTo ? (
                   `${format(dateFrom, "PPP", { locale: es })} - ${format(dateTo, "PPP", { locale: es })}`
                 ) : (
@@ -227,7 +213,7 @@ export const VacationsAbsencesList: React.FC<VacationsAbsencesListProps> = ({
                 mode="range"
                 defaultMonth={dateFrom}
                 selected={dateFrom && dateTo ? { from: dateFrom, to: dateTo } : undefined}
-                onSelect={(range) => {
+                onSelect={(range: any) => {
                   if (range?.from) {
                     setDateFrom(range.from);
                   }
@@ -349,32 +335,42 @@ export const VacationsAbsencesList: React.FC<VacationsAbsencesListProps> = ({
       </div>
 
       <div className="flex items-center justify-between">
-        <Pagination>
-          <PaginationContent>
-            <PaginationPrevious href="#" onClick={() => handlePageChange(page - 1)} disabled={page === 1} />
+        <div className="flex items-center space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handlePageChange(page - 1)}
+            disabled={page === 1}
+          >
+            Anterior
+          </Button>
+          
+          <div className="flex items-center space-x-1">
             {Array.from({ length: pageCount }, (_, i) => i + 1).map((num) => (
-              <PaginationItem key={num} active={page === num}>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "h-9 w-9 rounded-md border",
-                    page === num
-                      ? "bg-accent text-accent-foreground hover:bg-accent hover:text-accent-foreground"
-                      : "bg-background text-foreground hover:bg-muted hover:text-muted-foreground"
-                  )}
-                  onClick={() => handlePageChange(num)}
-                >
-                  {num}
-                </Button>
-              </PaginationItem>
+              <Button
+                key={num}
+                variant={page === num ? "default" : "outline"}
+                size="sm"
+                className="h-9 w-9"
+                onClick={() => handlePageChange(num)}
+              >
+                {num}
+              </Button>
             ))}
-            <PaginationNext href="#" onClick={() => handlePageChange(page + 1)} disabled={page === pageCount} />
-          </PaginationContent>
-        </Pagination>
-        <div className="space-x-2 text-sm text-muted-foreground">
-          <div>
-            Total: {filteredData.length} registros
           </div>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handlePageChange(page + 1)}
+            disabled={page === pageCount}
+          >
+            Siguiente
+          </Button>
+        </div>
+        
+        <div className="text-sm text-muted-foreground">
+          Total: {filteredData.length} registros
         </div>
       </div>
     </div>
