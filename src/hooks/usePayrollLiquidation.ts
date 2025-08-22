@@ -299,6 +299,7 @@ export const usePayrollLiquidation = () => {
   const [liquidationResult, setLiquidationResult] = useState<{
     periodData: { startDate: string; endDate: string; type: string };
     summary: PayrollSummary;
+    periodId?: string;
   } | null>(null);
 
   const liquidatePayroll = useCallback(async (startDate: string, endDate: string) => {
@@ -349,7 +350,8 @@ export const usePayrollLiquidation = () => {
         console.log('🔍 DEBUGGING summary antes del modal:', {
           totalNetPay: result.summary.totalNetPay,
           tipo: typeof result.summary.totalNetPay,
-          isFinite: Number.isFinite(result.summary.totalNetPay)
+          isFinite: Number.isFinite(result.summary.totalNetPay),
+          periodId: result.periodId
         });
 
         // ✅ CORREGIDO: Registrar provisiones automáticamente usando el período correcto
@@ -430,7 +432,8 @@ export const usePayrollLiquidation = () => {
 
         setLiquidationResult({
           periodData: { startDate, endDate, type: periodType },
-          summary: result.summary
+          summary: result.summary,
+          periodId: result.periodId || currentPeriodId
         });
 
         setShowSuccessModal(true);
