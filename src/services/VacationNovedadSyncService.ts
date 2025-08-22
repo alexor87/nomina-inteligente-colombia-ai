@@ -1,5 +1,7 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { VacationAbsenceFormData } from '@/types/vacations';
+import type { NovedadType } from '@/types/novedades';
 
 export class VacationNovedadSyncService {
   
@@ -253,6 +255,15 @@ export class VacationNovedadSyncService {
       throw vacationsError;
     }
 
+    // ✅ FIX TS: use a properly typed list of allowed novedades
+    const allowedNovedadTypes: NovedadType[] = [
+      'vacaciones',
+      'licencia_remunerada',
+      'licencia_no_remunerada',
+      'incapacidad',
+      'ausencia'
+    ];
+
     const { data: novedadesData, error: novedadesError } = await supabase
       .from('payroll_novedades')
       .select(`
@@ -260,7 +271,7 @@ export class VacationNovedadSyncService {
         empleado:employees(id, nombre, apellido, cedula)
       `)
       .eq('company_id', companyId)
-      .in('tipo_novedad', ['vacaciones', 'licencia_remunerada', 'licencia_no_remunerada', 'incapacidad', 'ausencia'])
+      .in('tipo_novedad', allowedNovedadTypes)
       .order('created_at', { ascending: false });
 
     if (novedadesError) {
@@ -474,3 +485,4 @@ export class VacationNovedadSyncService {
     return data.company_id;
   }
 }
+
