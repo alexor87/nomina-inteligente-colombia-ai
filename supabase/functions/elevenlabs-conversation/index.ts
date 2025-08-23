@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
 
@@ -223,24 +224,45 @@ serve(async (req) => {
   const CLIENT_TOOLS = createClientTools(supabase);
 
   try {
-    const ELEVENLABS_API_KEY = Deno.env.get('ELEVENLABS_API_KEY');
-    if (!ELEVENLABS_API_KEY) {
-      console.error('❌ ELEVENLABS_API_KEY not configured');
-      return new Response(JSON.stringify({ 
-        error: 'ELEVENLABS_API_KEY not configured',
-        error_code: 'MISSING_API_KEY',
-        status: 500
+    const { action, ...body } = await req.json();
+    console.log(`📥 Action received: ${action}`, body);
+
+    // NEW: Health check action
+    if (action === 'health_check') {
+      console.log('🏥 Health check requested');
+      
+      const ELEVENLABS_API_KEY = Deno.env.get('ELEVENLABS_API_KEY');
+      const has_api_key = !!ELEVENLABS_API_KEY;
+      
+      console.log(`🔑 API Key status: ${has_api_key ? 'configured' : 'missing'}`);
+      
+      return new Response(JSON.stringify({
+        ok: true,
+        has_api_key,
+        agent_id_received: true, // We always use the hardcoded agent ID
+        env: 'prod',
+        timestamp: new Date().toISOString()
       }), {
-        status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const { action, ...body } = await req.json();
-    console.log(`📥 Action received: ${action}`, body);
-
     if (action === 'start_session') {
       console.log('🚀 Starting new ElevenLabs conversation session');
+
+      const ELEVENLABS_API_KEY = Deno.env.get('ELEVENLABS_API_KEY');
+      if (!ELEVENLABS_API_KEY) {
+        console.error('❌ ELEVENLABS_API_KEY not configured');
+        return new Response(JSON.stringify({ 
+          ok: false,
+          error_code: 'MISSING_API_KEY',
+          error: 'ELEVENLABS_API_KEY not configured',
+          status: 500,
+          message: 'Clave de API no configurada. Contacta al administrador.'
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
 
       const agentId =
         (body && (body.agent_id || body.agentId)) ||
@@ -249,11 +271,12 @@ serve(async (req) => {
       if (!agentId || typeof agentId !== 'string' || !agentId.trim()) {
         console.error('❌ Missing agentId for session start');
         return new Response(JSON.stringify({ 
-          error: 'Missing agent_id for ElevenLabs conversation',
+          ok: false,
           error_code: 'MISSING_AGENT_ID',
-          status: 400
-        }), {
+          error: 'Missing agent_id for ElevenLabs conversation',
           status: 400,
+          message: 'ID del agente no especificado. Error de configuración.'
+        }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
@@ -285,15 +308,16 @@ serve(async (req) => {
 
           console.error('❌ ElevenLabs API error:', response.status, errorDetails);
           
-          // Return the exact ElevenLabs error with status
+          // Return structured error response with 200 status
           return new Response(JSON.stringify({ 
-            error: `ElevenLabs API error: ${response.status}`,
+            ok: false,
             error_code: 'ELEVENLABS_API_ERROR',
+            error: `ElevenLabs API error: ${response.status}`,
             status: response.status,
             elevenlabs_error: errorDetails,
-            agent_id: agentId
+            agent_id: agentId,
+            message: getErrorMessage(response.status, errorDetails)
           }), {
-            status: response.status,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
@@ -301,18 +325,22 @@ serve(async (req) => {
         const data = JSON.parse(responseText);
         console.log('✅ Session created successfully for agent:', agentId);
         
-        return new Response(JSON.stringify(data), {
+        return new Response(JSON.stringify({
+          ok: true,
+          ...data
+        }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       } catch (fetchError: any) {
         console.error('❌ Fetch error:', fetchError);
         return new Response(JSON.stringify({ 
-          error: `Failed to create session: ${fetchError.message}`,
+          ok: false,
           error_code: 'NETWORK_ERROR',
+          error: `Failed to create session: ${fetchError.message}`,
           status: 500,
-          agent_id: agentId
+          agent_id: agentId,
+          message: 'Error de red. Verifica tu conexión a internet.'
         }), {
-          status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
@@ -352,24 +380,45 @@ serve(async (req) => {
 
     console.log(`❌ Invalid action: ${action}`);
     return new Response(JSON.stringify({ 
-      error: `Invalid action: ${action}`,
+      ok: false,
       error_code: 'INVALID_ACTION',
-      status: 400
-    }), {
+      error: `Invalid action: ${action}`,
       status: 400,
+      message: `Acción inválida: ${action}`
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error: any) {
     console.error('❌ Conversation proxy error:', error);
     return new Response(JSON.stringify({ 
-      error: error.message,
+      ok: false,
       error_code: 'INTERNAL_ERROR',
+      error: error.message,
       status: 500,
+      message: 'Error interno del servidor. Intenta más tarde.',
       details: 'Check server logs for more information'
     }), {
-      status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 });
+
+function getErrorMessage(status: number, errorDetails: any): string {
+  if (status === 401) {
+    if (errorDetails?.detail?.status === 'invalid_api_key') {
+      return 'Clave de API inválida. Verifica la configuración en ElevenLabs.';
+    } else {
+      return 'No autorizado. Verifica la clave de API.';
+    }
+  } else if (status === 404) {
+    return 'Agente no encontrado. Verifica el ID del agente.';
+  } else if (status === 429) {
+    return 'Límite de uso alcanzado. Intenta más tarde.';
+  } else if (status >= 400 && status < 500) {
+    return `Error del cliente (${status}): ${errorDetails?.detail?.message || 'Solicitud inválida'}`;
+  } else if (status >= 500) {
+    return 'Error del servidor de ElevenLabs. Intenta más tarde.';
+  }
+  return `Error desconocido: ${status}`;
+}

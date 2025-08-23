@@ -11,6 +11,11 @@ export interface ConversationState {
   error: string | null;
   detailedError: any | null;
   microphonePermission: 'granted' | 'denied' | 'prompt' | 'checking' | null;
+  healthStatus: {
+    hasApiKey: boolean;
+    agentIdReceived: boolean;
+    lastCheck?: string;
+  } | null;
 }
 
 const ELEVENLABS_AGENT_ID = 'agent_8701k3by6j9ef8ka0wqzm6xtj3d9';
@@ -24,6 +29,7 @@ export const useElevenLabsConversation = () => {
     error: null,
     detailedError: null,
     microphonePermission: null,
+    healthStatus: null,
   });
 
   const updateState = useCallback((updates: Partial<ConversationState>) => {
@@ -62,13 +68,65 @@ export const useElevenLabsConversation = () => {
     }
   }, [updateState]);
 
+  const checkHealth = useCallback(async () => {
+    try {
+      console.log('🏥 Running health check...');
+      
+      const { data, error } = await supabase.functions.invoke('elevenlabs-conversation', {
+        body: { action: 'health_check' },
+      });
+
+      if (error) {
+        console.error('❌ Health check failed:', error);
+        updateState({
+          healthStatus: {
+            hasApiKey: false,
+            agentIdReceived: false,
+            lastCheck: new Date().toISOString(),
+          }
+        });
+        return false;
+      }
+
+      console.log('✅ Health check result:', data);
+      
+      updateState({
+        healthStatus: {
+          hasApiKey: data.has_api_key,
+          agentIdReceived: data.agent_id_received,
+          lastCheck: data.timestamp,
+        }
+      });
+
+      return data.has_api_key;
+    } catch (error) {
+      console.error('❌ Health check error:', error);
+      updateState({
+        healthStatus: {
+          hasApiKey: false,
+          agentIdReceived: false,
+          lastCheck: new Date().toISOString(),
+        }
+      });
+      return false;
+    }
+  }, [updateState]);
+
   const parseElevenLabsError = useCallback((errorData: any) => {
     console.log('🔍 Parsing ElevenLabs error:', errorData);
     
+    // Handle structured error responses from the updated edge function
+    if (errorData.ok === false) {
+      return {
+        userMessage: errorData.message || errorData.error || 'Error desconocido',
+        details: errorData
+      };
+    }
+    
+    // Legacy error handling
     let userMessage = 'Error desconocido del servicio';
     let details = errorData;
     
-    // Handle different error formats from our edge function
     if (errorData.error_code) {
       switch (errorData.error_code) {
         case 'MISSING_API_KEY':
@@ -78,22 +136,15 @@ export const useElevenLabsConversation = () => {
           userMessage = 'ID del agente no especificado. Error de configuración.';
           break;
         case 'ELEVENLABS_API_ERROR':
-          // Parse specific ElevenLabs API errors
           const status = errorData.status;
-          const elevenLabsError = errorData.elevenlabs_error;
-          
           if (status === 401) {
-            if (elevenLabsError?.detail?.status === 'invalid_api_key') {
-              userMessage = 'Clave de API inválida. Verifica la configuración en ElevenLabs.';
-            } else {
-              userMessage = 'No autorizado. Verifica la clave de API.';
-            }
+            userMessage = 'Clave de API inválida. Verifica la configuración en ElevenLabs.';
           } else if (status === 404) {
             userMessage = `Agente no encontrado (${errorData.agent_id}). Verifica el ID del agente.`;
           } else if (status === 429) {
             userMessage = 'Límite de uso alcanzado. Intenta más tarde.';
           } else if (status >= 400 && status < 500) {
-            userMessage = `Error del cliente (${status}): ${elevenLabsError?.detail?.message || 'Solicitud inválida'}`;
+            userMessage = `Error del cliente (${status}): ${errorData.elevenlabs_error?.detail?.message || 'Solicitud inválida'}`;
           } else if (status >= 500) {
             userMessage = 'Error del servidor de ElevenLabs. Intenta más tarde.';
           }
@@ -108,7 +159,6 @@ export const useElevenLabsConversation = () => {
           userMessage = `Error: ${errorData.error || 'Desconocido'}`;
       }
     } else if (errorData.message) {
-      // Handle other error formats
       if (errorData.message.includes('microphone') || errorData.message.includes('permission')) {
         userMessage = 'No se pudo acceder al micrófono. Verifica los permisos.';
       } else if (errorData.message.includes('network') || errorData.message.includes('websocket')) {
@@ -285,6 +335,15 @@ export const useElevenLabsConversation = () => {
         detailedError: null 
       });
 
+      console.log('🏥 Running pre-flight health check...');
+      const isHealthy = await checkHealth();
+      
+      if (!isHealthy) {
+        if (!state.healthStatus?.hasApiKey) {
+          throw new Error('Clave de API no configurada. Contacta al administrador.');
+        }
+      }
+
       console.log('🎤 Checking microphone permission...');
       const hasPermission = await checkMicrophonePermission();
       
@@ -303,13 +362,12 @@ export const useElevenLabsConversation = () => {
 
       if (error) {
         console.error('❌ Supabase function error:', error);
-        // Parse the error response which should now contain structured error info
-        const { userMessage, details } = parseElevenLabsError(error);
+        const { userMessage } = parseElevenLabsError(error);
         throw new Error(userMessage);
       }
 
-      // Check if the response itself contains an error (from our edge function)
-      if (data?.error) {
+      // Check if the response contains an error (from our edge function)
+      if (data?.ok === false) {
         console.error('❌ Backend error response:', data);
         const { userMessage, details } = parseElevenLabsError(data);
         
@@ -329,8 +387,8 @@ export const useElevenLabsConversation = () => {
 
       console.log('✅ Signed URL received, starting session with agent:', ELEVENLABS_AGENT_ID);
 
-      // Use the signed URL directly as the parameter
-      await conversation.startSession(signedUrl);
+      // Use the correct signature for startSession
+      await conversation.startSession({ url: signedUrl });
 
       console.log('✅ Conversation session started successfully');
     } catch (error) {
@@ -350,7 +408,7 @@ export const useElevenLabsConversation = () => {
         variant: 'destructive',
       });
     }
-  }, [conversation, updateState, checkMicrophonePermission, parseElevenLabsError]);
+  }, [conversation, updateState, checkMicrophonePermission, parseElevenLabsError, checkHealth, state.healthStatus]);
 
   const endConversation = useCallback(async () => {
     try {
@@ -382,6 +440,7 @@ export const useElevenLabsConversation = () => {
     startConversation,
     endConversation,
     checkMicrophonePermission,
+    checkHealth,
     isSpeaking: conversation.isSpeaking,
     status: conversation.status,
   };

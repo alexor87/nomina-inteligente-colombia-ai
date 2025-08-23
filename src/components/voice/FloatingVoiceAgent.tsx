@@ -1,20 +1,22 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Mic, MicOff, Volume2, VolumeX, MessageCircle, X, AlertCircle, RefreshCw } from 'lucide-react';
+import { Mic, MicOff, Volume2, VolumeX, MessageCircle, X, AlertCircle, RefreshCw, Activity } from 'lucide-react';
 import { useElevenLabsConversation } from '@/hooks/useElevenLabsConversation';
 import { useVoiceAgent } from '@/contexts/VoiceAgentContext';
 import { cn } from '@/lib/utils';
+import { toast } from '@/hooks/use-toast';
 
 export const FloatingVoiceAgent: React.FC = () => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showDetailedError, setShowDetailedError] = useState(false);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
   const { 
     state, 
     startConversation, 
     endConversation, 
     checkMicrophonePermission,
+    checkHealth,
     status, 
     isSpeaking 
   } = useElevenLabsConversation();
@@ -36,6 +38,33 @@ export const FloatingVoiceAgent: React.FC = () => {
 
   const handleCheckMicrophone = async () => {
     await checkMicrophonePermission();
+  };
+
+  const handleDiagnostics = async () => {
+    setShowDiagnostics(true);
+    
+    try {
+      toast({
+        title: "Ejecutando diagnóstico...",
+        description: "Verificando estado del sistema",
+      });
+      
+      const isHealthy = await checkHealth();
+      
+      toast({
+        title: "Diagnóstico completado",
+        description: isHealthy 
+          ? "✅ Sistema operativo - API Key configurada" 
+          : "❌ Sistema con problemas - revisar configuración",
+        variant: isHealthy ? "default" : "destructive",
+      });
+    } catch (error) {
+      toast({
+        title: "Error en diagnóstico",
+        description: "No se pudo completar la verificación",
+        variant: "destructive",
+      });
+    }
   };
 
   const isConnected = state.isConnected || status === 'connected';
@@ -105,6 +134,32 @@ export const FloatingVoiceAgent: React.FC = () => {
               Estado: <span className="font-medium text-foreground">{getStatusText()}</span>
             </div>
             
+            {/* Health Status Display */}
+            {state.healthStatus && (
+              <div className="text-xs bg-muted/50 p-2 rounded border">
+                <div className="font-medium mb-1">Estado del Sistema:</div>
+                <div className="space-y-1">
+                  <div className="flex justify-between">
+                    <span>API Key:</span>
+                    <span className={state.healthStatus.hasApiKey ? "text-green-600" : "text-red-600"}>
+                      {state.healthStatus.hasApiKey ? "✓ Configurada" : "✗ Faltante"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Agente:</span>
+                    <span className={state.healthStatus.agentIdReceived ? "text-green-600" : "text-red-600"}>
+                      {state.healthStatus.agentIdReceived ? "✓ Activo" : "✗ Error"}
+                    </span>
+                  </div>
+                  {state.healthStatus.lastCheck && (
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Última verificación: {new Date(state.healthStatus.lastCheck).toLocaleTimeString()}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            
             {/* Error Display */}
             {(state.error || contextError) && (
               <div className="space-y-2">
@@ -131,7 +186,7 @@ export const FloatingVoiceAgent: React.FC = () => {
                   </div>
                 )}
                 
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <Button
                     variant="outline"
                     size="sm"
@@ -141,6 +196,16 @@ export const FloatingVoiceAgent: React.FC = () => {
                   >
                     <RefreshCw className={cn("w-3 h-3 mr-1", { "animate-spin": state.isLoading })} />
                     Reintentar
+                  </Button>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleDiagnostics}
+                    className="text-xs h-7"
+                  >
+                    <Activity className="w-3 h-3 mr-1" />
+                    Diagnóstico
                   </Button>
                   
                   {state.microphonePermission === 'denied' && (
@@ -195,6 +260,20 @@ export const FloatingVoiceAgent: React.FC = () => {
                     Ana es tu asistente de voz especializada en nómina. 
                     Te ayudará con consultas y navegación en el sistema.
                   </p>
+                  
+                  {!isDisabled && (
+                    <div className="mt-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleDiagnostics}
+                        className="text-xs h-7 w-full"
+                      >
+                        <Activity className="w-3 h-3 mr-1" />
+                        Ejecutar Diagnóstico
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
