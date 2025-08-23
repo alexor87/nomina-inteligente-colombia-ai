@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Mic, MicOff, Volume2, VolumeX, MessageCircle, X, AlertCircle, RefreshCw, Activity } from 'lucide-react';
+import { Mic, MicOff, Volume2, VolumeX, MessageCircle, X, AlertCircle, RefreshCw, Activity, Navigation } from 'lucide-react';
 import { useElevenLabsConversation } from '@/hooks/useElevenLabsConversation';
 import { useVoiceAgent } from '@/contexts/VoiceAgentContext';
 import { cn } from '@/lib/utils';
@@ -65,6 +65,18 @@ export const FloatingVoiceAgent: React.FC = () => {
         variant: "destructive",
       });
     }
+  };
+
+  const testNavigation = () => {
+    const testSections = ['empleados', 'nomina', 'reportes', 'dashboard'];
+    const randomSection = testSections[Math.floor(Math.random() * testSections.length)];
+    
+    toast({
+      title: "🧪 Prueba de navegación",
+      description: `Simulando navegación a: ${randomSection}`,
+    });
+    
+    console.log(`🧪 Testing navigation to: ${randomSection}`);
   };
 
   const isConnected = state.isConnected || status === 'connected';
@@ -133,6 +145,22 @@ export const FloatingVoiceAgent: React.FC = () => {
             <div className="text-xs text-muted-foreground">
               Estado: <span className="font-medium text-foreground">{getStatusText()}</span>
             </div>
+            
+            {/* Last Tool Execution Display */}
+            {state.lastToolExecution && (
+              <div className="text-xs bg-green-50 dark:bg-green-900/20 p-2 rounded border border-green-200 dark:border-green-800">
+                <div className="font-medium text-green-800 dark:text-green-200 mb-1">
+                  🛠️ Herramienta ejecutada: {state.lastToolExecution.toolName}
+                </div>
+                <div className="text-green-700 dark:text-green-300 text-xs">
+                  {state.lastToolExecution.result.substring(0, 80)}
+                  {state.lastToolExecution.result.length > 80 && '...'}
+                </div>
+                <div className="text-green-600 dark:text-green-400 text-xs mt-1">
+                  {new Date(state.lastToolExecution.timestamp).toLocaleTimeString()}
+                </div>
+              </div>
+            )}
             
             {/* Health Status Display */}
             {state.healthStatus && (
@@ -223,20 +251,6 @@ export const FloatingVoiceAgent: React.FC = () => {
               </div>
             )}
             
-            {/* Microphone Permission Warning */}
-            {state.microphonePermission === 'denied' && (
-              <div className="text-xs text-orange-600 bg-orange-50 p-2 rounded border border-orange-200">
-                Se requiere acceso al micrófono. Haz clic en "Verificar Mic" o permite el acceso manualmente en tu navegador.
-              </div>
-            )}
-            
-            {/* Browser Compatibility Warning */}
-            {!isSupported && (
-              <div className="text-xs text-orange-600 bg-orange-50 p-2 rounded border border-orange-200">
-                Tu navegador no es compatible con las funciones de voz. Necesitas un navegador moderno con soporte para micrófono.
-              </div>
-            )}
-            
             {/* Success State - Ana Ready */}
             <div className="text-xs text-muted-foreground">
               {isConnected ? (
@@ -252,6 +266,19 @@ export const FloatingVoiceAgent: React.FC = () => {
                   <p className="text-xs mt-2 italic text-muted-foreground">
                     Solo habla naturalmente, yo entiendo español colombiano perfectamente.
                   </p>
+                  
+                  {/* Navigation Test Button (only when connected) */}
+                  <div className="mt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={testNavigation}
+                      className="text-xs h-7 w-full"
+                    >
+                      <Navigation className="w-3 h-3 mr-1" />
+                      Probar Navegación
+                    </Button>
+                  </div>
                 </>
               ) : (
                 <div>
@@ -322,6 +349,13 @@ export const FloatingVoiceAgent: React.FC = () => {
               "w-2 h-2 rounded-full animate-pulse",
               isCurrentlySpeaking ? "bg-blue-500" : "bg-green-500"
             )} />
+          </div>
+        )}
+        
+        {/* Tool execution indicator */}
+        {state.lastToolExecution && (
+          <div className="absolute -top-2 -left-2 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center animate-bounce">
+            <div className="w-2 h-2 bg-white rounded-full" />
           </div>
         )}
         

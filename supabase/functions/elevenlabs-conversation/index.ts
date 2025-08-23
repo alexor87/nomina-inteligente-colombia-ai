@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
 
@@ -30,11 +31,14 @@ function createSupabaseForRequest(req: Request) {
 function createClientTools(supabase: any) {
   return {
     getActiveEmployees: async () => {
-      console.log('🔍 Getting active employees...');
+      console.log('🔍 [TOOL] Getting active employees...');
       
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return "Error: Usuario no autenticado";
+        if (!user) {
+          console.log('❌ [TOOL] User not authenticated');
+          return "Error: Usuario no autenticado";
+        }
 
         const { data: profile } = await supabase
           .from('profiles')
@@ -42,7 +46,12 @@ function createClientTools(supabase: any) {
           .eq('user_id', user.id)
           .single();
 
-        if (!profile?.company_id) return "Error: No se encontró la empresa del usuario";
+        if (!profile?.company_id) {
+          console.log('❌ [TOOL] No company found for user');
+          return "Error: No se encontró la empresa del usuario";
+        }
+
+        console.log('🏢 [TOOL] User company:', profile.company_id);
 
         const { data: employees, error } = await supabase
           .from('employees')
@@ -52,11 +61,12 @@ function createClientTools(supabase: any) {
           .order('nombre');
 
         if (error) {
-          console.error('Database error:', error);
+          console.error('❌ [TOOL] Database error:', error);
           return `Error al consultar empleados: ${error.message}`;
         }
         
         if (!employees?.length) {
+          console.log('📋 [TOOL] No active employees found');
           return "No tienes empleados activos registrados en el sistema.";
         }
 
@@ -69,19 +79,23 @@ function createClientTools(supabase: any) {
             `${e.nombre} ${e.apellido} - ${e.cargo || 'Sin cargo'}`
           ).join(', ')}${totalEmployees > 3 ? ` y ${totalEmployees - 3} más` : ''}.`;
         
+        console.log('✅ [TOOL] getActiveEmployees result:', summary);
         return summary;
       } catch (error) {
-        console.error('Error in getActiveEmployees:', error);
+        console.error('❌ [TOOL] Error in getActiveEmployees:', error);
         return "Error interno al consultar empleados. Por favor intenta de nuevo.";
       }
     },
 
     getPayrollPeriods: async () => {
-      console.log('🔍 Getting payroll periods...');
+      console.log('🔍 [TOOL] Getting payroll periods...');
       
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return "Error: Usuario no autenticado";
+        if (!user) {
+          console.log('❌ [TOOL] User not authenticated');
+          return "Error: Usuario no autenticado";
+        }
 
         const { data: profile } = await supabase
           .from('profiles')
@@ -89,7 +103,12 @@ function createClientTools(supabase: any) {
           .eq('user_id', user.id)
           .single();
 
-        if (!profile?.company_id) return "Error: No se encontró la empresa del usuario";
+        if (!profile?.company_id) {
+          console.log('❌ [TOOL] No company found for user');
+          return "Error: No se encontró la empresa del usuario";
+        }
+
+        console.log('🏢 [TOOL] User company:', profile.company_id);
 
         const { data: periods, error } = await supabase
           .from('payroll_periods_real')
@@ -99,11 +118,12 @@ function createClientTools(supabase: any) {
           .limit(5);
 
         if (error) {
-          console.error('Database error:', error);
+          console.error('❌ [TOOL] Database error:', error);
           return `Error al consultar períodos: ${error.message}`;
         }
         
         if (!periods?.length) {
+          console.log('📋 [TOOL] No payroll periods found');
           return "No hay períodos de nómina registrados. Puedes crear uno nuevo desde la sección de nómina.";
         }
         
@@ -115,19 +135,23 @@ function createClientTools(supabase: any) {
           `Has procesado ${totalProcessed} períodos en total. ` +
           `Los últimos períodos son: ${periods.map((p: any) => `${p.periodo} (${p.estado})`).join(', ')}.`;
         
+        console.log('✅ [TOOL] getPayrollPeriods result:', summary);
         return summary;
       } catch (error) {
-        console.error('Error in getPayrollPeriods:', error);
+        console.error('❌ [TOOL] Error in getPayrollPeriods:', error);
         return "Error interno al consultar períodos. Por favor intenta de nuevo.";
       }
     },
 
     getCompanyInfo: async () => {
-      console.log('🔍 Getting company info...');
+      console.log('🔍 [TOOL] Getting company info...');
       
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return "Error: Usuario no autenticado";
+        if (!user) {
+          console.log('❌ [TOOL] User not authenticated');
+          return "Error: Usuario no autenticado";
+        }
 
         const { data: profile } = await supabase
           .from('profiles')
@@ -135,7 +159,12 @@ function createClientTools(supabase: any) {
           .eq('user_id', user.id)
           .single();
 
-        if (!profile?.company_id) return "Error: No se encontró la empresa del usuario";
+        if (!profile?.company_id) {
+          console.log('❌ [TOOL] No company found for user');
+          return "Error: No se encontró la empresa del usuario";
+        }
+
+        console.log('🏢 [TOOL] User company:', profile.company_id);
 
         const { count: employeeCount } = await supabase
           .from('employees')
@@ -168,16 +197,17 @@ function createClientTools(supabase: any) {
         
         summary += "¿En qué puedo ayudarte hoy? Puedo consultar empleados, períodos de nómina, o llevarte a cualquier sección del sistema.";
         
+        console.log('✅ [TOOL] getCompanyInfo result:', summary);
         return summary;
       } catch (error) {
-        console.error('Error in getCompanyInfo:', error);
+        console.error('❌ [TOOL] Error in getCompanyInfo:', error);
         return "Error interno al obtener información. Por favor intenta de nuevo.";
       }
     },
 
     navigateToSection: async (parameters: { section: string }) => {
       const { section } = parameters;
-      console.log(`🧭 Navigation request to: ${section}`);
+      console.log(`🧭 [TOOL] Navigation request to: ${section}`);
       
       try {
         const sectionMap: Record<string, { route: string; name: string }> = {
@@ -185,28 +215,38 @@ function createClientTools(supabase: any) {
           'employees': { route: '/app/employees', name: 'empleados' },
           'nomina': { route: '/app/payroll', name: 'nómina' },
           'payroll': { route: '/app/payroll', name: 'nómina' },
+          'liquidacion': { route: '/app/payroll', name: 'liquidación de nómina' },
           'reportes': { route: '/app/reports', name: 'reportes' },
           'reports': { route: '/app/reports', name: 'reportes' },
           'prestaciones': { route: '/app/prestaciones-sociales', name: 'prestaciones sociales' },
+          'prestaciones-sociales': { route: '/app/prestaciones-sociales', name: 'prestaciones sociales' },
           'configuracion': { route: '/app/settings', name: 'configuración' },
           'settings': { route: '/app/settings', name: 'configuración' },
           'dashboard': { route: '/app/dashboard', name: 'dashboard' },
           'inicio': { route: '/app/dashboard', name: 'inicio' },
-          'home': { route: '/app/dashboard', name: 'inicio' }
+          'home': { route: '/app/dashboard', name: 'inicio' },
+          'vacaciones': { route: '/app/vacations-absences', name: 'vacaciones y ausencias' },
+          'ausencias': { route: '/app/vacations-absences', name: 'vacaciones y ausencias' },
+          'vacations': { route: '/app/vacations-absences', name: 'vacaciones y ausencias' },
+          'absences': { route: '/app/vacations-absences', name: 'vacaciones y ausencias' }
         };
 
         const target = sectionMap[section.toLowerCase()];
         if (target) {
-          return `Perfecto, te estoy dirigiendo a la sección de ${target.name}. La página se cargará en un momento.`;
+          const result = `Perfecto, te estoy dirigiendo a la sección de ${target.name}. La página se cargará en un momento.`;
+          console.log(`✅ [TOOL] Navigation confirmed for: ${target.name} -> ${target.route}`);
+          return result;
         } else {
           const availableSections = Object.values(sectionMap)
             .map(s => s.name)
             .filter((name, index, arr) => arr.indexOf(name) === index)
             .join(', ');
-          return `No reconozco la sección "${section}". Las secciones disponibles son: ${availableSections}. ¿A cuál te gustaría que te lleve?`;
+          const result = `No reconozco la sección "${section}". Las secciones disponibles son: ${availableSections}. ¿A cuál te gustaría que te lleve?`;
+          console.log(`❌ [TOOL] Unknown section: ${section}`);
+          return result;
         }
       } catch (error) {
-        console.error('Error in navigateToSection:', error);
+        console.error('❌ [TOOL] Error in navigateToSection:', error);
         return "Error al procesar la navegación. Por favor intenta de nuevo.";
       }
     }
@@ -347,18 +387,18 @@ serve(async (req) => {
 
     if (action === 'tool_call') {
       const { tool_name, parameters } = body;
-      console.log(`🛠️ Tool call: ${tool_name}`, parameters);
+      console.log(`🛠️ [EDGE] Tool call: ${tool_name}`, parameters);
 
       if ((CLIENT_TOOLS as any)[tool_name]) {
         try {
           const result = await (CLIENT_TOOLS as any)[tool_name](parameters);
-          console.log(`✅ Tool call result for ${tool_name}:`, result);
+          console.log(`✅ [EDGE] Tool call result for ${tool_name}:`, result);
           
           return new Response(JSON.stringify({ result }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         } catch (toolError: any) {
-          console.error(`❌ Tool execution error for ${tool_name}:`, toolError);
+          console.error(`❌ [EDGE] Tool execution error for ${tool_name}:`, toolError);
           return new Response(JSON.stringify({ 
             result: `Error ejecutando ${tool_name}: ${toolError.message}` 
           }), {
@@ -366,7 +406,7 @@ serve(async (req) => {
           });
         }
       } else {
-        console.error(`❌ Unknown tool: ${tool_name}`);
+        console.error(`❌ [EDGE] Unknown tool: ${tool_name}`);
         return new Response(JSON.stringify({ 
           error: `Unknown tool: ${tool_name}`,
           result: `No reconozco la función ${tool_name}. Funciones disponibles: getActiveEmployees, getPayrollPeriods, getCompanyInfo, navigateToSection`

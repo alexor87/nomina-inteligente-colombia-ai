@@ -1,7 +1,9 @@
 import { useCallback, useState } from 'react';
 import { useConversation } from '@elevenlabs/react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { getRouteForSection, getSectionDisplayName } from '@/utils/voiceNavigationUtils';
 
 export interface ConversationState {
   isConnected: boolean;
@@ -16,11 +18,17 @@ export interface ConversationState {
     agentIdReceived: boolean;
     lastCheck?: string;
   } | null;
+  lastToolExecution?: {
+    toolName: string;
+    result: string;
+    timestamp: string;
+  } | null;
 }
 
 const ELEVENLABS_AGENT_ID = 'agent_3701k3bzfyn5f4ws09536v7bk5wf';
 
 export const useElevenLabsConversation = () => {
+  const navigate = useNavigate();
   const [state, setState] = useState<ConversationState>({
     isConnected: false,
     isListening: false,
@@ -35,6 +43,24 @@ export const useElevenLabsConversation = () => {
   const updateState = useCallback((updates: Partial<ConversationState>) => {
     setState((prev) => ({ ...prev, ...updates }));
   }, []);
+
+  const logToolExecution = useCallback((toolName: string, result: string) => {
+    console.log(`🛠️ Tool executed: ${toolName} -> ${result}`);
+    updateState({
+      lastToolExecution: {
+        toolName,
+        result,
+        timestamp: new Date().toISOString()
+      }
+    });
+    
+    // Show toast notification for tool execution
+    toast({
+      title: `🛠️ Herramienta ejecutada: ${toolName}`,
+      description: result.length > 100 ? result.substring(0, 100) + '...' : result,
+      duration: 3000,
+    });
+  }, [updateState]);
 
   const checkMicrophonePermission = useCallback(async () => {
     try {
@@ -123,7 +149,6 @@ export const useElevenLabsConversation = () => {
       };
     }
     
-    // Legacy error handling
     let userMessage = 'Error desconocido del servicio';
     let details = errorData;
     
@@ -227,7 +252,7 @@ export const useElevenLabsConversation = () => {
     },
     clientTools: {
       getActiveEmployees: async () => {
-        console.log('🛠️ Tool call: getActiveEmployees');
+        console.log('🛠️ [CLIENT TOOL] getActiveEmployees called');
         try {
           const { data, error } = await supabase.functions.invoke('elevenlabs-conversation', {
             body: { action: 'tool_call', tool_name: 'getActiveEmployees' },
@@ -235,17 +260,24 @@ export const useElevenLabsConversation = () => {
           
           if (error) {
             console.error('❌ Supabase function error:', error);
-            return `Error al consultar empleados: ${error.message}`;
+            const result = `Error al consultar empleados: ${error.message}`;
+            logToolExecution('getActiveEmployees', result);
+            return result;
           }
           
-          return data?.result || 'Error al obtener empleados';
+          const result = data?.result || 'Error al obtener empleados';
+          console.log('✅ [CLIENT TOOL] getActiveEmployees result:', result);
+          logToolExecution('getActiveEmployees', result);
+          return result;
         } catch (error) {
           console.error('❌ Error in getActiveEmployees:', error);
-          return 'Error al consultar empleados';
+          const result = 'Error al consultar empleados';
+          logToolExecution('getActiveEmployees', result);
+          return result;
         }
       },
       getPayrollPeriods: async () => {
-        console.log('🛠️ Tool call: getPayrollPeriods');
+        console.log('🛠️ [CLIENT TOOL] getPayrollPeriods called');
         try {
           const { data, error } = await supabase.functions.invoke('elevenlabs-conversation', {
             body: { action: 'tool_call', tool_name: 'getPayrollPeriods' },
@@ -253,17 +285,24 @@ export const useElevenLabsConversation = () => {
           
           if (error) {
             console.error('❌ Supabase function error:', error);
-            return `Error al consultar períodos: ${error.message}`;
+            const result = `Error al consultar períodos: ${error.message}`;
+            logToolExecution('getPayrollPeriods', result);
+            return result;
           }
           
-          return data?.result || 'Error al obtener períodos';
+          const result = data?.result || 'Error al obtener períodos';
+          console.log('✅ [CLIENT TOOL] getPayrollPeriods result:', result);
+          logToolExecution('getPayrollPeriods', result);
+          return result;
         } catch (error) {
           console.error('❌ Error in getPayrollPeriods:', error);
-          return 'Error al consultar períodos de nómina';
+          const result = 'Error al consultar períodos de nómina';
+          logToolExecution('getPayrollPeriods', result);
+          return result;
         }
       },
       getCompanyInfo: async () => {
-        console.log('🛠️ Tool call: getCompanyInfo');
+        console.log('🛠️ [CLIENT TOOL] getCompanyInfo called');
         try {
           const { data, error } = await supabase.functions.invoke('elevenlabs-conversation', {
             body: { action: 'tool_call', tool_name: 'getCompanyInfo' },
@@ -271,57 +310,78 @@ export const useElevenLabsConversation = () => {
           
           if (error) {
             console.error('❌ Supabase function error:', error);
-            return `Error al obtener información: ${error.message}`;
+            const result = `Error al obtener información: ${error.message}`;
+            logToolExecution('getCompanyInfo', result);
+            return result;
           }
           
-          return data?.result || 'Error al obtener información';
+          const result = data?.result || 'Error al obtener información';
+          console.log('✅ [CLIENT TOOL] getCompanyInfo result:', result);
+          logToolExecution('getCompanyInfo', result);
+          return result;
         } catch (error) {
           console.error('❌ Error in getCompanyInfo:', error);
-          return 'Error al obtener información de la empresa';
+          const result = 'Error al obtener información de la empresa';
+          logToolExecution('getCompanyInfo', result);
+          return result;
         }
       },
       navigateToSection: async (parameters: { section: string }) => {
-        console.log('🛠️ Tool call: navigateToSection', parameters);
+        console.log('🛠️ [CLIENT TOOL] navigateToSection called with:', parameters);
+        
         try {
-          const { data, error } = await supabase.functions.invoke('elevenlabs-conversation', {
-            body: {
-              action: 'tool_call',
-              tool_name: 'navigateToSection',
-              parameters,
-            },
-          });
+          const { section } = parameters;
+          const route = getRouteForSection(section);
+          const displayName = getSectionDisplayName(section);
+          
+          if (route) {
+            console.log(`🧭 [NAVIGATION] Navigating to: ${route} (${displayName})`);
+            
+            // Call backend to log the navigation
+            const { data, error } = await supabase.functions.invoke('elevenlabs-conversation', {
+              body: {
+                action: 'tool_call',
+                tool_name: 'navigateToSection',
+                parameters,
+              },
+            });
 
-          if (error) {
-            console.error('❌ Supabase function error:', error);
-            return `Error en navegación: ${error.message}`;
-          }
-
-          if (data?.result && !data.result.includes('Error')) {
-            const sectionMap: Record<string, string> = {
-              empleados: '/app/employees',
-              employees: '/app/employees',
-              nomina: '/app/payroll',
-              payroll: '/app/payroll',
-              reportes: '/app/reports',
-              reports: '/app/reports',
-              prestaciones: '/app/prestaciones-sociales',
-              configuracion: '/app/settings',
-              settings: '/app/settings',
-              dashboard: '/app/dashboard',
-            };
-
-            const route = sectionMap[parameters.section.toLowerCase()];
-            if (route) {
-              setTimeout(() => {
-                window.location.href = route;
-              }, 1000);
+            let result: string;
+            if (error) {
+              console.error('❌ Backend navigation logging error:', error);
+              result = `Error en navegación: ${error.message}`;
+            } else {
+              result = data?.result || `Te estoy dirigiendo a ${displayName}`;
             }
-          }
 
-          return data?.result || 'Error en navegación';
+            // Execute navigation after a small delay to let user hear confirmation
+            setTimeout(() => {
+              console.log(`🚀 [NAVIGATION] Executing navigation to: ${route}`);
+              navigate(route);
+              
+              // Show success toast
+              toast({
+                title: '🧭 Navegación exitosa',
+                description: `Te he dirigido a la sección de ${displayName}`,
+                duration: 2000,
+              });
+            }, 1500);
+
+            logToolExecution('navigateToSection', result);
+            return result;
+          } else {
+            const availableSections = ['empleados', 'nómina', 'reportes', 'prestaciones sociales', 'configuración', 'dashboard', 'vacaciones y ausencias'];
+            const result = `No reconozco la sección "${section}". Las secciones disponibles son: ${availableSections.join(', ')}. ¿A cuál te gustaría que te lleve?`;
+            
+            console.log('❌ [NAVIGATION] Unknown section:', section);
+            logToolExecution('navigateToSection', result);
+            return result;
+          }
         } catch (error) {
           console.error('❌ Error in navigateToSection:', error);
-          return 'Error al navegar a la sección solicitada';
+          const result = 'Error al procesar la navegación. Por favor intenta de nuevo.';
+          logToolExecution('navigateToSection', result);
+          return result;
         }
       },
     },
