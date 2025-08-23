@@ -3,30 +3,33 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Mic, MicOff, Volume2, VolumeX, MessageCircle, X, AlertCircle } from 'lucide-react';
-import { useElevenLabsAgent } from '@/hooks/useElevenLabsAgent';
+import { useElevenLabsConversation } from '@/hooks/useElevenLabsConversation';
 import { useVoiceAgent } from '@/contexts/VoiceAgentContext';
 import { cn } from '@/lib/utils';
 
 export const FloatingVoiceAgent: React.FC = () => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const { state, startConversation, endConversation } = useElevenLabsAgent();
-  const { isSupported, isLoaded, error: contextError } = useVoiceAgent();
+  const { state, startConversation, endConversation, status, isSpeaking } = useElevenLabsConversation();
+  const { isSupported, error: contextError } = useVoiceAgent();
 
   const handleToggleConversation = () => {
-    if (state.isConnected) {
+    if (state.isConnected || status === 'connected') {
       endConversation();
     } else {
       startConversation();
     }
   };
 
+  const isConnected = state.isConnected || status === 'connected';
+  const isCurrentlySpeaking = state.isSpeaking || isSpeaking;
+
   const getStatusColor = () => {
     if (state.error || contextError) return 'bg-destructive';
-    if (!isSupported || !isLoaded) return 'bg-muted';
+    if (!isSupported) return 'bg-muted';
     if (state.isLoading) return 'bg-yellow-500';
-    if (state.isConnected && state.isSpeaking) return 'bg-blue-500 animate-pulse';
-    if (state.isConnected && state.isListening) return 'bg-green-500 animate-pulse';
-    if (state.isConnected) return 'bg-green-500';
+    if (isConnected && isCurrentlySpeaking) return 'bg-blue-500 animate-pulse';
+    if (isConnected && state.isListening) return 'bg-green-500 animate-pulse';
+    if (isConnected) return 'bg-green-500';
     return 'bg-muted';
   };
 
@@ -34,24 +37,23 @@ export const FloatingVoiceAgent: React.FC = () => {
     if (contextError) return contextError;
     if (state.error) return 'Error';
     if (!isSupported) return 'No compatible';
-    if (!isLoaded) return 'Cargando SDK...';
     if (state.isLoading) return 'Conectando...';
-    if (state.isConnected && state.isSpeaking) return 'Ana hablando...';
-    if (state.isConnected && state.isListening) return 'Escuchando...';
-    if (state.isConnected) return 'Ana conectada';
+    if (isConnected && isCurrentlySpeaking) return 'Ana hablando...';
+    if (isConnected && state.isListening) return 'Escuchando...';
+    if (isConnected) return 'Ana conectada';
     return 'Desconectado';
   };
 
   const getMainIcon = () => {
     if (!isSupported || contextError) return <AlertCircle className="w-5 h-5" />;
-    if (!isLoaded || state.isLoading) return <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" />;
-    if (state.isConnected && state.isSpeaking) return <Volume2 className="w-5 h-5" />;
-    if (state.isConnected && state.isListening) return <Mic className="w-5 h-5 animate-pulse" />;
-    if (state.isConnected) return <Mic className="w-5 h-5" />;
+    if (state.isLoading) return <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" />;
+    if (isConnected && isCurrentlySpeaking) return <Volume2 className="w-5 h-5" />;
+    if (isConnected && state.isListening) return <Mic className="w-5 h-5 animate-pulse" />;
+    if (isConnected) return <Mic className="w-5 h-5" />;
     return <MicOff className="w-5 h-5" />;
   };
 
-  const isDisabled = !isSupported || !isLoaded || state.isLoading;
+  const isDisabled = !isSupported || state.isLoading;
 
   return (
     <div className="fixed bottom-6 right-6 z-50">
@@ -91,7 +93,7 @@ export const FloatingVoiceAgent: React.FC = () => {
             )}
             
             <div className="text-xs text-muted-foreground">
-              {state.isConnected ? (
+              {isConnected ? (
                 <>
                   <p className="mb-2 text-green-600 font-medium">✅ Ana está lista para ayudarte</p>
                   <p className="text-xs mb-1 text-foreground">Puedes preguntarme sobre:</p>
@@ -121,12 +123,12 @@ export const FloatingVoiceAgent: React.FC = () => {
               disabled={isDisabled}
               className={cn(
                 "w-full",
-                state.isConnected 
+                isConnected 
                   ? "bg-destructive hover:bg-destructive/90 text-destructive-foreground" 
                   : "bg-primary hover:bg-primary/90 text-primary-foreground"
               )}
             >
-              {state.isConnected ? 'Desactivar Ana' : 'Activar Ana'}
+              {isConnected ? 'Desactivar Ana' : 'Activar Ana'}
             </Button>
 
             {!isSupported && (
@@ -154,17 +156,17 @@ export const FloatingVoiceAgent: React.FC = () => {
         </Button>
         
         {/* Status indicator */}
-        {(state.isListening || state.isSpeaking) && (
+        {(state.isListening || isCurrentlySpeaking) && (
           <div className="absolute -top-1 -right-1 w-4 h-4 bg-white rounded-full flex items-center justify-center">
             <div className={cn(
               "w-2 h-2 rounded-full animate-pulse",
-              state.isSpeaking ? "bg-blue-500" : "bg-green-500"
+              isCurrentlySpeaking ? "bg-blue-500" : "bg-green-500"
             )} />
           </div>
         )}
         
         {/* Quick access button */}
-        {!isExpanded && state.isConnected && !isDisabled && (
+        {!isExpanded && isConnected && !isDisabled && (
           <Button
             onClick={handleToggleConversation}
             className="absolute -top-2 -left-12 w-8 h-8 rounded-full bg-background border border-border shadow-md hover:scale-110 transition-transform"
