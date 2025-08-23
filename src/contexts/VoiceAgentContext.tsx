@@ -52,7 +52,7 @@ export const VoiceAgentProvider: React.FC<VoiceAgentProviderProps> = ({ children
     const supported = checkSupport();
     setIsSupported(supported);
 
-    // Load ElevenLabs SDK
+    // Load ElevenLabs SDK with improved error handling
     const loadElevenLabsSDK = () => {
       if (window.ElevenLabs) {
         console.log('✅ ElevenLabs SDK already loaded');
@@ -61,30 +61,90 @@ export const VoiceAgentProvider: React.FC<VoiceAgentProviderProps> = ({ children
       }
 
       console.log('🔄 Loading ElevenLabs SDK...');
-      const script = document.createElement('script');
-      script.src = 'https://cdn.jsdelivr.net/npm/@11labs/client/dist/index.umd.js';
-      script.async = true;
-      script.crossOrigin = 'anonymous';
       
-      script.onload = () => {
-        console.log('✅ ElevenLabs SDK loaded successfully');
-        setIsLoaded(true);
-        setError(null);
+      // Try loading from CDN first
+      const loadFromCDN = () => {
+        return new Promise<void>((resolve, reject) => {
+          const script = document.createElement('script');
+          // Fixed: Correct CDN URL using @elevenlabs/client instead of @11labs/client
+          script.src = 'https://cdn.jsdelivr.net/npm/@elevenlabs/client/dist/index.umd.js';
+          script.async = true;
+          script.crossOrigin = 'anonymous';
+          
+          script.onload = () => {
+            console.log('✅ ElevenLabs SDK loaded successfully from CDN');
+            if (window.ElevenLabs) {
+              resolve();
+            } else {
+              reject(new Error('SDK loaded but ElevenLabs object not found'));
+            }
+          };
+          
+          script.onerror = (event) => {
+            console.error('❌ Failed to load ElevenLabs SDK from CDN:', event);
+            reject(new Error('Failed to load from CDN'));
+          };
+          
+          document.head.appendChild(script);
+        });
       };
-      
-      script.onerror = (event) => {
-        console.error('❌ Failed to load ElevenLabs SDK:', event);
-        setIsLoaded(false);
-        setError('Error cargando el SDK de ElevenLabs');
-      };
-      
-      document.head.appendChild(script);
 
-      // Cleanup function to remove script if component unmounts
+      // Try alternative CDN if first one fails
+      const loadFromAlternativeCDN = () => {
+        return new Promise<void>((resolve, reject) => {
+          const script = document.createElement('script');
+          // Alternative CDN source
+          script.src = 'https://unpkg.com/@elevenlabs/client@latest/dist/index.umd.js';
+          script.async = true;
+          script.crossOrigin = 'anonymous';
+          
+          script.onload = () => {
+            console.log('✅ ElevenLabs SDK loaded successfully from alternative CDN');
+            if (window.ElevenLabs) {
+              resolve();
+            } else {
+              reject(new Error('SDK loaded but ElevenLabs object not found'));
+            }
+          };
+          
+          script.onerror = (event) => {
+            console.error('❌ Failed to load ElevenLabs SDK from alternative CDN:', event);
+            reject(new Error('Failed to load from alternative CDN'));
+          };
+          
+          document.head.appendChild(script);
+        });
+      };
+
+      // Try primary CDN first, then fallback to alternative
+      loadFromCDN()
+        .then(() => {
+          setIsLoaded(true);
+          setError(null);
+        })
+        .catch((primaryError) => {
+          console.warn('⚠️ Primary CDN failed, trying alternative...', primaryError);
+          
+          return loadFromAlternativeCDN()
+            .then(() => {
+              setIsLoaded(true);
+              setError(null);
+            })
+            .catch((fallbackError) => {
+              console.error('❌ All CDN sources failed:', { primaryError, fallbackError });
+              setIsLoaded(false);
+              setError('Error cargando el SDK de ElevenLabs. Verifica tu conexión a internet.');
+            });
+        });
+
+      // Cleanup function
       return () => {
-        if (document.head.contains(script)) {
-          document.head.removeChild(script);
-        }
+        const scripts = document.querySelectorAll('script[src*="elevenlabs"]');
+        scripts.forEach(script => {
+          if (document.head.contains(script)) {
+            document.head.removeChild(script);
+          }
+        });
       };
     };
 
