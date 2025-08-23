@@ -171,8 +171,8 @@ export const useElevenLabsConversation = () => {
 
       console.log('✅ Signed URL received, starting session with agent:', ELEVENLABS_AGENT_ID);
 
-      // FIX: use `url` instead of `signedUrl` for @elevenlabs/react
-      await conversation.startSession({ url: signedUrl });
+      // Use the signed URL directly as the parameter
+      await conversation.startSession(signedUrl);
 
       console.log('✅ Conversation session started successfully');
     } catch (error) {
