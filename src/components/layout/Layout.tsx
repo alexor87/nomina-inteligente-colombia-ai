@@ -5,6 +5,8 @@ import { Sidebar } from './Sidebar';
 import Header from './Header';
 import { useAuth } from '@/contexts/AuthContext';
 import { LoadingWithTimeout } from '@/components/ui/LoadingWithTimeout';
+import { FloatingVoiceAgent } from '@/components/voice/FloatingVoiceAgent';
+import { VoiceAgentProvider } from '@/contexts/VoiceAgentContext';
 
 export const Layout = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -30,22 +32,27 @@ export const Layout = () => {
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
-      <Sidebar 
-        collapsed={sidebarCollapsed}
-        onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-      />
-      
-      <main 
-        className={`flex-1 transition-all duration-300 ${
-          sidebarCollapsed ? 'ml-16' : 'ml-64'
-        }`}
-      >
-        <Header />
-        <div className="min-h-screen bg-gray-50">
-          <Outlet />
-        </div>
-      </main>
-    </div>
+    <VoiceAgentProvider>
+      <div className="flex min-h-screen bg-gray-50">
+        <Sidebar 
+          collapsed={sidebarCollapsed}
+          onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+        />
+        
+        <main 
+          className={`flex-1 transition-all duration-300 ${
+            sidebarCollapsed ? 'ml-16' : 'ml-64'
+          }`}
+        >
+          <Header />
+          <div className="min-h-screen bg-gray-50">
+            <Outlet />
+          </div>
+        </main>
+
+        {/* Floating Voice Agent */}
+        <FloatingVoiceAgent />
+      </div>
+    </VoiceAgentProvider>
   );
 };
