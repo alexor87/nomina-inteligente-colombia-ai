@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
 
@@ -266,7 +265,7 @@ serve(async (req) => {
 
       const agentId =
         (body && (body.agent_id || body.agentId)) ||
-        'agent_8701k3by6j9ef8ka0wqzm6xtj3d9';
+        'agent_3701k3bzfyn5f4ws09536v7bk5wf';
 
       if (!agentId || typeof agentId !== 'string' || !agentId.trim()) {
         console.error('❌ Missing agentId for session start');

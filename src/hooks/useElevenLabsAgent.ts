@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -11,8 +10,8 @@ export interface ConversationState {
   error: string | null;
 }
 
-// NEW: Centralize the Agent ID provided by the user
-const ELEVENLABS_AGENT_ID = 'agent_8701k3by6j9ef8ka0wqzm6xtj3d9';
+// UPDATED: Use the correct Agent ID provided by the user
+const ELEVENLABS_AGENT_ID = 'agent_3701k3bzfyn5f4ws09536v7bk5wf';
 
 export const useElevenLabsAgent = () => {
   const [state, setState] = useState<ConversationState>({
