@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
 
@@ -227,7 +226,14 @@ serve(async (req) => {
     const ELEVENLABS_API_KEY = Deno.env.get('ELEVENLABS_API_KEY');
     if (!ELEVENLABS_API_KEY) {
       console.error('❌ ELEVENLABS_API_KEY not configured');
-      throw new Error('ELEVENLABS_API_KEY not configured');
+      return new Response(JSON.stringify({ 
+        error: 'ELEVENLABS_API_KEY not configured',
+        error_code: 'MISSING_API_KEY',
+        status: 500
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const { action, ...body } = await req.json();
@@ -242,7 +248,14 @@ serve(async (req) => {
 
       if (!agentId || typeof agentId !== 'string' || !agentId.trim()) {
         console.error('❌ Missing agentId for session start');
-        throw new Error('Missing agent_id for ElevenLabs conversation');
+        return new Response(JSON.stringify({ 
+          error: 'Missing agent_id for ElevenLabs conversation',
+          error_code: 'MISSING_AGENT_ID',
+          status: 400
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
 
       console.log('🎯 Using ElevenLabs Agent ID:', agentId);
@@ -258,13 +271,34 @@ serve(async (req) => {
           }
         );
 
+        const responseText = await response.text();
+        console.log(`📊 ElevenLabs API Response - Status: ${response.status}, Body:`, responseText);
+
         if (!response.ok) {
-          const errorText = await response.text();
-          console.error('❌ ElevenLabs API error:', response.status, errorText);
-          throw new Error(`ElevenLabs API error: ${response.status} - ${errorText}`);
+          // Parse the error response to provide specific details
+          let errorDetails: any = {};
+          try {
+            errorDetails = JSON.parse(responseText);
+          } catch {
+            errorDetails = { message: responseText };
+          }
+
+          console.error('❌ ElevenLabs API error:', response.status, errorDetails);
+          
+          // Return the exact ElevenLabs error with status
+          return new Response(JSON.stringify({ 
+            error: `ElevenLabs API error: ${response.status}`,
+            error_code: 'ELEVENLABS_API_ERROR',
+            status: response.status,
+            elevenlabs_error: errorDetails,
+            agent_id: agentId
+          }), {
+            status: response.status,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
         }
 
-        const data = await response.json();
+        const data = JSON.parse(responseText);
         console.log('✅ Session created successfully for agent:', agentId);
         
         return new Response(JSON.stringify(data), {
@@ -272,7 +306,15 @@ serve(async (req) => {
         });
       } catch (fetchError: any) {
         console.error('❌ Fetch error:', fetchError);
-        throw new Error(`Failed to create session: ${fetchError.message}`);
+        return new Response(JSON.stringify({ 
+          error: `Failed to create session: ${fetchError.message}`,
+          error_code: 'NETWORK_ERROR',
+          status: 500,
+          agent_id: agentId
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
     }
 
@@ -309,7 +351,11 @@ serve(async (req) => {
     }
 
     console.log(`❌ Invalid action: ${action}`);
-    return new Response(JSON.stringify({ error: `Invalid action: ${action}` }), {
+    return new Response(JSON.stringify({ 
+      error: `Invalid action: ${action}`,
+      error_code: 'INVALID_ACTION',
+      status: 400
+    }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -318,6 +364,8 @@ serve(async (req) => {
     console.error('❌ Conversation proxy error:', error);
     return new Response(JSON.stringify({ 
       error: error.message,
+      error_code: 'INTERNAL_ERROR',
+      status: 500,
       details: 'Check server logs for more information'
     }), {
       status: 500,

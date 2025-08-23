@@ -1,4 +1,3 @@
-
 import { useCallback, useState } from 'react';
 import { useConversation } from '@elevenlabs/react';
 import { supabase } from '@/integrations/supabase/client';
@@ -63,6 +62,65 @@ export const useElevenLabsConversation = () => {
     }
   }, [updateState]);
 
+  const parseElevenLabsError = useCallback((errorData: any) => {
+    console.log('🔍 Parsing ElevenLabs error:', errorData);
+    
+    let userMessage = 'Error desconocido del servicio';
+    let details = errorData;
+    
+    // Handle different error formats from our edge function
+    if (errorData.error_code) {
+      switch (errorData.error_code) {
+        case 'MISSING_API_KEY':
+          userMessage = 'Clave de API no configurada. Contacta al administrador.';
+          break;
+        case 'MISSING_AGENT_ID':
+          userMessage = 'ID del agente no especificado. Error de configuración.';
+          break;
+        case 'ELEVENLABS_API_ERROR':
+          // Parse specific ElevenLabs API errors
+          const status = errorData.status;
+          const elevenLabsError = errorData.elevenlabs_error;
+          
+          if (status === 401) {
+            if (elevenLabsError?.detail?.status === 'invalid_api_key') {
+              userMessage = 'Clave de API inválida. Verifica la configuración en ElevenLabs.';
+            } else {
+              userMessage = 'No autorizado. Verifica la clave de API.';
+            }
+          } else if (status === 404) {
+            userMessage = `Agente no encontrado (${errorData.agent_id}). Verifica el ID del agente.`;
+          } else if (status === 429) {
+            userMessage = 'Límite de uso alcanzado. Intenta más tarde.';
+          } else if (status >= 400 && status < 500) {
+            userMessage = `Error del cliente (${status}): ${elevenLabsError?.detail?.message || 'Solicitud inválida'}`;
+          } else if (status >= 500) {
+            userMessage = 'Error del servidor de ElevenLabs. Intenta más tarde.';
+          }
+          break;
+        case 'NETWORK_ERROR':
+          userMessage = 'Error de red. Verifica tu conexión a internet.';
+          break;
+        case 'INTERNAL_ERROR':
+          userMessage = 'Error interno del servidor. Intenta más tarde.';
+          break;
+        default:
+          userMessage = `Error: ${errorData.error || 'Desconocido'}`;
+      }
+    } else if (errorData.message) {
+      // Handle other error formats
+      if (errorData.message.includes('microphone') || errorData.message.includes('permission')) {
+        userMessage = 'No se pudo acceder al micrófono. Verifica los permisos.';
+      } else if (errorData.message.includes('network') || errorData.message.includes('websocket')) {
+        userMessage = 'Error de red. Verifica tu conexión a internet.';
+      } else {
+        userMessage = errorData.message;
+      }
+    }
+    
+    return { userMessage, details };
+  }, []);
+
   const conversation = useConversation({
     onConnect: () => {
       console.log('✅ Connected to ElevenLabs');
@@ -103,18 +161,13 @@ export const useElevenLabsConversation = () => {
     },
     onError: (error: any) => {
       console.error('❌ Conversation error:', error);
+      const { userMessage, details } = parseElevenLabsError(error);
+      
       updateState({
-        error: error.message || 'Error de conexión',
-        detailedError: error,
+        error: userMessage,
+        detailedError: details,
         isLoading: false,
       });
-      
-      let userMessage = 'Hubo un problema con la conexión';
-      if (error.message?.includes('microphone') || error.message?.includes('permission')) {
-        userMessage = 'No se pudo acceder al micrófono. Verifica los permisos.';
-      } else if (error.message?.includes('network') || error.message?.includes('websocket')) {
-        userMessage = 'Error de red. Verifica tu conexión a internet.';
-      }
       
       toast({
         title: 'Error del asistente',
@@ -250,25 +303,23 @@ export const useElevenLabsConversation = () => {
 
       if (error) {
         console.error('❌ Supabase function error:', error);
-        throw new Error(`Error del servidor: ${error.message}`);
+        // Parse the error response which should now contain structured error info
+        const { userMessage, details } = parseElevenLabsError(error);
+        throw new Error(userMessage);
       }
 
+      // Check if the response itself contains an error (from our edge function)
       if (data?.error) {
         console.error('❌ Backend error response:', data);
+        const { userMessage, details } = parseElevenLabsError(data);
         
-        // Parse specific ElevenLabs errors
-        let userFriendlyMessage = 'Error desconocido del servicio';
-        if (data.error.includes('invalid_api_key') || data.error.includes('401')) {
-          userFriendlyMessage = 'Clave de API inválida. Contacta al administrador.';
-        } else if (data.error.includes('404')) {
-          userFriendlyMessage = 'Agente no encontrado. Verifica la configuración.';
-        } else if (data.error.includes('rate_limit') || data.error.includes('429')) {
-          userFriendlyMessage = 'Límite de uso alcanzado. Intenta más tarde.';
-        } else if (data.error.includes('network') || data.error.includes('timeout')) {
-          userFriendlyMessage = 'Error de red. Verifica tu conexión.';
-        }
+        updateState({
+          error: userMessage,
+          detailedError: details,
+          isLoading: false,
+        });
         
-        throw new Error(userFriendlyMessage);
+        throw new Error(userMessage);
       }
 
       const signedUrl = data.signed_url;
@@ -299,7 +350,7 @@ export const useElevenLabsConversation = () => {
         variant: 'destructive',
       });
     }
-  }, [conversation, updateState, checkMicrophonePermission]);
+  }, [conversation, updateState, checkMicrophonePermission, parseElevenLabsError]);
 
   const endConversation = useCallback(async () => {
     try {
