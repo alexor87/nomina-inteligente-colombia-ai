@@ -1,3 +1,4 @@
+
 import { useCallback, useState } from 'react';
 import { useConversation } from '@elevenlabs/react';
 import { supabase } from '@/integrations/supabase/client';
@@ -387,8 +388,14 @@ export const useElevenLabsConversation = () => {
 
       console.log('✅ Signed URL received, starting session with agent:', ELEVENLABS_AGENT_ID);
 
-      // Use the correct signature for startSession
-      await conversation.startSession({ url: signedUrl });
+      // Fix: Use the correct signature for startSession with agentId
+      await conversation.startSession({
+        agentId: ELEVENLABS_AGENT_ID,
+        overrides: {
+          // Pass the signed URL through overrides or handle it differently
+          // For now, let's try with just the agentId as recommended in the docs
+        }
+      });
 
       console.log('✅ Conversation session started successfully');
     } catch (error) {
