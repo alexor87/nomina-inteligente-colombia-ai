@@ -11,6 +11,9 @@ export interface ConversationState {
   error: string | null;
 }
 
+// NEW: Centralize the Agent ID provided by the user
+const ELEVENLABS_AGENT_ID = 'agent_8701k3by6j9ef8ka0wqzm6xtj3d9';
+
 export const useElevenLabsAgent = () => {
   const [state, setState] = useState<ConversationState>({
     isConnected: false,
@@ -38,10 +41,11 @@ export const useElevenLabsAgent = () => {
         throw new Error('ElevenLabs SDK not loaded. Please refresh the page.');
       }
 
-      // Get signed URL through our edge function
+      // Get signed URL through our edge function, passing agent_id
       const { data, error } = await supabase.functions.invoke('elevenlabs-conversation', {
         body: { 
-          action: 'start_session'
+          action: 'start_session',
+          agent_id: ELEVENLABS_AGENT_ID
         }
       });
 
@@ -50,7 +54,7 @@ export const useElevenLabsAgent = () => {
       const signedUrl = data.signed_url;
       if (!signedUrl) throw new Error('No signed URL received');
 
-      console.log('✅ Signed URL received, initializing conversation...');
+      console.log('✅ Signed URL received, initializing conversation with agent:', ELEVENLABS_AGENT_ID);
 
       // Initialize conversation with client tools
       const conversation = window.ElevenLabs.Conversation({

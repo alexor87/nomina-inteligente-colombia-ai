@@ -217,14 +217,30 @@ serve(async (req) => {
 
     if (action === 'start_session') {
       console.log('🚀 Starting new ElevenLabs conversation session');
-      
+
+      // NEW: accept agent_id from client, with safe default (user’s agent)
+      const agentId =
+        (body && (body.agent_id || body.agentId)) ||
+        'agent_8701k3by6j9ef8ka0wqzm6xtj3d9';
+
+      if (!agentId) {
+        console.error('❌ Missing agentId for session start');
+        throw new Error('Missing agent_id for ElevenLabs conversation');
+      }
+
+      console.log('🎯 Using ElevenLabs Agent ID:', agentId);
+
       try {
-        const response = await fetch("https://api.elevenlabs.io/v1/convai/conversation/get_signed_url", {
-          method: "GET",
-          headers: {
-            "xi-api-key": ELEVENLABS_API_KEY,
-          },
-        });
+        // NEW: request a signed URL specific to the provided agent_id
+        const response = await fetch(
+          `https://api.elevenlabs.io/v1/convai/conversation/get_signed_url?agent_id=${encodeURIComponent(agentId)}`,
+          {
+            method: "GET",
+            headers: {
+              "xi-api-key": ELEVENLABS_API_KEY,
+            },
+          }
+        );
 
         if (!response.ok) {
           const errorText = await response.text();
@@ -233,7 +249,7 @@ serve(async (req) => {
         }
 
         const data = await response.json();
-        console.log('✅ Session created successfully');
+        console.log('✅ Session created successfully for agent:', agentId);
         
         return new Response(JSON.stringify(data), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -248,9 +264,9 @@ serve(async (req) => {
       const { tool_name, parameters } = body;
       console.log(`🛠️ Tool call: ${tool_name}`, parameters);
 
-      if (CLIENT_TOOLS[tool_name]) {
+      if ((CLIENT_TOOLS as any)[tool_name]) {
         try {
-          const result = await CLIENT_TOOLS[tool_name](parameters);
+          const result = await (CLIENT_TOOLS as any)[tool_name](parameters);
           console.log(`✅ Tool call result for ${tool_name}:`, result);
           
           return new Response(JSON.stringify({ result }), {
