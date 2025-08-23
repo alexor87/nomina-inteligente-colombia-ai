@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect } from 'react';
 interface VoiceAgentContextType {
   isSupported: boolean;
   isLoaded: boolean;
+  error: string | null;
 }
 
 const VoiceAgentContext = createContext<VoiceAgentContextType | undefined>(undefined);
@@ -23,6 +24,7 @@ interface VoiceAgentProviderProps {
 export const VoiceAgentProvider: React.FC<VoiceAgentProviderProps> = ({ children }) => {
   const [isLoaded, setIsLoaded] = React.useState(false);
   const [isSupported, setIsSupported] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
 
   useEffect(() => {
     // Check if browser supports required APIs
@@ -30,46 +32,74 @@ export const VoiceAgentProvider: React.FC<VoiceAgentProviderProps> = ({ children
       const hasMediaDevices = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
       const hasWebAudio = !!(window.AudioContext || (window as any).webkitAudioContext);
       const hasWebSocket = !!window.WebSocket;
+      const isSecureContext = window.isSecureContext || window.location.protocol === 'https:';
+      
+      console.log('🔍 Checking browser support:', {
+        hasMediaDevices,
+        hasWebAudio,
+        hasWebSocket,
+        isSecureContext
+      });
+      
+      if (!isSecureContext) {
+        setError('Se requiere HTTPS para el micrófono');
+        return false;
+      }
       
       return hasMediaDevices && hasWebAudio && hasWebSocket;
     };
     
-    setIsSupported(checkSupport());
+    const supported = checkSupport();
+    setIsSupported(supported);
 
     // Load ElevenLabs SDK
     const loadElevenLabsSDK = () => {
       if (window.ElevenLabs) {
+        console.log('✅ ElevenLabs SDK already loaded');
         setIsLoaded(true);
         return;
       }
 
+      console.log('🔄 Loading ElevenLabs SDK...');
       const script = document.createElement('script');
-      script.src = 'https://cdn.jsdelivr.net/npm/@11labs/react@latest/dist/index.umd.js';
+      script.src = 'https://cdn.jsdelivr.net/npm/@11labs/client/dist/index.umd.js';
       script.async = true;
+      script.crossOrigin = 'anonymous';
+      
       script.onload = () => {
-        console.log('✅ ElevenLabs SDK loaded');
+        console.log('✅ ElevenLabs SDK loaded successfully');
         setIsLoaded(true);
+        setError(null);
       };
-      script.onerror = () => {
-        console.error('❌ Failed to load ElevenLabs SDK');
+      
+      script.onerror = (event) => {
+        console.error('❌ Failed to load ElevenLabs SDK:', event);
         setIsLoaded(false);
+        setError('Error cargando el SDK de ElevenLabs');
       };
       
       document.head.appendChild(script);
+
+      // Cleanup function to remove script if component unmounts
+      return () => {
+        if (document.head.contains(script)) {
+          document.head.removeChild(script);
+        }
+      };
     };
 
-    if (isSupported) {
-      loadElevenLabsSDK();
+    if (supported) {
+      const cleanup = loadElevenLabsSDK();
+      return cleanup;
+    } else {
+      setError('Navegador no compatible con funciones de voz');
     }
-
-    return () => {
-      // Cleanup if needed
-    };
-  }, [isSupported]);
+  }, []);
 
   const value = {
     isSupported,
     isLoaded,
+    error,
   };
 
   return (

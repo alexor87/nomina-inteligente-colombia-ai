@@ -41,8 +41,7 @@ export const useElevenLabsAgent = () => {
       // Get signed URL through our edge function
       const { data, error } = await supabase.functions.invoke('elevenlabs-conversation', {
         body: { 
-          action: 'start_session',
-          agentId: 'your-agent-id' // You'll need to replace this with actual agent ID
+          action: 'start_session'
         }
       });
 
@@ -51,6 +50,8 @@ export const useElevenLabsAgent = () => {
       const signedUrl = data.signed_url;
       if (!signedUrl) throw new Error('No signed URL received');
 
+      console.log('✅ Signed URL received, initializing conversation...');
+
       // Initialize conversation with client tools
       const conversation = window.ElevenLabs.Conversation({
         onConnect: () => {
@@ -58,7 +59,7 @@ export const useElevenLabsAgent = () => {
           updateState({ isConnected: true, isLoading: false });
           toast({
             title: "Asistente activado",
-            description: "¡Hola! Soy tu asistente de nómina. ¿En qué puedo ayudarte?",
+            description: "¡Hola! Soy Ana, tu asistente de nómina. ¿En qué puedo ayudarte?",
           });
         },
         onDisconnect: () => {
@@ -71,13 +72,27 @@ export const useElevenLabsAgent = () => {
         },
         onMessage: (message: any) => {
           console.log('📩 Message received:', message);
-          if (message.source === 'ai' && message.message) {
-            // Handle AI messages if needed
+          
+          // Update speaking/listening states based on message source
+          if (message.source === 'ai') {
+            updateState({ isSpeaking: true, isListening: false });
+          } else if (message.source === 'user') {
+            updateState({ isSpeaking: false, isListening: true });
           }
+        },
+        onModeChange: (mode: any) => {
+          console.log('🎯 Mode changed:', mode);
+          updateState({
+            isListening: mode.mode === 'listening',
+            isSpeaking: mode.mode === 'speaking'
+          });
         },
         onError: (error: any) => {
           console.error('❌ Conversation error:', error);
-          updateState({ error: error.message || 'Error de conexión' });
+          updateState({ 
+            error: error.message || 'Error de conexión',
+            isLoading: false 
+          });
           toast({
             title: "Error del asistente",
             description: error.message || 'Hubo un problema con la conexión',
@@ -86,60 +101,89 @@ export const useElevenLabsAgent = () => {
         },
         clientTools: {
           getActiveEmployees: async () => {
-            const { data } = await supabase.functions.invoke('elevenlabs-conversation', {
-              body: { action: 'tool_call', tool_name: 'getActiveEmployees' }
-            });
-            return data?.result || "Error al obtener empleados";
+            console.log('🛠️ Tool call: getActiveEmployees');
+            try {
+              const { data } = await supabase.functions.invoke('elevenlabs-conversation', {
+                body: { action: 'tool_call', tool_name: 'getActiveEmployees' }
+              });
+              return data?.result || "Error al obtener empleados";
+            } catch (error) {
+              console.error('❌ Error in getActiveEmployees:', error);
+              return "Error al consultar empleados";
+            }
           },
           getPayrollPeriods: async () => {
-            const { data } = await supabase.functions.invoke('elevenlabs-conversation', {
-              body: { action: 'tool_call', tool_name: 'getPayrollPeriods' }
-            });
-            return data?.result || "Error al obtener períodos";
+            console.log('🛠️ Tool call: getPayrollPeriods');
+            try {
+              const { data } = await supabase.functions.invoke('elevenlabs-conversation', {
+                body: { action: 'tool_call', tool_name: 'getPayrollPeriods' }
+              });
+              return data?.result || "Error al obtener períodos";
+            } catch (error) {
+              console.error('❌ Error in getPayrollPeriods:', error);
+              return "Error al consultar períodos de nómina";
+            }
           },
           getCompanyInfo: async () => {
-            const { data } = await supabase.functions.invoke('elevenlabs-conversation', {
-              body: { action: 'tool_call', tool_name: 'getCompanyInfo' }
-            });
-            return data?.result || "Error al obtener información";
+            console.log('🛠️ Tool call: getCompanyInfo');
+            try {
+              const { data } = await supabase.functions.invoke('elevenlabs-conversation', {
+                body: { action: 'tool_call', tool_name: 'getCompanyInfo' }
+              });
+              return data?.result || "Error al obtener información";
+            } catch (error) {
+              console.error('❌ Error in getCompanyInfo:', error);
+              return "Error al obtener información de la empresa";
+            }
           },
           navigateToSection: async (parameters: { section: string }) => {
-            const { data } = await supabase.functions.invoke('elevenlabs-conversation', {
-              body: { 
-                action: 'tool_call', 
-                tool_name: 'navigateToSection',
-                parameters 
-              }
-            });
-            
-            // Actually navigate if successful
-            if (data?.result && !data.result.includes('Error')) {
-              const sectionMap: Record<string, string> = {
-                'empleados': '/app/employees',
-                'employees': '/app/employees',
-                'nomina': '/app/payroll',
-                'payroll': '/app/payroll',
-                'reportes': '/app/reports',
-                'reports': '/app/reports',
-                'prestaciones': '/app/prestaciones-sociales',
-                'configuracion': '/app/settings',
-                'settings': '/app/settings',
-                'dashboard': '/app/dashboard'
-              };
+            console.log('🛠️ Tool call: navigateToSection', parameters);
+            try {
+              const { data } = await supabase.functions.invoke('elevenlabs-conversation', {
+                body: { 
+                  action: 'tool_call', 
+                  tool_name: 'navigateToSection',
+                  parameters 
+                }
+              });
               
-              const route = sectionMap[parameters.section.toLowerCase()];
-              if (route) {
-                window.location.href = route;
+              // Actually navigate if successful
+              if (data?.result && !data.result.includes('Error')) {
+                const sectionMap: Record<string, string> = {
+                  'empleados': '/app/employees',
+                  'employees': '/app/employees',
+                  'nomina': '/app/payroll',
+                  'payroll': '/app/payroll',
+                  'reportes': '/app/reports',
+                  'reports': '/app/reports',
+                  'prestaciones': '/app/prestaciones-sociales',
+                  'configuracion': '/app/settings',
+                  'settings': '/app/settings',
+                  'dashboard': '/app/dashboard'
+                };
+                
+                const route = sectionMap[parameters.section.toLowerCase()];
+                if (route) {
+                  setTimeout(() => {
+                    window.location.href = route;
+                  }, 1000); // Small delay to let user hear confirmation
+                }
               }
+              
+              return data?.result || "Error en navegación";
+            } catch (error) {
+              console.error('❌ Error in navigateToSection:', error);
+              return "Error al navegar a la sección solicitada";
             }
-            
-            return data?.result || "Error en navegación";
           }
         }
       });
 
       await conversation.startSession({ signedUrl });
       conversationRef.current = conversation;
+      sessionIdRef.current = data.session_id || null;
+
+      console.log('✅ Conversation session started successfully');
 
     } catch (error) {
       console.error('❌ Failed to start conversation:', error);
@@ -157,6 +201,8 @@ export const useElevenLabsAgent = () => {
 
   const endConversation = useCallback(async () => {
     try {
+      console.log('🛑 Ending conversation...');
+      
       if (conversationRef.current) {
         await conversationRef.current.endSession();
         conversationRef.current = null;
@@ -174,6 +220,8 @@ export const useElevenLabsAgent = () => {
         title: "Asistente desactivado",
         description: "¡Hasta luego! Siempre puedes reactivarme cuando me necesites.",
       });
+      
+      console.log('✅ Conversation ended successfully');
     } catch (error) {
       console.error('❌ Error ending conversation:', error);
     }
@@ -185,6 +233,7 @@ export const useElevenLabsAgent = () => {
     }
 
     try {
+      console.log('📤 Sending message:', message);
       await conversationRef.current.sendMessage(message);
     } catch (error) {
       console.error('❌ Error sending message:', error);
