@@ -2,14 +2,22 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Mic, MicOff, Volume2, VolumeX, MessageCircle, X, AlertCircle } from 'lucide-react';
+import { Mic, MicOff, Volume2, VolumeX, MessageCircle, X, AlertCircle, RefreshCw } from 'lucide-react';
 import { useElevenLabsConversation } from '@/hooks/useElevenLabsConversation';
 import { useVoiceAgent } from '@/contexts/VoiceAgentContext';
 import { cn } from '@/lib/utils';
 
 export const FloatingVoiceAgent: React.FC = () => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const { state, startConversation, endConversation, status, isSpeaking } = useElevenLabsConversation();
+  const [showDetailedError, setShowDetailedError] = useState(false);
+  const { 
+    state, 
+    startConversation, 
+    endConversation, 
+    checkMicrophonePermission,
+    status, 
+    isSpeaking 
+  } = useElevenLabsConversation();
   const { isSupported, error: contextError } = useVoiceAgent();
 
   const handleToggleConversation = () => {
@@ -20,13 +28,25 @@ export const FloatingVoiceAgent: React.FC = () => {
     }
   };
 
+  const handleRetryConnection = () => {
+    if (!state.isLoading) {
+      startConversation();
+    }
+  };
+
+  const handleCheckMicrophone = async () => {
+    await checkMicrophonePermission();
+  };
+
   const isConnected = state.isConnected || status === 'connected';
   const isCurrentlySpeaking = state.isSpeaking || isSpeaking;
 
   const getStatusColor = () => {
     if (state.error || contextError) return 'bg-destructive';
     if (!isSupported) return 'bg-muted';
-    if (state.isLoading) return 'bg-yellow-500';
+    if (state.microphonePermission === 'denied') return 'bg-orange-500';
+    if (state.microphonePermission === 'checking') return 'bg-yellow-500 animate-pulse';
+    if (state.isLoading) return 'bg-yellow-500 animate-pulse';
     if (isConnected && isCurrentlySpeaking) return 'bg-blue-500 animate-pulse';
     if (isConnected && state.isListening) return 'bg-green-500 animate-pulse';
     if (isConnected) return 'bg-green-500';
@@ -35,8 +55,10 @@ export const FloatingVoiceAgent: React.FC = () => {
 
   const getStatusText = () => {
     if (contextError) return contextError;
-    if (state.error) return 'Error';
+    if (state.error) return 'Error de conexión';
     if (!isSupported) return 'No compatible';
+    if (state.microphonePermission === 'denied') return 'Micrófono denegado';
+    if (state.microphonePermission === 'checking') return 'Verificando micrófono...';
     if (state.isLoading) return 'Conectando...';
     if (isConnected && isCurrentlySpeaking) return 'Ana hablando...';
     if (isConnected && state.isListening) return 'Escuchando...';
@@ -46,14 +68,17 @@ export const FloatingVoiceAgent: React.FC = () => {
 
   const getMainIcon = () => {
     if (!isSupported || contextError) return <AlertCircle className="w-5 h-5" />;
-    if (state.isLoading) return <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" />;
+    if (state.microphonePermission === 'denied') return <VolumeX className="w-5 h-5" />;
+    if (state.microphonePermission === 'checking' || state.isLoading) {
+      return <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" />;
+    }
     if (isConnected && isCurrentlySpeaking) return <Volume2 className="w-5 h-5" />;
     if (isConnected && state.isListening) return <Mic className="w-5 h-5 animate-pulse" />;
     if (isConnected) return <Mic className="w-5 h-5" />;
     return <MicOff className="w-5 h-5" />;
   };
 
-  const isDisabled = !isSupported || state.isLoading;
+  const isDisabled = !isSupported || state.isLoading || state.microphonePermission === 'checking';
 
   return (
     <div className="fixed bottom-6 right-6 z-50">
@@ -80,18 +105,74 @@ export const FloatingVoiceAgent: React.FC = () => {
               Estado: <span className="font-medium text-foreground">{getStatusText()}</span>
             </div>
             
+            {/* Error Display */}
             {(state.error || contextError) && (
-              <div className="text-xs text-destructive bg-destructive/10 p-2 rounded border border-destructive/20">
-                {state.error || contextError}
+              <div className="space-y-2">
+                <div className="text-xs text-destructive bg-destructive/10 p-2 rounded border border-destructive/20">
+                  {state.error || contextError}
+                </div>
+                
+                {state.detailedError && (
+                  <div className="space-y-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowDetailedError(!showDetailedError)}
+                      className="h-6 text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      {showDetailedError ? 'Ocultar' : 'Ver'} detalles técnicos
+                    </Button>
+                    
+                    {showDetailedError && (
+                      <div className="text-xs bg-muted p-2 rounded border font-mono max-h-20 overflow-y-auto">
+                        {JSON.stringify(state.detailedError, null, 2)}
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRetryConnection}
+                    disabled={state.isLoading}
+                    className="text-xs h-7"
+                  >
+                    <RefreshCw className={cn("w-3 h-3 mr-1", { "animate-spin": state.isLoading })} />
+                    Reintentar
+                  </Button>
+                  
+                  {state.microphonePermission === 'denied' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleCheckMicrophone}
+                      className="text-xs h-7"
+                    >
+                      <Mic className="w-3 h-3 mr-1" />
+                      Verificar Mic
+                    </Button>
+                  )}
+                </div>
               </div>
             )}
             
+            {/* Microphone Permission Warning */}
+            {state.microphonePermission === 'denied' && (
+              <div className="text-xs text-orange-600 bg-orange-50 p-2 rounded border border-orange-200">
+                Se requiere acceso al micrófono. Haz clic en "Verificar Mic" o permite el acceso manualmente en tu navegador.
+              </div>
+            )}
+            
+            {/* Browser Compatibility Warning */}
             {!isSupported && (
               <div className="text-xs text-orange-600 bg-orange-50 p-2 rounded border border-orange-200">
                 Tu navegador no es compatible con las funciones de voz. Necesitas un navegador moderno con soporte para micrófono.
               </div>
             )}
             
+            {/* Success State - Ana Ready */}
             <div className="text-xs text-muted-foreground">
               {isConnected ? (
                 <>
@@ -150,7 +231,7 @@ export const FloatingVoiceAgent: React.FC = () => {
             getStatusColor(),
             "text-white border-2 border-white/20"
           )}
-          disabled={state.isLoading}
+          disabled={state.isLoading || state.microphonePermission === 'checking'}
         >
           {getMainIcon()}
         </Button>
@@ -175,6 +256,13 @@ export const FloatingVoiceAgent: React.FC = () => {
           >
             <MessageCircle className="w-4 h-4" />
           </Button>
+        )}
+        
+        {/* Error indicator */}
+        {(state.error || state.microphonePermission === 'denied') && !isExpanded && (
+          <div className="absolute -top-1 -left-1 w-4 h-4 bg-destructive rounded-full flex items-center justify-center">
+            <AlertCircle className="w-2 h-2 text-white" />
+          </div>
         )}
       </div>
     </div>

@@ -10,6 +10,8 @@ export interface ConversationState {
   isSpeaking: boolean;
   isLoading: boolean;
   error: string | null;
+  detailedError: any | null;
+  microphonePermission: 'granted' | 'denied' | 'prompt' | 'checking' | null;
 }
 
 const ELEVENLABS_AGENT_ID = 'agent_8701k3by6j9ef8ka0wqzm6xtj3d9';
@@ -21,16 +23,55 @@ export const useElevenLabsConversation = () => {
     isSpeaking: false,
     isLoading: false,
     error: null,
+    detailedError: null,
+    microphonePermission: null,
   });
 
   const updateState = useCallback((updates: Partial<ConversationState>) => {
     setState((prev) => ({ ...prev, ...updates }));
   }, []);
 
+  const checkMicrophonePermission = useCallback(async () => {
+    try {
+      updateState({ microphonePermission: 'checking' });
+      
+      // Check current permission state
+      const permissionStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+      
+      if (permissionStatus.state === 'granted') {
+        updateState({ microphonePermission: 'granted' });
+        return true;
+      } else if (permissionStatus.state === 'denied') {
+        updateState({ microphonePermission: 'denied' });
+        return false;
+      } else {
+        // Permission is 'prompt' - we need to request it
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          stream.getTracks().forEach(track => track.stop()); // Stop immediately
+          updateState({ microphonePermission: 'granted' });
+          return true;
+        } catch (error) {
+          updateState({ microphonePermission: 'denied' });
+          return false;
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error checking microphone permission:', error);
+      updateState({ microphonePermission: 'denied' });
+      return false;
+    }
+  }, [updateState]);
+
   const conversation = useConversation({
     onConnect: () => {
       console.log('✅ Connected to ElevenLabs');
-      updateState({ isConnected: true, isLoading: false });
+      updateState({ 
+        isConnected: true, 
+        isLoading: false,
+        error: null,
+        detailedError: null
+      });
       toast({
         title: 'Asistente activado',
         description: '¡Hola! Soy Ana, tu asistente de nómina. ¿En qué puedo ayudarte?',
@@ -64,11 +105,20 @@ export const useElevenLabsConversation = () => {
       console.error('❌ Conversation error:', error);
       updateState({
         error: error.message || 'Error de conexión',
+        detailedError: error,
         isLoading: false,
       });
+      
+      let userMessage = 'Hubo un problema con la conexión';
+      if (error.message?.includes('microphone') || error.message?.includes('permission')) {
+        userMessage = 'No se pudo acceder al micrófono. Verifica los permisos.';
+      } else if (error.message?.includes('network') || error.message?.includes('websocket')) {
+        userMessage = 'Error de red. Verifica tu conexión a internet.';
+      }
+      
       toast({
         title: 'Error del asistente',
-        description: error.message || 'Hubo un problema con la conexión',
+        description: userMessage,
         variant: 'destructive',
       });
     },
@@ -76,9 +126,15 @@ export const useElevenLabsConversation = () => {
       getActiveEmployees: async () => {
         console.log('🛠️ Tool call: getActiveEmployees');
         try {
-          const { data } = await supabase.functions.invoke('elevenlabs-conversation', {
+          const { data, error } = await supabase.functions.invoke('elevenlabs-conversation', {
             body: { action: 'tool_call', tool_name: 'getActiveEmployees' },
           });
+          
+          if (error) {
+            console.error('❌ Supabase function error:', error);
+            return `Error al consultar empleados: ${error.message}`;
+          }
+          
           return data?.result || 'Error al obtener empleados';
         } catch (error) {
           console.error('❌ Error in getActiveEmployees:', error);
@@ -88,9 +144,15 @@ export const useElevenLabsConversation = () => {
       getPayrollPeriods: async () => {
         console.log('🛠️ Tool call: getPayrollPeriods');
         try {
-          const { data } = await supabase.functions.invoke('elevenlabs-conversation', {
+          const { data, error } = await supabase.functions.invoke('elevenlabs-conversation', {
             body: { action: 'tool_call', tool_name: 'getPayrollPeriods' },
           });
+          
+          if (error) {
+            console.error('❌ Supabase function error:', error);
+            return `Error al consultar períodos: ${error.message}`;
+          }
+          
           return data?.result || 'Error al obtener períodos';
         } catch (error) {
           console.error('❌ Error in getPayrollPeriods:', error);
@@ -100,9 +162,15 @@ export const useElevenLabsConversation = () => {
       getCompanyInfo: async () => {
         console.log('🛠️ Tool call: getCompanyInfo');
         try {
-          const { data } = await supabase.functions.invoke('elevenlabs-conversation', {
+          const { data, error } = await supabase.functions.invoke('elevenlabs-conversation', {
             body: { action: 'tool_call', tool_name: 'getCompanyInfo' },
           });
+          
+          if (error) {
+            console.error('❌ Supabase function error:', error);
+            return `Error al obtener información: ${error.message}`;
+          }
+          
           return data?.result || 'Error al obtener información';
         } catch (error) {
           console.error('❌ Error in getCompanyInfo:', error);
@@ -112,13 +180,18 @@ export const useElevenLabsConversation = () => {
       navigateToSection: async (parameters: { section: string }) => {
         console.log('🛠️ Tool call: navigateToSection', parameters);
         try {
-          const { data } = await supabase.functions.invoke('elevenlabs-conversation', {
+          const { data, error } = await supabase.functions.invoke('elevenlabs-conversation', {
             body: {
               action: 'tool_call',
               tool_name: 'navigateToSection',
               parameters,
             },
           });
+
+          if (error) {
+            console.error('❌ Supabase function error:', error);
+            return `Error en navegación: ${error.message}`;
+          }
 
           if (data?.result && !data.result.includes('Error')) {
             const sectionMap: Record<string, string> = {
@@ -153,7 +226,18 @@ export const useElevenLabsConversation = () => {
 
   const startConversation = useCallback(async () => {
     try {
-      updateState({ isLoading: true, error: null });
+      updateState({ 
+        isLoading: true, 
+        error: null, 
+        detailedError: null 
+      });
+
+      console.log('🎤 Checking microphone permission...');
+      const hasPermission = await checkMicrophonePermission();
+      
+      if (!hasPermission) {
+        throw new Error('Se requieren permisos de micrófono para usar el asistente de voz');
+      }
 
       console.log('🚀 Starting ElevenLabs conversation...');
 
@@ -164,10 +248,33 @@ export const useElevenLabsConversation = () => {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Supabase function error:', error);
+        throw new Error(`Error del servidor: ${error.message}`);
+      }
+
+      if (data?.error) {
+        console.error('❌ Backend error response:', data);
+        
+        // Parse specific ElevenLabs errors
+        let userFriendlyMessage = 'Error desconocido del servicio';
+        if (data.error.includes('invalid_api_key') || data.error.includes('401')) {
+          userFriendlyMessage = 'Clave de API inválida. Contacta al administrador.';
+        } else if (data.error.includes('404')) {
+          userFriendlyMessage = 'Agente no encontrado. Verifica la configuración.';
+        } else if (data.error.includes('rate_limit') || data.error.includes('429')) {
+          userFriendlyMessage = 'Límite de uso alcanzado. Intenta más tarde.';
+        } else if (data.error.includes('network') || data.error.includes('timeout')) {
+          userFriendlyMessage = 'Error de red. Verifica tu conexión.';
+        }
+        
+        throw new Error(userFriendlyMessage);
+      }
 
       const signedUrl = data.signed_url;
-      if (!signedUrl) throw new Error('No signed URL received');
+      if (!signedUrl) {
+        throw new Error('No se recibió URL de sesión del servidor');
+      }
 
       console.log('✅ Signed URL received, starting session with agent:', ELEVENLABS_AGENT_ID);
 
@@ -177,17 +284,22 @@ export const useElevenLabsConversation = () => {
       console.log('✅ Conversation session started successfully');
     } catch (error) {
       console.error('❌ Failed to start conversation:', error);
+      
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+      
       updateState({
-        error: error instanceof Error ? error.message : 'Error desconocido',
+        error: errorMessage,
+        detailedError: error,
         isLoading: false,
       });
+      
       toast({
-        title: 'Error al iniciar',
-        description: 'No se pudo conectar con el asistente. Inténtalo de nuevo.',
+        title: 'Error al iniciar asistente',
+        description: errorMessage,
         variant: 'destructive',
       });
     }
-  }, [conversation, updateState]);
+  }, [conversation, updateState, checkMicrophonePermission]);
 
   const endConversation = useCallback(async () => {
     try {
@@ -200,6 +312,7 @@ export const useElevenLabsConversation = () => {
         isListening: false,
         isSpeaking: false,
         error: null,
+        detailedError: null,
       });
 
       toast({
@@ -217,6 +330,7 @@ export const useElevenLabsConversation = () => {
     state,
     startConversation,
     endConversation,
+    checkMicrophonePermission,
     isSpeaking: conversation.isSpeaking,
     status: conversation.status,
   };
