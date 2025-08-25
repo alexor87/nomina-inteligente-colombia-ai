@@ -1,20 +1,25 @@
 
 project_id = "xrmorlkakwujyozgmilf"
 
-[functions.calculate-social-benefits]
-verify_jwt = true
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
 
-[functions.payroll-calculations]
-verify_jwt = true
+[db]
+port = 54322
 
-[functions.payroll-liquidation-atomic]
-verify_jwt = true
-
-[functions.generate-voucher-pdf]
-verify_jwt = true
+[studio]
+enabled = true
+port = 54323
 
 [functions.provision-social-benefits]
 verify_jwt = true
 
 [functions.elevenlabs-conversation]
 verify_jwt = true
+
+[functions.elevenlabs-websocket]
+verify_jwt = false
