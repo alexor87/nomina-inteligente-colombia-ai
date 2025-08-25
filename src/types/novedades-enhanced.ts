@@ -1,4 +1,3 @@
-
 export interface PayrollNovedad {
   id: string;
   company_id: string;
@@ -17,6 +16,7 @@ export interface PayrollNovedad {
   creado_por?: string;
   created_at: string;
   updated_at: string;
+  constitutivo_salario?: boolean;
 }
 
 // ✅ UPDATED: Extended BaseCalculoData to support new calculation details

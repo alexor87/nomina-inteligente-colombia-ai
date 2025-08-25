@@ -267,6 +267,59 @@ export const PayrollHistoryDetailPage = () => {
     loadPeriodDetail();
   }, [periodId]);
 
+  // Helper function to calculate total net value of novedades for an employee
+  const calculateEmployeeNovedadesTotal = (employeeId: string): number => {
+    const employeeNovedades = novedadesByEmployee[employeeId];
+    if (!employeeNovedades || !employeeNovedades.items) return 0;
+    
+    return employeeNovedades.items.reduce((sum, novedad) => sum + (novedad.valor || 0), 0);
+  };
+
+  // Helper function to calculate preview totals with pending novelties
+  const calculateEmployeePreview = (employee: EmployeePayroll) => {
+    const pendingForEmployee = pendingNovedades.filter(p => p.employee_id === employee.employee_id);
+    
+    if (pendingForEmployee.length === 0) {
+      return {
+        originalDevengado: employee.total_devengado,
+        originalDeducciones: employee.total_deducciones,
+        originalNeto: employee.neto_pagado,
+        newDevengado: employee.total_devengado,
+        newDeducciones: employee.total_deducciones,
+        newNeto: employee.neto_pagado,
+        hasPending: false,
+        pendingCount: 0
+      };
+    }
+
+    let totalPendingDevengos = 0;
+    let totalPendingDeducciones = 0;
+
+    pendingForEmployee.forEach(pending => {
+      const { novedadData } = pending;
+      if (novedadData.valor > 0) {
+        totalPendingDevengos += novedadData.valor;
+      } else {
+        totalPendingDeducciones += Math.abs(novedadData.valor);
+      }
+    });
+
+    const newDevengado = employee.total_devengado + totalPendingDevengos;
+    const newDeducciones = employee.total_deducciones + totalPendingDeducciones;
+    const newNeto = newDevengado - newDeducciones;
+
+    return {
+      originalDevengado: employee.total_devengado,
+      originalDeducciones: employee.total_deducciones,
+      originalNeto: employee.neto_pagado,
+      newDevengado,
+      newDeducciones,
+      newNeto,
+      hasPending: true,
+      pendingCount: pendingForEmployee.length
+    };
+  };
+
   const handleSendVoucherEmail = async (employeeId: string, employeeName: string) => {
     // Find the employee in current data
     const employeePayroll = employees.find(emp => emp.employee_id === employeeId);
@@ -619,51 +672,6 @@ export const PayrollHistoryDetailPage = () => {
     setPendingNovedades(prev => prev.filter((_, i) => i !== index));
   };
 
-  // Helper function to calculate preview totals with pending novelties
-  const calculateEmployeePreview = (employee: EmployeePayroll) => {
-    const pendingForEmployee = pendingNovedades.filter(p => p.employee_id === employee.employee_id);
-    
-    if (pendingForEmployee.length === 0) {
-      return {
-        originalDevengado: employee.total_devengado,
-        originalDeducciones: employee.total_deducciones,
-        originalNeto: employee.neto_pagado,
-        newDevengado: employee.total_devengado,
-        newDeducciones: employee.total_deducciones,
-        newNeto: employee.neto_pagado,
-        hasPending: false,
-        pendingCount: 0
-      };
-    }
-
-    let totalPendingDevengos = 0;
-    let totalPendingDeducciones = 0;
-
-    pendingForEmployee.forEach(pending => {
-      const { novedadData } = pending;
-      if (novedadData.valor > 0) {
-        totalPendingDevengos += novedadData.valor;
-      } else {
-        totalPendingDeducciones += Math.abs(novedadData.valor);
-      }
-    });
-
-    const newDevengado = employee.total_devengado + totalPendingDevengos;
-    const newDeducciones = employee.total_deducciones + totalPendingDeducciones;
-    const newNeto = newDevengado - newDeducciones;
-
-    return {
-      originalDevengado: employee.total_devengado,
-      originalDeducciones: employee.total_deducciones,
-      originalNeto: employee.neto_pagado,
-      newDevengado,
-      newDeducciones,
-      newNeto,
-      hasPending: true,
-      pendingCount: pendingForEmployee.length
-    };
-  };
-
   if (loading) {
     return (
       <div className="px-6 py-6">
@@ -811,7 +819,7 @@ export const PayrollHistoryDetailPage = () => {
                       <TableHead className="min-w-[140px] bg-red-100 text-right font-semibold">
                         Total Deducciones
                       </TableHead>
-                       <TableHead className="min-w-[100px] text-center">
+                       <TableHead className="min-w-[140px] text-center">
                          Novedades
                        </TableHead>
                       <TableHead className="min-w-[140px] bg-blue-100 text-right font-semibold">
@@ -828,6 +836,14 @@ export const PayrollHistoryDetailPage = () => {
                       const isSendingEmail = sendingEmails.has(employee.employee_id);
                       const hasEmail = !!employee.completeEmployeeData?.email;
                       const employeeNovedades = novedadesByEmployee[employee.employee_id] || { count: 0, items: [] };
+                      const novedadesTotal = calculateEmployeeNovedadesTotal(employee.employee_id);
+                      
+                      // Calculate pending novedades total for this employee
+                      const pendingNovedadesTotal = pendingNovedades
+                        .filter(p => p.employee_id === employee.employee_id)
+                        .reduce((sum, p) => sum + (p.novedadData.valor || 0), 0);
+                      
+                      const totalNovedadesValue = novedadesTotal + pendingNovedadesTotal;
                       
                       return (
                         <TableRow key={employee.id}>
@@ -914,13 +930,20 @@ export const PayrollHistoryDetailPage = () => {
                               >
                                 <Plus className="h-4 w-4" />
                               </Button>
-                              {/* Show real novedades count + pending count */}
-                              <Badge 
-                                variant={employeeNovedades.count > 0 ? "default" : "secondary"} 
-                                className={employeeNovedades.count > 0 ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-600"}
-                              >
-                                {employeeNovedades.count + preview.pendingCount}
-                              </Badge>
+                              {/* Show total net value like in liquidation module */}
+                              {totalNovedadesValue !== 0 ? (
+                                <span className={`font-semibold text-sm ${
+                                  totalNovedadesValue > 0 
+                                    ? 'text-green-600' 
+                                    : 'text-red-600'
+                                }`}>
+                                  {totalNovedadesValue > 0 ? '+' : ''}{formatCurrency(totalNovedadesValue)}
+                                </span>
+                              ) : (
+                                <span className="text-sm text-muted-foreground">
+                                  {formatCurrency(0)}
+                                </span>
+                              )}
                             </div>
                           </TableCell>
                           <TableCell className="bg-blue-100 text-right">
