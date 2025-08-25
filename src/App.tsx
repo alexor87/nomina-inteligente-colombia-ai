@@ -11,7 +11,7 @@ import { ReportsPage } from '@/components/reports/ReportsPage';
 import SettingsPage from '@/pages/SettingsPage';
 import SocialBenefitsPage from '@/pages/SocialBenefitsPage';
 import VacationsAbsencesPage from './pages/VacationsAbsencesPage';
-import { OptimizedVoiceAgent } from '@/components/voice/OptimizedVoiceAgent';
+import { VoiceAgentProvider } from '@/contexts/VoiceAgentContext';
 
 // Create a client instance
 const queryClient = new QueryClient({
@@ -26,21 +26,22 @@ const queryClient = new QueryClient({
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Layout />}>
-            <Route index element={<DashboardPage />} />
-            <Route path="employees" element={<EmployeesPage />} />
-            <Route path="payroll" element={<PayrollPage />} />
-            <Route path="reports" element={<ReportsPage />} />
-            <Route path="settings" element={<SettingsPage />} />
-            <Route path="prestaciones-sociales" element={<SocialBenefitsPage />} />
-            <Route path="vacations-absences" element={<VacationsAbsencesPage />} />
-          </Route>
-        </Routes>
-        <OptimizedVoiceAgent />
-        <Toaster />
-      </BrowserRouter>
+      <VoiceAgentProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Layout />}>
+              <Route index element={<DashboardPage />} />
+              <Route path="employees" element={<EmployeesPage />} />
+              <Route path="payroll" element={<PayrollPage />} />
+              <Route path="reports" element={<ReportsPage />} />
+              <Route path="settings" element={<SettingsPage />} />
+              <Route path="prestaciones-sociales" element={<SocialBenefitsPage />} />
+              <Route path="vacations-absences" element={<VacationsAbsencesPage />} />
+            </Route>
+          </Routes>
+          <Toaster />
+        </BrowserRouter>
+      </VoiceAgentProvider>
     </QueryClientProvider>
   );
 }
