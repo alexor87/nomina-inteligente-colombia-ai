@@ -1,4 +1,8 @@
 
+// Temporarily disabled to prevent forwardRef conflicts with @elevenlabs/react
+// This file contains global type definitions that were causing build errors
+
+/*
 declare global {
   interface Window {
     ElevenLabs: {
@@ -19,3 +23,4 @@ declare global {
 }
 
 export {};
+*/
