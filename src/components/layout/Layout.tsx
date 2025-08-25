@@ -5,8 +5,8 @@ import { Sidebar } from './Sidebar';
 import Header from './Header';
 import { useAuth } from '@/contexts/AuthContext';
 import { LoadingWithTimeout } from '@/components/ui/LoadingWithTimeout';
-import { VoiceAgentProvider } from '@/contexts/VoiceAgentContext';
 import { FloatingVoiceAgent } from '@/components/voice/FloatingVoiceAgent';
+import { VoiceAgentProvider } from '@/contexts/VoiceAgentContext';
 
 export const Layout = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -50,7 +50,7 @@ export const Layout = () => {
           </div>
         </main>
 
-        {/* Floating Voice Agent - Now re-enabled with custom hook only */}
+        {/* Floating Voice Agent */}
         <FloatingVoiceAgent />
       </div>
     </VoiceAgentProvider>
