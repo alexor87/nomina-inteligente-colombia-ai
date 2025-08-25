@@ -1,6 +1,6 @@
-
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useRoles } from '@/contexts/RoleContext';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -23,7 +23,8 @@ interface CompanyOption {
 }
 
 export const CompanySelector = () => {
-  const { user, profile, roles, refreshUserData } = useAuth();
+  const { user, profile, refreshUserData } = useAuth();
+  const { roles } = useRoles();
   const { toast } = useToast();
   const [isChanging, setIsChanging] = useState(false);
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
@@ -116,7 +117,7 @@ export const CompanySelector = () => {
     }
   };
 
-  // Solo mostrar si hay múltiples empresas
+  // Only show if there are multiple companies
   if (roles.length <= 1) return null;
 
   const currentCompany = companies.find(c => c.isActive);
