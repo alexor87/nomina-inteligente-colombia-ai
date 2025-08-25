@@ -11,8 +11,8 @@ import { ReportsPage } from '@/components/reports/ReportsPage';
 import SettingsPage from '@/pages/SettingsPage';
 import SocialBenefitsPage from '@/pages/SocialBenefitsPage';
 import VacationsAbsencesPage from './pages/VacationsAbsencesPage';
-import { VoiceAgentProvider } from '@/contexts/VoiceAgentContext';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { RoleProvider } from '@/contexts/RoleContext';
 
 // Create a client instance
 const queryClient = new QueryClient({
@@ -28,7 +28,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <VoiceAgentProvider>
+        <RoleProvider>
           <BrowserRouter>
             <Routes>
               <Route path="/" element={<Layout />}>
@@ -43,7 +43,7 @@ function App() {
             </Routes>
             <Toaster />
           </BrowserRouter>
-        </VoiceAgentProvider>
+        </RoleProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

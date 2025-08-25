@@ -4,34 +4,25 @@ import { Outlet, Navigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import Header from './Header';
 import { useAuth } from '@/contexts/AuthContext';
-import { LoadingWithTimeout } from '@/components/ui/LoadingWithTimeout';
-import { OptimizedVoiceAgent } from '@/components/voice/OptimizedVoiceAgent';
+import { AppLoading } from '@/components/ui/AppLoading';
 
 export const Layout = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const { user, loading } = useAuth();
 
-  console.log('🏗️ Layout rendered with sidebar collapsed:', sidebarCollapsed, 'user:', user?.email);
+  console.log('🏗️ Layout render - User:', user?.email, 'Loading:', loading);
 
-  // Mostrar loading mientras se verifica la autenticación
   if (loading) {
-    return (
-      <LoadingWithTimeout 
-        message="Verificando autenticación..."
-        timeout={7}
-        redirectTo="/login"
-      />
-    );
+    return <AppLoading message="Verificando autenticación..." />;
   }
 
-  // Redirigir a login si no hay usuario autenticado
   if (!user) {
-    console.log('🚫 Layout: No authenticated user, redirecting to login');
+    console.log('🚫 No user, redirecting to login');
     return <Navigate to="/login" replace />;
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex min-h-screen bg-background">
       <Sidebar 
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
@@ -43,13 +34,10 @@ export const Layout = () => {
         }`}
       >
         <Header />
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-background">
           <Outlet />
         </div>
       </main>
-
-      {/* Optimized Voice Agent - Now properly within VoiceAgentProvider */}
-      <OptimizedVoiceAgent />
     </div>
   );
 };

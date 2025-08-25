@@ -2,6 +2,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useRoles } from '@/contexts/RoleContext';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -16,7 +17,8 @@ import { Badge } from '@/components/ui/badge';
 import { LogOut, User, Settings, Crown } from 'lucide-react';
 
 export const UserMenu = () => {
-  const { user, profile, roles, isSuperAdmin, hasOptimisticRole } = useAuth();
+  const { user, profile, signOut } = useAuth();
+  const { roles, isSuperAdmin } = useRoles();
   const navigate = useNavigate();
 
   if (!user || !profile) return null;
@@ -24,7 +26,6 @@ export const UserMenu = () => {
   const initials = `${profile.first_name?.[0] || ''}${profile.last_name?.[0] || ''}`.toUpperCase();
   const fullName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim();
   
-  // Mostrar rol principal sin estados de carga confusos
   const getRoleDisplay = () => {
     if (isSuperAdmin) return 'SuperAdmin';
     if (roles.length === 0) return 'Usuario';
@@ -33,16 +34,17 @@ export const UserMenu = () => {
 
   const displayRole = getRoleDisplay();
 
-  const handleSignOut = () => {
-    navigate('/logout');
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/login');
   };
 
   const handleProfileClick = () => {
-    navigate('/app/profile');
+    navigate('/profile');
   };
 
   const handleSettingsClick = () => {
-    navigate('/app/settings');
+    navigate('/settings');
   };
 
   return (
@@ -67,15 +69,12 @@ export const UserMenu = () => {
             </p>
             <div className="flex items-center gap-2 mt-1">
               {isSuperAdmin ? (
-                <Badge variant="default" className="bg-yellow-100 text-yellow-800 text-xs">
+                <Badge variant="default" className="text-xs">
                   <Crown className="h-3 w-3 mr-1" />
                   SuperAdmin
                 </Badge>
               ) : (
-                <Badge 
-                  variant={hasOptimisticRole ? "secondary" : "outline"} 
-                  className="text-xs capitalize"
-                >
+                <Badge variant="outline" className="text-xs capitalize">
                   {displayRole}
                 </Badge>
               )}
