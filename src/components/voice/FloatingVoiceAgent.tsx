@@ -1,8 +1,9 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Mic, MicOff, Volume2, VolumeX, MessageCircle, X, AlertCircle, RefreshCw, Activity, Navigation } from 'lucide-react';
-import { useElevenLabsConversation } from '@/hooks/useElevenLabsConversation';
+import { useCustomVoiceChat } from '@/hooks/useCustomVoiceChat';
 import { useVoiceAgent } from '@/contexts/VoiceAgentContext';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
@@ -10,7 +11,6 @@ import { toast } from '@/hooks/use-toast';
 export const FloatingVoiceAgent: React.FC = () => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showDetailedError, setShowDetailedError] = useState(false);
-  const [showDiagnostics, setShowDiagnostics] = useState(false);
   const { 
     state, 
     startConversation, 
@@ -19,7 +19,7 @@ export const FloatingVoiceAgent: React.FC = () => {
     checkHealth,
     status, 
     isSpeaking 
-  } = useElevenLabsConversation();
+  } = useCustomVoiceChat();
   const { isSupported, error: contextError } = useVoiceAgent();
 
   const handleToggleConversation = () => {
@@ -41,8 +41,6 @@ export const FloatingVoiceAgent: React.FC = () => {
   };
 
   const handleDiagnostics = async () => {
-    setShowDiagnostics(true);
-    
     try {
       toast({
         title: "Ejecutando diagnóstico...",
@@ -267,7 +265,6 @@ export const FloatingVoiceAgent: React.FC = () => {
                     Solo habla naturalmente, yo entiendo español colombiano perfectamente.
                   </p>
                   
-                  {/* Navigation Test Button (only when connected) */}
                   <div className="mt-2">
                     <Button
                       variant="outline"
