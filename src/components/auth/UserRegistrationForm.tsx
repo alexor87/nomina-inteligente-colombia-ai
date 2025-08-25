@@ -89,7 +89,9 @@ export const UserRegistrationForm = () => {
       
       const { error } = await signUp(
         formData.email, 
-        formData.password
+        formData.password, 
+        formData.firstName, 
+        formData.lastName
       );
       
       if (error) {

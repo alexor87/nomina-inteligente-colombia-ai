@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -30,6 +31,8 @@ const getTransportAssistanceLimit = (year: string) => {
  * ===============================
  *  JORNADA LEGAL (KISS, LEY 2101)
  * ===============================
+ * - Jornada laboral: transiciones 15/jul (2023→47, 2024→46, 2025→44, 2026→42)
+ * - Recargos: divisor mensual 220h desde 01/jul/2025, antes usa jornada vigente
  */
 
 // Fechas de vigencia de jornada semanal
@@ -105,59 +108,15 @@ const calcularValorHoraRecargoBase = (salarioMensual: number, fecha: Date): numb
 };
 
 // Factor legal para horas extra (KISS: mantener dominical/festivo = 1.75 como venía en negocio)
-const normalize = (v?: string) => String(v || '').toLowerCase().trim();
-
-// ✅ NUEVO: recargo dominical/festivo dinámico por fecha (Ley 2466 de 2025)
-const getRecargoDominicalFestivoPct = (fecha: Date): number => {
-  // 75% hasta 30-jun-2025
-  if (fecha < new Date('2025-07-01')) return 0.75;
-  // 80% 01-jul-2025 a 30-jun-2026
-  if (fecha < new Date('2026-07-01')) return 0.80;
-  // 90% 01-jul-2026 a 30-jun-2027
-  if (fecha < new Date('2027-07-01')) return 0.90;
-  // 100% desde 01-jul-2027
-  return 1.00;
-};
-
-// ❌ Reemplazamos la versión anterior por una con fecha y subtipos detallados
-const getOvertimeFactor = (subtipoRaw?: string, fechaPeriodo?: Date): number => {
+const getOvertimeFactor = (subtipoRaw?: string): number => {
   const s = String(subtipoRaw || '').toLowerCase().trim();
-  const fecha = fechaPeriodo || new Date();
-  const recargoDom = getRecargoDominicalFestivoPct(fecha);
-
-  // Base: extras simples
-  if (s === 'diurnas' || s === 'diurna' || s === 'extra_diurna') {
-    console.log('⏫ Factor HE diurna = 1.25');
-    return 1.25;
-  }
-  if (s === 'nocturnas' || s === 'nocturna' || s === 'extra_nocturna') {
-    console.log('⏫ Factor HE nocturna = 1.75');
-    return 1.75;
-  }
-
-  // Combinadas con dominical/festivo (acumulables)
-  if (['dominicales_diurnas','festivas_diurnas','dominical_diurna','festiva_diurna','domingo_diurna'].includes(s)) {
-    const factor = 1 + 0.25 + recargoDom;
-    console.log(`⏫ Factor HE dominical/festivo diurna = 1 + 0.25 + ${recargoDom} = ${factor} (fecha ${fecha.toISOString().slice(0,10)})`);
-    return factor;
-  }
-  if (['dominicales_nocturnas','festivas_nocturnas','dominical_nocturna','festiva_nocturna','domingo_nocturna'].includes(s)) {
-    const factor = 1 + 0.75 + recargoDom;
-    console.log(`⏫ Factor HE dominical/festivo nocturna = 1 + 0.75 + ${recargoDom} = ${factor} (fecha ${fecha.toISOString().slice(0,10)})`);
-    return factor;
-  }
-
-  // Genérico "dominicales"/"festivas" (asumir diurna por defecto)
-  if (['dominicales','dominical','festivas','festiva','domingo','festivo'].includes(s)) {
-    const factor = 1 + 0.25 + recargoDom;
-    console.log(`⏫ Factor HE dominical/festivo (genérico → diurna) = 1 + 0.25 + ${recargoDom} = ${factor} (fecha ${fecha.toISOString().slice(0,10)})`);
-    return factor;
-  }
-
-  // Default: diurna
-  console.log('ℹ️ Subtipo HE no reconocido, usando diurna = 1.25. Subtipo recibido:', s);
-  return 1.25;
+  if (s === 'nocturnas') return 1.75;           // Extra nocturna (75%)
+  if (s === 'dominicales' || s === 'festivas') return 1.75; // Mantener negocio actual
+  return 1.25; // Diurnas: 25%
 };
+
+// Normalizador simple
+const normalize = (v?: string) => String(v || '').toLowerCase().trim();
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -261,108 +220,71 @@ async function calculatePayroll(supabase: any, data: any) {
     disabilities = 0,
     bonuses = 0,
     absences = 0,
-    periodType = 'mensual',
+    periodType,
     novedades = []
   } = data;
 
-  console.log('📋 CÁLCULO NÓMINA CON PERIODICIDAD:', {
-    periodType,
-    baseSalary: baseSalary.toLocaleString(),
-    workedDays,
-    novedadesCount: novedades.length
-  });
+  const dailySalary = baseSalary / 30;
+  const regularPay = (dailySalary * workedDays) - absences;
+  let extraPay = bonuses; // Legacy field compatibility
 
-  // ✅ SAFETY NET: Re-calcular días de incapacidad en el período y días efectivos
-  let totalIncapacityDaysInPeriod = 0;
+  // ✅ PROCESAR NOVEDADES CON POLÍTICAS
+  console.log('📋 Processing novedades:', novedades.length);
+  
   let totalIncapacityValue = 0;
+  let totalIncapacityDays = 0;
   let totalConstitutiveNovedades = 0;
 
-  const legalDays = periodType === 'quincenal' ? 15 : 30;
-
-  console.log('📋 Processing novedades with safety net:', novedades.length);
-  
   for (const novedad of novedades) {
     if (novedad.tipo_novedad === 'incapacidad') {
-      const incapacityDaysInPeriod = Math.min(novedad.dias || 0, legalDays);
-      totalIncapacityDaysInPeriod += incapacityDaysInPeriod;
-
       const incapacityValue = await calculateIncapacityWithPolicy(
         baseSalary, 
-        incapacityDaysInPeriod, 
+        novedad.dias || 0, 
         novedad.subtipo, 
         policy,
         config.salarioMinimo
       );
       totalIncapacityValue += incapacityValue;
-
-      console.log('🏥 Incapacidad procesada (safety net):', {
-        diasAjustados: incapacityDaysInPeriod,
-        valor: incapacityValue
-      });
+      totalIncapacityDays += novedad.dias || 0;
     } else if (novedad.constitutivo_salario) {
+      // Other constitutive novedades
       totalConstitutiveNovedades += novedad.valor || 0;
     }
+    
+    // Add to extraPay for gross calculation
+    extraPay += novedad.valor || 0;
   }
 
-  const effectiveWorkedDays = Math.max(0, Math.min(workedDays, legalDays - totalIncapacityDaysInPeriod));
+  const grossPay = regularPay + extraPay;
 
-  console.log('🎯 SAFETY NET - Días recalculados:', {
-    legalDays,
-    workedDaysInput: workedDays,
-    totalIncapacityDaysInPeriod,
-    effectiveWorkedDays
-  });
+  // ✅ IBC AUTOMÁTICO: Incapacidad vs Proporcional
+  let ibcSalud: number;
+  let ibcMode: string;
 
-  const dailySalary = baseSalary / 30;
-  const regularPay = (dailySalary * effectiveWorkedDays) - absences;
-
-  let extraPay = bonuses;
-  for (const novedad of novedades) {
-    if (novedad.tipo_novedad !== 'incapacidad') {
-      extraPay += novedad.valor || 0;
-    }
+  if (totalIncapacityDays > 0) {
+    // Con incapacidades: IBC = valor total de incapacidades
+    ibcSalud = totalIncapacityValue;
+    ibcMode = 'incapacity';
+    console.log('🧮 IBC automático (incapacidad):', { totalIncapacityValue, totalIncapacityDays });
+  } else {
+    // Sin incapacidades: IBC proporcional
+    const effectiveWorkedDays = Math.min(workedDays, 30);
+    ibcSalud = Math.round((baseSalary / 30) * effectiveWorkedDays + totalConstitutiveNovedades);
+    ibcMode = 'proportional';
+    console.log('🧮 IBC automático (proporcional):', { ibcSalud, effectiveWorkedDays });
   }
-
-  const grossPay = regularPay + extraPay + totalIncapacityValue;
-
-  console.log('💰 GROSS PAY BREAKDOWN:', {
-    regularPay: Math.round(regularPay).toLocaleString(),
-    extraPay: Math.round(extraPay).toLocaleString(),
-    incapacityValue: Math.round(totalIncapacityValue).toLocaleString(),
-    grossPay: Math.round(grossPay).toLocaleString()
-  });
-
-  // ✅ IBC CORREGIDO: Siempre incluye salario proporcional + novedades constitutivas + incapacidad
-  const proportionalIbcFromWorkedDays = Math.round((baseSalary / 30) * effectiveWorkedDays);
-  const ibcSalud = Math.round(
-    proportionalIbcFromWorkedDays + 
-    totalConstitutiveNovedades + 
-    totalIncapacityValue
-  );
-  const ibcMode = totalIncapacityDaysInPeriod > 0 ? 'mixed' : 'proportional';
-
-  console.log('🧮 IBC automático (corregido):', {
-    ibcMode,
-    proportionalIbcFromWorkedDays,
-    totalConstitutiveNovedades,
-    totalIncapacityValue,
-    ibcSalud
-  });
 
   const healthDeduction = Math.round(ibcSalud * 0.04);
   const pensionDeduction = Math.round(ibcSalud * 0.04);
   const totalDeductions = healthDeduction + pensionDeduction;
 
-  const transportAllowance = calculateTransportAllowance(
-    baseSalary,
-    effectiveWorkedDays,
-    totalIncapacityDaysInPeriod,
-    year,
-    periodType
-  );
+  // ✅ AUXILIO DE TRANSPORTE CORREGIDO: Solo si salario ≤ 2 SMMLV
+  const transportLimit = getTransportAssistanceLimit(year);
+  const transportAllowance = baseSalary <= transportLimit ? config.auxilioTransporte : 0;
 
   const netPay = grossPay - totalDeductions + transportAllowance;
 
+  // Employer contributions (not affected by IBC mode)
   const employerHealth = Math.round(ibcSalud * 0.085);
   const employerPension = Math.round(ibcSalud * 0.12);
   const employerArl = Math.round(ibcSalud * 0.00522);
@@ -375,7 +297,7 @@ async function calculatePayroll(supabase: any, data: any) {
 
   const result = {
     regularPay: Math.round(regularPay),
-    extraPay: Math.round(extraPay + totalIncapacityValue),
+    extraPay: Math.round(extraPay),
     transportAllowance,
     grossPay: Math.round(grossPay),
     healthDeduction,
@@ -390,21 +312,18 @@ async function calculatePayroll(supabase: any, data: any) {
     employerSena,
     employerContributions,
     totalPayrollCost: Math.round(netPay + employerContributions),
+    // ✅ IBC UNIFICADO
     ibc: ibcSalud
   };
 
-  console.log('✅ RESULTADO FINAL CON DÍAS EFECTIVOS CORREGIDOS:', {
-    periodType,
+  console.log('✅ Calculation (automatic IBC) result:', {
     policy,
-    legalDays,
-    effectiveWorkedDays,
-    totalIncapacityDaysInPeriod,
-    totalIncapacityValue: totalIncapacityValue.toLocaleString(),
+    totalIncapacityDays,
+    totalIncapacityValue,
     ibcMode,
-    ibcSalud: ibcSalud.toLocaleString(),
-    transportAllowance: transportAllowance.toLocaleString(),
-    grossPay: result.grossPay.toLocaleString(),
-    netPay: result.netPay.toLocaleString()
+    ibcSalud,
+    healthDeduction,
+    pensionDeduction
   });
 
   return result;
@@ -514,6 +433,7 @@ async function calculateNovedadesTotals(supabase: any, data: any) {
     let valorCalculado = valorOriginal || 0;
 
     if (tipo_novedad === 'incapacidad') {
+      // ✅ Recalcular incapacidades con política de empresa
       valorCalculado = await calculateIncapacityWithPolicy(
         salarioBase, 
         dias || 0, 
@@ -530,19 +450,19 @@ async function calculateNovedadesTotals(supabase: any, data: any) {
     } else if (tipo_novedad === 'horas_extra') {
       const horasNum = Number(horas || 0);
       if (horasNum > 0) {
-        const factor = getOvertimeFactor(subtipo, fecha); // ✅ PASAMOS FECHA
+        const factor = getOvertimeFactor(subtipo);
         valorCalculado = Math.round(valorHoraExtraBase * horasNum * factor);
 
-        console.log('🛠️ Horas extra (normativa dinámica):', {
+        console.log('🛠️ Horas extra (normativa):', {
           subtipo,
           horasNum,
           base: Math.round(valorHoraExtraBase),
           factor,
-          fecha: fecha.toISOString().slice(0,10),
-          detalle: 'Factor incluye recargo dominical/festivo dinámico cuando aplica'
+          valorCalculado
         });
       }
     } else if (tipo_novedad === 'recargo_nocturno') {
+      // Solo recargo (35%) sobre base de recargos
       const horasNum = Number(horas || 0);
       if (horasNum > 0) {
         const recargo = 0.35;
@@ -557,11 +477,13 @@ async function calculateNovedadesTotals(supabase: any, data: any) {
       }
     }
 
+    // Clasificar como devengo o deducción
     if (['incapacidad', 'horas_extra', 'bonificacion', 'comision', 'prima', 'recargo_nocturno'].includes(tipo_novedad)) {
       totalDevengos += valorCalculado;
     } else if (['descuento', 'prestamo', 'multa'].includes(tipo_novedad)) {
       totalDeducciones += valorCalculado;
     } else {
+      // Por defecto, considerar como devengo
       totalDevengos += valorCalculado;
     }
   }
@@ -642,17 +564,17 @@ async function calculateSingleNovedad(supabase: any, data: any) {
 
   } else if (tipoNovedad === 'horas_extra') {
     const horasNum = Number(horas || 0);
-    const factor = getOvertimeFactor(subtipo, fecha); // ✅ PASAMOS FECHA
+    const factor = getOvertimeFactor(subtipo);
     valor = Math.round(valorHoraExtraBase * horasNum * factor);
     factorCalculo = factor;
     detalleCalculo = `Horas extra ${subtipo || 'diurnas'}: ${horasNum} h × $${Math.round(valorHoraExtraBase).toLocaleString()} × ${factor} = $${valor.toLocaleString()}`;
 
-    console.log('🛠️ calculateSingleNovedad horas extra (normativa dinámica):', {
+    console.log('🛠️ calculateSingleNovedad horas extra (normativa):', {
       subtipo,
       horasNum,
       baseExtra: Math.round(valorHoraExtraBase),
       factor,
-      fecha: fecha.toISOString().slice(0,10)
+      valor
     });
 
   } else if (tipoNovedad === 'recargo_nocturno') {
@@ -682,6 +604,7 @@ async function calculateSingleNovedad(supabase: any, data: any) {
     detalleCalculo = `${tipoNovedad}: ${diasNum} días × $${Math.round(valorDiario).toLocaleString()} = $${valor.toLocaleString()}`;
 
   } else {
+    // Fallback: valor manual o 0
     valor = 0;
     factorCalculo = 0;
     detalleCalculo = `Sin cálculo automático para tipo: ${tipoNovedad}`;
@@ -738,36 +661,3 @@ async function validateEmployee(data: any) {
     warnings
   };
 }
-
-const calculateTransportAllowance = (
-  baseSalary: number,
-  workedDays: number,
-  totalIncapacityDays: number,
-  year: string,
-  periodType: 'quincenal' | 'mensual'
-): number => {
-  const config = OFFICIAL_VALUES[year as keyof typeof OFFICIAL_VALUES] || OFFICIAL_VALUES['2025'];
-  const transportLimit = getTransportAssistanceLimit(year);
-  
-  if (baseSalary > transportLimit) {
-    console.log(`🚫 AUXILIO TRANSPORTE: Salario ${baseSalary.toLocaleString()} > límite ${transportLimit.toLocaleString()}`);
-    return 0;
-  }
-  
-  const eligibleDays = Math.max(workedDays - totalIncapacityDays, 0);
-  
-  const dailyAllowance = config.auxilioTransporte / 30;
-  const proratedAllowance = Math.round(dailyAllowance * eligibleDays);
-  
-  console.log(`🚌 AUXILIO TRANSPORTE PRORRATEADO (${periodType}):`, {
-    salario: baseSalary.toLocaleString(),
-    limite: transportLimit.toLocaleString(),
-    diasTrabajados: workedDays,
-    diasIncapacidad: totalIncapacityDays,
-    diasElegibles: eligibleDays,
-    auxilioDiario: Math.round(dailyAllowance).toLocaleString(),
-    auxilioCalculado: proratedAllowance.toLocaleString()
-  });
-  
-  return proratedAllowance;
-};

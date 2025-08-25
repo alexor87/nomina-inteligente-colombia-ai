@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { useRoles } from '@/contexts/RoleContext';
 
 interface CompanyInfo {
   id: string;
@@ -10,8 +9,7 @@ interface CompanyInfo {
 }
 
 export const useCompanyName = () => {
-  const { profile } = useAuth();
-  const { isSuperAdmin } = useRoles();
+  const { profile, isSuperAdmin, roles } = useAuth();
   const [companyName, setCompanyName] = useState<string>('');
   const [loading, setLoading] = useState(true);
 

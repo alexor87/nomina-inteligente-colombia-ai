@@ -23,78 +23,10 @@
     <meta name="twitter:title" content="Finppi Nómina - Gestión de Nómina" />
     <meta name="twitter:description" content="Plataforma SaaS para gestión de nómina empresarial en Colombia" />
     <meta name="twitter:image" content="/favicon.png" />
-
-    <!-- Critical CSS - Inline above-the-fold styles -->
-    <style>
-      /* Critical CSS for initial paint */
-      * {
-        box-sizing: border-box;
-      }
-      
-      html {
-        line-height: 1.15;
-        -webkit-text-size-adjust: 100%;
-      }
-      
-      body {
-        margin: 0;
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        background-color: hsl(0 0% 100%);
-        color: hsl(222.2 84% 4.9%);
-      }
-      
-      /* Loading state styling */
-      .loading-container {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background-color: hsl(0 0% 100%);
-        z-index: 9999;
-      }
-      
-      .loading-spinner {
-        width: 40px;
-        height: 40px;
-        border: 4px solid hsl(214.3 31.8% 91.4%);
-        border-top: 4px solid hsl(222.2 47.4% 11.2%);
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-      }
-      
-      @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-      }
-
-      /* Hide loading when app is ready */
-      .app-ready .loading-container {
-        display: none;
-      }
-    </style>
-
-    <!-- Preload critical resources -->
-    <link rel="preload" href="/src/main.tsx" as="script" crossorigin>
   </head>
 
   <body>
-    <!-- Loading indicator for better perceived performance -->
-    <div class="loading-container">
-      <div class="loading-spinner"></div>
-    </div>
-
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-    
-    <!-- Remove loading indicator once app is loaded -->
-    <script>
-      window.addEventListener('load', function() {
-        document.body.classList.add('app-ready');
-      });
-    </script>
   </body>
 </html>

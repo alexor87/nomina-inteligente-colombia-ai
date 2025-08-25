@@ -1,7 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
 import { VacationAbsenceFormData } from '@/types/vacations';
-import type { NovedadType } from '@/types/novedades';
-import { VacationStatusValidationService } from './VacationStatusValidationService';
 
 export class VacationNovedadSyncService {
   
@@ -15,20 +13,6 @@ export class VacationNovedadSyncService {
     
     console.log('📋 Using processed_in_period_id:', processed_in_period_id);
     
-    // 🎯 VALIDACIÓN PREVIA: Verificar duplicados antes de crear
-    const companyId = await VacationNovedadSyncService.getCurrentCompanyId();
-    const existingDuplicate = await this.checkForDuplicate(
-      companyId,
-      formData.employee_id,
-      formData.type as NovedadType,
-      formData.start_date,
-      formData.end_date
-    );
-
-    if (existingDuplicate) {
-      throw new Error('Ya existe un registro idéntico para este empleado en las mismas fechas');
-    }
-    
     // 🎯 CORRECCIÓN BOOLEAN: Valores seguros para todos los campos
     const insertData = {
       employee_id: formData.employee_id,
@@ -40,7 +24,7 @@ export class VacationNovedadSyncService {
       observations: formData.observations || '',
       status: 'pendiente',
       created_by: (await supabase.auth.getUser()).data.user?.id,
-      company_id: companyId,
+      company_id: await VacationNovedadSyncService.getCurrentCompanyId(),
       processed_in_period_id: processed_in_period_id
     };
     
@@ -62,34 +46,6 @@ export class VacationNovedadSyncService {
     
     console.log('✅ Vacation created successfully:', data);
     return data;
-  }
-
-  /**
-   * 🔍 VALIDACIÓN: Verificar duplicados exactos
-   */
-  private static async checkForDuplicate(
-    companyId: string,
-    employeeId: string,
-    type: NovedadType,
-    startDate: string,
-    endDate: string
-  ): Promise<boolean> {
-    const { data, error } = await supabase
-      .from('employee_vacation_periods')
-      .select('id')
-      .eq('company_id', companyId)
-      .eq('employee_id', employeeId)
-      .eq('type', type)
-      .eq('start_date', startDate)
-      .eq('end_date', endDate)
-      .limit(1);
-
-    if (error) {
-      console.warn('⚠️ Error checking duplicates:', error);
-      return false;
-    }
-
-    return (data && data.length > 0) || false;
   }
 
   /**
@@ -168,76 +124,40 @@ export class VacationNovedadSyncService {
   }
 
   /**
-   * ✅ SOLUCIÓN MEJORADA: Deduplicar registros unificados con lógica robusta
+   * ✅ SOLUCIÓN KISS: Deduplicar registros unificados por ID
    */
   private static deduplicateUnifiedData(unifiedData: any[]): any[] {
     const deduplicatedMap = new Map();
-    const contentMap = new Map(); // Para detectar duplicados por contenido
     let duplicatesDetected = 0;
 
     unifiedData.forEach(item => {
-      // Clave primaria por ID
-      const existingById = deduplicatedMap.get(item.id);
+      const existingItem = deduplicatedMap.get(item.id);
       
-      // Clave secundaria por contenido (empleado + fechas + tipo)
-      const contentKey = `${item.empleado_id}_${item.tipo_novedad}_${item.fecha_inicio}_${item.fecha_fin}`;
-      const existingByContent = contentMap.get(contentKey);
-      
-      if (existingById) {
+      if (existingItem) {
         duplicatesDetected++;
-        console.log(`🔄 Duplicado por ID detectado: ${item.id}, priorizando fuente: ${existingById.source_type}`);
+        console.log(`🔄 Duplicado detectado ID: ${item.id}, priorizando fuente: ${existingItem.source_type}`);
         
-        // Priorizar vacation sobre novedad si hay conflicto por ID
-        if (item.source_type === 'vacation' && existingById.source_type === 'novedad') {
+        if (item.source_type === 'vacation' && existingItem.source_type === 'novedad') {
           deduplicatedMap.set(item.id, item);
           console.log(`✅ Reemplazado por fuente vacation: ${item.id}`);
         }
-      } else if (existingByContent && existingByContent.length > 0) {
-        // Duplicado por contenido - mantener solo uno
-        const existing = existingByContent[0];
-        duplicatesDetected++;
-        console.log(`🔄 Duplicado por contenido detectado para empleado: ${item.empleado_id}`);
-        
-        // Si el existente es del mismo módulo, mantener el más reciente
-        if (existing.source_type === item.source_type) {
-          if (new Date(item.created_at) > new Date(existing.created_at)) {
-            // Remover el anterior y agregar el nuevo
-            deduplicatedMap.delete(existing.id);
-            contentMap.get(contentKey).splice(0, 1, item);
-            deduplicatedMap.set(item.id, item);
-            console.log(`✅ Reemplazado por versión más reciente: ${item.id}`);
-          }
-        } else {
-          // Diferentes módulos, priorizar vacation
-          if (item.source_type === 'vacation') {
-            deduplicatedMap.delete(existing.id);
-            contentMap.get(contentKey).splice(0, 1, item);
-            deduplicatedMap.set(item.id, item);
-            console.log(`✅ Reemplazado por fuente vacation: ${item.id}`);
-          }
-        }
       } else {
-        // Registro único
         deduplicatedMap.set(item.id, item);
-        if (!contentMap.has(contentKey)) {
-          contentMap.set(contentKey, []);
-        }
-        contentMap.get(contentKey).push(item);
       }
     });
 
     if (duplicatesDetected > 0) {
-      console.log(`🎯 DEDUPLICACIÓN MEJORADA: ${duplicatesDetected} duplicados eliminados de vista`);
+      console.log(`🎯 DEDUPLICACIÓN KISS: ${duplicatesDetected} duplicados eliminados de vista`);
     }
 
     return Array.from(deduplicatedMap.values());
   }
 
   /**
-   * 🎯 CORRECCIÓN BOOLEAN: Obtener datos unificados con validación de estado mejorada
+   * 🎯 CORRECCIÓN BOOLEAN: Obtener datos unificados con manejo seguro de campos
    */
   static async getUnifiedVacationData(filters: any = {}) {
-    console.log('🔍 Loading unified vacation data with improved status validation:', filters);
+    console.log('🔍 Loading unified vacation data with filters:', filters);
     
     const companyId = await VacationNovedadSyncService.getCurrentCompanyId();
     
@@ -255,15 +175,6 @@ export class VacationNovedadSyncService {
       throw vacationsError;
     }
 
-    // ✅ FIX TS: use a properly typed list of allowed novedades
-    const allowedNovedadTypes: NovedadType[] = [
-      'vacaciones',
-      'licencia_remunerada',
-      'licencia_no_remunerada',
-      'incapacidad',
-      'ausencia'
-    ];
-
     const { data: novedadesData, error: novedadesError } = await supabase
       .from('payroll_novedades')
       .select(`
@@ -271,7 +182,7 @@ export class VacationNovedadSyncService {
         empleado:employees(id, nombre, apellido, cedula)
       `)
       .eq('company_id', companyId)
-      .in('tipo_novedad', allowedNovedadTypes)
+      .in('tipo_novedad', ['vacaciones', 'licencia_remunerada', 'licencia_no_remunerada', 'incapacidad', 'ausencia'])
       .order('created_at', { ascending: false });
 
     if (novedadesError) {
@@ -303,14 +214,17 @@ export class VacationNovedadSyncService {
 
     console.log('🔍 Period status map:', periodStatusMap);
 
-    // 🎯 VALIDACIÓN MEJORADA: Transformación con estado correcto calculado
+    // 🎯 CORRECCIÓN BOOLEAN: Transformación segura con valores por defecto
     const unifiedData = [
-      ...(await Promise.all((vacationsData || []).map(async item => {
-        // 🎯 NUEVA LÓGICA: Calcular estado correcto usando validación
-        const calculatedStatus = await VacationStatusValidationService.calculateCorrectStatus(
-          item, 
-          periodStatusMap
-        );
+      ...(vacationsData || []).map(item => {
+        let calculatedStatus: 'pendiente' | 'liquidada' | 'cancelada' = 'pendiente';
+        
+        if (item.processed_in_period_id) {
+          const periodStatus = periodStatusMap[item.processed_in_period_id];
+          if (periodStatus === 'cerrado') {
+            calculatedStatus = 'liquidada';
+          }
+        }
 
         return {
           source_type: 'vacation' as const,
@@ -325,7 +239,7 @@ export class VacationNovedadSyncService {
           dias: item.days_count || 0,
           valor: 0,
           observacion: item.observations || '',
-          status: calculatedStatus, // 🎯 ESTADO VALIDADO
+          status: calculatedStatus,
           creado_por: item.created_by,
           created_at: item.created_at,
           updated_at: item.updated_at,
@@ -342,7 +256,7 @@ export class VacationNovedadSyncService {
           created_by: item.created_by,
           processed_in_period_id: item.processed_in_period_id
         };
-      }))),
+      }),
       
       ...(novedadesData || []).map(item => {
         let calculatedStatus: 'pendiente' | 'liquidada' | 'cancelada' = 'pendiente';
@@ -413,9 +327,8 @@ export class VacationNovedadSyncService {
       filteredData = filteredData.filter(item => item.fecha_fin && item.fecha_fin <= filters.date_to);
     }
 
-    console.log('✅ DATOS CON VALIDACIÓN DE ESTADO MEJORADA:', {
-      totalOriginal: unifiedData.length,
-      totalFiltrado: filteredData.length,
+    console.log('✅ DATOS DEDUPLICADOS Y FILTRADOS:', {
+      total: filteredData.length,
       pendientes: filteredData.filter(item => item.status === 'pendiente').length,
       liquidadas: filteredData.filter(item => item.status === 'liquidada').length,
       periodStatusMap

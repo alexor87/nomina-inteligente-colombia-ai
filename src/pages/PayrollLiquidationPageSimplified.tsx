@@ -1,139 +1,244 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calculator, Users, Loader2 } from 'lucide-react';
+import { Calculator, Users, Settings, RotateCcw } from 'lucide-react';
 import { PayrollLiquidationTable } from '@/components/payroll/liquidation/PayrollLiquidationTable';
 import { SimplePeriodSelector } from '@/components/payroll/SimplePeriodSelector';
+import { AutoSaveIndicator } from '@/components/payroll/AutoSaveIndicator';
+import { usePayrollLiquidationSimplified } from '@/hooks/usePayrollLiquidationSimplified';
+import { useSimplePeriodSelection } from '@/hooks/useSimplePeriodSelection';
 import { EmployeeAddModal } from '@/components/payroll/modals/EmployeeAddModal';
-import { PayrollSuccessModal } from '@/components/payroll/modals/PayrollSuccessModal';
-import { PayrollPeriodGuard } from '@/components/payroll/PayrollPeriodGuard';
 import { useCurrentCompany } from '@/hooks/useCurrentCompany';
-import { usePayrollLiquidation } from '@/hooks/usePayrollLiquidation';
-import { SelectablePeriod } from '@/services/payroll/SimplePeriodService';
-import { useNavigate } from 'react-router-dom';
-import { useYear } from '@/contexts/YearContext';
-import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { PayrollCleanupService } from '@/services/PayrollCleanupService';
 
-const PayrollLiquidationPageSimple = () => {
+import { SelectablePeriod } from '@/services/payroll/SimplePeriodService';
+import { PayrollProgressIndicator } from '@/components/payroll/liquidation/PayrollProgressIndicator';
+import { ReliquidationDialog } from '@/components/payroll/liquidation/ReliquidationDialog';
+import { PayrollValidationService } from '@/services/PayrollValidationService';
+import { PayrollWorldClassControlPanel } from '@/components/payroll/liquidation/PayrollWorldClassControlPanel';
+import { PayrollRecoveryPanel } from '@/components/payroll/recovery/PayrollRecoveryPanel';
+import { useYear } from '@/contexts/YearContext';
+import { PayrollSuccessModal } from '@/components/payroll/modals/PayrollSuccessModal';
+import { NewYearConfigurationModal } from '@/components/payroll/modals/NewYearConfigurationModal';
+import { EndOfYearDetectionService, EndOfYearSituation } from '@/services/EndOfYearDetectionService';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import type { PayrollSummary } from '@/types/payroll';
+
+const PayrollLiquidationPageSimplified = () => {
   const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false);
-  const [selectedPeriod, setSelectedPeriod] = useState<SelectablePeriod | null>(null);
-  const [hideZeroNetPeriods, setHideZeroNetPeriods] = useState(false);
-  const [periods, setPeriods] = useState<any[]>([]);
+  
+  const [showReliquidationDialog, setShowReliquidationDialog] = useState(false);
+  const [showRecoveryPanel, setShowRecoveryPanel] = useState(false);
+  const [periodSelected, setPeriodSelected] = useState(false);
+  const [periodAlreadyLiquidated, setPeriodAlreadyLiquidated] = useState(false);
+  const [validationSummary, setValidationSummary] = useState<any>(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [liquidationResult, setLiquidationResult] = useState<any>(null);
+  const [showNewYearModal, setShowNewYearModal] = useState(false);
+  const [endOfYearSituation, setEndOfYearSituation] = useState<EndOfYearSituation | null>(null);
+  
+  const navigate = useNavigate();
   
   const { companyId } = useCurrentCompany();
-  const navigate = useNavigate();
   const { selectedYear } = useYear();
-  const { toast } = useToast();
   
+  // ✅ USAR HOOK SIMPLIFICADO
   const {
     employees,
     isLoading,
     isLiquidating,
     currentPeriodId,
+    currentPeriod,
     loadEmployees,
     addEmployees,
     removeEmployee,
     liquidatePayroll,
     refreshEmployeeNovedades,
-    showSuccessModal,
-    liquidationResult,
-    closeSuccessModal
-  } = usePayrollLiquidation();
+    updateEmployeeCalculationsInDB,
+    isAutoSaving,
+    lastAutoSaveTime,
+    isRemovingEmployee,
+    canProceedWithLiquidation,
+    isLoadingEmployees,
+    validatePeriod,
+    showProgress,
+    liquidationStep,
+    liquidationProgress,
+    processedEmployees,
+    liquidationErrors,
+    // World-class features
+    useAtomicLiquidation,
+    setUseAtomicLiquidation,
+    useExhaustiveValidation,
+    setUseExhaustiveValidation,
+    exhaustiveValidationResults,
+    isValidating,
+    performExhaustiveValidation,
+    autoRepairValidationIssues
+  } = usePayrollLiquidationSimplified(companyId || '');
 
-  // ✅ NUEVA FUNCIÓN: Limpiar borradores vacíos
-  const handleCleanupEmptyDrafts = async () => {
-    if (!companyId) return;
-    
-    try {
-      console.log('🧹 Limpiando borradores vacíos...');
-      
-      // Buscar borradores vacíos
-      const { data: emptyDrafts, error: fetchError } = await supabase
-        .from('payroll_periods_real')
-        .select('id, periodo')
-        .eq('company_id', companyId)
-        .eq('estado', 'borrador')
-        .or('total_neto.eq.0,empleados_count.eq.0');
-      
-      if (fetchError) throw fetchError;
-      
-      if (!emptyDrafts || emptyDrafts.length === 0) {
-        toast({
-          title: "No hay borradores vacíos",
-          description: "No se encontraron períodos en borrador para limpiar",
-          className: "border-blue-200 bg-blue-50"
-        });
-        return;
+  const {
+    selectedPeriod,
+    handlePeriodSelect,
+    resetSelection,
+    markCurrentPeriodAsLiquidated
+  } = useSimplePeriodSelection(companyId || '');
+
+  // Helper: sumar directamente desde payrolls por periodId, con pequeño retry para evitar carrera
+  const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
+  const fetchSummaryFromDB = async (periodId: string, attempt = 1): Promise<PayrollSummary> => {
+    const { data, error } = await supabase
+      .from('payrolls')
+      .select('total_devengado,total_deducciones,neto_pagado')
+      .eq('period_id', periodId);
+
+    if (error) {
+      console.error('Error fetching payrolls summary:', error);
+      if (attempt < 2) {
+        await sleep(400);
+        return fetchSummaryFromDB(periodId, attempt + 1);
       }
-      
-      const confirmed = window.confirm(
-        `¿Deseas eliminar ${emptyDrafts.length} borradores vacíos?\n\n` +
-        emptyDrafts.slice(0, 3).map(p => `• ${p.periodo}`).join('\n') +
-        (emptyDrafts.length > 3 ? `\n... y ${emptyDrafts.length - 3} más` : '')
-      );
-      
-      if (!confirmed) return;
-      
-      // Eliminar borradores vacíos
-      const { error: deleteError } = await supabase
-        .from('payroll_periods_real')
-        .delete()
-        .in('id', emptyDrafts.map(p => p.id));
-      
-      if (deleteError) throw deleteError;
-      
-      toast({
-        title: "✅ Limpieza Completada",
-        description: `Se eliminaron ${emptyDrafts.length} borradores vacíos`,
-        className: "border-green-200 bg-green-50"
-      });
-      
-      // Recargar períodos si es necesario
-      // (esto se puede mejorar con un callback desde SimplePeriodSelector)
-      
-    } catch (error) {
-      console.error('❌ Error limpiando borradores:', error);
-      toast({
-        title: "❌ Error",
-        description: "No se pudieron limpiar los borradores vacíos",
-        variant: "destructive"
-      });
+      return {
+        totalEmployees: 0,
+        validEmployees: 0,
+        totalGrossPay: 0,
+        totalDeductions: 0,
+        totalNetPay: 0,
+        employerContributions: 0,
+        totalPayrollCost: 0,
+      };
     }
+
+    const rows = data || [];
+    const validEmployees = rows.length;
+    const totalGrossPay = rows.reduce((s, r: any) => s + Number(r.total_devengado ?? 0), 0);
+    const totalDeductions = rows.reduce((s, r: any) => s + Number(r.total_deducciones ?? 0), 0);
+    const totalNetPay = rows.reduce((s, r: any) => s + Number(r.neto_pagado ?? 0), 0);
+
+    // Si aún no hay filas (replicación/actualización), reintentar una vez
+    if (validEmployees === 0 && attempt < 2) {
+      await sleep(400);
+      return fetchSummaryFromDB(periodId, attempt + 1);
+    }
+
+    return {
+      totalEmployees: validEmployees,
+      validEmployees,
+      totalGrossPay,
+      totalDeductions,
+      totalNetPay,
+      employerContributions: totalGrossPay * 0.205,
+      totalPayrollCost: totalGrossPay + totalGrossPay * 0.205,
+    };
   };
 
-  const handlePeriodSelection = async (period: SelectablePeriod & { year?: string }) => {
-    console.log('🎯 Período seleccionado:', period.label, 'Año:', period.year);
-    setSelectedPeriod(period);
-    // ✅ NUEVO: Pasar el año al cargar empleados
-    await loadEmployees(period.startDate, period.endDate, period.year);
+  // Limpiar períodos abandonados al montar
+  useEffect(() => {
+    PayrollCleanupService.cleanupAbandonedPeriods();
+  }, []);
+
+  // ✅ MÉTODO SIMPLIFICADO: Solo cargar empleados
+  const handlePeriodSelection = async (period: SelectablePeriod) => {
+    console.log('🎯 Período seleccionado:', period.label);
+    handlePeriodSelect(period);
+    setPeriodSelected(true);
+    
+    // Cargar empleados con el método simplificado
+    const loadedPeriodId: string | undefined = await loadEmployees(period.startDate, period.endDate);
+    
+    // Ejecutar validación automática si está habilitada
+    if (useExhaustiveValidation && loadedPeriodId) {
+      console.log('🔍 Ejecutando validación automática...');
+      await performExhaustiveValidation(loadedPeriodId);
+    }
   };
 
   const handleLiquidate = async () => {
-    if (!selectedPeriod || employees.length === 0) {
-      return;
-    }
-
-    // ✅ VALIDACIÓN MEJORADA: Verificar datos antes de confirmar
-    const employeesWithErrors = employees.filter(emp => 
-      !emp.salario_base && !emp.baseSalary ||
-      !emp.dias_trabajados && !emp.worked_days
-    );
+    if (!selectedPeriod || employees.length === 0 || !currentPeriodId || !companyId) return;
     
-    if (employeesWithErrors.length > 0) {
-      toast({
-        title: "❌ Datos Incompletos",
-        description: `${employeesWithErrors.length} empleados tienen datos faltantes. Revisa los salarios base y días trabajados.`,
-        variant: "destructive"
-      });
-      return;
-    }
-
-    const confirmMessage = `¿Deseas cerrar este periodo de nómina y generar los comprobantes de pago?\n\nPeríodo: ${selectedPeriod.label}\nEmpleados: ${employees.length}`;
-    
-    if (window.confirm(confirmMessage)) {
+    try {
+      // Validar período antes de liquidar
+      const validation = await PayrollValidationService.validatePreLiquidation(
+        currentPeriodId,
+        companyId
+      );
+      
+      // Verificar si el período ya está liquidado
+      const isAlreadyLiquidated = validation.issues.some(
+        issue => issue.type === 'period_already_liquidated'
+      );
+      
+      if (isAlreadyLiquidated) {
+        setValidationSummary(validation.summary);
+        setShowReliquidationDialog(true);
+        setPeriodAlreadyLiquidated(true);
+        return;
+      }
+      
+      // Si no está liquidado, proceder normalmente
       await liquidatePayroll(selectedPeriod.startDate, selectedPeriod.endDate);
+      await markCurrentPeriodAsLiquidated();
+      
+      // Refrescar empleados desde BD y construir resumen real desde BD
+      const loadedPid = await loadEmployees(selectedPeriod.startDate, selectedPeriod.endDate);
+      const pid = loadedPid || currentPeriodId || selectedPeriod.id;
+      const summary = await fetchSummaryFromDB(pid);
+
+      setLiquidationResult({
+        periodData: {
+          startDate: selectedPeriod.startDate,
+          endDate: selectedPeriod.endDate,
+          type: 'mensual'
+        },
+        summary,
+        periodId: pid || selectedPeriod.id
+      });
+      setShowSuccessModal(true);
+      
+      // 🎯 DETECCIÓN DE FIN DE AÑO después de liquidación exitosa
+      await checkEndOfYearSituation();
+    } catch (error) {
+      console.error('Error en handleLiquidate:', error);
     }
+  };
+
+  const handleReliquidate = async () => {
+    if (!selectedPeriod || !currentPeriodId) return;
+    
+    try {
+      setShowReliquidationDialog(false);
+      await liquidatePayroll(selectedPeriod.startDate, selectedPeriod.endDate, true);
+      await markCurrentPeriodAsLiquidated();
+      setPeriodAlreadyLiquidated(false);
+      
+      // Refrescar empleados y construir resumen real desde BD
+      const loadedPid = await loadEmployees(selectedPeriod.startDate, selectedPeriod.endDate);
+      const pid = loadedPid || currentPeriodId || selectedPeriod.id;
+      const summary = await fetchSummaryFromDB(pid);
+
+      setLiquidationResult({
+        periodData: {
+          startDate: selectedPeriod.startDate,
+          endDate: selectedPeriod.endDate,
+          type: 'mensual'
+        },
+        summary,
+        periodId: pid || selectedPeriod.id
+      });
+      setShowSuccessModal(true);
+      
+      // 🎯 DETECCIÓN DE FIN DE AÑO después de re-liquidación exitosa
+      await checkEndOfYearSituation();
+    } catch (error) {
+      console.error('Error en re-liquidación:', error);
+    }
+  };
+
+  const handleViewResults = () => {
+    setShowReliquidationDialog(false);
+    // TODO: Implementar navegación a vista de resultados
+    console.log('Ver resultados de liquidación...');
   };
 
   const handleAddEmployees = async (employeeIds: string[]) => {
@@ -146,12 +251,42 @@ const PayrollLiquidationPageSimple = () => {
   };
 
   const handleReset = () => {
-    setSelectedPeriod(null);
+    resetSelection();
+    setPeriodSelected(false);
+  };
+
+  // 🎯 NUEVA FUNCIÓN: Detectar situación de fin de año
+  const checkEndOfYearSituation = async () => {
+    if (!companyId) return;
+    
+    try {
+      console.log('🔍 Verificando situación de fin de año...');
+      
+      const situation = await EndOfYearDetectionService.detectEndOfYearSituation(companyId);
+      
+      if (situation.needsNewYear) {
+        console.log('🎯 Se detectó necesidad de crear nuevo año:', situation);
+        setEndOfYearSituation(situation);
+        setShowNewYearModal(true);
+      }
+      
+    } catch (error) {
+      console.error('❌ Error detectando fin de año:', error);
+      // No mostrar error al usuario, es una función auxiliar
+    }
+  };
+
+  const handleYearCreated = () => {
+    console.log('✅ Nuevo año creado exitosamente');
+    // El modal se cierra automáticamente
+    setShowNewYearModal(false);
+    setEndOfYearSituation(null);
   };
 
   const handleSuccessModalClose = () => {
-    closeSuccessModal();
-    navigate('/app/dashboard');
+    setShowSuccessModal(false);
+    setLiquidationResult(null);
+    navigate('/app/payroll');
   };
 
   return (
@@ -161,27 +296,92 @@ const PayrollLiquidationPageSimple = () => {
           <Calculator className="h-6 w-6 text-blue-600" />
           <h1 className="text-2xl font-bold">Liquidación de Nómina</h1>
         </div>
+        
+        <div className="flex items-center space-x-4">
+          {employees.length > 0 && (
+            <AutoSaveIndicator 
+              isSaving={isAutoSaving}
+              lastSaveTime={lastAutoSaveTime}
+            />
+          )}
+          
+        </div>
       </div>
 
-      {/* ✅ NUEVO: Componente de guardia para períodos */}
-      {companyId && (
-        <PayrollPeriodGuard
-          periods={periods}
-          onCleanupEmptyDrafts={handleCleanupEmptyDrafts}
-          hideZeroNetPeriods={hideZeroNetPeriods}
-          onToggleZeroNetFilter={setHideZeroNetPeriods}
+      {/* World-Class Control Panel - OCULTO: Validación automática activa
+      {periodSelected && selectedPeriod && (
+        <PayrollWorldClassControlPanel
+          exhaustiveValidationResults={exhaustiveValidationResults}
+          isValidating={isValidating}
+          onPerformExhaustiveValidation={async () => { await performExhaustiveValidation(); }}
+          onAutoRepairIssues={async () => { await autoRepairValidationIssues(); }}
+          canProceedWithLiquidation={canProceedWithLiquidation}
+          showProgress={showProgress}
+          liquidationProgress={liquidationProgress}
+          liquidationStep={liquidationStep}
         />
       )}
+      */}
 
-      {companyId && !selectedPeriod && (
+      {/* Recovery Panel */}
+      {showRecoveryPanel && (
+        <Card className="border-orange-200 bg-orange-50">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg text-orange-800">Diagnóstico y Reparación del Sistema</CardTitle>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowRecoveryPanel(false)}
+                className="text-orange-600"
+              >
+                ✕
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <PayrollRecoveryPanel onClose={() => setShowRecoveryPanel(false)} />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ✅ INFORMACIÓN ARQUITECTÓNICA - OCULTO: Banner técnico removido para UI más limpia
+      <Card className="border-blue-200 bg-blue-50">
+        <CardContent className="pt-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Calculator className="h-5 w-5 text-blue-600" />
+              <div>
+                <h3 className="font-medium text-blue-800">Sistema de Liquidación de Clase Mundial</h3>
+                <p className="text-blue-700 text-sm">
+                  Liquidación atómica con validaciones exhaustivas, detección automática de problemas y recuperación inteligente.
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowRecoveryPanel(true)}
+              className="border-orange-300 text-orange-700 hover:bg-orange-100"
+            >
+              Diagnóstico y Reparación
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+      */}
+
+      {/* Selector de Período */}
+      {companyId && !periodSelected && (
         <SimplePeriodSelector
           companyId={companyId}
           onPeriodSelected={handlePeriodSelection}
-          disabled={isLoading}
+          disabled={isLoadingEmployees}
         />
       )}
 
-      {selectedPeriod && (
+      {/* Información del Período Seleccionado */}
+      {selectedPeriod && periodSelected && (
         <Card className="border-green-200 bg-green-50">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -202,36 +402,34 @@ const PayrollLiquidationPageSimple = () => {
         </Card>
       )}
 
-      {isLoading && (
-        <Card className="border-blue-200 bg-blue-50">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-center space-x-2">
-              <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
-              <span className="text-blue-800 font-medium">Cargando empleados...</span>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
+      {/* Tabla de Empleados */}
       {employees.length > 0 && selectedPeriod && (
         <Card>
           <CardHeader>
             <div className="flex justify-between items-center">
-              <CardTitle>Empleados a Liquidar ({employees.length})</CardTitle>
+              <div className="flex items-center space-x-4">
+                <CardTitle>Empleados a Liquidar ({employees.length})</CardTitle>
+                <AutoSaveIndicator 
+                  isSaving={isAutoSaving}
+                  lastSaveTime={lastAutoSaveTime}
+                />
+              </div>
               <div className="flex space-x-2">
                 <Button 
                   onClick={() => setShowAddEmployeeModal(true)}
                   variant="outline"
+                  disabled={isLoading || !currentPeriodId || isRemovingEmployee}
                 >
                   <Users className="h-4 w-4 mr-2" />
                   Agregar Empleado
                 </Button>
                 <Button 
                   onClick={handleLiquidate}
-                  disabled={employees.length === 0 || isLiquidating}
-                  className="bg-green-600 hover:bg-green-700"
+                  disabled={isLiquidating || !canProceedWithLiquidation || isRemovingEmployee || (useExhaustiveValidation && !exhaustiveValidationResults?.canProceed)}
+                  className={periodAlreadyLiquidated ? "bg-orange-600 hover:bg-orange-700" : ""}
                 >
-                  {isLiquidating ? 'Liquidando...' : 'Liquidar Periodo'}
+                  {isLiquidating ? 'Liquidando...' : periodAlreadyLiquidated ? 'Re-liquidar' : `Liquidar${useAtomicLiquidation ? ' (Atómico)' : ''}`}
+                  {periodAlreadyLiquidated && <RotateCcw className="h-4 w-4 ml-2" />}
                 </Button>
               </div>
             </div>
@@ -242,13 +440,27 @@ const PayrollLiquidationPageSimple = () => {
               startDate={selectedPeriod.startDate}
               endDate={selectedPeriod.endDate}
               currentPeriodId={currentPeriodId}
+              currentPeriod={currentPeriod}
               onRemoveEmployee={removeEmployee}
               onEmployeeNovedadesChange={refreshEmployeeNovedades}
+              updateEmployeeCalculationsInDB={updateEmployeeCalculationsInDB}
               year={selectedYear}
             />
           </CardContent>
         </Card>
       )}
+
+      {/* Indicador de Progreso */}
+      <PayrollProgressIndicator
+        currentStep={liquidationStep}
+        progress={liquidationProgress}
+        totalEmployees={employees.length}
+        processedEmployees={processedEmployees}
+        errors={liquidationErrors}
+        isVisible={showProgress}
+      />
+
+      {/* Modales */}
 
       <EmployeeAddModal
         isOpen={showAddEmployeeModal}
@@ -258,6 +470,17 @@ const PayrollLiquidationPageSimple = () => {
         companyId={companyId || ''}
       />
 
+      <ReliquidationDialog
+        isOpen={showReliquidationDialog}
+        onClose={() => setShowReliquidationDialog(false)}
+        onViewResults={handleViewResults}
+        onReliquidate={handleReliquidate}
+        periodName={selectedPeriod?.label || ''}
+        summary={validationSummary}
+        isReliquidating={isLiquidating}
+      />
+
+      {/* Success Modal */}
       {showSuccessModal && liquidationResult && (
         <PayrollSuccessModal
           isOpen={showSuccessModal}
@@ -267,8 +490,18 @@ const PayrollLiquidationPageSimple = () => {
           periodId={liquidationResult.periodId}
         />
       )}
+
+      {/* New Year Configuration Modal */}
+      {showNewYearModal && endOfYearSituation && (
+        <NewYearConfigurationModal
+          isOpen={showNewYearModal}
+          onClose={() => setShowNewYearModal(false)}
+          endOfYearSituation={endOfYearSituation}
+          onYearCreated={handleYearCreated}
+        />
+      )}
     </div>
   );
 };
 
-export default PayrollLiquidationPageSimple;
+export default PayrollLiquidationPageSimplified;

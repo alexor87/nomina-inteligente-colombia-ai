@@ -1,42 +1,31 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
 
 export const useCurrentCompany = () => {
-  const { user } = useAuth();
   const [companyId, setCompanyId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchCompanyId = async () => {
-      if (!user) {
-        setIsLoading(false);
-        return;
-      }
-
+    const getCurrentUserCompany = async () => {
       try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('company_id')
-          .eq('user_id', user.id)
-          .single();
-
+        const { data, error } = await supabase.rpc('get_current_user_company_id');
+        
         if (error) {
-          setError(error.message);
-        } else {
-          setCompanyId(data?.company_id || null);
+          console.error('Error getting current user company:', error);
+          return;
         }
-      } catch (err: any) {
-        setError(err.message);
+        
+        setCompanyId(data);
+      } catch (error) {
+        console.error('Error in getCurrentUserCompany:', error);
       } finally {
-        setIsLoading(false);
+        setLoading(false);
       }
     };
 
-    fetchCompanyId();
-  }, [user]);
+    getCurrentUserCompany();
+  }, []);
 
-  return { companyId, isLoading, error };
+  return { companyId, loading };
 };

@@ -1,25 +1,14 @@
 
-import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { EmployeesDashboard } from '@/components/employees/EmployeesDashboard';
 
 const EmployeesPage = () => {
   return (
     <div className="px-6 py-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Empleados</h1>
-        <p className="text-gray-600">Gestiona la información de los empleados</p>
+        <p className="text-gray-600">Gestiona la información de los empleados de tu empresa</p>
       </div>
-      
-      <Card>
-        <CardHeader>
-          <CardTitle>Listado de Empleados</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-gray-600">
-            Este módulo está en desarrollo. Aquí podrás gestionar toda la información de los empleados.
-          </p>
-        </CardContent>
-      </Card>
+      <EmployeesDashboard />
     </div>
   );
 };

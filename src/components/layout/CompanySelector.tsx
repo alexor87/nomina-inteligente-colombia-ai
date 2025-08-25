@@ -1,6 +1,6 @@
+
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useRoles } from '@/contexts/RoleContext';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -23,15 +23,11 @@ interface CompanyOption {
 }
 
 export const CompanySelector = () => {
-  const { user, profile, refreshUserData } = useAuth();
-  const { roles, loading: rolesLoading } = useRoles();
+  const { user, profile, roles, refreshUserData } = useAuth();
   const { toast } = useToast();
   const [isChanging, setIsChanging] = useState(false);
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [isOpen, setIsOpen] = useState(false);
-
-  // Don't render if roles are still loading or if there's only one company/role
-  if (rolesLoading || !roles || roles.length <= 1) return null;
 
   // Cargar empresas cuando se abre el dropdown
   const loadCompanies = async () => {
@@ -119,6 +115,9 @@ export const CompanySelector = () => {
       loadCompanies();
     }
   };
+
+  // Solo mostrar si hay múltiples empresas
+  if (roles.length <= 1) return null;
 
   const currentCompany = companies.find(c => c.isActive);
   const displayName = currentCompany?.name || 'Seleccionar empresa';

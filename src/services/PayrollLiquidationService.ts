@@ -1,9 +1,10 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { SecureBaseService } from './SecureBaseService';
 import { NovedadesCalculationService } from './NovedadesCalculationService';
 import { ConfigurationService } from './ConfigurationService';
 import { DeductionCalculationService } from './DeductionCalculationService';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 
 interface Employee {
   id: string;
@@ -22,98 +23,11 @@ interface Employee {
   deducciones_novedades: number;
 }
 
-// ✅ NUEVA INTERFAZ: Para validar datos de empleado antes de liquidar
-interface EmployeeInputData {
-  id: string;
-  name?: string;
-  baseSalary?: number;
-  salario_base?: number;
-  worked_days?: number;
-  dias_trabajados?: number;
-  transport_allowance?: number;
-  auxilio_transporte?: number;
-  additional_deductions?: number;
-  deducciones_novedades?: number;
-  [key: string]: any;
-}
-
 /**
  * 🔒 SECURITY MIGRATION: PayrollLiquidationService now extends SecureBaseService
  * All database operations are automatically secured with company_id filtering
  */
 export class PayrollLiquidationService extends SecureBaseService {
-
-  // ✅ NUEVA FUNCIÓN: Normalizar datos de empleado (inglés → español)
-  static normalizeEmployeeData(employee: EmployeeInputData): any {
-    console.log('🔄 Normalizando datos del empleado:', employee.id);
-    
-    const normalized = {
-      id: employee.id,
-      // ✅ MAPEO CLAVE: inglés → español con fallbacks
-      salario_base: employee.salario_base ?? employee.baseSalary ?? 0,
-      dias_trabajados: employee.dias_trabajados ?? employee.worked_days ?? 15,
-      auxilio_transporte: employee.auxilio_transporte ?? employee.transport_allowance ?? 0,
-      deducciones_novedades: employee.deducciones_novedades ?? employee.additional_deductions ?? 0,
-      // Conservar otros campos
-      devengos: employee.devengos ?? 0,
-      deducciones: employee.deducciones ?? 0,
-      total_pagar: employee.total_pagar ?? 0,
-      salud_empleado: employee.salud_empleado ?? 0,
-      pension_empleado: employee.pension_empleado ?? 0,
-      fondo_solidaridad: employee.fondo_solidaridad ?? 0,
-      retencion_fuente: employee.retencion_fuente ?? 0
-    };
-
-    // ✅ VALIDACIÓN: Verificar campos críticos
-    if (!normalized.salario_base || normalized.salario_base <= 0) {
-      throw new Error(`❌ Empleado ${employee.id}: salario_base inválido (${normalized.salario_base})`);
-    }
-    if (!normalized.dias_trabajados || normalized.dias_trabajados <= 0) {
-      throw new Error(`❌ Empleado ${employee.id}: dias_trabajados inválido (${normalized.dias_trabajados})`);
-    }
-
-    console.log('✅ Datos normalizados:', {
-      id: normalized.id,
-      salario_base: normalized.salario_base,
-      dias_trabajados: normalized.dias_trabajados,
-      auxilio_transporte: normalized.auxilio_transporte
-    });
-
-    return normalized;
-  }
-
-  // ✅ NUEVA FUNCIÓN: Validar lista de empleados antes de liquidar
-  static validateEmployeesForLiquidation(employees: EmployeeInputData[]): void {
-    console.log('🔍 Validando empleados para liquidación...');
-    
-    if (!employees || employees.length === 0) {
-      throw new Error('❌ No hay empleados para liquidar');
-    }
-
-    const errors: string[] = [];
-    
-    employees.forEach((employee, index) => {
-      if (!employee.id) {
-        errors.push(`Empleado ${index + 1}: ID faltante`);
-      }
-      
-      const salario = employee.salario_base ?? employee.baseSalary;
-      if (!salario || salario <= 0) {
-        errors.push(`Empleado ${employee.id || index + 1}: salario_base inválido`);
-      }
-      
-      const dias = employee.dias_trabajados ?? employee.worked_days;
-      if (!dias || dias <= 0) {
-        errors.push(`Empleado ${employee.id || index + 1}: dias_trabajados inválido`);
-      }
-    });
-
-    if (errors.length > 0) {
-      throw new Error(`❌ Errores de validación:\n${errors.join('\n')}`);
-    }
-
-    console.log('✅ Validación exitosa:', employees.length, 'empleados');
-  }
 
   static calculateWorkingDays(startDate: string, endDate: string): number {
     const start = new Date(startDate);
@@ -126,65 +40,56 @@ export class PayrollLiquidationService extends SecureBaseService {
   static calculateTransportAllowance(baseSalary: number, workedDays: number, year?: string): number {
     const configYear = year || new Date().getFullYear().toString();
     const config = ConfigurationService.getConfiguration(configYear);
+    
     const dosSmmlv = config.salarioMinimo * 2;
+    
     if (baseSalary <= dosSmmlv) {
       return Math.round((config.auxilioTransporte / 30) * workedDays);
     }
+    
     return 0;
   }
 
   static async ensurePeriodExists(startDate: string, endDate: string): Promise<string> {
     try {
-      console.log('🔒 Ensuring period exists securely (KISS)');
+      console.log('🔒 Ensuring period exists securely');
+      const periodName = `${format(new Date(startDate), 'dd/MM/yyyy')} - ${format(new Date(endDate), 'dd/MM/yyyy')}`;
       
-      // ✅ KISS FIX: Formateo directo sin Date objects para evitar timezone shift
-      const periodName = `${format(parseISO(startDate), 'dd/MM/yyyy')} - ${format(parseISO(endDate), 'dd/MM/yyyy')}`;
-
+      // Use secure query to check for existing period
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) {
         throw new Error('🔒 [SECURITY] Access denied: No company context');
       }
+      
+      const existingQuery = this.secureQuery('payroll_periods_real', companyId, 'id', {
+        fecha_inicio: startDate,
+        fecha_fin: endDate
+      });
+      
+      const { data: existingPeriod } = await existingQuery.single();
 
-      // Buscar por fechas + empresa SIN lanzar error cuando no existe
-      const { data: existingPeriod, error: existingErr } = await supabase
-        .from('payroll_periods_real')
-        .select('id, periodo')
-        .eq('company_id', companyId)
-        .eq('fecha_inicio', startDate)
-        .eq('fecha_fin', endDate)
-        .maybeSingle();
-
-      if (existingErr) {
-        console.warn('⚠️ Error buscando período (non-fatal):', existingErr.message);
-      }
-
-      if (existingPeriod?.id) {
+      if (existingPeriod) {
         return existingPeriod.id;
       }
 
-      // Crear período como borrador y devolver su id en una sola operación
-      const { data: newPeriod, error: insertErr } = await supabase
-        .from('payroll_periods_real')
-        .insert({
-          company_id: companyId,
-          periodo: periodName,
-          fecha_inicio: startDate,
-          fecha_fin: endDate,
-          tipo_periodo: 'personalizado',
-          estado: 'borrador',
-          empleados_count: 0,
-          total_devengado: 0,
-          total_deducciones: 0,
-          total_neto: 0
-        })
-        .select('id, periodo')
-        .single();
+      // Use secure insert to create new period
+      const { data: newPeriod, error } = await this.secureInsert('payroll_periods_real', {
+        periodo: periodName,
+        fecha_inicio: startDate,
+        fecha_fin: endDate,
+        tipo_periodo: 'personalizado',
+        estado: 'borrador',
+        empleados_count: 0,
+        total_devengado: 0,
+        total_deducciones: 0,
+        total_neto: 0
+      });
 
-      if (insertErr) {
-        throw insertErr;
+      if (error) {
+        throw error;
       }
 
-      return newPeriod.id;
+      return newPeriod[0].id;
     } catch (error) {
       console.error('Error ensuring period exists:', error);
       throw error;
@@ -195,6 +100,7 @@ export class PayrollLiquidationService extends SecureBaseService {
     try {
       console.log('🔒 Loading employees for period securely');
 
+      // Use secure query to get active employees
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) {
         throw new Error('🔒 [SECURITY] Access denied: No company context');
@@ -215,6 +121,7 @@ export class PayrollLiquidationService extends SecureBaseService {
       }
 
       const diasTrabajados = this.calculateWorkingDays(startDate, endDate);
+
       const configYear = year || new Date().getFullYear().toString();
       
       const processedEmployees: Employee[] = await Promise.all(employees.map(async (employee) => {
@@ -259,6 +166,7 @@ export class PayrollLiquidationService extends SecureBaseService {
     try {
       console.log('🔒 Loading specific employees for period securely');
 
+      // Use secure query with IN filter for specific employees
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) {
         throw new Error('🔒 [SECURITY] Access denied: No company context');
@@ -279,6 +187,7 @@ export class PayrollLiquidationService extends SecureBaseService {
       }
 
       const diasTrabajados = this.calculateWorkingDays(startDate, endDate);
+
       const configYear = year || new Date().getFullYear().toString();
       
       const processedEmployees: Employee[] = await Promise.all(employees.map(async (employee) => {
@@ -320,136 +229,131 @@ export class PayrollLiquidationService extends SecureBaseService {
   }
 
   /**
-   * ✅ CORREGIDO: Liquidación con normalización de datos y validación previa
+   * ✅ CORREGIDO: Liquidación con cálculo único de totales
    */
-  static async liquidatePayroll(employees: EmployeeInputData[], startDate: string, endDate: string) {
+  static async liquidatePayroll(employees: Employee[], startDate: string, endDate: string) {
     try {
-      console.log('🚀 Iniciando liquidación con validación y normalización...');
-      
-      // ✅ PASO 1: Validar datos de entrada
-      this.validateEmployeesForLiquidation(employees);
-      
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) {
         throw new Error('No se pudo obtener la empresa del usuario');
       }
 
-      const periodId = await this.ensurePeriodExists(startDate, endDate);
+      const periodName = `${format(new Date(startDate), 'dd/MM/yyyy')} - ${format(new Date(endDate), 'dd/MM/yyyy')}`;
 
-      const { data: periodData, error: periodFetchErr } = await supabase
+      // ✅ CORREGIDO: Crear período SIN totales iniciales
+      const { data: period, error: periodError } = await supabase
         .from('payroll_periods_real')
-        .select('id, periodo')
-        .eq('id', periodId)
-        .maybeSingle();
+        .insert({
+          company_id: companyId,
+          periodo: periodName,
+          fecha_inicio: startDate,
+          fecha_fin: endDate,
+          tipo_periodo: 'personalizado',
+          estado: 'cerrado',
+          empleados_count: employees.length,
+          // ✅ CORREGIDO: NO escribir totales iniciales
+          total_devengado: 0,
+          total_deducciones: 0,
+          total_neto: 0
+        })
+        .select()
+        .single();
 
-      if (periodFetchErr || !periodData) {
-        throw new Error(`No se pudo cargar el período generado (${periodFetchErr?.message || 'sin datos'})`);
+      if (periodError) {
+        throw periodError;
       }
 
-      const periodName = periodData.periodo;
-
+      // ✅ CORREGIDO: Crear registros de payroll
       const payrollInserts = [];
-      
-      // ✅ PASO 2: Normalizar y procesar cada empleado
-      for (const employeeInput of employees) {
-        try {
-          const employee = this.normalizeEmployeeData(employeeInput);
-          
-          const salarioProporcional = (employee.salario_base / 30) * employee.dias_trabajados;
-          const totalDevengadoFinal = salarioProporcional + employee.auxilio_transporte + employee.devengos;
-          const totalDeduccionesFinal = employee.deducciones + employee.deducciones_novedades;
-          const netoPagadoFinal = totalDevengadoFinal - totalDeduccionesFinal;
+      for (const employee of employees) {
+        const salarioProporcional = (employee.salario_base / 30) * employee.dias_trabajados;
+        const totalDevengadoFinal = salarioProporcional + employee.auxilio_transporte + employee.devengos;
+        const totalDeduccionesFinal = employee.deducciones + employee.deducciones_novedades;
+        const netoPagadoFinal = totalDevengadoFinal - totalDeduccionesFinal;
 
-          payrollInserts.push({
-            company_id: companyId,
-            employee_id: employee.id,
-            periodo: periodName,
-            period_id: periodId,
-            salario_base: employee.salario_base, // ✅ GARANTIZADO: no null
-            dias_trabajados: employee.dias_trabajados,
-            auxilio_transporte: employee.auxilio_transporte,
-            total_devengado: totalDevengadoFinal,
-            salud_empleado: employee.salud_empleado,
-            pension_empleado: employee.pension_empleado,
-            fondo_solidaridad: employee.fondo_solidaridad,
-            retencion_fuente: employee.retencion_fuente,
-            otras_deducciones: employee.deducciones_novedades,
-            total_deducciones: totalDeduccionesFinal,
-            neto_pagado: netoPagadoFinal,
-            estado: 'procesada',
-          });
-        } catch (employeeError) {
-          console.error(`❌ Error procesando empleado ${employeeInput.id}:`, employeeError);
-          throw new Error(`Error en empleado ${employeeInput.id}: ${employeeError.message}`);
-        }
+        payrollInserts.push({
+          company_id: companyId,
+          employee_id: employee.id,
+          periodo: periodName,
+          period_id: period.id,
+          salario_base: employee.salario_base,
+          dias_trabajados: employee.dias_trabajados,
+          auxilio_transporte: employee.auxilio_transporte,
+          total_devengado: totalDevengadoFinal,
+          salud_empleado: employee.salud_empleado,
+          pension_empleado: employee.pension_empleado,
+          fondo_solidaridad: employee.fondo_solidaridad,
+          retencion_fuente: employee.retencion_fuente,
+          otras_deducciones: employee.deducciones_novedades,
+          total_deducciones: totalDeduccionesFinal,
+          neto_pagado: netoPagadoFinal,
+          estado: 'procesada'
+        });
       }
 
-      if (payrollInserts.length > 0) {
-        // Use upsert to avoid unique_violation on existing payrolls for the same employee/period/company
-        const { error: payrollError } = await supabase
-          .from('payrolls')
-          .upsert(
-            payrollInserts.map((p) => ({ ...p, updated_at: new Date().toISOString() })),
-            { onConflict: 'company_id,employee_id,period_id' }
-          )
-          .select('id');
-        if (payrollError) {
-          throw payrollError;
-        }
+      const { error: payrollError } = await supabase
+        .from('payrolls')
+        .insert(payrollInserts);
+
+      if (payrollError) {
+        throw payrollError;
       }
 
-      // Calculate totals from the values we just wrote
+      // ✅ CORREGIDO: Calcular totales CORRECTOS una sola vez con validación
       console.log('🧮 Calculando totales. Registros:', payrollInserts.length);
+      
+      // Log valores para debugging
       payrollInserts.forEach((p, index) => {
         if (!Number.isFinite(p.neto_pagado) || p.neto_pagado == null) {
           console.warn(`⚠️ Valor inválido en empleado ${index}:`, {
             employee_id: p.employee_id,
             neto_pagado: p.neto_pagado,
-            tipo: typeof p.neto_pagado,
+            tipo: typeof p.neto_pagado
           });
         }
       });
-
+      
       const finalTotalDevengado = payrollInserts.reduce((sum, p) => sum + (Number(p.total_devengado) || 0), 0);
       const finalTotalDeducciones = payrollInserts.reduce((sum, p) => sum + (Number(p.total_deducciones) || 0), 0);
       const finalTotalNeto = payrollInserts.reduce((sum, p) => sum + (Number(p.neto_pagado) || 0), 0);
-
+      
       console.log('💰 Totales calculados:', {
         devengado: finalTotalDevengado,
         deducciones: finalTotalDeducciones,
         neto: finalTotalNeto,
-        neto_valid: Number.isFinite(finalTotalNeto),
+        neto_valid: Number.isFinite(finalTotalNeto)
       });
-
+      
+      // Validación adicional
       if (!Number.isFinite(finalTotalNeto) || finalTotalNeto < 0) {
         console.error('❌ Error en cálculo de neto total:', finalTotalNeto);
         throw new Error(`Error en cálculo de neto total: ${finalTotalNeto}`);
       }
 
+      // ✅ CORREGIDO: Actualizar totales UNA SOLA VEZ
       const { error: updateError } = await supabase
         .from('payroll_periods_real')
         .update({
-          empleados_count: employees.length,
           total_devengado: finalTotalDevengado,
           total_deducciones: finalTotalDeducciones,
-          total_neto: finalTotalNeto,
-          estado: 'cerrado',
+          total_neto: finalTotalNeto
         })
-        .eq('id', periodId);
+        .eq('id', period.id);
+
       if (updateError) {
         throw updateError;
       }
 
-      console.log('✅ LIQUIDACIÓN COMPLETADA CON NORMALIZACIÓN:', {
+      console.log('✅ LIQUIDACIÓN COMPLETADA CON TOTALES ÚNICOS:', {
         totalDevengado: finalTotalDevengado,
         totalDeducciones: finalTotalDeducciones,
-        totalNeto: finalTotalNeto,
+        totalNeto: finalTotalNeto
       });
 
       return {
         success: true,
-        message: `Liquidación completada para ${employees.length} empleados con normalización de datos`,
-        periodId: periodId,
+        message: `Liquidación completada para ${employees.length} empleados con cálculo único de totales`,
+        periodId: period.id,
         summary: {
           totalEmployees: employees.length,
           validEmployees: employees.length,
@@ -457,14 +361,14 @@ export class PayrollLiquidationService extends SecureBaseService {
           totalDeductions: Number.isFinite(finalTotalDeducciones) ? finalTotalDeducciones : 0,
           totalNetPay: Number.isFinite(finalTotalNeto) ? finalTotalNeto : 0,
           employerContributions: finalTotalDevengado * 0.205,
-          totalPayrollCost: finalTotalDevengado + finalTotalDevengado * 0.205,
-        },
+          totalPayrollCost: finalTotalDevengado + (finalTotalDevengado * 0.205)
+        }
       };
-    } catch (error: any) {
-      console.error('❌ Error liquidating payroll:', error);
+    } catch (error) {
+      console.error('Error liquidating payroll:', error);
       return {
         success: false,
-        message: error?.message || String(error) || 'Error desconocido',
+        message: error instanceof Error ? error.message : 'Error desconocido'
       };
     }
   }
