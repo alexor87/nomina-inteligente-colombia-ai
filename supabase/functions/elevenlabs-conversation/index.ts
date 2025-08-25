@@ -7,7 +7,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Project constants (do not change)
+// Project constants
 const SUPABASE_URL = "https://xrmorlkakwujyozgmilf.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhybW9ybGtha3d1anlvemdtaWxmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA1NzMxNDYsImV4cCI6MjA2NjE0OTE0Nn0.JSKbniDUkbNEAVCxCkrG_J5NQTt0yHc7W5PPheJ8X_U";
 
@@ -266,7 +266,7 @@ serve(async (req) => {
     const { action, ...body } = await req.json();
     console.log(`📥 Action received: ${action}`, body);
 
-    // NEW: Health check action
+    // Health check action
     if (action === 'health_check') {
       console.log('🏥 Health check requested');
       
@@ -278,7 +278,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({
         ok: true,
         has_api_key,
-        agent_id_received: true, // We always use the hardcoded agent ID
+        agent_id_received: true,
         env: 'prod',
         timestamp: new Date().toISOString()
       }), {
@@ -303,9 +303,7 @@ serve(async (req) => {
         });
       }
 
-      const agentId =
-        (body && (body.agent_id || body.agentId)) ||
-        'agent_3701k3bzfyn5f4ws09536v7bk5wf';
+      const agentId = body.agent_id || 'agent_3701k3bzfyn5f4ws09536v7bk5wf';
 
       if (!agentId || typeof agentId !== 'string' || !agentId.trim()) {
         console.error('❌ Missing agentId for session start');
@@ -337,7 +335,6 @@ serve(async (req) => {
         console.log(`📊 ElevenLabs API Response - Status: ${response.status}, Body:`, responseText);
 
         if (!response.ok) {
-          // Parse the error response to provide specific details
           let errorDetails: any = {};
           try {
             errorDetails = JSON.parse(responseText);
@@ -347,7 +344,6 @@ serve(async (req) => {
 
           console.error('❌ ElevenLabs API error:', response.status, errorDetails);
           
-          // Return structured error response with 200 status
           return new Response(JSON.stringify({ 
             ok: false,
             error_code: 'ELEVENLABS_API_ERROR',

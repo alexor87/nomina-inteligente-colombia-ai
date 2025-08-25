@@ -15,3 +15,6 @@ verify_jwt = true
 
 [functions.provision-social-benefits]
 verify_jwt = true
+
+[functions.elevenlabs-conversation]
+verify_jwt = true
