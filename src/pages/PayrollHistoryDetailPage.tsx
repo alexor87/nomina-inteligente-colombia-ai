@@ -24,8 +24,6 @@ import {
   type PayrollHistoryData 
 } from '@/utils/payrollDataTransformer';
 import { useCompanyDetails } from '@/hooks/useCompanyDetails';
-import { ConfigurationService } from '@/services/ConfigurationService';
-import { NovedadesEnhancedService } from '@/services/NovedadesEnhancedService';
 
 interface PeriodDetail {
   id: string;
@@ -85,8 +83,7 @@ export const PayrollHistoryDetailPage = () => {
   const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
   const [selectedVoucherEmployee, setSelectedVoucherEmployee] = useState<any>(null);
   const [sendingEmails, setSendingEmails] = useState<Set<string>>(new Set());
-  const [novedadesCounts, setNovedadesCounts] = useState<Record<string, number>>({});
-
+  
   // Hook para gestionar novedades
   const { createNovedad } = usePayrollNovedadesUnified(periodId || '');
   
@@ -95,27 +92,6 @@ export const PayrollHistoryDetailPage = () => {
   
   // Hook para obtener datos completos de la empresa
   const { companyDetails } = useCompanyDetails();
-
-  // Cargar conteos de novedades del período
-  const loadNovedadesCounts = async (compId: string, perId: string) => {
-    if (!compId || !perId) return;
-    try {
-      console.log('🔄 Cargando conteos de novedades...', { compId, perId });
-      const novedades = await NovedadesEnhancedService.getNovedades(compId, perId);
-      const map: Record<string, number> = {};
-      novedades.forEach((n: any) => {
-        const empId = n?.empleado_id;
-        if (empId) {
-          map[empId] = (map[empId] || 0) + 1;
-        }
-      });
-      setNovedadesCounts(map);
-      console.log('✅ Conteos de novedades cargados:', map);
-    } catch (error) {
-      console.error('❌ Error cargando conteos de novedades:', error);
-      setNovedadesCounts({});
-    }
-  };
 
   const loadPeriodDetail = async () => {
     if (!periodId) return;
@@ -132,11 +108,6 @@ export const PayrollHistoryDetailPage = () => {
       
       if (periodError) throw periodError;
       setPeriod(periodData);
-
-      // Obtener configuración del año del período para calcular IBC
-      const year = periodData?.fecha_inicio ? new Date(periodData.fecha_inicio).getFullYear().toString() : '2025';
-      const config = await ConfigurationService.getConfigurationAsync(year);
-      console.log('⚙️ Configuración usada para IBC:', { year, porcentajes: config?.porcentajes });
 
       // Load employees payroll data with complete employee information
       const { data: payrollData, error: payrollError } = await supabase
@@ -165,57 +136,38 @@ export const PayrollHistoryDetailPage = () => {
       
       if (payrollError) throw payrollError;
       
-      const employeesWithNames = payrollData?.map((p: any) => {
-        // Calcular IBC desde deducciones persistidas
-        const salud: number = p.salud_empleado || 0;
-        const pension: number = p.pension_empleado || 0;
-        let ibcCalc = 0;
-
-        if (salud > 0 && config?.porcentajes?.saludEmpleado) {
-          ibcCalc = Math.round(salud / config.porcentajes.saludEmpleado);
-        } else if (pension > 0 && config?.porcentajes?.pensionEmpleado) {
-          ibcCalc = Math.round(p.pension_empleado / config.porcentajes.pensionEmpleado);
-        } else {
-          ibcCalc = p.salario_base || 0; // fallback
-        }
-
-        return {
-          id: p.id,
-          employee_id: p.employee_id,
-          employee_name: p.employees.nombre,
-          employee_lastname: p.employees.apellido,
-          total_devengado: p.total_devengado || 0,
-          total_deducciones: p.total_deducciones || 0,
-          neto_pagado: p.neto_pagado || 0,
-          salario_base: p.salario_base || 0,
-          ibc: ibcCalc,
-          dias_trabajados: p.dias_trabajados || 30,
-          // Campos específicos de payrolls para conceptos exactos
-          auxilio_transporte: p.auxilio_transporte || 0,
-          salud_empleado: p.salud_empleado || 0,
-          pension_empleado: p.pension_empleado || 0,
-          horas_extra: p.horas_extra || 0,
-          bonificaciones: p.bonificaciones || 0,
-          comisiones: p.comisiones || 0,
-          cesantias: p.cesantias || 0,
-          prima: p.prima || 0,
-          vacaciones: p.vacaciones || 0,
-          incapacidades: p.incapacidades || 0,
-          otros_devengos: p.otros_devengos || 0,
-          otros_descuentos: p.descuentos_varios || 0,
-          retencion_fuente: p.retencion_fuente || 0,
-          // Complete employee data for voucher
-          completeEmployeeData: p.employees
-        };
-      }) || [];
+      const employeesWithNames = payrollData?.map(p => ({
+        id: p.id,
+        employee_id: p.employee_id,
+        employee_name: p.employees.nombre,
+        employee_lastname: p.employees.apellido,
+        total_devengado: p.total_devengado || 0,
+        total_deducciones: p.total_deducciones || 0,
+        neto_pagado: p.neto_pagado || 0,
+        salario_base: p.salario_base || 0,
+        ibc: p.salario_base || 0,
+        dias_trabajados: p.dias_trabajados || 30,
+        // Campos específicos de payrolls para conceptos exactos
+        auxilio_transporte: p.auxilio_transporte || 0,
+        salud_empleado: p.salud_empleado || 0,
+        pension_empleado: p.pension_empleado || 0,
+        horas_extra: p.horas_extra || 0,
+        bonificaciones: p.bonificaciones || 0,
+        comisiones: p.comisiones || 0,
+        cesantias: p.cesantias || 0,
+        prima: p.prima || 0,
+        vacaciones: p.vacaciones || 0,
+        incapacidades: p.incapacidades || 0,
+        otros_devengos: p.otros_devengos || 0,
+        otros_descuentos: p.descuentos_varios || 0,
+        retencion_fuente: p.retencion_fuente || 0,
+        // Complete employee data for voucher
+        completeEmployeeData: p.employees
+      })) || [];
       
       setEmployees(employeesWithNames);
 
-      // Cargar conteos de novedades reales del período (si ya tenemos companyId)
-      if (companyId) {
-        await loadNovedadesCounts(companyId, periodId);
-      }
-
+      
     } catch (error) {
       console.error('Error loading period detail:', error);
       toast({
@@ -231,13 +183,6 @@ export const PayrollHistoryDetailPage = () => {
   useEffect(() => {
     loadPeriodDetail();
   }, [periodId]);
-
-  // Recalcular conteos de novedades cuando tengamos companyId o cambie el listado
-  useEffect(() => {
-    if (periodId && companyId) {
-      loadNovedadesCounts(companyId, periodId);
-    }
-  }, [periodId, companyId, employees.length]);
 
   const handleSendVoucherEmail = async (employeeId: string, employeeName: string) => {
     // Find the employee in current data
@@ -799,7 +744,6 @@ export const PayrollHistoryDetailPage = () => {
                       const preview = calculateEmployeePreview(employee);
                       const isSendingEmail = sendingEmails.has(employee.employee_id);
                       const hasEmail = !!employee.completeEmployeeData?.email;
-                      const realNovedadesCount = novedadesCounts[employee.employee_id] || 0;
                       
                       return (
                         <TableRow key={employee.id}>
@@ -879,11 +823,6 @@ export const PayrollHistoryDetailPage = () => {
                               >
                                 <Plus className="h-4 w-4" />
                               </Button>
-                              {realNovedadesCount > 0 && (
-                                <Badge variant="secondary" className="bg-emerald-100 text-emerald-800">
-                                  {realNovedadesCount}
-                                </Badge>
-                              )}
                               {preview.pendingCount > 0 && (
                                 <Badge variant="secondary" className="bg-blue-100 text-blue-800">
                                   {preview.pendingCount}
