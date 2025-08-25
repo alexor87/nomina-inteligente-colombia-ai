@@ -1,26 +1,9 @@
 
-// Temporarily disabled to prevent forwardRef conflicts with @elevenlabs/react
-// This file contains global type definitions that were causing build errors
+// Completely disabled to prevent forwardRef conflicts
+// This file is not needed since we're using a custom voice implementation
 
-/*
-declare global {
-  interface Window {
-    ElevenLabs: {
-      Conversation: (config: {
-        onConnect?: () => void;
-        onDisconnect?: () => void;
-        onMessage?: (message: any) => void;
-        onModeChange?: (mode: any) => void;
-        onError?: (error: any) => void;
-        clientTools?: Record<string, (...args: any[]) => any>;
-      }) => {
-        startSession: (config: { signedUrl: string }) => Promise<void>;
-        endSession: () => Promise<void>;
-        sendMessage: (message: string) => Promise<void>;
-      };
-    };
-  }
-}
+// All ElevenLabs type definitions have been removed to prevent build errors
+// The custom voice chat implementation in useCustomVoiceChat.ts provides
+// all necessary functionality without external dependencies
 
 export {};
-*/
