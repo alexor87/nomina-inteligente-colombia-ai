@@ -24,11 +24,14 @@ interface CompanyOption {
 
 export const CompanySelector = () => {
   const { user, profile, refreshUserData } = useAuth();
-  const { roles } = useRoles();
+  const { roles, loading: rolesLoading } = useRoles();
   const { toast } = useToast();
   const [isChanging, setIsChanging] = useState(false);
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [isOpen, setIsOpen] = useState(false);
+
+  // Don't render if roles are still loading or if there's only one company/role
+  if (rolesLoading || !roles || roles.length <= 1) return null;
 
   // Cargar empresas cuando se abre el dropdown
   const loadCompanies = async () => {
@@ -116,9 +119,6 @@ export const CompanySelector = () => {
       loadCompanies();
     }
   };
-
-  // Only show if there are multiple companies
-  if (roles.length <= 1) return null;
 
   const currentCompany = companies.find(c => c.isActive);
   const displayName = currentCompany?.name || 'Seleccionar empresa';
