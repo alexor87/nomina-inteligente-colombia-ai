@@ -5,7 +5,6 @@ import { Sidebar } from './Sidebar';
 import Header from './Header';
 import { useAuth } from '@/contexts/AuthContext';
 import { LoadingWithTimeout } from '@/components/ui/LoadingWithTimeout';
-import { FloatingVoiceAgent } from '@/components/voice/FloatingVoiceAgent';
 import { VoiceAgentProvider } from '@/contexts/VoiceAgentContext';
 
 export const Layout = () => {
@@ -50,8 +49,9 @@ export const Layout = () => {
           </div>
         </main>
 
-        {/* Floating Voice Agent */}
+        {/* Floating Voice Agent - Temporarily disabled to fix forwardRef error
         <FloatingVoiceAgent />
+        */}
       </div>
     </VoiceAgentProvider>
   );

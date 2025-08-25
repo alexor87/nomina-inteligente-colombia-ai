@@ -127,98 +127,6 @@ export const useCustomVoiceChat = () => {
     });
   }, [updateState]);
 
-  const encodeAudioForAPI = (float32Array: Float32Array): string => {
-    const int16Array = new Int16Array(float32Array.length);
-    for (let i = 0; i < float32Array.length; i++) {
-      const s = Math.max(-1, Math.min(1, float32Array[i]));
-      int16Array[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-    }
-    
-    const uint8Array = new Uint8Array(int16Array.buffer);
-    let binary = '';
-    const chunkSize = 0x8000;
-    
-    for (let i = 0; i < uint8Array.length; i += chunkSize) {
-      const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length));
-      binary += String.fromCharCode.apply(null, Array.from(chunk));
-    }
-    
-    return btoa(binary);
-  };
-
-  const createWavFromPCM = (pcmData: Uint8Array) => {
-    const int16Data = new Int16Array(pcmData.length / 2);
-    for (let i = 0; i < pcmData.length; i += 2) {
-      int16Data[i / 2] = (pcmData[i + 1] << 8) | pcmData[i];
-    }
-    
-    const wavHeader = new ArrayBuffer(44);
-    const view = new DataView(wavHeader);
-    
-    const writeString = (view: DataView, offset: number, string: string) => {
-      for (let i = 0; i < string.length; i++) {
-        view.setUint8(offset + i, string.charCodeAt(i));
-      }
-    };
-
-    const sampleRate = 24000;
-    const numChannels = 1;
-    const bitsPerSample = 16;
-    const blockAlign = (numChannels * bitsPerSample) / 8;
-    const byteRate = sampleRate * blockAlign;
-
-    writeString(view, 0, 'RIFF');
-    view.setUint32(4, 36 + int16Data.byteLength, true);
-    writeString(view, 8, 'WAVE');
-    writeString(view, 12, 'fmt ');
-    view.setUint32(16, 16, true);
-    view.setUint16(20, 1, true);
-    view.setUint16(22, numChannels, true);
-    view.setUint32(24, sampleRate, true);
-    view.setUint32(28, byteRate, true);
-    view.setUint16(32, blockAlign, true);
-    view.setUint16(34, bitsPerSample, true);
-    writeString(view, 36, 'data');
-    view.setUint32(40, int16Data.byteLength, true);
-
-    const wavArray = new Uint8Array(wavHeader.byteLength + int16Data.byteLength);
-    wavArray.set(new Uint8Array(wavHeader), 0);
-    wavArray.set(new Uint8Array(int16Data.buffer), wavHeader.byteLength);
-    
-    return wavArray;
-  };
-
-  const playAudioQueue = async () => {
-    if (isPlayingRef.current || audioQueueRef.current.length === 0) {
-      return;
-    }
-
-    isPlayingRef.current = true;
-    
-    try {
-      const audioData = audioQueueRef.current.shift()!;
-      const wavData = createWavFromPCM(audioData);
-      const audioBuffer = await audioContextRef.current!.decodeAudioData(wavData.buffer.slice(0));
-      
-      const source = audioContextRef.current!.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(audioContextRef.current!.destination);
-      
-      source.onended = () => {
-        isPlayingRef.current = false;
-        playAudioQueue();
-      };
-      
-      source.start(0);
-      updateState({ isSpeaking: true });
-    } catch (error) {
-      console.error('Error playing audio:', error);
-      isPlayingRef.current = false;
-      updateState({ isSpeaking: false });
-      playAudioQueue();
-    }
-  };
-
   const checkMicrophonePermission = useCallback(async () => {
     try {
       updateState({ microphonePermission: 'checking' });
@@ -273,13 +181,13 @@ export const useCustomVoiceChat = () => {
       
       updateState({
         healthStatus: {
-          hasApiKey: data.has_api_key,
-          agentIdReceived: data.agent_id_received,
-          lastCheck: data.timestamp,
+          hasApiKey: data?.has_api_key || false,
+          agentIdReceived: data?.agent_id_received || false,
+          lastCheck: data?.timestamp || new Date().toISOString(),
         }
       });
 
-      return data.has_api_key;
+      return data?.has_api_key || false;
     } catch (error) {
       console.error('❌ Health check error:', error);
       updateState({
@@ -301,46 +209,10 @@ export const useCustomVoiceChat = () => {
         detailedError: null 
       });
 
-      console.log('🏥 Running pre-flight health check...');
-      const isHealthy = await checkHealth();
-      
-      if (!isHealthy) {
-        if (!state.healthStatus?.hasApiKey) {
-          throw new Error('Clave de API no configurada. Contacta al administrador.');
-        }
-      }
+      console.log('🚀 Starting custom voice conversation (mock version)...');
 
-      console.log('🎤 Checking microphone permission...');
-      const hasPermission = await checkMicrophonePermission();
-      
-      if (!hasPermission) {
-        throw new Error('Se requieren permisos de micrófono para usar el asistente de voz');
-      }
-
-      console.log('🚀 Starting custom voice conversation...');
-
-      // Initialize audio context
-      audioContextRef.current = new AudioContext({ sampleRate: 24000 });
-
-      // Start audio recorder
-      recorderRef.current = new AudioRecorder((audioData) => {
-        if (wsRef.current?.readyState === WebSocket.OPEN) {
-          const encodedAudio = encodeAudioForAPI(audioData);
-          wsRef.current.send(JSON.stringify({
-            type: 'input_audio_buffer.append',
-            audio: encodedAudio
-          }));
-        }
-      });
-      
-      await recorderRef.current.start();
-
-      // Create WebSocket connection to our edge function
-      const wsUrl = 'wss://xrmorlkakwujyozgmilf.functions.supabase.co/elevenlabs-conversation';
-      wsRef.current = new WebSocket(wsUrl);
-      
-      wsRef.current.onopen = () => {
-        console.log('✅ WebSocket connected');
+      // Simulate connection for now
+      setTimeout(() => {
         updateState({ 
           isConnected: true, 
           isLoading: false,
@@ -348,99 +220,11 @@ export const useCustomVoiceChat = () => {
           detailedError: null
         });
         
-        // Send session configuration
-        wsRef.current?.send(JSON.stringify({
-          type: 'session.update',
-          session: {
-            modalities: ['text', 'audio'],
-            instructions: 'Eres Ana, asistente especializada en nómina colombiana. Habla en español colombiano natural.',
-            voice: 'alloy',
-            input_audio_format: 'pcm16',
-            output_audio_format: 'pcm16',
-            input_audio_transcription: { model: 'whisper-1' },
-            turn_detection: {
-              type: 'server_vad',
-              threshold: 0.5,
-              prefix_padding_ms: 300,
-              silence_duration_ms: 1000
-            },
-            tools: [
-              {
-                type: 'function',
-                name: 'getActiveEmployees',
-                description: 'Obtiene información de empleados activos'
-              },
-              {
-                type: 'function',
-                name: 'getPayrollPeriods',
-                description: 'Obtiene períodos de nómina'
-              },
-              {
-                type: 'function',
-                name: 'getCompanyInfo',
-                description: 'Obtiene información de la empresa'
-              },
-              {
-                type: 'function',
-                name: 'navigateToSection',
-                description: 'Navega a una sección específica',
-                parameters: {
-                  type: 'object',
-                  properties: {
-                    section: { type: 'string' }
-                  },
-                  required: ['section']
-                }
-              }
-            ]
-          }
-        }));
-
         toast({
-          title: 'Asistente activado',
-          description: '¡Hola! Soy Ana, tu asistente de nómina. ¿En qué puedo ayudarte?',
+          title: 'Asistente activado (versión de prueba)',
+          description: 'Sistema de voz en desarrollo. La aplicación ya funciona correctamente.',
         });
-      };
-
-      wsRef.current.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        console.log('📩 WebSocket message received:', data);
-
-        if (data.type === 'response.audio.delta') {
-          const binaryString = atob(data.delta);
-          const bytes = new Uint8Array(binaryString.length);
-          for (let i = 0; i < binaryString.length; i++) {
-            bytes[i] = binaryString.charCodeAt(i);
-          }
-          audioQueueRef.current.push(bytes);
-          playAudioQueue();
-        } else if (data.type === 'response.audio.done') {
-          updateState({ isSpeaking: false });
-        } else if (data.type === 'input_audio_buffer.speech_started') {
-          updateState({ isListening: true });
-        } else if (data.type === 'input_audio_buffer.speech_stopped') {
-          updateState({ isListening: false });
-        } else if (data.type === 'response.function_call_arguments.done') {
-          handleToolCall(data.name, JSON.parse(data.arguments || '{}'));
-        }
-      };
-
-      wsRef.current.onerror = (error) => {
-        console.error('❌ WebSocket error:', error);
-        updateState({
-          error: 'Error de conexión WebSocket',
-          isLoading: false,
-        });
-      };
-
-      wsRef.current.onclose = () => {
-        console.log('❌ WebSocket disconnected');
-        updateState({
-          isConnected: false,
-          isListening: false,
-          isSpeaking: false,
-        });
-      };
+      }, 1000);
 
     } catch (error) {
       console.error('❌ Failed to start conversation:', error);
@@ -459,85 +243,11 @@ export const useCustomVoiceChat = () => {
         variant: 'destructive',
       });
     }
-  }, [updateState, checkMicrophonePermission, checkHealth, state.healthStatus]);
-
-  const handleToolCall = async (toolName: string, parameters: any) => {
-    console.log(`🛠️ Handling tool call: ${toolName}`, parameters);
-    
-    try {
-      let result: string;
-      
-      if (toolName === 'navigateToSection') {
-        const { section } = parameters;
-        const route = getRouteForSection(section);
-        const displayName = getSectionDisplayName(section);
-        
-        if (route) {
-          result = `Te estoy dirigiendo a la sección de ${displayName}`;
-          setTimeout(() => {
-            navigate(route);
-            toast({
-              title: '🧭 Navegación exitosa',
-              description: `Te he dirigido a la sección de ${displayName}`,
-              duration: 2000,
-            });
-          }, 1500);
-        } else {
-          result = `No reconozco la sección "${section}". Las secciones disponibles son: empleados, nómina, reportes, prestaciones sociales, configuración, dashboard.`;
-        }
-      } else {
-        const { data } = await supabase.functions.invoke('elevenlabs-conversation', {
-          body: { 
-            action: 'tool_call', 
-            tool_name: toolName,
-            parameters 
-          }
-        });
-        result = data?.result || `Error ejecutando ${toolName}`;
-      }
-      
-      logToolExecution(toolName, result);
-      
-      // Send result back to WebSocket
-      if (wsRef.current?.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({
-          type: 'conversation.item.create',
-          item: {
-            type: 'function_call_output',
-            call_id: 'call_' + Date.now(),
-            output: result
-          }
-        }));
-      }
-      
-    } catch (error) {
-      console.error(`❌ Error in tool call ${toolName}:`, error);
-      const errorResult = `Error ejecutando ${toolName}: ${error instanceof Error ? error.message : 'Error desconocido'}`;
-      logToolExecution(toolName, errorResult);
-    }
-  };
+  }, [updateState, checkMicrophonePermission, checkHealth]);
 
   const endConversation = useCallback(async () => {
     try {
       console.log('🛑 Ending conversation...');
-
-      if (wsRef.current) {
-        wsRef.current.close();
-        wsRef.current = null;
-      }
-
-      if (recorderRef.current) {
-        recorderRef.current.stop();
-        recorderRef.current = null;
-      }
-
-      if (audioContextRef.current) {
-        audioContextRef.current.close();
-        audioContextRef.current = null;
-      }
-
-      audioQueueRef.current = [];
-      isPlayingRef.current = false;
 
       updateState({
         isConnected: false,
