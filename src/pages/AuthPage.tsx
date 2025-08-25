@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -96,9 +95,7 @@ const AuthPage = () => {
     try {
       const { error } = await signUp(
         signupForm.email, 
-        signupForm.password, 
-        signupForm.firstName, 
-        signupForm.lastName
+        signupForm.password
       );
       
       if (error) {

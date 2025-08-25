@@ -1,14 +1,8 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, Session } from '@supabase/supabase-js';
+import { User as SupabaseUser, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useRoleManagement } from '@/hooks/useRoleManagement';
-
-interface User {
-  id: string;
-  email: string;
-  name?: string;
-}
 
 interface Profile {
   user_id: string;
@@ -27,7 +21,7 @@ interface UserRole {
 }
 
 interface AuthContextType {
-  user: User | null;
+  user: SupabaseUser | null;
   session: Session | null;
   profile: Profile | null;
   roles: UserRole[];
@@ -60,7 +54,7 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<SupabaseUser | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -75,7 +69,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      setUser(session?.user as User || null);
+      setUser(session?.user || null);
       if (session?.user) {
         fetchProfile(session.user.id);
       } else {
@@ -87,7 +81,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
-        setUser(session?.user as User || null);
+        setUser(session?.user || null);
         if (session?.user) {
           fetchProfile(session.user.id);
         } else {
