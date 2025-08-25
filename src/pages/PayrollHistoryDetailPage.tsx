@@ -24,6 +24,9 @@ import {
   type PayrollHistoryData 
 } from '@/utils/payrollDataTransformer';
 import { useCompanyDetails } from '@/hooks/useCompanyDetails';
+import { ConfigurationService } from '@/services/ConfigurationService';
+import { NovedadesEnhancedService } from '@/services/NovedadesEnhancedService';
+import { PayrollNovedad } from '@/types/novedades-enhanced';
 
 interface PeriodDetail {
   id: string;
@@ -36,6 +39,7 @@ interface PeriodDetail {
   total_deducciones: number;
   total_neto: number;
   estado: string;
+  company_id: string; // Added for proper IBC calculation
 }
 
 interface EmployeePayroll {
@@ -47,8 +51,11 @@ interface EmployeePayroll {
   total_deducciones: number;
   neto_pagado: number;
   salario_base: number;
-  ibc?: number;
+  ibc: number; // Will be calculated properly
   dias_trabajados?: number;
+  // Added fields for IBC calculation
+  salud_empleado?: number;
+  pension_empleado?: number;
   completeEmployeeData?: any;
 }
 
@@ -61,6 +68,11 @@ interface PendingNovedad {
   novedadData: CreateNovedadData;
 }
 
+interface NovedadesByEmployee {
+  count: number;
+  items: PayrollNovedad[];
+}
+
 export const PayrollHistoryDetailPage = () => {
   const { periodId } = useParams<{ periodId: string }>();
   const navigate = useNavigate();
@@ -68,6 +80,7 @@ export const PayrollHistoryDetailPage = () => {
   
   const [period, setPeriod] = useState<PeriodDetail | null>(null);
   const [employees, setEmployees] = useState<EmployeePayroll[]>([]);
+  const [novedadesByEmployee, setNovedadesByEmployee] = useState<Record<string, NovedadesByEmployee>>({});
   
   const [loading, setLoading] = useState(true);
   const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
@@ -93,6 +106,26 @@ export const PayrollHistoryDetailPage = () => {
   // Hook para obtener datos completos de la empresa
   const { companyDetails } = useCompanyDetails();
 
+  // Function to calculate IBC from saved deductions
+  const calculateIBCFromDeductions = async (salud_empleado: number, pension_empleado: number, salario_base: number, fechaInicio: string) => {
+    try {
+      const year = new Date(fechaInicio).getFullYear().toString();
+      const config = await ConfigurationService.getConfigurationAsync(year);
+      
+      if (salud_empleado > 0) {
+        return Math.round(salud_empleado / config.porcentajes.saludEmpleado);
+      } else if (pension_empleado > 0) {
+        return Math.round(pension_empleado / config.porcentajes.pensionEmpleado);
+      }
+      
+      // Fallback to salary base if no saved deductions
+      return salario_base;
+    } catch (error) {
+      console.error('Error calculating IBC:', error);
+      return salario_base; // Fallback
+    }
+  };
+
   const loadPeriodDetail = async () => {
     if (!periodId) return;
     
@@ -107,7 +140,17 @@ export const PayrollHistoryDetailPage = () => {
         .single();
       
       if (periodError) throw periodError;
-      setPeriod(periodData);
+      
+      const periodDetail: PeriodDetail = {
+        ...periodData,
+        company_id: periodData.company_id
+      };
+      setPeriod(periodDetail);
+      
+      // Set company ID for configuration loading
+      if (periodData.company_id && !companyId) {
+        setCompanyId(periodData.company_id);
+      }
 
       // Load employees payroll data with complete employee information
       const { data: payrollData, error: payrollError } = await supabase
@@ -136,37 +179,77 @@ export const PayrollHistoryDetailPage = () => {
       
       if (payrollError) throw payrollError;
       
-      const employeesWithNames = payrollData?.map(p => ({
-        id: p.id,
-        employee_id: p.employee_id,
-        employee_name: p.employees.nombre,
-        employee_lastname: p.employees.apellido,
-        total_devengado: p.total_devengado || 0,
-        total_deducciones: p.total_deducciones || 0,
-        neto_pagado: p.neto_pagado || 0,
-        salario_base: p.salario_base || 0,
-        ibc: p.salario_base || 0,
-        dias_trabajados: p.dias_trabajados || 30,
-        // Campos específicos de payrolls para conceptos exactos
-        auxilio_transporte: p.auxilio_transporte || 0,
-        salud_empleado: p.salud_empleado || 0,
-        pension_empleado: p.pension_empleado || 0,
-        horas_extra: p.horas_extra || 0,
-        bonificaciones: p.bonificaciones || 0,
-        comisiones: p.comisiones || 0,
-        cesantias: p.cesantias || 0,
-        prima: p.prima || 0,
-        vacaciones: p.vacaciones || 0,
-        incapacidades: p.incapacidades || 0,
-        otros_devengos: p.otros_devengos || 0,
-        otros_descuentos: p.descuentos_varios || 0,
-        retencion_fuente: p.retencion_fuente || 0,
-        // Complete employee data for voucher
-        completeEmployeeData: p.employees
-      })) || [];
+      // Calculate IBC for each employee
+      const employeesWithCorrectIBC = await Promise.all(
+        (payrollData || []).map(async (p) => {
+          const calculatedIBC = await calculateIBCFromDeductions(
+            p.salud_empleado || 0,
+            p.pension_empleado || 0,
+            p.salario_base || 0,
+            periodDetail.fecha_inicio
+          );
+          
+          return {
+            id: p.id,
+            employee_id: p.employee_id,
+            employee_name: p.employees.nombre,
+            employee_lastname: p.employees.apellido,
+            total_devengado: p.total_devengado || 0,
+            total_deducciones: p.total_deducciones || 0,
+            neto_pagado: p.neto_pagado || 0,
+            salario_base: p.salario_base || 0,
+            ibc: calculatedIBC, // Correctly calculated IBC
+            dias_trabajados: p.dias_trabajados || 30,
+            salud_empleado: p.salud_empleado || 0,
+            pension_empleado: p.pension_empleado || 0,
+            // Campos específicos de payrolls para conceptos exactos
+            auxilio_transporte: p.auxilio_transporte || 0,
+            horas_extra: p.horas_extra || 0,
+            bonificaciones: p.bonificaciones || 0,
+            comisiones: p.comisiones || 0,
+            cesantias: p.cesantias || 0,
+            prima: p.prima || 0,
+            vacaciones: p.vacaciones || 0,
+            incapacidades: p.incapacidades || 0,
+            otros_devengos: p.otros_devengos || 0,
+            otros_descuentos: p.descuentos_varios || 0,
+            retencion_fuente: p.retencion_fuente || 0,
+            // Complete employee data for voucher
+            completeEmployeeData: p.employees
+          };
+        })
+      );
       
-      setEmployees(employeesWithNames);
+      setEmployees(employeesWithCorrectIBC);
 
+      // Load novedades for the period
+      if (periodDetail.company_id) {
+        try {
+          const novedades = await NovedadesEnhancedService.getNovedades(periodDetail.company_id, periodId);
+          
+          // Group novedades by employee_id
+          const novedadesMap: Record<string, NovedadesByEmployee> = {};
+          
+          novedades.forEach(novedad => {
+            if (!novedadesMap[novedad.empleado_id]) {
+              novedadesMap[novedad.empleado_id] = {
+                count: 0,
+                items: []
+              };
+            }
+            novedadesMap[novedad.empleado_id].count++;
+            novedadesMap[novedad.empleado_id].items.push(novedad);
+          });
+          
+          setNovedadesByEmployee(novedadesMap);
+          
+          console.log('✅ Loaded novedades for period:', novedades.length, 'grouped by employee:', Object.keys(novedadesMap).length);
+        } catch (error) {
+          console.error('Error loading novedades:', error);
+          // Don't fail the entire load, just set empty novedades
+          setNovedadesByEmployee({});
+        }
+      }
       
     } catch (error) {
       console.error('Error loading period detail:', error);
@@ -744,6 +827,7 @@ export const PayrollHistoryDetailPage = () => {
                       const preview = calculateEmployeePreview(employee);
                       const isSendingEmail = sendingEmails.has(employee.employee_id);
                       const hasEmail = !!employee.completeEmployeeData?.email;
+                      const employeeNovedades = novedadesByEmployee[employee.employee_id] || { count: 0, items: [] };
                       
                       return (
                         <TableRow key={employee.id}>
@@ -764,11 +848,18 @@ export const PayrollHistoryDetailPage = () => {
                               </Badge>
                             )}
                           </TableCell>
-                          <TableCell className="font-medium">
+                          <TableCell className="font-medium text-right">
                             {formatCurrency(employee.salario_base)}
                           </TableCell>
-                          <TableCell className="font-medium">
-                            {formatCurrency(employee.ibc || employee.salario_base)}
+                          <TableCell className="font-medium text-right">
+                            <div className="flex flex-col items-end">
+                              <span>{formatCurrency(employee.ibc)}</span>
+                              {employee.ibc === employee.salario_base && (employee.salud_empleado === 0 && employee.pension_empleado === 0) && (
+                                <span className="text-xs text-muted-foreground" title="IBC estimado - sin deducciones guardadas">
+                                  (estimado)
+                                </span>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell className="text-center font-medium">
                             {employee.dias_trabajados || (period?.tipo_periodo === 'quincenal' ? 15 : 30)}
@@ -823,11 +914,13 @@ export const PayrollHistoryDetailPage = () => {
                               >
                                 <Plus className="h-4 w-4" />
                               </Button>
-                              {preview.pendingCount > 0 && (
-                                <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                                  {preview.pendingCount}
-                                </Badge>
-                              )}
+                              {/* Show real novedades count + pending count */}
+                              <Badge 
+                                variant={employeeNovedades.count > 0 ? "default" : "secondary"} 
+                                className={employeeNovedades.count > 0 ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-600"}
+                              >
+                                {employeeNovedades.count + preview.pendingCount}
+                              </Badge>
                             </div>
                           </TableCell>
                           <TableCell className="bg-blue-100 text-right">
