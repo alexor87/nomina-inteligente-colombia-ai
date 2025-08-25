@@ -6,6 +6,7 @@ import Header from './Header';
 import { useAuth } from '@/contexts/AuthContext';
 import { LoadingWithTimeout } from '@/components/ui/LoadingWithTimeout';
 import { VoiceAgentProvider } from '@/contexts/VoiceAgentContext';
+import { FloatingVoiceAgent } from '@/components/voice/FloatingVoiceAgent';
 
 export const Layout = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -49,9 +50,8 @@ export const Layout = () => {
           </div>
         </main>
 
-        {/* Floating Voice Agent - Temporarily disabled to fix forwardRef error
+        {/* Floating Voice Agent - Now re-enabled with custom hook only */}
         <FloatingVoiceAgent />
-        */}
       </div>
     </VoiceAgentProvider>
   );
