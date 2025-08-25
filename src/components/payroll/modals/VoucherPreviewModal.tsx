@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { CustomModal, CustomModalHeader, CustomModalTitle } from '@/components/ui/custom-modal';
 import { Button } from '@/components/ui/button';
@@ -222,14 +223,23 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
     }
   };
 
-  // Synchronized calculations with PDF generator
+  // Use actual historical values from the liquidated data
   const salarioBase = Number(employee.baseSalary) || 0;
   const diasTrabajados = Number(employee.workedDays) || 30;
   const salarioNeto = Number(employee.netPay) || 0;
-  const deducciones = Number(employee.deductions) || 0;
+  const totalDeducciones = Number(employee.deductions) || 0;
   const horasExtra = Number(employee.extraHours) || 0;
   const bonificaciones = Number(employee.bonuses) || 0;
   const subsidioTransporte = Number(employee.transportAllowance) || 0;
+  
+  // Use actual historical deduction values instead of calculating with fixed percentages
+  const saludEmpleado = Number(employee.healthDeduction) || 0;
+  const pensionEmpleado = Number(employee.pensionDeduction) || 0;
+  
+  // Calculate actual percentages based on historical data (for display purposes)
+  const ibc = Number(employee.ibc) || salarioBase;
+  const saludPorcentaje = ibc > 0 ? (saludEmpleado / ibc * 100).toFixed(1) : '4.0';
+  const pensionPorcentaje = ibc > 0 ? (pensionEmpleado / ibc * 100).toFixed(1) : '4.0';
   
   // Proportional salary calculation (same as PDF)
   const salarioProporcional = Math.round((salarioBase * diasTrabajados) / 30);
@@ -237,11 +247,6 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
   // Extra hours calculation (same as PDF)
   const valorHoraExtra = Math.round((salarioBase / 240) * 1.25);
   const totalHorasExtra = horasExtra > 0 ? horasExtra * valorHoraExtra : 0;
-  
-  // Deductions calculation (same as PDF)
-  const saludEmpleado = Math.round(salarioBase * 0.04);
-  const pensionEmpleado = Math.round(salarioBase * 0.04);
-  const totalDeduccionesCalculadas = saludEmpleado + pensionEmpleado;
 
   return (
     <CustomModal 
@@ -254,11 +259,11 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
       <CustomModalHeader>
         <CustomModalTitle className="flex items-center gap-2">
           <FileText className="h-5 w-5" />
-          Vista Previa - Comprobante de Nómina (Generador Nativo)
+          Vista Previa - Comprobante de Nómina (Valores Históricos Reales)
         </CustomModalTitle>
       </CustomModalHeader>
 
-      {/* Preview con el mismo diseño profesional que el PDF */}
+      {/* Preview con valores históricos reales */}
       <div className="bg-white p-8 space-y-6" style={{ fontFamily: '"Open Sans", sans-serif' }}>
         
         <h1 className="text-2xl font-semibold text-center text-blue-800 mb-8">
@@ -331,7 +336,7 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
 
         <div className="space-y-3">
           <h2 className="text-lg font-semibold text-blue-800 border-b-2 border-gray-200 pb-2">
-            💵 Resumen del Pago (Generador Nativo)
+            💵 Resumen del Pago (Valores Históricos Reales)
           </h2>
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
             <table className="w-full">
@@ -374,7 +379,7 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
                 )}
                 <tr className="bg-red-50">
                   <td className="px-4 py-3 text-sm font-semibold text-red-700">Total Deducciones</td>
-                  <td className="px-4 py-3 text-sm font-semibold text-red-700 text-right">-{formatCurrency(deducciones)}</td>
+                  <td className="px-4 py-3 text-sm font-semibold text-red-700 text-right">-{formatCurrency(totalDeducciones)}</td>
                 </tr>
                 <tr className="bg-green-50">
                   <td className="px-4 py-3 text-sm font-semibold text-green-700">NETO A PAGAR</td>
@@ -416,10 +421,10 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
           </div>
         )}
 
-        {employee.deductions > 0 && (
+        {totalDeducciones > 0 && (
           <div className="space-y-3">
             <h2 className="text-lg font-semibold text-blue-800 border-b-2 border-gray-200 pb-2">
-              💸 Retenciones y Deducciones
+              💸 Retenciones y Deducciones (Valores Históricos Reales)
             </h2>
             <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
               <table className="w-full">
@@ -434,20 +439,20 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
                   {saludEmpleado > 0 && (
                     <tr>
                       <td className="px-4 py-3 text-sm text-gray-900">Salud</td>
-                      <td className="px-4 py-3 text-sm text-gray-900 text-center">4%</td>
+                      <td className="px-4 py-3 text-sm text-gray-900 text-center">{saludPorcentaje}%</td>
                       <td className="px-4 py-3 text-sm text-gray-900 text-right">{formatCurrency(saludEmpleado)}</td>
                     </tr>
                   )}
                   {pensionEmpleado > 0 && (
                     <tr>
                       <td className="px-4 py-3 text-sm text-gray-900">Pensión</td>
-                      <td className="px-4 py-3 text-sm text-gray-900 text-center">4%</td>
+                      <td className="px-4 py-3 text-sm text-gray-900 text-center">{pensionPorcentaje}%</td>
                       <td className="px-4 py-3 text-sm text-gray-900 text-right">{formatCurrency(pensionEmpleado)}</td>
                     </tr>
                   )}
                   <tr className="bg-blue-50">
                     <td className="px-4 py-3 text-sm font-semibold text-blue-800" colSpan={2}>Total Retenciones y Deducciones</td>
-                    <td className="px-4 py-3 text-sm font-semibold text-blue-800 text-right">{formatCurrency(employee.deductions)}</td>
+                    <td className="px-4 py-3 text-sm font-semibold text-blue-800 text-right">{formatCurrency(totalDeducciones)}</td>
                   </tr>
                 </tbody>
               </table>
@@ -476,7 +481,7 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
           <div className="text-center text-xs text-gray-600 space-y-1">
             <p>Este documento fue generado con <span className="font-semibold text-blue-800">Finppi</span> – Software de Nómina y Seguridad Social</p>
             <p><a href="https://www.finppi.com" className="text-blue-600 hover:underline">www.finppi.com</a></p>
-            <p className="mt-2">Generado el {new Date().toLocaleString('es-CO')} - <span className="text-green-600 font-semibold">Generador PDF Nativo</span></p>
+            <p className="mt-2">Generado el {new Date().toLocaleString('es-CO')} - <span className="text-green-600 font-semibold">Valores Históricos Reales</span></p>
           </div>
         </div>
       </div>

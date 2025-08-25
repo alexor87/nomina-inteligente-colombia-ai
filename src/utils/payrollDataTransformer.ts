@@ -1,3 +1,4 @@
+
 import { PayrollEmployee } from '@/types/payroll';
 
 // Interface para los datos que vienen del historial (payrolls + employees)
@@ -46,7 +47,7 @@ export interface PayrollHistoryData {
 
 /**
  * Transforma datos del historial de nómina al formato PayrollEmployee
- * que espera el VoucherPreviewModal
+ * que espera el VoucherPreviewModal - AHORA CON VALORES HISTÓRICOS REALES
  */
 export function transformPayrollHistoryToEmployee(
   historyData: PayrollHistoryData
@@ -58,7 +59,7 @@ export function transformPayrollHistoryToEmployee(
     throw new Error(`Datos de empleado incompletos para ID: ${historyData.employee_id}`);
   }
 
-  // Usar valores exactos de la tabla payrolls en lugar de aproximaciones
+  // ✅ USAR VALORES HISTÓRICOS REALES DE LA LIQUIDACIÓN
   const totalDeductions = historyData.total_deducciones || 0;
   const healthDeduction = historyData.salud_empleado || 0;
   const pensionDeduction = historyData.pension_empleado || 0;
@@ -67,6 +68,7 @@ export function transformPayrollHistoryToEmployee(
   const baseSalary = historyData.salario_base || 0;
   const employerContributions = baseSalary * 0.205; // 20.5% aportes patronales
 
+  // ✅ MAPEO COMPLETO CON VALORES HISTÓRICOS REALES
   return {
     id: historyData.employee_id,
     name: `${historyData.employee_name} ${historyData.employee_lastname}`,
@@ -87,8 +89,9 @@ export function transformPayrollHistoryToEmployee(
     transportAllowance: historyData.auxilio_transporte || 0,
     employerContributions,
     ibc: historyData.ibc || historyData.salario_base || 0,
-    healthDeduction,
-    pensionDeduction,
+    // ✅ CRÍTICO: Usar valores históricos reales de deducciones
+    healthDeduction: healthDeduction,
+    pensionDeduction: pensionDeduction,
     // Campos adicionales necesarios para el PDF
     cedula: emp.cedula || '',
     email: emp.email || '',

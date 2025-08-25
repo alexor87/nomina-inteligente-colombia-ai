@@ -1,237 +1,277 @@
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { NovedadesEnhancedService, CreateNovedadData } from '@/services/NovedadesEnhancedService';
+import { PayrollNovedad } from '@/types/novedades-enhanced';
 import { useToast } from '@/hooks/use-toast';
-import { NovedadesCalculationService, NovedadesTotals } from '@/services/NovedadesCalculationService';
-import { NovedadesEnhancedService } from '@/services/NovedadesEnhancedService';
-import { CreateNovedadData } from '@/types/novedades-enhanced';
-import type { Tables } from '@/integrations/supabase/types';
 
-type PayrollNovedad = Tables<'payroll_novedades'>;
-import { supabase } from '@/integrations/supabase/client';
+export interface UsePayrollNovedadesUnifiedOptions {
+  companyId?: string;
+  periodId?: string;
+  employeeId?: string;
+  enabled?: boolean;
+}
 
-export const usePayrollNovedadesUnified = (periodId: string) => {
-  const [novedadesTotals, setNovedadesTotals] = useState<Record<string, NovedadesTotals>>({});
-  const [isLoading, setIsLoading] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
-  const [lastRefreshTime, setLastRefreshTime] = useState<number>(0);
+export interface UsePayrollNovedadesUnifiedReturn {
+  novedades: PayrollNovedad[];
+  isLoading: boolean;
+  error: Error | null;
+  createNovedad: (data: CreateNovedadData) => Promise<PayrollNovedad | null>;
+  updateNovedad: (id: string, data: Partial<CreateNovedadData>) => Promise<PayrollNovedad | null>;
+  deleteNovedad: (id: string) => Promise<void>;
+  isCreating: boolean;
+  isUpdating: boolean;
+  isDeleting: boolean;
+  refetch: () => void;
+}
+
+// Helper function to transform PayrollNovedad to the expected format
+const transformNovedadForQuery = (novedad: PayrollNovedad) => ({
+  adjunto_url: novedad.adjunto_url || '',
+  base_calculo: novedad.base_calculo ? JSON.stringify(novedad.base_calculo) : '',
+  company_id: novedad.company_id,
+  constitutivo_salario: novedad.constitutivo_salario || false,
+  creado_por: novedad.creado_por || '',
+  created_at: novedad.created_at,
+  dias: novedad.dias || 0,
+  empleado_id: novedad.empleado_id,
+  fecha_fin: novedad.fecha_fin || '',
+  fecha_inicio: novedad.fecha_inicio || '',
+  horas: novedad.horas || 0,
+  id: novedad.id,
+  observacion: novedad.observacion || '',
+  periodo_id: novedad.periodo_id,
+  subtipo: novedad.subtipo || '',
+  tipo_novedad: novedad.tipo_novedad,
+  updated_at: novedad.updated_at,
+  valor: novedad.valor
+});
+
+/**
+ * ✅ HOOK UNIFICADO - FASE 3 CRÍTICA
+ * Hook consolidado para manejar todas las operaciones de novedades
+ * Funciona tanto para empresa+período como para empleado específico
+ */
+export const usePayrollNovedadesUnified = ({
+  companyId,
+  periodId,
+  employeeId,
+  enabled = true
+}: UsePayrollNovedadesUnifiedOptions): UsePayrollNovedadesUnifiedReturn => {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [isCreating, setIsCreating] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  // Actualizar totales para un empleado específico
-  const refreshEmployeeNovedades = useCallback(async (employeeId: string) => {
-    if (!periodId) return;
-    
-    console.log('🔄 Actualizando novedades para empleado:', employeeId);
-    try {
-      const totals = await NovedadesCalculationService.calculateEmployeeNovedadesTotals(employeeId, periodId);
-      setNovedadesTotals(prev => ({
-        ...prev,
-        [employeeId]: totals
-      }));
-      setLastRefreshTime(Date.now());
-      console.log('✅ Novedades actualizadas para empleado:', employeeId, totals);
-    } catch (error) {
-      console.error('❌ Error actualizando novedades de empleado:', error);
-    }
-  }, [periodId]);
+  // Determinar la key y función de fetch según los parámetros
+  const queryKey = employeeId 
+    ? ['novedades', 'employee', employeeId, periodId]
+    : ['novedades', 'company', companyId, periodId];
 
-  // Cargar totales de novedades para empleados específicos
-  const loadNovedadesTotals = useCallback(async (employeeIds: string[]) => {
-    if (!periodId || employeeIds.length === 0) return;
-    
-    setIsLoading(true);
-    try {
-      console.log('🔄 Cargando totales de novedades para empleados:', employeeIds, 'período:', periodId);
-      const totals = await NovedadesCalculationService.calculateAllEmployeesNovedadesTotals(employeeIds, periodId);
-      setNovedadesTotals(totals);
-      console.log('✅ Totales de novedades cargados:', totals);
-    } catch (error) {
-      console.error('❌ Error cargando totales de novedades:', error);
-      setNovedadesTotals({});
-    } finally {
-      setIsLoading(false);
-    }
-  }, [periodId]);
+  const fetchFunction = employeeId 
+    ? () => NovedadesEnhancedService.getNovedadesByEmployee(employeeId, periodId!)
+    : () => NovedadesEnhancedService.getNovedades(companyId!, periodId!);
 
-  // Crear múltiples novedades de una vez
-  const createMultipleNovedades = useCallback(async (novedadesArray: CreateNovedadData[]): Promise<PayrollNovedad[]> => {
-    if (!periodId) {
+  // Query principal
+  const {
+    data: novedades = [],
+    isLoading,
+    error,
+    refetch: queryRefetch
+  } = useQuery({
+    queryKey,
+    queryFn: fetchFunction,
+    enabled: enabled && ((companyId && periodId) || (employeeId && periodId)),
+    staleTime: 30000, // 30 segundos
+    gcTime: 300000, // 5 minutos
+    retry: 2,
+    refetchOnWindowFocus: false
+  });
+
+  // Mutation para crear novedad
+  const createMutation = useMutation({
+    mutationFn: async (data: CreateNovedadData) => {
+      setIsCreating(true);
+      console.log('🔄 Creando novedad:', data);
+      
+      const result = await NovedadesEnhancedService.createNovedad(data);
+      
+      if (!result) {
+        throw new Error('No se pudo crear la novedad');
+      }
+      
+      return result;
+    },
+    onSuccess: (newNovedad) => {
+      console.log('✅ Novedad creada exitosamente:', newNovedad);
+      
+      // Transform the novedad for cache update
+      const transformedNovedad = transformNovedadForQuery(newNovedad);
+      
+      // Invalidar y actualizar cache
+      queryClient.setQueryData(queryKey, (old: typeof transformedNovedad[] = []) => {
+        return [...old, transformedNovedad];
+      });
+      
+      queryClient.invalidateQueries({ 
+        queryKey: ['novedades'],
+        exact: false 
+      });
+      
+      toast({
+        title: "✅ Novedad creada",
+        description: "La novedad se ha creado correctamente",
+        className: "border-green-200 bg-green-50"
+      });
+    },
+    onError: (error: Error) => {
+      console.error('❌ Error creando novedad:', error);
       toast({
         title: "❌ Error",
-        description: "No hay período activo",
+        description: error.message || "Error creando la novedad",
         variant: "destructive"
       });
-      return [];
-    }
-
-    setIsCreating(true);
-    const createdNovedades: PayrollNovedad[] = [];
-    
-    try {
-      console.log(`🚀 Creating ${novedadesArray.length} novelties`);
-      
-      // Get company_id if not provided
-      let companyId = novedadesArray[0]?.company_id;
-      if (!companyId) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('company_id')
-            .eq('user_id', user.id)
-            .single();
-          companyId = profile?.company_id;
-        }
-      }
-
-      if (!companyId) {
-        throw new Error('No se pudo determinar la empresa');
-      }
-      
-      // Crear cada novedad
-      for (const novedadData of novedadesArray) {
-        const createData: CreateNovedadData = {
-          ...novedadData,
-          periodo_id: periodId,
-          company_id: companyId, // ✅ Ensure company_id is always present
-          valor: Number(novedadData.valor) || 0, // ✅ Ensure valor is always a number
-          horas: novedadData.horas ? Number(novedadData.horas) : undefined,
-          dias: novedadData.dias ? Number(novedadData.dias) : undefined,
-          constitutivo_salario: novedadData.constitutivo_salario || false
-        };
-
-        console.log('💾 Creating novelty:', createData);
-        const result = await NovedadesEnhancedService.createNovedad(createData);
-        
-        if (result) {
-          createdNovedades.push(result);
-          console.log('✅ Novelty created:', result);
-        }
-      }
-
-      if (createdNovedades.length > 0) {
-        // Invalidar cache y recalcular
-        const employeeId = createdNovedades[0].empleado_id;
-        console.log('🔄 Invalidating cache and recalculating totals...');
-        NovedadesCalculationService.invalidateCache(employeeId, periodId);
-        
-        // Wait a bit for DB to propagate, then refresh
-        await new Promise(resolve => setTimeout(resolve, 100));
-        await refreshEmployeeNovedades(employeeId);
-        
-        toast({
-          title: "✅ Novedades creadas",
-          description: `Se crearon ${createdNovedades.length} novedades exitosamente`,
-          className: "border-green-200 bg-green-50"
-        });
-      }
-      
-      return createdNovedades;
-    } catch (error) {
-      console.error('❌ Error creating novelties:', error);
-      
-      let errorMessage = 'No se pudieron crear las novedades';
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-      
-      toast({
-        title: "❌ Error al crear novedades",
-        description: errorMessage,
-        variant: "destructive"
-      });
-      return [];
-    } finally {
+    },
+    onSettled: () => {
       setIsCreating(false);
     }
-  }, [periodId, toast, refreshEmployeeNovedades]);
+  });
 
-  // Crear nueva novedad (single)
-  const createNovedad = useCallback(async (data: CreateNovedadData): Promise<PayrollNovedad | null> => {
-    const results = await createMultipleNovedades([data]);
-    return results.length > 0 ? results[0] : null;
-  }, [createMultipleNovedades]);
-
-  // Obtener totales de un empleado específico
-  const getEmployeeNovedades = useCallback((employeeId: string): NovedadesTotals => {
-    const result = novedadesTotals[employeeId] || {
-      totalDevengos: 0,
-      totalDeducciones: 0,
-      totalNeto: 0,
-      hasNovedades: false
-    };
-    return result;
-  }, [novedadesTotals]);
-
-  // Refrescar todos los empleados después de cambios
-  const refreshAllEmployees = useCallback(async (employeeIds: string[]) => {
-    console.log('🔄 Refrescando todos los empleados después de cambios');
-    NovedadesCalculationService.invalidateCache();
-    await loadNovedadesTotals(employeeIds);
-  }, [loadNovedadesTotals]);
-
-  // Obtener novedades existentes para un empleado
-  const getEmployeeNovedadesList = useCallback(async (employeeId: string): Promise<PayrollNovedad[]> => {
-    if (!employeeId || !periodId) return [];
-    
-    try {
-      const novedades = await NovedadesEnhancedService.getNovedadesByEmployee(employeeId, periodId);
-      return novedades;
-    } catch (error) {
-      console.error('❌ Error obteniendo lista de novedades:', error);
-      return [];
-    }
-  }, [periodId]);
-
-  // Eliminar novedad
-  const deleteNovedad = useCallback(async (novedadId: string, employeeId: string) => {
-    try {
-      console.log('🗑️ Eliminando novedad:', novedadId);
-      await NovedadesEnhancedService.deleteNovedad(novedadId);
+  // Mutation para actualizar novedad
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<CreateNovedadData> }) => {
+      setIsUpdating(true);
+      console.log('🔄 Actualizando novedad:', id, data);
       
-      // Invalidar cache and recalcular
-      NovedadesCalculationService.invalidateCache(employeeId, periodId);
-      await refreshEmployeeNovedades(employeeId);
+      const result = await NovedadesEnhancedService.updateNovedad(id, data);
+      
+      if (!result) {
+        throw new Error('No se pudo actualizar la novedad');
+      }
+      
+      return result;
+    },
+    onSuccess: (updatedNovedad) => {
+      console.log('✅ Novedad actualizada exitosamente:', updatedNovedad);
+      
+      // Transform the novedad for cache update
+      const transformedNovedad = transformNovedadForQuery(updatedNovedad);
+      
+      // Actualizar cache local
+      queryClient.setQueryData(queryKey, (old: typeof transformedNovedad[] = []) => {
+        return old.map(item => 
+          item.id === updatedNovedad.id ? transformedNovedad : item
+        );
+      });
+      
+      queryClient.invalidateQueries({ 
+        queryKey: ['novedades'],
+        exact: false 
+      });
+      
+      toast({
+        title: "✅ Novedad actualizada",
+        description: "La novedad se ha actualizado correctamente",
+        className: "border-green-200 bg-green-50"
+      });
+    },
+    onError: (error: Error) => {
+      console.error('❌ Error actualizando novedad:', error);
+      toast({
+        title: "❌ Error",
+        description: error.message || "Error actualizando la novedad",
+        variant: "destructive"
+      });
+    },
+    onSettled: () => {
+      setIsUpdating(false);
+    }
+  });
+
+  // Mutation para eliminar novedad
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      setIsDeleting(true);
+      console.log('🔄 Eliminando novedad:', id);
+      
+      await NovedadesEnhancedService.deleteNovedad(id);
+      return id;
+    },
+    onSuccess: (deletedId) => {
+      console.log('✅ Novedad eliminada exitosamente:', deletedId);
+      
+      // Actualizar cache local
+      queryClient.setQueryData(queryKey, (old: any[] = []) => {
+        return old.filter(item => item.id !== deletedId);
+      });
+      
+      queryClient.invalidateQueries({ 
+        queryKey: ['novedades'],
+        exact: false 
+      });
       
       toast({
         title: "✅ Novedad eliminada",
-        description: "La novedad se eliminó correctamente",
-        className: "border-orange-200 bg-orange-50"
+        description: "La novedad se ha eliminado correctamente",
+        className: "border-green-200 bg-green-50"
       });
-    } catch (error) {
+    },
+    onError: (error: Error) => {
       console.error('❌ Error eliminando novedad:', error);
       toast({
         title: "❌ Error",
-        description: "No se pudo eliminar la novedad",
+        description: error.message || "Error eliminando la novedad",
         variant: "destructive"
       });
+    },
+    onSettled: () => {
+      setIsDeleting(false);
     }
-  }, [periodId, refreshEmployeeNovedades, toast]);
+  });
 
-  // Reset cuando cambie el período
-  useEffect(() => {
-    if (periodId) {
-      console.log('🔄 Período cambió, limpiando estado:', periodId);
-      setNovedadesTotals({});
-      NovedadesCalculationService.invalidateCache();
-      setLastRefreshTime(Date.now());
+  // Funciones wrapper para las mutations
+  const createNovedad = async (data: CreateNovedadData): Promise<PayrollNovedad | null> => {
+    try {
+      return await createMutation.mutateAsync(data);
+    } catch (error) {
+      console.error('Error en createNovedad:', error);
+      return null;
     }
-  }, [periodId]);
+  };
+
+  const updateNovedad = async (id: string, data: Partial<CreateNovedadData>): Promise<PayrollNovedad | null> => {
+    try {
+      return await updateMutation.mutateAsync({ id, data });
+    } catch (error) {
+      console.error('Error en updateNovedad:', error);
+      return null;
+    }
+  };
+
+  const deleteNovedad = async (id: string): Promise<void> => {
+    try {
+      await deleteMutation.mutateAsync(id);
+    } catch (error) {
+      console.error('Error en deleteNovedad:', error);
+      throw error;
+    }
+  };
+
+  const refetch = () => {
+    queryRefetch();
+  };
 
   return {
-    // Estados
-    novedadesTotals,
+    novedades,
     isLoading,
-    isCreating,
-    lastRefreshTime,
-    
-    // Métodos principales
-    loadNovedadesTotals,
+    error: error as Error | null,
     createNovedad,
-    createMultipleNovedades,
-    refreshEmployeeNovedades,
-    getEmployeeNovedades,
-    refreshAllEmployees,
-    getEmployeeNovedadesList,
-    deleteNovedad
+    updateNovedad,
+    deleteNovedad,
+    isCreating,
+    isUpdating,
+    isDeleting,
+    refetch
   };
 };
