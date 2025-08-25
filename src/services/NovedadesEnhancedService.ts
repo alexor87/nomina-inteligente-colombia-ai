@@ -1,10 +1,11 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { Database, Tables } from '@/integrations/supabase/types';
-import { NOVEDAD_CATEGORIES } from '@/types/novedades-enhanced';
+import { NOVEDAD_CATEGORIES, PayrollNovedad as AppPayrollNovedad, BaseCalculoData } from '@/types/novedades-enhanced';
 
 // ✅ USAR TIPO DIRECTO DE LA BASE DE DATOS
 type DatabaseNovedadType = Database['public']['Enums']['novedad_type'] | 'deduccion_especial';
-type PayrollNovedad = Tables<'payroll_novedades'>;
+type DbNovedadRow = Tables<'payroll_novedades'>;
 
 export interface CreateNovedadData {
   empleado_id: string;
@@ -29,6 +30,42 @@ const getDefaultConstitutivoByType = (tipo: DatabaseNovedadType): boolean => {
   return cfg?.constitutivo_default ?? false;
 };
 
+// ✅ Helpers de mapeo/parsing KISS
+const parseBaseCalculo = (bc: unknown): BaseCalculoData | undefined => {
+  if (!bc) return undefined;
+  if (typeof bc === 'string') {
+    try {
+      return JSON.parse(bc);
+    } catch (e) {
+      console.warn('⚠️ base_calculo con JSON inválido, se ignora:', e);
+      return undefined;
+    }
+  }
+  return bc as BaseCalculoData;
+};
+
+const mapDbRowToApp = (n: any): AppPayrollNovedad => {
+  return {
+    id: n.id,
+    company_id: n.company_id,
+    empleado_id: n.empleado_id,
+    periodo_id: n.periodo_id,
+    tipo_novedad: n.tipo_novedad,
+    subtipo: n.subtipo || undefined,
+    fecha_inicio: n.fecha_inicio || undefined,
+    fecha_fin: n.fecha_fin || undefined,
+    dias: typeof n.dias === 'number' ? n.dias : n.dias ?? undefined,
+    horas: typeof n.horas === 'number' ? n.horas : n.horas ?? undefined,
+    valor: Number(n.valor || 0),
+    base_calculo: parseBaseCalculo(n.base_calculo),
+    observacion: n.observacion || undefined,
+    adjunto_url: n.adjunto_url || undefined,
+    creado_por: n.creado_por || undefined,
+    created_at: n.created_at,
+    updated_at: n.updated_at,
+  };
+};
+
 /**
  * ✅ SERVICIO DE NOVEDADES REPARADO - FASE 3 CRÍTICA
  * Implementación real para conectar con base de datos
@@ -36,7 +73,7 @@ const getDefaultConstitutivoByType = (tipo: DatabaseNovedadType): boolean => {
 export class NovedadesEnhancedService {
   
   // ✅ NUEVO: Método para obtener novedades por empresa y período
-  static async getNovedades(companyId: string, periodId: string): Promise<PayrollNovedad[]> {
+  static async getNovedades(companyId: string, periodId: string): Promise<AppPayrollNovedad[]> {
     try {
       console.log(`🔍 Obteniendo novedades para empresa ${companyId} en período ${periodId}`);
       
@@ -56,7 +93,7 @@ export class NovedadesEnhancedService {
         .filter(n => {
           const shouldBeTrue = getDefaultConstitutivoByType(n.tipo_novedad as DatabaseNovedadType);
           const isHEoRecargo = n.tipo_novedad === 'horas_extra' || n.tipo_novedad === 'recargo_nocturno';
-          const explicitFalse = n.constitutivo_salario === false;
+          const explicitFalse = (n as any).constitutivo_salario === false;
           return isHEoRecargo && shouldBeTrue && explicitFalse;
         })
         .map(n => n.id as unknown as string);
@@ -74,7 +111,7 @@ export class NovedadesEnhancedService {
           // Reflejar el cambio en memoria
           (novedades || []).forEach(n => {
             if (toFixIds.includes(n.id as unknown as string)) {
-              n.constitutivo_salario = true;
+              (n as any).constitutivo_salario = true;
             }
           });
           console.log('✅ Auto-fix aplicado en constitutividad (horas extra / recargos = TRUE)');
@@ -82,7 +119,8 @@ export class NovedadesEnhancedService {
       }
 
       console.log(`✅ Novedades encontradas: ${novedades?.length || 0}`);
-      return (novedades || []);
+      // ✅ Mapeo a tipo de la app con base_calculo parseado
+      return (novedades || []).map(mapDbRowToApp);
       
     } catch (error) {
       console.error('💥 Error crítico en getNovedades:', error);
@@ -90,7 +128,7 @@ export class NovedadesEnhancedService {
     }
   }
   
-  static async getNovedadesByEmployee(employeeId: string, periodId: string): Promise<PayrollNovedad[]> {
+  static async getNovedadesByEmployee(employeeId: string, periodId: string): Promise<AppPayrollNovedad[]> {
     try {
       console.log(`🔍 Obteniendo novedades para empleado ${employeeId} en período ${periodId}`);
       
@@ -110,7 +148,7 @@ export class NovedadesEnhancedService {
         .filter(n => {
           const shouldBeTrue = getDefaultConstitutivoByType(n.tipo_novedad as DatabaseNovedadType);
           const isHEoRecargo = n.tipo_novedad === 'horas_extra' || n.tipo_novedad === 'recargo_nocturno';
-          const explicitFalse = n.constitutivo_salario === false;
+          const explicitFalse = (n as any).constitutivo_salario === false;
           return isHEoRecargo && shouldBeTrue && explicitFalse;
         })
         .map(n => n.id as unknown as string);
@@ -127,7 +165,7 @@ export class NovedadesEnhancedService {
         } else {
           (novedades || []).forEach(n => {
             if (toFixIds.includes(n.id as unknown as string)) {
-              n.constitutivo_salario = true;
+              (n as any).constitutivo_salario = true;
             }
           });
           console.log('✅ Auto-fix aplicado (empleado) en constitutividad');
@@ -135,7 +173,8 @@ export class NovedadesEnhancedService {
       }
 
       console.log(`✅ Novedades encontradas: ${novedades?.length || 0}`);
-      return (novedades || []) as PayrollNovedad[];
+      // ✅ Mapeo a tipo de la app con base_calculo parseado
+      return (novedades || []).map(mapDbRowToApp);
       
     } catch (error) {
       console.error('💥 Error crítico en getNovedadesByEmployee:', error);
@@ -143,7 +182,7 @@ export class NovedadesEnhancedService {
     }
   }
 
-  static async createNovedad(novedadData: CreateNovedadData): Promise<PayrollNovedad | null> {
+  static async createNovedad(novedadData: CreateNovedadData): Promise<AppPayrollNovedad | null> {
     try {
       console.log('➕ Creando nueva novedad:', novedadData);
       
@@ -217,7 +256,7 @@ export class NovedadesEnhancedService {
       }
 
       console.log('✅ Novedad creada exitosamente');
-      return novedad as PayrollNovedad;
+      return mapDbRowToApp(novedad);
       
     } catch (error) {
       console.error('💥 Error crítico creando novedad:', error);
@@ -225,7 +264,7 @@ export class NovedadesEnhancedService {
     }
   }
 
-  static async updateNovedad(novedadId: string, updates: Partial<CreateNovedadData>): Promise<PayrollNovedad | null> {
+  static async updateNovedad(novedadId: string, updates: Partial<CreateNovedadData>): Promise<AppPayrollNovedad | null> {
     try {
       console.log(`🔄 Actualizando novedad ${novedadId}:`, updates);
       
@@ -242,7 +281,7 @@ export class NovedadesEnhancedService {
       }
 
       console.log('✅ Novedad actualizada exitosamente');
-      return novedad as PayrollNovedad;
+      return mapDbRowToApp(novedad);
       
     } catch (error) {
       console.error('💥 Error crítico actualizando novedad:', error);
@@ -272,3 +311,4 @@ export class NovedadesEnhancedService {
     }
   }
 }
+
