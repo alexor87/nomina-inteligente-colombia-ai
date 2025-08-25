@@ -17,6 +17,8 @@ export default defineConfig(({ command }) => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      // Ensure any accidental import of '@elevenlabs/react' resolves to a harmless shim
+      "@elevenlabs/react": path.resolve(__dirname, "./src/shims/empty.ts"),
     },
   },
   build: {
