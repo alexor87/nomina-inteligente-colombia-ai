@@ -1,87 +1,81 @@
 
 import React from 'react';
-import { Dashboard } from '@/components/dashboard/Dashboard';
-import { useSubscription } from '@/contexts/SubscriptionContext';
-import { LoadingWithTimeout } from '@/components/ui/LoadingWithTimeout';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
-import { RefreshCw, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Users, DollarSign, Calendar, FileText } from 'lucide-react';
 
 const DashboardPage = () => {
-  const { subscription, loading, error, refreshSubscription } = useSubscription();
-
-  // Show loading state with timeout while subscription is loading
-  if (loading) {
-    return (
-      <LoadingWithTimeout 
-        message="Cargando configuración de suscripción..."
-        timeout={7}
-        redirectTo="/error"
-      />
-    );
-  }
-
-  // Show error state with retry option
-  if (error && !subscription) {
-    return (
-      <div className="flex items-center justify-center min-h-screen p-4 bg-gray-50">
-        <div className="max-w-md w-full">
-          <Alert variant="destructive" className="mb-4">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>
-              {error}
-            </AlertDescription>
-          </Alert>
-          <Button 
-            onClick={refreshSubscription}
-            className="w-full"
-            variant="outline"
-          >
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Reintentar Carga
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  // Show warning if using fallback subscription
-  const showFallbackWarning = error && subscription && subscription.id.includes('fallback');
-
   return (
-    <div className="min-h-screen bg-gray-50">
-      {showFallbackWarning && (
-        <div className="p-4">
-          <Alert className="border-yellow-200 bg-yellow-50">
-            <AlertTriangle className="h-4 w-4 text-yellow-600" />
-            <AlertDescription className="text-yellow-800">
-              Usando configuración temporal de suscripción. {error}
-              <Button 
-                onClick={refreshSubscription}
-                size="sm"
-                variant="outline"
-                className="ml-2"
-              >
-                <RefreshCw className="h-3 w-3 mr-1" />
-                Reintentar
-              </Button>
-            </AlertDescription>
-          </Alert>
-        </div>
-      )}
+    <div className="px-6 py-6">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+        <p className="text-gray-600">Resumen general de la plataforma de recursos humanos</p>
+      </div>
       
-      {subscription && !error && (
-        <div className="p-4">
-          <Alert className="border-green-200 bg-green-50 mb-4">
-            <CheckCircle className="h-4 w-4 text-green-600" />
-            <AlertDescription className="text-green-800">
-              Suscripción {subscription.plan_type} activa - {subscription.max_employees} empleados máx.
-            </AlertDescription>
-          </Alert>
-        </div>
-      )}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Empleados</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">0</div>
+            <p className="text-xs text-muted-foreground">Empleados activos</p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Nómina Mensual</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">$0</div>
+            <p className="text-xs text-muted-foreground">Total del mes</p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Vacaciones</CardTitle>
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">0</div>
+            <p className="text-xs text-muted-foreground">Solicitudes pendientes</p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Reportes</CardTitle>
+            <FileText className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">0</div>
+            <p className="text-xs text-muted-foreground">Generados este mes</p>
+          </CardContent>
+        </Card>
+      </div>
       
-      <Dashboard />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Actividad Reciente</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-gray-600">No hay actividad reciente</p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>Próximos Eventos</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-gray-600">No hay eventos próximos</p>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };
