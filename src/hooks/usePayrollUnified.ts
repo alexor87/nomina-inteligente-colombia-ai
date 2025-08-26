@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollEmployee } from '@/types/payroll';
 import { useToast } from '@/hooks/use-toast';
@@ -36,6 +36,9 @@ export const usePayrollUnified = (companyId: string) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isLiquidating, setIsLiquidating] = useState(false);
   const { toast } = useToast();
+
+  // NUEVO: Lock para evitar cargas concurrentes que causan parpadeo/reprocesos
+  const loadingRef = useRef(false);
 
   // Función simple para limpiar duplicados
   const cleanDuplicates = useCallback(async () => {
@@ -154,6 +157,13 @@ export const usePayrollUnified = (companyId: string) => {
 
   // Cargar empleados con integración automática de vacaciones
   const loadEmployees = useCallback(async (startDate: string, endDate: string): Promise<string | undefined> => {
+    // Evitar llamadas concurrentes
+    if (loadingRef.current) {
+      console.log('⏳ loadEmployees ignorado - ya hay una carga en progreso');
+      return;
+    }
+
+    loadingRef.current = true;
     setIsLoading(true);
     let periodId: string | undefined;
     
@@ -168,28 +178,6 @@ export const usePayrollUnified = (companyId: string) => {
       periodId = period.id;
       setCurrentPeriod(period);
 
-      // Procesar vacaciones/ausencias automáticamente al cargar empleados
-      console.log('🏖️ Procesando vacaciones/ausencias automáticamente...');
-      try {
-        const integrationResult = await VacationPayrollIntegrationService.processVacationsForPayroll({
-          periodId: period.id,
-          companyId: companyId,
-          startDate: startDate,
-          endDate: endDate
-        });
-
-        if (integrationResult.success && integrationResult.processedVacations > 0) {
-          toast({
-            title: "✅ Vacaciones integradas",
-            description: `Se procesaron ${integrationResult.processedVacations} ausencias automáticamente`,
-            className: "border-green-200 bg-green-50"
-          });
-        }
-      } catch (integrationError) {
-        console.warn('⚠️ Error en integración de vacaciones:', integrationError);
-        // Continuar sin bloquear la carga de empleados
-      }
-
       // Verificar si el período ya fue inicializado con empleados
       const { data: periodData, error: periodDataError } = await supabase
         .from('payroll_periods_real')
@@ -203,7 +191,7 @@ export const usePayrollUnified = (companyId: string) => {
         return;
       }
 
-      // Query mejorado y más simple para evitar fallos
+      // Query de empleados del período
       const { data: periodEmployees, error: periodError } = await supabase
         .from('payrolls')
         .select('*, employees(*)')
@@ -216,21 +204,19 @@ export const usePayrollUnified = (companyId: string) => {
         return;
       }
 
-      // Logging detallado para debugging
       console.log('📊 Resultado del query de empleados:', {
         periodEmployees: periodEmployees?.length || 0,
         employees_loaded: periodData.employees_loaded,
         period_id: period.id
       });
 
-      // Detectar estado inconsistente: marcado como inicializado pero sin empleados
+      // Detectar estado inconsistente
       const isInconsistentState = periodData.employees_loaded && 
                                  (!periodEmployees || periodEmployees.length === 0);
 
       if (isInconsistentState) {
         console.warn('⚠️ Estado inconsistente detectado: período marcado como inicializado pero sin empleados. Corrigiendo...');
         
-        // Resetear el flag de inicialización
         await supabase
           .from('payroll_periods_real')
           .update({ employees_loaded: false })
@@ -239,6 +225,28 @@ export const usePayrollUnified = (companyId: string) => {
 
       // Crear empleados si NO está inicializado O si hay inconsistencia
       if (!periodData.employees_loaded || isInconsistentState) {
+        // MOVIDO: Integración de vacaciones SOLO en inicialización para evitar reprocesos
+        console.log('🏖️ Procesando vacaciones/ausencias automáticamente (solo en inicialización)...');
+        try {
+          const integrationResult = await VacationPayrollIntegrationService.processVacationsForPayroll({
+            periodId: period.id,
+            companyId: companyId,
+            startDate: startDate,
+            endDate: endDate
+          });
+
+          if (integrationResult.success && integrationResult.processedVacations > 0) {
+            toast({
+              title: "✅ Vacaciones integradas",
+              description: `Se procesaron ${integrationResult.processedVacations} ausencias automáticamente`,
+              className: "border-green-200 bg-green-50"
+            });
+          }
+        } catch (integrationError) {
+          console.warn('⚠️ Error en integración de vacaciones (no bloqueante):', integrationError);
+          // Continuar sin bloquear la carga de empleados
+        }
+
         console.log('🔧 No hay empleados en payrolls, creando desde empleados activos...');
         
         const { data: activeEmployees, error: empError } = await supabase
@@ -282,7 +290,6 @@ export const usePayrollUnified = (companyId: string) => {
 
           console.log('✅ Registros de payroll creados exitosamente');
 
-          // Marcar el período como inicializado y actualizar contador
           await supabase
             .from('payroll_periods_real')
             .update({ 
@@ -293,7 +300,6 @@ export const usePayrollUnified = (companyId: string) => {
 
           console.log('✅ Período marcado como inicializado');
 
-          // Convertir a formato PayrollEmployee
           const employeesList: PayrollEmployee[] = activeEmployees.map(emp => ({
             id: emp.id,
             name: `${emp.nombre} ${emp.apellido}`,
@@ -323,7 +329,7 @@ export const usePayrollUnified = (companyId: string) => {
           setEmployees([]);
         }
       } else {
-        // Si el período YA fue inicializado, solo cargar empleados existentes (respetando eliminaciones)
+        // Si el período YA fue inicializado, solo cargar empleados existentes
         console.log(`✅ Período ya inicializado. Empleados en payrolls: ${periodEmployees?.length || 0}`);
         
         const employeesList: PayrollEmployee[] = (periodEmployees || []).map(payroll => {
@@ -365,9 +371,10 @@ export const usePayrollUnified = (companyId: string) => {
       setEmployees([]);
     } finally {
       setIsLoading(false);
+      loadingRef.current = false;
     }
     
-    return periodId; // ✅ NUEVO: Retornar el periodId para validación automática
+    return periodId; // ✅ Retornar el periodId para validación automática
   }, [companyId, findOrCreatePeriod, toast]);
 
   const addEmployees = useCallback(async (employeeIds: string[]) => {
@@ -697,11 +704,15 @@ export const usePayrollUnified = (companyId: string) => {
 
   const refreshEmployeeNovedades = useCallback(async (employeeId: string) => {
     console.log('🔄 Refrescando novedades para empleado:', employeeId);
-    // Recargar empleados para obtener los datos más actuales
+    // Evitar recarga si ya hay una en curso
+    if (loadingRef.current || isLoading) {
+      console.log('⏳ Saltando refreshEmployeeNovedades: carga en curso');
+      return;
+    }
     if (currentPeriod) {
       await loadEmployees(currentPeriod.fecha_inicio, currentPeriod.fecha_fin);
     }
-  }, [currentPeriod, loadEmployees]);
+  }, [currentPeriod, loadEmployees, isLoading]);
 
   // ✅ NUEVA FUNCIÓN: Persistir cálculos de preliquidación automáticamente
   const updateEmployeeCalculationsInDB = useCallback(async (
