@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -40,9 +41,7 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  // ✅ NUEVO: Formatear tipo de novedad para mostrar correctamente
   const formatTipoNovedad = (tipo: string, subtipo?: string) => {
-    // ✅ MANEJO ESPECÍFICO PARA RECARGOS NOCTURNOS
     if (tipo === 'recargo_nocturno') {
       switch (subtipo) {
         case 'nocturno':
@@ -56,7 +55,6 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
       }
     }
 
-    // ✅ MANTENER FORMATO EXISTENTE PARA OTROS TIPOS
     const tipos: Record<string, string> = {
       'horas_extra': 'Horas Extra',
       'bonificacion': 'Bonificación',
@@ -72,142 +70,37 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
     return subtipo && tipo !== 'recargo_nocturno' ? `${base} (${subtipo})` : base;
   };
 
-  // ✅ NUEVO: Recalcular incapacidades con política antes de mostrar
-  const recalculateIncapacitiesIfNeeded = async (items: DisplayNovedad[]): Promise<DisplayNovedad[]> => {
-    try {
-      // Filtrar ítems de incapacidad
-      const incapItems = items.filter(i => i.tipo_novedad === 'incapacidad' && (i.dias || 0) > 0);
-      if (incapItems.length === 0) {
-        return items;
-      }
-
-      console.log('🔍 Recalculando incapacidades (policy-aware) para', incapItems.length, 'ítems');
-
-      // 1) Obtener fecha de inicio del período (año correcto para SMLV)
-      let periodStart: string | null = null;
-      const { data: periodRow } = await supabase
-        .from('payroll_periods_real')
-        .select('fecha_inicio')
-        .eq('id', periodId)
-        .single();
-      if (periodRow?.fecha_inicio) {
-        periodStart = periodRow.fecha_inicio;
-      }
-      console.log('📅 Period start for calculation:', periodStart);
-
-      // 2) Obtener salarios base de los empleados involucrados
-      const uniqueEmployeeIds = Array.from(new Set(items.map(i => i.empleado_id).filter(Boolean))) as string[];
-      let salaryMap = new Map<string, number>();
-      if (uniqueEmployeeIds.length > 0) {
-        const { data: employeesData, error: empErr } = await supabase
-          .from('employees')
-          .select('id, salario_base')
-          .in('id', uniqueEmployeeIds);
-        if (!empErr && employeesData) {
-          employeesData.forEach((e: any) => salaryMap.set(e.id, Number(e.salario_base || 0)));
-        }
-      }
-      console.log('💰 Salary map size:', salaryMap.size);
-
-      // 3) Recalcular cada incapacidad con la edge function
-      const adjusted = await Promise.all(items.map(async (item) => {
-        if (item.tipo_novedad !== 'incapacidad' || !item.empleado_id) {
-          return item;
-        }
-        const salarioBase = salaryMap.get(item.empleado_id) || 0;
-        const dias = Number(item.dias || 0);
-        if (salarioBase <= 0 || dias <= 0) {
-          return item;
-        }
-
-        try {
-          const { data, error } = await supabase.functions.invoke('payroll-calculations', {
-            body: {
-              action: 'calculate-novedad',
-              data: {
-                tipoNovedad: 'incapacidad',
-                subtipo: item.subtipo,            // 'comun'/'general'/'laboral'
-                salarioBase,
-                dias,
-                fechaPeriodo: periodStart || undefined
-              }
-            }
-          });
-
-          if (error) {
-            console.warn('⚠️ Edge function error (calculate-novedad):', error);
-            return item;
-          }
-          if (data?.success && typeof data.data?.valor === 'number') {
-            const nuevoValor = Number(data.data.valor);
-            // Reemplazar valor mostrado sin cambiar UX
-            const updated: DisplayNovedad = { ...item, valor: nuevoValor };
-            console.log('✅ Ajuste incapacidad:', {
-              empleado: item.empleado_id,
-              subtipo: item.subtipo,
-              dias,
-              old: item.valor,
-              new: nuevoValor
-            });
-            return updated;
-          }
-        } catch (e) {
-          console.error('❌ Error recalculando incapacidad:', e);
-        }
-
-        // Fallback: dejar el valor original
-        return item;
-      }));
-
-      return adjusted;
-    } catch (e) {
-      console.error('❌ Error en recalculateIncapacitiesIfNeeded:', e);
-      return items;
-    }
-  };
-
   const fetchIntegratedData = async () => {
     try {
       setLoading(true);
-      console.log('📋 Cargando datos integrados para empleado:', employeeId, 'período:', periodId);
       const result = await loadIntegratedNovedades(employeeId);
-
-      // ✅ Ajuste KISS: recalcular incapacidades antes de setear el estado
-      const adjusted = await recalculateIncapacitiesIfNeeded(result);
-      setIntegratedData(adjusted);
-
-      console.log('📊 Datos integrados cargados (ajustados):', adjusted.length, 'elementos');
+      setIntegratedData(result);
     } catch (error) {
-      console.error('❌ Error cargando datos integrados:', error);
+      console.error('Error cargando datos integrados:', error);
       toast({
         title: "Error",
         description: "No se pudieron cargar los datos integrados",
         variant: "destructive",
       });
-      // Fallback en error: no romper UI
       setIntegratedData([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // Cargar datos al montar y cuando cambien los parámetros
   useEffect(() => {
     if (employeeId && periodId) {
       fetchIntegratedData();
     }
   }, [employeeId, periodId]);
 
-  // Refrescar cuando cambie refreshTrigger
   useEffect(() => {
     if (refreshTrigger && employeeId && periodId) {
-      console.log('🔄 RefreshTrigger activado, recargando datos integrados...');
       fetchIntegratedData();
     }
   }, [refreshTrigger]);
 
   const handleEditNovedad = (item: DisplayNovedad) => {
-    console.log('✏️ Editando novedad:', item);
     toast({
       title: "Funcionalidad en desarrollo",
       description: "La edición de novedades estará disponible próximamente",
@@ -216,8 +109,6 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
 
   const handleViewVacationDetail = async (item: DisplayNovedad) => {
     try {
-      console.log('👁️ Viendo detalles de vacación:', item);
-      
       const { data: vacation, error } = await supabase
         .from('employee_vacation_periods')
         .select(`
@@ -244,8 +135,6 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
   };
 
   const handleGoToVacationModule = (employeeId: string) => {
-    console.log('🔗 Navegando al módulo de vacaciones para empleado:', employeeId);
-    
     navigate('/app/vacations-absences', {
       state: { 
         filterByEmployee: employeeId,
@@ -279,7 +168,6 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
           setIntegratedData(prev => prev.filter(n => n.id !== item.id));
           
           if (onEmployeeNovedadesChange) {
-            console.log('🔄 Notificando cambio después de eliminar ausencia para:', employeeId);
             await onEmployeeNovedadesChange(employeeId);
           }
           
@@ -303,7 +191,6 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
           setIntegratedData(prev => prev.filter(n => n.id !== item.id));
           
           if (onEmployeeNovedadesChange) {
-            console.log('🔄 Notificando cambio después de eliminar novedad para:', employeeId);
             await onEmployeeNovedadesChange(employeeId);
           }
           
@@ -500,9 +387,7 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
           </Card>
         ) : (
           <>
-            {/* ✅ NUEVO: Resumen integrado con totales separados */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              {/* Valores Confirmados */}
               <Card className="border-green-200 bg-green-50">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-medium text-green-800 flex items-center gap-2">
@@ -534,7 +419,6 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
                 </CardContent>
               </Card>
 
-              {/* Valores Estimados */}
               <Card className="border-yellow-200 bg-yellow-50">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-medium text-yellow-800 flex items-center gap-2">
@@ -567,13 +451,11 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
               </Card>
             </div>
 
-            {/* Lista integrada mejorada */}
             <div className="space-y-3">
               {integratedData.map((item) => (
                 <Card key={`${item.origen}-${item.id}`} className={`hover:shadow-md transition-shadow ${!item.isConfirmed ? 'border-yellow-200 bg-yellow-50' : ''}`}>
                   <CardContent className="pt-4">
                     <div className="grid grid-cols-12 gap-4 items-center">
-                      {/* Columna 1: Origen y tipo */}
                       <div className="col-span-12 sm:col-span-4 lg:col-span-3">
                         <div className="space-y-2">
                           <div className="flex items-center gap-2">
@@ -586,7 +468,6 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
                                item.status === 'registrada' ? 'Registrada' : 
                                item.status}
                             </Badge>
-                            {/* ✅ NUEVO: Indicador de confirmación */}
                             {!item.isConfirmed && (
                               <Badge variant="outline" className="text-xs bg-yellow-100 text-yellow-800">
                                 Estimado
@@ -599,7 +480,6 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
                         </div>
                       </div>
 
-                      {/* Columna 2: Valor monetario */}
                       <div className="col-span-6 sm:col-span-3 lg:col-span-2">
                         <div className="text-right sm:text-left">
                           <div className={`text-lg font-bold ${item.valor >= 0 ? 'text-green-600' : 'text-red-600'}`}>
@@ -611,7 +491,6 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
                         </div>
                       </div>
 
-                      {/* Columna 3: Detalles (horas/días) */}
                       <div className="col-span-6 sm:col-span-2 lg:col-span-2">
                         <div className="text-sm text-gray-600 space-y-1">
                           {item.horas && (
@@ -634,7 +513,6 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
                         </div>
                       </div>
 
-                      {/* Columna 4: Observaciones */}
                       <div className="col-span-12 sm:col-span-8 lg:col-span-4">
                         {item.observacion && (
                           <div className="text-sm text-gray-600 bg-gray-50 p-2 rounded text-left">
@@ -645,7 +523,6 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
                         )}
                       </div>
 
-                      {/* Columna 5: Acciones */}
                       <div className="col-span-12 sm:col-span-4 lg:col-span-1">
                         <div className="flex justify-end sm:justify-center">
                           {getActionButtons(item)}
@@ -666,7 +543,6 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
         </div>
       </div>
 
-      {/* Modal de detalles de vacación */}
       <VacationAbsenceDetailModal
         isOpen={vacationDetailModal.isOpen}
         onClose={() => setVacationDetailModal({ isOpen: false, vacation: null })}
