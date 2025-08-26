@@ -293,14 +293,24 @@ export const usePayrollNovedadesUnified = (
     onSuccess: (deletedId) => {
       console.log('✅ Novedad eliminada exitosamente:', deletedId);
       
-      // Actualizar cache local
+      // Actualizar cache local de la query actual
       queryClient.setQueryData(queryKey, (old: any[] = []) => {
         return old.filter(item => item.id !== deletedId);
       });
-      
-      // Refresh employee cache for all employees (since we don't know which employee)
+
+      // ✅ NUEVO: Purga defensiva del cache por empleado (si no sabemos el empleado, removemos de todos)
+      setEmployeeNovedadesCache(prev => {
+        const updated: Record<string, PayrollNovedad[]> = {};
+        Object.entries(prev).forEach(([empId, list]) => {
+          updated[empId] = list.filter(n => n.id !== deletedId);
+        });
+        return updated;
+      });
+
+      // Forzar recálculo dependiente (triggers en tablas)
       setLastRefreshTime(Date.now());
       
+      // Invalidar todas las queries relacionadas con novedades
       queryClient.invalidateQueries({ 
         queryKey: ['novedades'],
         exact: false 

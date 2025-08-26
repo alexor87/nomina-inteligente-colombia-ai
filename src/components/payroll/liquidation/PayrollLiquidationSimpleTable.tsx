@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, Trash2, Loader2 } from 'lucide-react';
@@ -68,10 +67,10 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
     pensionDeduction: number; 
     transportAllowance: number; 
   }>>({});
+  const novedadChangedRef = useRef(false);
   const { toast } = useToast();
   const { companyId } = useCurrentCompany();
 
-  // ✅ FIXED: Use correct hook signature
   const {
     loadNovedadesTotals,
     createNovedad,
@@ -85,7 +84,6 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
     enabled: !!currentPeriodId 
   });
 
-  // ✅ NUEVO: Calcular fecha del período para usar en cálculos de jornada legal
   const getPeriodDate = () => {
     if (startDate) {
       return new Date(startDate);
@@ -93,7 +91,6 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
     return new Date();
   };
 
-  // Cargar novedades cuando se monten los empleados o cambie el período
   useEffect(() => {
     if (employees.length > 0 && currentPeriodId) {
       console.log('📊 Cargando novedades para empleados, período:', currentPeriodId);
@@ -102,7 +99,6 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
     }
   }, [employees, currentPeriodId, loadNovedadesTotals]);
 
-  // ✅ NUEVO: Recalcular totales cuando cambien las novedades
   useEffect(() => {
     const recalculateAllEmployees = async () => {
       if (!currentPeriodId || employees.length === 0) return;
@@ -118,16 +114,13 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
         transportAllowance: number; 
       }> = {};
 
-      // Obtener configuración para el año
       const config = getCurrentYearConfig();
 
       for (const employee of employees) {
         try {
-          // Obtener novedades del empleado
           const novedadesList = await getEmployeeNovedadesList(employee.id);
           const novedadesForIBC: NovedadForIBC[] = convertNovedadesToIBC(novedadesList);
 
-          // ✅ INFORMACIÓN NORMATIVA DE NOVEDADES
           const constitutivas = novedadesForIBC.filter(n => n.constitutivo_salario);
           const noConstitutivas = novedadesForIBC.filter(n => !n.constitutivo_salario);
           
@@ -140,7 +133,6 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
             detalleNoConstitutivas: noConstitutivas.map(n => `${n.tipo_novedad}: $${n.valor}`)
           });
 
-          // ✅ CORRECCIÓN CRÍTICA: Usar servicio centralizado para días trabajados
           const currentWorkedDays = workedDays;
           const periodType = periodForCalculation.tipo_periodo;
           
@@ -158,20 +150,18 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
             novedadesCount: novedadesForIBC.length
           });
 
-          // ✅ CORRECCIÓN CRÍTICA: Enviar salario mensual completo - el edge function hará la proporcionalidad
           const calculation = await PayrollCalculationBackendService.calculatePayroll({
-            baseSalary: employee.baseSalary, // ✅ ENVIAR SALARIO MENSUAL COMPLETO
+            baseSalary: employee.baseSalary,
             workedDays: currentWorkedDays,
             extraHours: 0,
             disabilities: 0,
             bonuses: 0,
             absences: 0,
-            periodType: periodType, // ✅ Usar tipo de período correcto
+            periodType: periodType,
             novedades: novedadesForIBC,
-            year: year // ✅ AGREGAR EL AÑO PARA CÁLCULOS ESPECÍFICOS
+            year: year
           });
 
-          // ✅ NUEVO: Calcular auxilio de transporte prorrateado en frontend
           const eligible = employee.baseSalary <= (config.salarioMinimo * 2);
           const proratedTransport = eligible ? Math.round((config.auxilioTransporte / 30) * currentWorkedDays) : 0;
           
@@ -186,7 +176,6 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
             backendTransport: calculation.transportAllowance
           });
 
-          // ✅ AJUSTAR GROSS PAY Y NET PAY CON AUXILIO PRORRATEADO
           const adjustedGrossPay = calculation.grossPay - calculation.transportAllowance + proratedTransport;
           const adjustedNetPay = calculation.netPay - calculation.transportAllowance + proratedTransport;
 
@@ -197,7 +186,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
             deductions: calculation.totalDeductions,
             healthDeduction: calculation.healthDeduction,
             pensionDeduction: calculation.pensionDeduction,
-            transportAllowance: proratedTransport // ✅ USAR VALOR PRORRATEADO
+            transportAllowance: proratedTransport
           };
 
           console.log('✅ Empleado calculado con auxilio corregido:', employee.name, {
@@ -225,7 +214,6 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
 
       setEmployeeCalculations(newCalculations);
 
-      // ✅ NUEVA FUNCIONALIDAD: Persistir automáticamente en la BD
       if (updateEmployeeCalculationsInDB && Object.keys(newCalculations).length > 0) {
         console.log('💾 Activando persistencia automática de cálculos...');
         try {
@@ -240,8 +228,6 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
     recalculateAllEmployees();
   }, [employees, currentPeriodId, lastRefreshTime, getEmployeeNovedadesList, updateEmployeeCalculationsInDB, year]);
 
-  // USAR SERVICIO CENTRALIZADO: Fuente única de verdad para días trabajados
-  // Usar el tipo de período desde el hook (datos de BD)
   const periodForCalculation = {
     tipo_periodo: (currentPeriod?.tipo_periodo || 'quincenal') as 'quincenal' | 'mensual',
     fecha_inicio: startDate,
@@ -259,7 +245,6 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
     realDays: daysInfo.realDays
   });
 
-  // Obtener configuración legal por año seleccionado
   const getCurrentYearConfig = () => {
     return ConfigurationService.getConfiguration(year);
   };
@@ -267,22 +252,25 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
   const handleOpenNovedadModal = (employee: PayrollEmployee) => {
     console.log('📝 Abriendo modal de novedades para:', employee.name);
     console.log('📅 Fecha del período:', startDate);
+    novedadChangedRef.current = false;
     setSelectedEmployee(employee);
     setNovedadModalOpen(true);
   };
 
   const handleCloseNovedadModal = async () => {
     if (selectedEmployee) {
-      // ✅ CORRECCIÓN CRÍTICA: Delay antes de sincronización final para asegurar que BD esté lista
-      console.log('⏳ Esperando sincronización final de BD antes de cerrar modal...');
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      // Asegurar sincronización final al cerrar el modal
-      console.log('🔄 Sincronización final al cerrar modal para:', selectedEmployee.name);
-      await onEmployeeNovedadesChange(selectedEmployee.id);
+      if (!novedadChangedRef.current) {
+        console.log('⏳ Esperando sincronización final de BD antes de cerrar modal...');
+        await new Promise(resolve => setTimeout(resolve, 300));
+        console.log('🔄 Sincronización al cerrar modal (no hubo cambio previo explícito) para:', selectedEmployee.name);
+        await onEmployeeNovedadesChange(selectedEmployee.id);
+      } else {
+        console.log('✅ Saltando recarga al cerrar modal: ya se recargó por el cambio en novedades');
+      }
     }
     setNovedadModalOpen(false);
     setSelectedEmployee(null);
+    novedadChangedRef.current = false;
   };
 
   const handleNovedadSubmit = async (data: CreateNovedadData) => {
@@ -301,7 +289,6 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
       });
       
       if (result) {
-        // Cerrar modal
         handleCloseNovedadModal();
         
         console.log('✅ Novedad creada y sincronizada exitosamente');
@@ -311,9 +298,9 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
     }
   };
 
-  // Callback para manejar cambios desde el modal (eliminaciones, etc.)
   const handleNovedadChange = async (employeeId: string) => {
     console.log('🔄 Novedad modificada para empleado:', employeeId);
+    novedadChangedRef.current = true;
     await onEmployeeNovedadesChange(employeeId);
   };
 
@@ -337,7 +324,6 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
     setEmployeeToDelete(null);
   };
 
-  // ✅ MEJORADO: Usar cálculos con IBC correcto
   const getTotalToPay = (employee: PayrollEmployee) => {
     const calculation = employeeCalculations[employee.id];
     return calculation ? calculation.totalToPay : 0;
@@ -380,13 +366,11 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
 
               return (
                 <TableRow key={employee.id}>
-                  {/* Empleado (Fijo) */}
                   <TableCell className="sticky left-0 bg-background z-10">
                     <div className="font-medium">{employee.name}</div>
                     <div className="text-sm text-gray-500">{employee.position}</div>
                   </TableCell>
                   
-                  {/* Básicos */}
                   <TableCell className="text-right font-medium">
                     {formatCurrency(employee.baseSalary)}
                   </TableCell>
@@ -401,17 +385,14 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
                     {workedDays} días
                   </TableCell>
                   
-                  {/* Total Devengado (incluye auxilio de transporte prorrateado) */}
                   <TableCell className="text-right bg-green-100 font-semibold">
                     {formatCurrency(calc?.grossPay || 0)}
                   </TableCell>
                   
-                  {/* Total Deducciones */}
                   <TableCell className="text-right bg-red-100 font-semibold">
                     {formatCurrency(calc?.deductions || 0)}
                   </TableCell>
                   
-                  {/* NOVEDADES Y TOTALES - FIXED: Always show the net value */}
                   <TableCell className="text-center">
                     <div className="flex items-center justify-center space-x-2">
                       <Button
@@ -435,7 +416,6 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
                     {formatCurrency(totalToPay)}
                   </TableCell>
 
-                  {/* Acciones (Fijo) */}
                   <TableCell className="text-center sticky right-0 bg-background z-10">
                     {onRemoveEmployee && (
                       <Button
@@ -455,7 +435,6 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
         </Table>
       </div>
 
-      {/* Modal de novedades */}
       {selectedEmployee && currentPeriodId && (
         <NovedadUnifiedModal
           open={novedadModalOpen}
@@ -473,7 +452,6 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
         />
       )}
 
-      {/* Confirmation Dialog for Delete */}
       <AlertDialog open={!!employeeToDelete} onOpenChange={cancelDeleteEmployee}>
         <AlertDialogContent>
           <AlertDialogHeader>
