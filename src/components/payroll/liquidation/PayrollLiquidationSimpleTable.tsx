@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -80,7 +79,10 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
     isCreating,
     lastRefreshTime,
     getEmployeeNovedadesList
-  } = usePayrollNovedadesUnified({ periodId: currentPeriodId || '', enabled: true });
+  } = usePayrollNovedadesUnified({ 
+    periodId: currentPeriodId || '', 
+    enabled: !!currentPeriodId 
+  });
 
   // ✅ NUEVO: Calcular fecha del período para usar en cálculos de jornada legal
   const getPeriodDate = () => {
@@ -488,7 +490,6 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
             >
               Remover
             </AlertDialogAction>
-          </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
