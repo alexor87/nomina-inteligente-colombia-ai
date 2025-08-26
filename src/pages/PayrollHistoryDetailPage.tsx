@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
@@ -249,8 +248,16 @@ export default function PayrollHistoryDetailPage() {
                     <Form {...form}>
                       <form onSubmit={form.handleSubmit(async (values) => {
                         console.log(values)
+                        if (!selectedEmployee) {
+                          console.error('No employee selected');
+                          return;
+                        }
+                        
                         await handleCreateNovedad({
-                          tipo_novedad: values.tipo_novedad as 'bonificacion', // ✅ FIXED: Type assertion to proper novedad type
+                          empleado_id: selectedEmployee,
+                          periodo_id: periodId!,
+                          company_id: '', // This will be set by the service
+                          tipo_novedad: values.tipo_novedad as 'bonificacion',
                           subtipo: values.subtipo,
                           valor: parseFloat(values.valor),
                           fecha_inicio: values.fecha_inicio.toISOString(),
