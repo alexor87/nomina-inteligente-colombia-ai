@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
@@ -249,7 +250,7 @@ export default function PayrollHistoryDetailPage() {
                       <form onSubmit={form.handleSubmit(async (values) => {
                         console.log(values)
                         await handleCreateNovedad({
-                          tipo_novedad: values.tipo_novedad,
+                          tipo_novedad: values.tipo_novedad as 'bonificacion', // ✅ FIXED: Type assertion to proper novedad type
                           subtipo: values.subtipo,
                           valor: parseFloat(values.valor),
                           fecha_inicio: values.fecha_inicio.toISOString(),

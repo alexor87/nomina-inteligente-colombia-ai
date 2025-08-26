@@ -25,7 +25,7 @@ import ProfilePage from "./pages/ProfilePage";
 import PayrollLiquidationPageSimplified from "./pages/PayrollLiquidationPageSimplified";
 import VacationsAbsencesPage from "./pages/VacationsAbsencesPage";
 import { PayrollHistoryPage } from "./pages/PayrollHistoryPage";
-import { PayrollHistoryDetailPage } from "./pages/PayrollHistoryDetailPage";
+import PayrollHistoryDetailPage from "./pages/PayrollHistoryDetailPage";
 import CompanyRegistrationPage from "./pages/CompanyRegistrationPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import SocialBenefitsPage from "./pages/SocialBenefitsPage";
