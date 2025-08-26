@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { NovedadesEnhancedService, CreateNovedadData } from '@/services/NovedadesEnhancedService';
@@ -85,7 +84,7 @@ export const usePayrollNovedadesUnified = (
     ? () => NovedadesEnhancedService.getNovedadesByEmployee(employeeId, periodId!)
     : () => NovedadesEnhancedService.getNovedades(companyId!, periodId!);
 
-  // Query principal
+  // ✅ FIXED: Query principal with correct enabled type
   const {
     data: novedades = [],
     isLoading,
@@ -94,7 +93,7 @@ export const usePayrollNovedadesUnified = (
   } = useQuery({
     queryKey,
     queryFn: fetchFunction,
-    enabled: enabled && ((companyId && periodId) || (employeeId && periodId)),
+    enabled: Boolean(enabled && ((companyId && periodId) || (employeeId && periodId))),
     staleTime: 30000, // 30 segundos
     gcTime: 300000, // 5 minutos
     retry: 2,

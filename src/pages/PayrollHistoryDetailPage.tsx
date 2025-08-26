@@ -1,1070 +1,411 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useCompanyId } from '@/components/employees/form/useCompanyId';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, FileText, Plus, Calendar, Users, DollarSign, History, Mail } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import { formatCurrency } from '@/lib/utils';
-import { useToast } from '@/hooks/use-toast';
-import { NovedadUnifiedModal } from '@/components/payroll/novedades/NovedadUnifiedModal';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Button } from "@/components/ui/button"
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import { Badge } from "@/components/ui/badge"
+import { MoreVertical, Edit, Copy, Trash, FileText, XCircle } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { toast } from "@/hooks/use-toast"
+import { useToast as useToastHook } from "@/hooks/use-toast"
+import { Separator } from "@/components/ui/separator"
 import { usePayrollNovedadesUnified } from '@/hooks/usePayrollNovedadesUnified';
-import { CreateNovedadData } from '@/types/novedades-enhanced';
-import { PeriodAuditSummaryComponent } from '@/components/payroll/audit/PeriodAuditSummary';
-import { NovedadAuditHistoryModal } from '@/components/payroll/audit/NovedadAuditHistoryModal';
-import { ConfirmAdjustmentModal } from '@/components/payroll/corrections/ConfirmAdjustmentModal';
-import { PendingNovedadesService, PendingAdjustmentData } from '@/services/PendingNovedadesService';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { VoucherPreviewModal } from '@/components/payroll/modals/VoucherPreviewModal';
-import { 
-  transformPayrollHistoryToEmployee, 
-  validateEmployeeForVoucher, 
-  type PayrollHistoryData 
-} from '@/utils/payrollDataTransformer';
-import { useCompanyDetails } from '@/hooks/useCompanyDetails';
-import { ConfigurationService } from '@/services/ConfigurationService';
-import { NovedadesEnhancedService } from '@/services/NovedadesEnhancedService';
 import { PayrollNovedad } from '@/types/novedades-enhanced';
+import { CreateNovedadData } from '@/services/NovedadesEnhancedService';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
+import { z } from "zod"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useForm } from "react-hook-form"
+import { Textarea } from "@/components/ui/textarea"
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { DatePicker } from "@/components/ui/date-picker"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { CalendarIcon } from "@radix-ui/react-icons"
+import { cn } from "@/lib/utils"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
-interface PeriodDetail {
-  id: string;
-  periodo: string;
-  fecha_inicio: string;
-  fecha_fin: string;
-  tipo_periodo: string;
-  empleados_count: number;
-  total_devengado: number;
-  total_deducciones: number;
-  total_neto: number;
-  estado: string;
-  company_id: string; // Added for proper IBC calculation
-}
+const taxSchema = z.object({
+  tipo_novedad: z.string().min(2, {
+    message: "Username must be at least 2 characters.",
+  }),
+  subtipo: z.string().min(2, {
+    message: "Username must be at least 2 characters.",
+  }),
+  valor: z.string().min(2, {
+    message: "Username must be at least 2 characters.",
+  }),
+  fecha_inicio: z.date(),
+  fecha_fin: z.date(),
+  observacion: z.string().min(2, {
+    message: "Username must be at least 2 characters.",
+  }),
+})
 
-interface EmployeePayroll {
-  id: string;
-  employee_id: string;
-  employee_name: string;
-  employee_lastname: string;
-  total_devengado: number;
-  total_deducciones: number;
-  neto_pagado: number;
-  salario_base: number;
-  ibc: number; // Will be calculated properly
-  dias_trabajados?: number;
-  // Added fields for IBC calculation
-  salud_empleado?: number;
-  pension_empleado?: number;
-  completeEmployeeData?: any;
-}
-
-interface PendingNovedad {
-  employee_id: string;
-  employee_name: string;
-  tipo_novedad: string;
-  valor: number;
-  observacion?: string;
-  novedadData: CreateNovedadData;
-}
-
-interface NovedadesByEmployee {
-  count: number;
-  items: PayrollNovedad[];
-}
-
-export const PayrollHistoryDetailPage = () => {
+export default function PayrollHistoryDetailPage() {
   const { periodId } = useParams<{ periodId: string }>();
   const navigate = useNavigate();
-  const { toast } = useToast();
-  
-  const [period, setPeriod] = useState<PeriodDetail | null>(null);
-  const [employees, setEmployees] = useState<EmployeePayroll[]>([]);
-  const [novedadesByEmployee, setNovedadesByEmployee] = useState<Record<string, NovedadesByEmployee>>({});
-  
-  const [loading, setLoading] = useState(true);
-  const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [showAuditModal, setShowAuditModal] = useState(false);
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
-  const [selectedEmployeeSalary, setSelectedEmployeeSalary] = useState<number>(0);
-  const [selectedNovedadId, setSelectedNovedadId] = useState<string | null>(null);
-  const [selectedEmployeeName, setSelectedEmployeeName] = useState<string>('');
-  const [pendingNovedades, setPendingNovedades] = useState<PendingNovedad[]>([]);
-  const [isApplyingAdjustments, setIsApplyingAdjustments] = useState(false);
-  const [companyId, setCompanyId] = useState<string | null>(null);
-  const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
-  const [selectedVoucherEmployee, setSelectedVoucherEmployee] = useState<any>(null);
-  const [sendingEmails, setSendingEmails] = useState<Set<string>>(new Set());
+  const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null);
 
-  // Hook para gestionar novedades
+  // ✅ FIXED: Use correct hook signature and destructure createNovedad
   const {
     novedades,
-    isLoading: novedadesLoading,
-    error: novedadesError
-  } = usePayrollNovedadesUnified({ 
-    companyId, 
-    periodId: periodId || '', 
-    enabled: !!companyId && !!periodId 
-  });
+    isLoading: isLoadingNovedades,
+    createNovedad,
+    updateNovedad,
+    deleteNovedad,
+    refetch: refetchNovedades
+  } = usePayrollNovedadesUnified({ periodId: periodId || '', enabled: !!periodId });
 
-  // Hook para obtener company_id
-  useCompanyId(setCompanyId);
-  
-  // Hook para obtener datos completos de la empresa
-  const { companyDetails } = useCompanyDetails();
+  const [open, setOpen] = React.useState(false)
 
-  // Function to calculate IBC from saved deductions
-  const calculateIBCFromDeductions = async (salud_empleado: number, pension_empleado: number, salario_base: number, fechaInicio: string) => {
-    try {
-      const year = new Date(fechaInicio).getFullYear().toString();
-      const config = await ConfigurationService.getConfigurationAsync(year);
-      
-      if (salud_empleado > 0) {
-        return Math.round(salud_empleado / config.porcentajes.saludEmpleado);
-      } else if (pension_empleado > 0) {
-        return Math.round(pension_empleado / config.porcentajes.pensionEmpleado);
-      }
-      
-      // Fallback to salary base if no saved deductions
-      return salario_base;
-    } catch (error) {
-      console.error('Error calculating IBC:', error);
-      return salario_base; // Fallback
-    }
+  const form = useForm<z.infer<typeof taxSchema>>({
+    resolver: zodResolver(taxSchema),
+    defaultValues: {
+      tipo_novedad: "",
+      subtipo: "",
+      valor: "",
+      fecha_inicio: new Date(),
+      fecha_fin: new Date(),
+      observacion: "",
+    },
+  })
+
+  function formatDate(date: Date) {
+    return format(date, 'dd MMMM yyyy', { locale: es });
+  }
+
+  const handleGoBack = () => {
+    navigate('/payroll/history');
   };
 
-  const loadPeriodDetail = async () => {
-    if (!periodId) return;
-    
-    try {
-      setLoading(true);
-      
-      // Load period details
-      const { data: periodData, error: periodError } = await supabase
-        .from('payroll_periods_real')
-        .select('*')
-        .eq('id', periodId)
-        .single();
-      
-      if (periodError) throw periodError;
-      
-      const periodDetail: PeriodDetail = {
-        ...periodData,
-        company_id: periodData.company_id
-      };
-      setPeriod(periodDetail);
-      
-      // Set company ID for configuration loading
-      if (periodData.company_id && !companyId) {
-        setCompanyId(periodData.company_id);
-      }
-
-      // Load employees payroll data with complete employee information
-      const { data: payrollData, error: payrollError } = await supabase
-        .from('payrolls')
-        .select(`
-          *,
-          employees!inner(
-            id,
-            nombre, 
-            apellido, 
-            cedula, 
-            email, 
-            telefono, 
-            cargo, 
-            salario_base,
-            banco,
-            tipo_cuenta,
-            numero_cuenta,
-            eps,
-            afp,
-            arl,
-            caja_compensacion
-          )
-        `)
-        .eq('period_id', periodId);
-      
-      if (payrollError) throw payrollError;
-      
-      // Calculate IBC for each employee
-      const employeesWithCorrectIBC = await Promise.all(
-        (payrollData || []).map(async (p) => {
-          const calculatedIBC = await calculateIBCFromDeductions(
-            p.salud_empleado || 0,
-            p.pension_empleado || 0,
-            p.salario_base || 0,
-            periodDetail.fecha_inicio
-          );
-          
-          return {
-            id: p.id,
-            employee_id: p.employee_id,
-            employee_name: p.employees.nombre,
-            employee_lastname: p.employees.apellido,
-            total_devengado: p.total_devengado || 0,
-            total_deducciones: p.total_deducciones || 0,
-            neto_pagado: p.neto_pagado || 0,
-            salario_base: p.salario_base || 0,
-            ibc: calculatedIBC, // Correctly calculated IBC
-            dias_trabajados: p.dias_trabajados || 30,
-            salud_empleado: p.salud_empleado || 0,
-            pension_empleado: p.pension_empleado || 0,
-            // Campos específicos de payrolls para conceptos exactos
-            auxilio_transporte: p.auxilio_transporte || 0,
-            horas_extra: p.horas_extra || 0,
-            bonificaciones: p.bonificaciones || 0,
-            comisiones: p.comisiones || 0,
-            cesantias: p.cesantias || 0,
-            prima: p.prima || 0,
-            vacaciones: p.vacaciones || 0,
-            incapacidades: p.incapacidades || 0,
-            otros_devengos: p.otros_devengos || 0,
-            otros_descuentos: p.descuentos_varios || 0,
-            retencion_fuente: p.retencion_fuente || 0,
-            // Complete employee data for voucher
-            completeEmployeeData: p.employees
-          };
-        })
-      );
-      
-      setEmployees(employeesWithCorrectIBC);
-
-      // Load novedades for the period
-      if (periodDetail.company_id) {
-        try {
-          const novedades = await NovedadesEnhancedService.getNovedades(periodDetail.company_id, periodId);
-          
-          // Group novedades by employee_id
-          const novedadesMap: Record<string, NovedadesByEmployee> = {};
-          
-          novedades.forEach(novedad => {
-            if (!novedadesMap[novedad.empleado_id]) {
-              novedadesMap[novedad.empleado_id] = {
-                count: 0,
-                items: []
-              };
-            }
-            novedadesMap[novedad.empleado_id].count++;
-            novedadesMap[novedad.empleado_id].items.push(novedad);
-          });
-          
-          setNovedadesByEmployee(novedadesMap);
-          
-          console.log('✅ Loaded novedades for period:', novedades.length, 'grouped by employee:', Object.keys(novedadesMap).length);
-        } catch (error) {
-          console.error('Error loading novedades:', error);
-          // Don't fail the entire load, just set empty novedades
-          setNovedadesByEmployee({});
-        }
-      }
-      
-    } catch (error) {
-      console.error('Error loading period detail:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo cargar el detalle del período",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
+  const handleEmployeeSelection = (employeeId: string) => {
+    setSelectedEmployee(employeeId);
   };
 
-  useEffect(() => {
-    loadPeriodDetail();
-  }, [periodId]);
-
-  // Helper function to calculate total net value of novedades for an employee
-  const calculateEmployeeNovedadesTotal = (employeeId: string): number => {
-    const employeeNovedades = novedadesByEmployee[employeeId];
-    if (!employeeNovedades || !employeeNovedades.items) return 0;
+  const handleCreateNovedad = async (data: CreateNovedadData) => {
+    if (!selectedEmployee) return;
     
-    return employeeNovedades.items.reduce((sum, novedad) => sum + (novedad.valor || 0), 0);
-  };
-
-  // Helper function to calculate preview totals with pending novelties
-  const calculateEmployeePreview = (employee: EmployeePayroll) => {
-    const pendingForEmployee = pendingNovedades.filter(p => p.employee_id === employee.employee_id);
-    
-    if (pendingForEmployee.length === 0) {
-      return {
-        originalDevengado: employee.total_devengado,
-        originalDeducciones: employee.total_deducciones,
-        originalNeto: employee.neto_pagado,
-        newDevengado: employee.total_devengado,
-        newDeducciones: employee.total_deducciones,
-        newNeto: employee.neto_pagado,
-        hasPending: false,
-        pendingCount: 0
-      };
-    }
-
-    let totalPendingDevengos = 0;
-    let totalPendingDeducciones = 0;
-
-    pendingForEmployee.forEach(pending => {
-      const { novedadData } = pending;
-      if (novedadData.valor > 0) {
-        totalPendingDevengos += novedadData.valor;
-      } else {
-        totalPendingDeducciones += Math.abs(novedadData.valor);
-      }
-    });
-
-    const newDevengado = employee.total_devengado + totalPendingDevengos;
-    const newDeducciones = employee.total_deducciones + totalPendingDeducciones;
-    const newNeto = newDevengado - newDeducciones;
-
-    return {
-      originalDevengado: employee.total_devengado,
-      originalDeducciones: employee.total_deducciones,
-      originalNeto: employee.neto_pagado,
-      newDevengado,
-      newDeducciones,
-      newNeto,
-      hasPending: true,
-      pendingCount: pendingForEmployee.length
+    const novedadData = {
+      ...data,
+      empleado_id: selectedEmployee,
+      periodo_id: periodId!
     };
-  };
-
-  const handleSendVoucherEmail = async (employeeId: string, employeeName: string) => {
-    // Find the employee in current data
-    const employeePayroll = employees.find(emp => emp.employee_id === employeeId);
-    if (!employeePayroll) {
-      toast({
-        title: "Error",
-        description: "No se encontraron datos del empleado",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Check if employee has email
-    const employeeEmail = employeePayroll.completeEmployeeData?.email;
-    if (!employeeEmail) {
-      toast({
-        title: "Email no disponible",
-        description: `${employeeName} no tiene un email registrado`,
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(employeeEmail)) {
-      toast({
-        title: "Email inválido",
-        description: `El email ${employeeEmail} no tiene un formato válido`,
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Prevent multiple sends for same employee
-    if (sendingEmails.has(employeeId)) {
-      toast({
-        title: "Enviando...",
-        description: "Ya se está enviando el comprobante a este empleado",
-      });
-      return;
-    }
-
-    try {
-      setSendingEmails(prev => new Set(prev).add(employeeId));
-
-      // Step 1: Generate PDF with base64 return
-      console.log('🚀 Generating PDF for employee:', employeePayroll.id);
-      
-      const { data: pdfData, error: pdfError } = await supabase.functions.invoke('generate-voucher-pdf', {
-        body: {
-          payrollId: employeePayroll.id, // Use payroll record ID
-          returnBase64: true
-        }
-      });
-
-      if (pdfError) {
-        console.error('❌ PDF generation error:', pdfError);
-        throw new Error(`Error generando PDF: ${pdfError.message}`);
-      }
-
-      if (!pdfData || !pdfData.base64) {
-        console.error('❌ No PDF data returned');
-        throw new Error('No se pudo generar el PDF del comprobante');
-      }
-
-      console.log('✅ PDF generated successfully');
-
-      // Step 2: Send email with PDF attachment
-      const emailPayload = {
-        employeeEmail,
-        employeeName,
-        period: {
-          periodo: period?.periodo,
-          startDate: period?.fecha_inicio,
-          endDate: period?.fecha_fin
-        },
-        netPay: employeePayroll.neto_pagado,
-        companyName: companyDetails?.razon_social || 'Mi Empresa',
-        subject: `Comprobante de Pago - ${period?.periodo || ''}`,
-        attachment: {
-          fileName: pdfData.fileName || `comprobante-${employeeName.replace(/\s+/g, '-')}.pdf`,
-          base64: pdfData.base64,
-          mimeType: pdfData.mimeType || 'application/pdf'
-        }
-      };
-
-      console.log('📧 Sending email to:', employeeEmail);
-
-      const { data: emailResult, error: emailError } = await supabase.functions.invoke('send-voucher-email', {
-        body: emailPayload
-      });
-
-      if (emailError) {
-        console.error('❌ Email sending error:', emailError);
-        throw new Error(`Error enviando email: ${emailError.message}`);
-      }
-
-      // Check if email was actually sent successfully
-      if (!emailResult || !emailResult.success) {
-        console.error('❌ Email service returned failure:', emailResult);
-        throw new Error(emailResult?.error || 'El servicio de email no pudo enviar el correo');
-      }
-
-      if (!emailResult.emailId) {
-        console.error('❌ No email ID returned');
-        throw new Error('Email no confirmado - no se recibió ID de confirmación');
-      }
-
-      console.log('✅ Email sent successfully:', emailResult.emailId);
-
-      // Handle test mode vs normal mode responses
-      if (emailResult.testMode) {
-        toast({
-          title: "📧 Comprobante enviado (Modo Prueba)",
-          description: `El comprobante fue enviado a ${emailResult.actualRecipient} en modo de pruebas. Original: ${emailResult.originalRecipient}`,
-          className: "border-orange-200 bg-orange-50",
-          duration: 8000
-        });
-      } else {
-        toast({
-          title: "✅ Comprobante enviado",
-          description: `El comprobante de pago fue enviado exitosamente a ${employeeEmail}`,
-          className: "border-green-200 bg-green-50"
-        });
-      }
-
-    } catch (error) {
-      console.error('❌ Error sending voucher email:', error);
-      toast({
-        title: "Error al enviar",
-        description: error instanceof Error ? error.message : "No se pudo enviar el comprobante por email",
-        variant: "destructive"
-      });
-    } finally {
-      setSendingEmails(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(employeeId);
-        return newSet;
-      });
-    }
-  };
-
-  const handleDownloadVoucher = async (employeeId: string, employeeName: string) => {
-    // Find the employee in current data
-    const employeePayroll = employees.find(emp => emp.employee_id === employeeId);
-    if (!employeePayroll) {
-      toast({
-        title: "Error",
-        description: "No se encontraron datos del empleado",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    try {
-      // NEW APPROACH: Use the payroll record ID directly for PDF generation
-      console.log('✅ Opening voucher modal with payroll ID:', employeePayroll.id);
-      
-      // Create a simplified employee object with the payroll ID
-      const employeeForVoucher = {
-        id: employeePayroll.id, // This is the payroll record ID - what we need for the PDF
-        name: `${employeePayroll.employee_name} ${employeePayroll.employee_lastname}`.trim(),
-        employee_id: employeePayroll.employee_id,
-        baseSalary: employeePayroll.salario_base,
-        workedDays: employeePayroll.dias_trabajados,
-        grossPay: employeePayroll.total_devengado,
-        deductions: employeePayroll.total_deducciones,
-        netPay: employeePayroll.neto_pagado,
-        // Additional fields from the database
-        transportAllowance: (employeePayroll as any).auxilio_transporte || 0,
-        extraHours: (employeePayroll as any).horas_extra || 0,
-        bonuses: (employeePayroll as any).bonificaciones || 0,
-        position: employeePayroll.completeEmployeeData?.cargo || '',
-        cedula: employeePayroll.completeEmployeeData?.cedula || '',
-        eps: employeePayroll.completeEmployeeData?.eps || '',
-        afp: employeePayroll.completeEmployeeData?.afp || '',
-        disabilities: 0,
-        absences: 0,
-        employerContributions: 0
-      };
-
-      console.log('✅ Employee data prepared for voucher:', employeeForVoucher);
-      setSelectedVoucherEmployee(employeeForVoucher);
-      setIsVoucherModalOpen(true);
-      
-    } catch (error) {
-      console.error('❌ Error preparing employee data:', error);
-      toast({
-        title: "Error de preparación",
-        description: "Error al preparar los datos del empleado para el comprobante",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleAdjustmentSuccess = () => {
-    setShowAdjustmentModal(false);
-    loadPeriodDetail(); // Reload data to show new adjustment
-    toast({
-      title: "Ajuste registrado",
-      description: "El ajuste se ha registrado correctamente",
-    });
-  };
-
-  const handleOpenAdjustmentModal = (employeeId?: string, employeeSalary?: number) => {
-    console.log('🔵 handleOpenAdjustmentModal called with:', { employeeId, employeeSalary });
-    console.log('🔵 Period status:', period?.estado);
-    console.log('🔵 Current showAdjustmentModal:', showAdjustmentModal);
     
-    if (employeeId && employeeSalary) {
-      // Ajuste para empleado específico
-      setSelectedEmployeeId(employeeId);
-      setSelectedEmployeeSalary(employeeSalary);
-      const employeeData = employees.find(e => e.employee_id === employeeId);
-      setSelectedEmployeeName(employeeData ? `${employeeData.employee_name} ${employeeData.employee_lastname}` : '');
-      setShowAdjustmentModal(true);
-      console.log('🔵 Set specific employee data and modal to true');
-    } else if (employees.length > 0) {
-      // Usar el primer empleado como fallback
-      setSelectedEmployeeId(employees[0].employee_id);
-      setSelectedEmployeeSalary(employees[0].salario_base);
-      setSelectedEmployeeName(`${employees[0].employee_name} ${employees[0].employee_lastname}`);
-      setShowAdjustmentModal(true);
-      console.log('🔵 Set fallback employee data and modal to true');
-    } else {
-      console.log('🔵 No employees available');
-      toast({
-        title: "Error",
-        description: "No hay empleados disponibles para ajustar",
-        variant: "destructive"
-      });
+    const result = await createNovedad(novedadData);
+    if (result) {
+      refetchNovedades();
     }
   };
-
-  const handleNovedadSubmit = async (data: CreateNovedadData) => {
-    console.log('🟢 handleNovedadSubmit called with data:', data);
-    console.log('🟢 Period estado:', period?.estado);
-    console.log('🟢 selectedEmployeeId:', selectedEmployeeId);
-    console.log('🟢 Current pendingNovedades length:', pendingNovedades.length);
-    
-    try {
-      // For closed periods, add to pending list instead of applying immediately
-      if (period?.estado === 'cerrado') {
-        const employeeData = employees.find(e => e.employee_id === selectedEmployeeId);
-        console.log('🟢 Found employee data:', employeeData);
-        
-        const newPendingNovedad: PendingNovedad = {
-          employee_id: selectedEmployeeId,
-          employee_name: employeeData ? `${employeeData.employee_name} ${employeeData.employee_lastname}` : selectedEmployeeName,
-          tipo_novedad: data.tipo_novedad,
-          valor: data.valor || 0,
-          observacion: data.observacion,
-          novedadData: data
-        };
-        
-        console.log('🟢 Creating new pending novedad:', newPendingNovedad);
-        setPendingNovedades(prev => {
-          const newArray = [...prev, newPendingNovedad];
-          console.log('🟢 Updated pendingNovedades array:', newArray);
-          return newArray;
-        });
-        setShowAdjustmentModal(false);
-        console.log('🟢 Modal closed, pending novedad added');
-        
-        toast({
-          title: "Novedad agregada",
-          description: "La novedad se agregó a la lista de ajustes pendientes",
-        });
-      } else {
-        // For open periods, apply immediately
-        console.log('🟢 Applying novedad immediately for open period');
-        await createNovedad(data);
-        handleAdjustmentSuccess();
-      }
-    } catch (error) {
-      console.error('❌ Error creating novedad:', error);
-      throw error;
-    }
-  };
-
-  const handleApplyPendingAdjustments = async (justification: string) => {
-    if (!periodId || pendingNovedades.length === 0) return;
-
-    try {
-      setIsApplyingAdjustments(true);
-
-      // Group novelties by employee
-      const employeeGroups = pendingNovedades.reduce((groups, novedad) => {
-        if (!groups[novedad.employee_id]) {
-          groups[novedad.employee_id] = {
-            employeeId: novedad.employee_id,
-            employeeName: novedad.employee_name,
-            novedades: []
-          };
-        }
-        groups[novedad.employee_id].novedades.push(novedad.novedadData);
-        return groups;
-      }, {} as Record<string, { employeeId: string; employeeName: string; novedades: CreateNovedadData[] }>);
-
-      // Apply adjustments for each employee
-      for (const group of Object.values(employeeGroups)) {
-        const adjustmentData: PendingAdjustmentData = {
-          periodId,
-          employeeId: group.employeeId,
-          employeeName: group.employeeName,
-          justification,
-          novedades: group.novedades
-        };
-
-        const result = await PendingNovedadesService.applyPendingAdjustments(adjustmentData);
-        
-        if (!result.success) {
-          throw new Error(result.message);
-        }
-      }
-
-      // Create notification
-      await PendingNovedadesService.createAdjustmentNotification(
-        periodId,
-        Object.keys(employeeGroups).length,
-        pendingNovedades.length
-      );
-
-      toast({
-        title: "Ajustes aplicados",
-        description: `Se aplicaron ${pendingNovedades.length} ajustes correctamente`,
-      });
-
-      // Clear pending novelties and close modal
-      setPendingNovedades([]);
-      setShowConfirmModal(false);
-      
-      // Reload data
-      loadPeriodDetail();
-
-    } catch (error) {
-      console.error("Error applying adjustments:", error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "No se pudieron aplicar los ajustes",
-        variant: "destructive"
-      });
-    } finally {
-      setIsApplyingAdjustments(false);
-    }
-  };
-
-  const handleRemovePendingNovedad = (index: number) => {
-    setPendingNovedades(prev => prev.filter((_, i) => i !== index));
-  };
-
-  if (loading) {
-    return (
-      <div className="px-6 py-6">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Cargando detalle del período...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!period) {
-    return (
-      <div className="px-6 py-6">
-        <div className="text-center py-12">
-          <h3 className="text-lg font-medium mb-2">Período no encontrado</h3>
-          <p className="text-muted-foreground mb-4">El período solicitado no existe o no tienes permisos para verlo.</p>
-          <Button onClick={() => navigate('/app/payroll-history')}>
-            Volver al historial
-          </Button>
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="px-6 py-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={() => navigate('/app/payroll-history')}
-            className="flex items-center gap-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Volver
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">{period.periodo}</h1>
-            <p className="text-muted-foreground">
-              {new Date(period.fecha_inicio).toLocaleDateString()} - {new Date(period.fecha_fin).toLocaleDateString()}
-            </p>
-          </div>
-        </div>
-        
-        {/* Show save button for closed periods with pending novelties */}
-        {period?.estado === 'cerrado' && pendingNovedades.length > 0 && (
-          <div className="flex items-center gap-2">
-            <Badge variant="secondary" className="animate-pulse">
-              {pendingNovedades.length} novedades pendientes
-            </Badge>
-            <Button 
-              onClick={() => setShowConfirmModal(true)}
-              className="bg-warning hover:bg-warning/90 text-warning-foreground"
-            >
-              Guardar Novedades
-            </Button>
-          </div>
-        )}
-        
-      </div>
+    <>
+      <div className="container py-10">
+        <Card>
+          <CardHeader>
+            <CardTitle>Detalle del Período de Nómina</CardTitle>
+            <CardDescription>
+              Aquí puedes ver y gestionar las novedades del período seleccionado.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {periodId ? (
+              <>
+                <Alert>
+                  <AlertTitle>Período seleccionado: {periodId}</AlertTitle>
+                  <AlertDescription>
+                    Estás viendo las novedades del período con ID: {periodId}.
+                  </AlertDescription>
+                </Alert>
 
-      {/* Period Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Tipo</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold capitalize">{period.tipo_periodo}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Empleados</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{period.empleados_count}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Devengado</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(period.total_devengado)}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Neto</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(period.total_neto)}</div>
-            <div className="text-xs text-muted-foreground">
-              Deducciones: {formatCurrency(period.total_deducciones)}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+                <Separator className="my-4" />
 
-      {/* Main Content with Tabs */}
-      <Tabs defaultValue="employees" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="employees" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            Empleados
-          </TabsTrigger>
-          <TabsTrigger value="audit" className="flex items-center gap-2">
-            <History className="h-4 w-4" />
-            Auditoría
-          </TabsTrigger>
-        </TabsList>
+                <div>
+                  <h2>Seleccionar Empleado</h2>
+                  <Input
+                    type="text"
+                    placeholder="Buscar empleado por ID"
+                    onChange={(e) => handleEmployeeSelection(e.target.value)}
+                  />
+                  {selectedEmployee && (
+                    <Badge variant="outline">
+                      Empleado seleccionado: {selectedEmployee}
+                    </Badge>
+                  )}
+                </div>
 
-        <TabsContent value="employees">
-          <Card>
-            <CardHeader>
-              <CardTitle>Empleados Liquidados</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="w-full overflow-x-auto">
-                <Table className="min-w-max">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="sticky left-0 bg-background z-10 min-w-[200px]">
-                        Empleado
-                      </TableHead>
-                      <TableHead className="min-w-[140px] text-right">Salario Base</TableHead>
-                      <TableHead className="min-w-[140px] text-right">IBC</TableHead>
-                      <TableHead className="min-w-[100px] text-center">Días Trabajados</TableHead>
-                      <TableHead className="min-w-[140px] bg-green-100 text-right font-semibold">
-                        Total Devengado
-                      </TableHead>
-                      <TableHead className="min-w-[140px] bg-red-100 text-right font-semibold">
-                        Total Deducciones
-                      </TableHead>
-                       <TableHead className="min-w-[100px] text-center">
-                         Novedades
-                       </TableHead>
-                      <TableHead className="min-w-[140px] bg-blue-100 text-right font-semibold">
-                        Neto Pagado
-                      </TableHead>
-                      <TableHead className="min-w-[140px] sticky right-0 bg-background z-10 text-center">
-                        Acciones
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {employees.map((employee) => {
-                      const preview = calculateEmployeePreview(employee);
-                      const isSendingEmail = sendingEmails.has(employee.employee_id);
-                      const hasEmail = !!employee.completeEmployeeData?.email;
-                      const employeeNovedades = novedadesByEmployee[employee.employee_id] || { count: 0, items: [] };
-                      const novedadesTotal = calculateEmployeeNovedadesTotal(employee.employee_id);
-                      
-                      // Calculate pending novedades total for this employee
-                      const pendingNovedadesTotal = pendingNovedades
-                        .filter(p => p.employee_id === employee.employee_id)
-                        .reduce((sum, p) => sum + (p.novedadData.valor || 0), 0);
-                      
-                      const totalNovedadesValue = novedadesTotal + pendingNovedadesTotal;
-                      
-                      return (
-                        <TableRow key={employee.id}>
-                          <TableCell className="sticky left-0 bg-background z-10 min-w-[200px] font-medium">
-                            <div className="flex items-center">
-                              <div>
-                                <div className="font-medium">
-                                  {employee.employee_name} {employee.employee_lastname}
-                                </div>
-                                <div className="text-sm text-gray-500">
-                                  {employee.completeEmployeeData?.email || 'Sin email'}
-                                </div>
-                              </div>
-                            </div>
-                            {preview.hasPending && (
-                              <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800 mt-1">
-                                {preview.pendingCount} pendiente{preview.pendingCount > 1 ? 's' : ''}
-                              </Badge>
-                            )}
-                          </TableCell>
-                          <TableCell className="font-medium text-right">
-                            {formatCurrency(employee.salario_base)}
-                          </TableCell>
-                          <TableCell className="font-medium text-right">
-                            <div className="flex flex-col items-end">
-                              <span>{formatCurrency(employee.ibc)}</span>
-                              {employee.ibc === employee.salario_base && (employee.salud_empleado === 0 && employee.pension_empleado === 0) && (
-                                <span className="text-xs text-muted-foreground" title="IBC estimado - sin deducciones guardadas">
-                                  (estimado)
-                                </span>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-center font-medium">
-                            {employee.dias_trabajados || (period?.tipo_periodo === 'quincenal' ? 15 : 30)}
-                          </TableCell>
-                          <TableCell className="bg-green-100 text-right">
-                            {preview.hasPending ? (
-                              <div className="space-y-1">
-                                <div className="text-muted-foreground line-through text-sm">
-                                  {formatCurrency(preview.originalDevengado)}
-                                </div>
-                                <div className="font-semibold text-green-600">
-                                   {formatCurrency(preview.newDevengado)}
-                                   <span className="text-xs ml-1">
-                                     (+{formatCurrency(preview.newDevengado - preview.originalDevengado)})
-                                   </span>
-                                 </div>
-                               </div>
-                             ) : (
-                               <span className="font-semibold text-green-600">
-                                 {formatCurrency(employee.total_devengado)}
-                               </span>
-                            )}
-                          </TableCell>
-                          <TableCell className="bg-red-100 text-right">
-                            {preview.hasPending ? (
-                              <div className="space-y-1">
-                                <div className="text-muted-foreground line-through text-sm">
-                                  {formatCurrency(preview.originalDeducciones)}
-                                </div>
-                                 <div className="font-semibold text-red-600">
-                                   {formatCurrency(preview.newDeducciones)}
-                                   {preview.newDeducciones !== preview.originalDeducciones && (
-                                     <span className="text-xs ml-1">
-                                       ({preview.newDeducciones > preview.originalDeducciones ? '+' : ''}{formatCurrency(preview.newDeducciones - preview.originalDeducciones)})
-                                     </span>
-                                   )}
-                                 </div>
-                               </div>
-                             ) : (
-                               <span className="font-semibold text-red-600">
-                                 {formatCurrency(employee.total_deducciones)}
-                               </span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-center font-medium">
-                            <div className="flex items-center justify-center gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-8 w-8 p-0 rounded-full border-dashed border-2 border-blue-300 text-blue-600 hover:border-blue-500 hover:text-blue-700 hover:bg-blue-50"
-                                onClick={() => handleOpenAdjustmentModal(employee.employee_id, employee.salario_base)}
-                              >
-                                <Plus className="h-4 w-4" />
-                              </Button>
-                              {/* Show total net value like in liquidation module */}
-                              {totalNovedadesValue !== 0 ? (
-                                <span className={`font-semibold text-sm ${
-                                  totalNovedadesValue > 0 
-                                    ? 'text-green-600' 
-                                    : 'text-red-600'
-                                }`}>
-                                  {totalNovedadesValue > 0 ? '+' : ''}{formatCurrency(totalNovedadesValue)}
-                                </span>
-                              ) : (
-                                <span className="text-sm text-muted-foreground">
-                                  {formatCurrency(0)}
-                                </span>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell className="bg-blue-100 text-right">
-                            {preview.hasPending ? (
-                              <div className="space-y-1">
-                                <div className="text-muted-foreground line-through text-sm">
-                                  {formatCurrency(preview.originalNeto)}
-                                </div>
-                                 <div className="font-semibold text-blue-600">
-                                    {formatCurrency(preview.newNeto)}
-                                    <span className="text-xs ml-1">
-                                      ({preview.newNeto > preview.originalNeto ? '+' : ''}{formatCurrency(preview.newNeto - preview.originalNeto)})
-                                    </span>
-                                 </div>
-                               </div>
-                             ) : (
-                               <span className="font-semibold text-blue-600">
-                                 {formatCurrency(employee.neto_pagado)}
-                               </span>
-                             )}
-                          </TableCell>
-                          <TableCell className="sticky right-0 bg-background z-10 text-center font-medium">
-                            <div className="flex items-center gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleDownloadVoucher(employee.employee_id, `${employee.employee_name} ${employee.employee_lastname}`)}
-                                aria-label="Descargar comprobante"
-                                title="Descargar comprobante"
-                              >
-                                <FileText className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleSendVoucherEmail(employee.employee_id, `${employee.employee_name} ${employee.employee_lastname}`)}
-                                disabled={isSendingEmail || !hasEmail}
-                                aria-label="Enviar por email"
-                                title={hasEmail ? "Enviar comprobante por email" : "Empleado sin email registrado"}
-                                className={!hasEmail ? "opacity-50 cursor-not-allowed" : ""}
-                              >
-                                {isSendingEmail ? (
-                                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-primary border-t-transparent" />
-                                ) : (
-                                  <Mail className="h-4 w-4" />
-                                )}
-                              </Button>
-                            </div>
-                          </TableCell>
+                <Separator className="my-4" />
+
+                <div>
+                  <h2>Novedades del Período</h2>
+                  {isLoadingNovedades ? (
+                    <p>Cargando novedades...</p>
+                  ) : (
+                    <Table>
+                      <TableCaption>Lista de novedades para este período.</TableCaption>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[100px]">Tipo</TableHead>
+                          <TableHead>Subtipo</TableHead>
+                          <TableHead>Valor</TableHead>
+                          <TableHead>Fecha Inicio</TableHead>
+                          <TableHead>Fecha Fin</TableHead>
+                          <TableHead className="text-right">Acciones</TableHead>
                         </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                      </TableHeader>
+                      <TableBody>
+                        {novedades.map((novedad) => (
+                          <TableRow key={novedad.id}>
+                            <TableCell className="font-medium">{novedad.tipo_novedad}</TableCell>
+                            <TableCell>{novedad.subtipo}</TableCell>
+                            <TableCell>{novedad.valor}</TableCell>
+                            <TableCell>{novedad.fecha_inicio}</TableCell>
+                            <TableCell>{novedad.fecha_fin}</TableCell>
+                            <TableCell className="text-right">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" className="h-8 w-8 p-0">
+                                    <span className="sr-only">Open menu</span>
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                                  <DropdownMenuItem>
+                                    <Edit className="mr-2 h-4 w-4" /> Editar
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem>
+                                    <Copy className="mr-2 h-4 w-4" /> Duplicar
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem>
+                                    <Trash className="mr-2 h-4 w-4" /> Eliminar
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </div>
 
-        <TabsContent value="audit">
-          <PeriodAuditSummaryComponent 
-            periodId={periodId || ''} 
-            periodName={period.periodo} 
-          />
-        </TabsContent>
-      </Tabs>
+                <Separator className="my-4" />
 
-      {/* Adjustment Modal */}
-      <NovedadUnifiedModal
-        mode="ajustes"
-        open={showAdjustmentModal}
-        setOpen={setShowAdjustmentModal}
-        employeeId={selectedEmployeeId}
-        employeeSalary={selectedEmployeeSalary}
-        periodId={periodId}
-        onSubmit={handleNovedadSubmit}
-        selectedNovedadType={null}
-        startDate={period?.fecha_inicio}
-        endDate={period?.fecha_fin}
-        companyId={companyId}
-        onClose={() => setShowAdjustmentModal(false)}
-      />
+                <Dialog open={open} onOpenChange={setOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="default">Agregar Novedad</Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                      <DialogTitle>Agregar Novedad</DialogTitle>
+                      <DialogDescription>
+                        Agrega una nueva novedad al período seleccionado.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <Form {...form}>
+                      <form onSubmit={form.handleSubmit(async (values) => {
+                        console.log(values)
+                        await handleCreateNovedad({
+                          tipo_novedad: values.tipo_novedad,
+                          subtipo: values.subtipo,
+                          valor: parseFloat(values.valor),
+                          fecha_inicio: values.fecha_inicio.toISOString(),
+                          fecha_fin: values.fecha_fin.toISOString(),
+                          observacion: values.observacion,
+                        })
+                        setOpen(false)
+                      })} className="space-y-4">
+                        <div className="grid gap-2">
+                          <FormItem>
+                            <FormLabel>Tipo de Novedad</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Tipo de Novedad" {...form.register("tipo_novedad")} />
+                            </FormControl>
+                            <FormDescription>
+                              Este es el tipo de novedad.
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        </div>
+                        <div className="grid gap-2">
+                          <FormItem>
+                            <FormLabel>Subtipo de Novedad</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Subtipo de Novedad" {...form.register("subtipo")} />
+                            </FormControl>
+                            <FormDescription>
+                              Este es el subtipo de novedad.
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        </div>
+                        <div className="grid gap-2">
+                          <FormItem>
+                            <FormLabel>Valor</FormLabel>
+                            <FormControl>
+                              <Input type="number" placeholder="Valor" {...form.register("valor")} />
+                            </FormControl>
+                            <FormDescription>
+                              Este es el valor de la novedad.
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormItem>
+                            <FormLabel>Fecha de Inicio</FormLabel>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <FormControl>
+                                  <Button
+                                    variant={"outline"}
+                                    className={cn(
+                                      "w-[240px] pl-3 text-left font-normal",
+                                      !form.getValues().fecha_inicio && "text-muted-foreground"
+                                    )}
+                                  >
+                                    {form.getValues().fecha_inicio ? (
+                                      formatDate(form.getValues().fecha_inicio)
+                                    ) : (
+                                      <span>Pick a date</span>
+                                    )}
+                                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                  </Button>
+                                </FormControl>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="center" side="bottom">
+                                <DatePicker
+                                  mode="single"
+                                  selected={form.getValues().fecha_inicio}
+                                  onSelect={(date) => form.setValue("fecha_inicio", date!)}
+                                  initialFocus
+                                />
+                              </PopoverContent>
+                            </Popover>
+                            <FormDescription>
+                              Esta es la fecha de inicio de la novedad.
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                          <FormItem>
+                            <FormLabel>Fecha de Fin</FormLabel>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <FormControl>
+                                  <Button
+                                    variant={"outline"}
+                                    className={cn(
+                                      "w-[240px] pl-3 text-left font-normal",
+                                      !form.getValues().fecha_fin && "text-muted-foreground"
+                                    )}
+                                  >
+                                    {form.getValues().fecha_fin ? (
+                                      formatDate(form.getValues().fecha_fin)
+                                    ) : (
+                                      <span>Pick a date</span>
+                                    )}
+                                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                  </Button>
+                                </FormControl>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="center" side="bottom">
+                                <DatePicker
+                                  mode="single"
+                                  selected={form.getValues().fecha_fin}
+                                  onSelect={(date) => form.setValue("fecha_fin", date!)}
+                                  initialFocus
+                                />
+                              </PopoverContent>
+                            </Popover>
+                            <FormDescription>
+                              Esta es la fecha de fin de la novedad.
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        </div>
+                        <div className="grid gap-2">
+                          <FormItem>
+                            <FormLabel>Observación</FormLabel>
+                            <FormControl>
+                              <Textarea
+                                placeholder="Observación"
+                                className="resize-none"
+                                {...form.register("observacion")}
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              Esta es la observación de la novedad.
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        </div>
+                        <Button type="submit">Agregar</Button>
+                      </form>
+                    </Form>
+                  </DialogContent>
+                </Dialog>
 
-      {/* Confirmation Modal for Pending Adjustments */}
-      <ConfirmAdjustmentModal
-        isOpen={showConfirmModal}
-        onClose={() => setShowConfirmModal(false)}
-        onConfirm={handleApplyPendingAdjustments}
-        pendingNovedades={pendingNovedades}
-        periodName={period?.periodo || ''}
-        isLoading={isApplyingAdjustments}
-      />
+                <Separator className="my-4" />
 
-      {/* Audit History Modal */}
-      <NovedadAuditHistoryModal
-        open={showAuditModal}
-        onClose={() => setShowAuditModal(false)}
-        novedadId={selectedNovedadId}
-        employeeName={selectedEmployeeName}
-      />
-
-      {/* Voucher Preview Modal */}
-      <VoucherPreviewModal
-        isOpen={isVoucherModalOpen}
-        onClose={() => setIsVoucherModalOpen(false)}
-        employee={selectedVoucherEmployee}
-        period={period ? {
-          startDate: period.fecha_inicio,
-          endDate: period.fecha_fin,
-          type: period.tipo_periodo
-        } : null}
-        companyInfo={companyDetails}
-      />
-    </div>
+                <Button variant="secondary" onClick={handleGoBack}>
+                  Volver a la Lista de Períodos
+                </Button>
+              </>
+            ) : (
+              <Alert variant="destructive">
+                <XCircle className="h-4 w-4" />
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>
+                  No se ha especificado un período válido.
+                </AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </>
   );
-};
+}
