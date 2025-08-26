@@ -23,6 +23,12 @@ export interface UsePayrollNovedadesUnifiedReturn {
   isUpdating: boolean;
   isDeleting: boolean;
   refetch: () => void;
+  // ✅ RESTORED: Missing methods that were causing build errors
+  loadNovedadesTotals: (employeeIds: string[]) => void;
+  getEmployeeNovedades: (employeeId: string) => { totalNeto: number; devengos: number; deducciones: number };
+  refreshEmployeeNovedades: (employeeId: string) => Promise<void>;
+  lastRefreshTime: number;
+  getEmployeeNovedadesList: (employeeId: string) => Promise<PayrollNovedad[]>;
 }
 
 // Helper function to transform PayrollNovedad to the expected format
@@ -52,17 +58,23 @@ const transformNovedadForQuery = (novedad: PayrollNovedad) => ({
  * Hook consolidado para manejar todas las operaciones de novedades
  * Funciona tanto para empresa+período como para empleado específico
  */
-export const usePayrollNovedadesUnified = ({
-  companyId,
-  periodId,
-  employeeId,
-  enabled = true
-}: UsePayrollNovedadesUnifiedOptions): UsePayrollNovedadesUnifiedReturn => {
+export const usePayrollNovedadesUnified = (
+  optionsOrPeriodId: UsePayrollNovedadesUnifiedOptions | string
+): UsePayrollNovedadesUnifiedReturn => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isCreating, setIsCreating] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [lastRefreshTime, setLastRefreshTime] = useState(Date.now());
+  const [employeeNovedadesCache, setEmployeeNovedadesCache] = useState<Record<string, PayrollNovedad[]>>({});
+
+  // ✅ FIXED: Handle both string and options parameter
+  const options: UsePayrollNovedadesUnifiedOptions = typeof optionsOrPeriodId === 'string' 
+    ? { periodId: optionsOrPeriodId, enabled: true }
+    : optionsOrPeriodId;
+
+  const { companyId, periodId, employeeId, enabled = true } = options;
 
   // Determinar la key y función de fetch según los parámetros
   const queryKey = employeeId 
@@ -89,6 +101,77 @@ export const usePayrollNovedadesUnified = ({
     refetchOnWindowFocus: false
   });
 
+  // ✅ RESTORED: Load novedades totals for multiple employees
+  const loadNovedadesTotals = async (employeeIds: string[]) => {
+    if (!periodId) return;
+    
+    console.log('📊 Loading novedades totals for employees:', employeeIds);
+    
+    for (const employeeId of employeeIds) {
+      try {
+        const employeeNovedades = await NovedadesEnhancedService.getNovedadesByEmployee(employeeId, periodId);
+        setEmployeeNovedadesCache(prev => ({
+          ...prev,
+          [employeeId]: employeeNovedades
+        }));
+      } catch (error) {
+        console.error(`Error loading novedades for employee ${employeeId}:`, error);
+      }
+    }
+    
+    setLastRefreshTime(Date.now());
+  };
+
+  // ✅ RESTORED: Get employee novedades totals
+  const getEmployeeNovedades = (employeeId: string) => {
+    const employeeNovedades = employeeNovedadesCache[employeeId] || [];
+    
+    let devengos = 0;
+    let deducciones = 0;
+    
+    employeeNovedades.forEach(novedad => {
+      const valor = Number(novedad.valor || 0);
+      if (valor >= 0) {
+        devengos += valor;
+      } else {
+        deducciones += Math.abs(valor);
+      }
+    });
+    
+    const totalNeto = devengos - deducciones;
+    
+    return { totalNeto, devengos, deducciones };
+  };
+
+  // ✅ RESTORED: Refresh employee novedades
+  const refreshEmployeeNovedades = async (employeeId: string) => {
+    if (!periodId) return;
+    
+    try {
+      const employeeNovedades = await NovedadesEnhancedService.getNovedadesByEmployee(employeeId, periodId);
+      setEmployeeNovedadesCache(prev => ({
+        ...prev,
+        [employeeId]: employeeNovedades
+      }));
+      setLastRefreshTime(Date.now());
+    } catch (error) {
+      console.error(`Error refreshing novedades for employee ${employeeId}:`, error);
+    }
+  };
+
+  // ✅ RESTORED: Get employee novedades list
+  const getEmployeeNovedadesList = async (employeeId: string): Promise<PayrollNovedad[]> => {
+    if (!periodId) return [];
+    
+    try {
+      const employeeNovedades = await NovedadesEnhancedService.getNovedadesByEmployee(employeeId, periodId);
+      return employeeNovedades;
+    } catch (error) {
+      console.error(`Error getting novedades list for employee ${employeeId}:`, error);
+      return [];
+    }
+  };
+
   // Mutation para crear novedad
   const createMutation = useMutation({
     mutationFn: async (data: CreateNovedadData) => {
@@ -113,6 +196,11 @@ export const usePayrollNovedadesUnified = ({
       queryClient.setQueryData(queryKey, (old: typeof transformedNovedad[] = []) => {
         return [...old, transformedNovedad];
       });
+      
+      // Update employee cache
+      if (newNovedad.empleado_id) {
+        refreshEmployeeNovedades(newNovedad.empleado_id);
+      }
       
       queryClient.invalidateQueries({ 
         queryKey: ['novedades'],
@@ -165,6 +253,11 @@ export const usePayrollNovedadesUnified = ({
         );
       });
       
+      // Update employee cache
+      if (updatedNovedad.empleado_id) {
+        refreshEmployeeNovedades(updatedNovedad.empleado_id);
+      }
+      
       queryClient.invalidateQueries({ 
         queryKey: ['novedades'],
         exact: false 
@@ -205,6 +298,9 @@ export const usePayrollNovedadesUnified = ({
       queryClient.setQueryData(queryKey, (old: any[] = []) => {
         return old.filter(item => item.id !== deletedId);
       });
+      
+      // Refresh employee cache for all employees (since we don't know which employee)
+      setLastRefreshTime(Date.now());
       
       queryClient.invalidateQueries({ 
         queryKey: ['novedades'],
@@ -272,6 +368,12 @@ export const usePayrollNovedadesUnified = ({
     isCreating,
     isUpdating,
     isDeleting,
-    refetch
+    refetch,
+    // ✅ RESTORED: Missing methods
+    loadNovedadesTotals,
+    getEmployeeNovedades,
+    refreshEmployeeNovedades,
+    lastRefreshTime,
+    getEmployeeNovedadesList
   };
 };

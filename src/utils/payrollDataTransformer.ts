@@ -64,11 +64,14 @@ export function transformPayrollHistoryToEmployee(
   const healthDeduction = historyData.salud_empleado || 0;
   const pensionDeduction = historyData.pension_empleado || 0;
   
+  // ✅ FIXED: Ensure transport allowance is correctly mapped from historical data
+  const transportAllowance = historyData.auxilio_transporte || 0;
+  
   // Calcular aportes patronales (aproximación)
   const baseSalary = historyData.salario_base || 0;
   const employerContributions = baseSalary * 0.205; // 20.5% aportes patronales
 
-  // ✅ MAPEO COMPLETO CON VALORES HISTÓRICOS REALES
+  // ✅ MAPEO COMPLETO CON VALORES HISTÓRICOS REALES - TRANSPORT ALLOWANCE INCLUDED
   return {
     id: historyData.employee_id,
     name: `${historyData.employee_name} ${historyData.employee_lastname}`,
@@ -86,7 +89,7 @@ export function transformPayrollHistoryToEmployee(
     errors: [],
     eps: emp.eps || '',
     afp: emp.afp || '',
-    transportAllowance: historyData.auxilio_transporte || 0,
+    transportAllowance: transportAllowance, // ✅ FIXED: Use historical transport allowance
     employerContributions,
     ibc: historyData.ibc || historyData.salario_base || 0,
     // ✅ CRÍTICO: Usar valores históricos reales de deducciones

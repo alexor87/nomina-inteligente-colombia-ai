@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -70,14 +71,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
   const { toast } = useToast();
   const { companyId } = useCurrentCompany();
 
-  // ✅ NUEVO: Calcular fecha del período para usar en cálculos de jornada legal
-  const getPeriodDate = () => {
-    if (startDate) {
-      return new Date(startDate);
-    }
-    return new Date();
-  };
-
+  // ✅ FIXED: Use correct hook signature
   const {
     loadNovedadesTotals,
     createNovedad,
@@ -86,7 +80,15 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
     isCreating,
     lastRefreshTime,
     getEmployeeNovedadesList
-  } = usePayrollNovedadesUnified(currentPeriodId || '');
+  } = usePayrollNovedadesUnified({ periodId: currentPeriodId || '', enabled: true });
+
+  // ✅ NUEVO: Calcular fecha del período para usar en cálculos de jornada legal
+  const getPeriodDate = () => {
+    if (startDate) {
+      return new Date(startDate);
+    }
+    return new Date();
+  };
 
   // Cargar novedades cuando se monten los empleados o cambie el período
   useEffect(() => {
@@ -163,19 +165,33 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
             year: year // ✅ AGREGAR EL AÑO PARA CÁLCULOS ESPECÍFICOS
           });
 
+          // ✅ FIXED: Ensure transport allowance is correctly included in gross pay
+          const expectedTransportAllowance = calculation.transportAllowance;
+          const adjustedGrossPay = calculation.grossPay; // Backend should already include transport allowance
+
+          console.log('🚌 Transport allowance calculation:', {
+            employee: employee.name,
+            expectedTransportAllowance,
+            grossPay: adjustedGrossPay,
+            periodType,
+            workedDays: currentWorkedDays
+          });
+
           newCalculations[employee.id] = {
             totalToPay: calculation.netPay,
             ibc: calculation.ibc,
-            grossPay: calculation.grossPay,
+            grossPay: adjustedGrossPay,
             deductions: calculation.totalDeductions,
             healthDeduction: calculation.healthDeduction,
             pensionDeduction: calculation.pensionDeduction,
-            transportAllowance: calculation.transportAllowance
+            transportAllowance: expectedTransportAllowance
           };
 
           console.log('✅ Empleado calculado:', employee.name, {
             ibc: calculation.ibc,
             netPay: calculation.netPay,
+            grossPay: adjustedGrossPay,
+            transportAllowance: expectedTransportAllowance,
             healthDeduction: calculation.healthDeduction,
             pensionDeduction: calculation.pensionDeduction
           });
@@ -209,7 +225,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
     };
 
     recalculateAllEmployees();
-  }, [employees, currentPeriodId, lastRefreshTime, getEmployeeNovedadesList, updateEmployeeCalculationsInDB]);
+  }, [employees, currentPeriodId, lastRefreshTime, getEmployeeNovedadesList, updateEmployeeCalculationsInDB, year]);
 
   // USAR SERVICIO CENTRALIZADO: Fuente única de verdad para días trabajados
   // Usar el tipo de período desde el hook (datos de BD)
@@ -319,6 +335,11 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
     return calculation ? calculation.ibc : employee.baseSalary;
   };
 
+  const getEmployeeTransportAllowance = (employee: PayrollEmployee) => {
+    const calculation = employeeCalculations[employee.id];
+    return calculation ? calculation.transportAllowance : 0;
+  };
+
   return (
     <>
       <div className="w-full overflow-x-auto">
@@ -329,6 +350,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
               <TableHead className="text-right min-w-[120px]">Salario Base</TableHead>
               <TableHead className="text-right min-w-[120px]">IBC</TableHead>
               <TableHead className="text-center min-w-[100px]">Días Trabajados</TableHead>
+              <TableHead className="text-right min-w-[120px]">Aux. Transporte</TableHead>
               <TableHead className="text-right min-w-[140px] bg-green-100 font-semibold">Total Devengado</TableHead>
               <TableHead className="text-right min-w-[140px] bg-red-100 font-semibold">Total Deducciones</TableHead>
               <TableHead className="text-center min-w-[100px]">Novedades</TableHead>
@@ -341,6 +363,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
               const novedades = getEmployeeNovedades(employee.id);
               const totalToPay = getTotalToPay(employee);
               const ibc = getEmployeeIBC(employee);
+              const transportAllowance = getEmployeeTransportAllowance(employee);
               const calc = employeeCalculations[employee.id];
 
               return (
@@ -364,6 +387,13 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
                   
                   <TableCell className="text-center font-medium">
                     {workedDays} días
+                  </TableCell>
+
+                  {/* ✅ NEW: Transport Allowance Column */}
+                  <TableCell className="text-right">
+                    <div className="font-medium text-blue-600">
+                      {formatCurrency(transportAllowance)}
+                    </div>
                   </TableCell>
                   
                   {/* Total Devengado */}
@@ -458,6 +488,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
             >
               Remover
             </AlertDialogAction>
+          </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

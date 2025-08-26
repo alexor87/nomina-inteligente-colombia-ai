@@ -96,10 +96,18 @@ export const PayrollHistoryDetailPage = () => {
   const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
   const [selectedVoucherEmployee, setSelectedVoucherEmployee] = useState<any>(null);
   const [sendingEmails, setSendingEmails] = useState<Set<string>>(new Set());
-  
+
   // Hook para gestionar novedades
-  const { createNovedad } = usePayrollNovedadesUnified(periodId || '');
-  
+  const {
+    novedades,
+    isLoading: novedadesLoading,
+    error: novedadesError
+  } = usePayrollNovedadesUnified({ 
+    companyId, 
+    periodId: periodId || '', 
+    enabled: !!companyId && !!periodId 
+  });
+
   // Hook para obtener company_id
   useCompanyId(setCompanyId);
   
@@ -819,7 +827,7 @@ export const PayrollHistoryDetailPage = () => {
                       <TableHead className="min-w-[140px] bg-red-100 text-right font-semibold">
                         Total Deducciones
                       </TableHead>
-                       <TableHead className="min-w-[140px] text-center">
+                       <TableHead className="min-w-[100px] text-center">
                          Novedades
                        </TableHead>
                       <TableHead className="min-w-[140px] bg-blue-100 text-right font-semibold">
