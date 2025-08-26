@@ -37,7 +37,6 @@ const parseBaseCalculo = (bc: unknown): BaseCalculoData | undefined => {
     try {
       return JSON.parse(bc);
     } catch (e) {
-      console.warn('⚠️ base_calculo con JSON inválido, se ignora:', e);
       return undefined;
     }
   }
@@ -67,58 +66,14 @@ const mapDbRowToApp = (n: any): AppPayrollNovedad => {
 };
 
 /**
- * ✅ Caché KISS en memoria para lecturas frecuentes
- */
-type CacheEntry<T> = { data: T; expiresAt: number };
-const CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutos
-
-const companyPeriodCache = new Map<string, CacheEntry<AppPayrollNovedad[]>>();
-const employeePeriodCache = new Map<string, CacheEntry<AppPayrollNovedad[]>>();
-
-const getCache = <T>(map: Map<string, CacheEntry<T>>, key: string): T | null => {
-  const hit = map.get(key);
-  if (hit && hit.expiresAt > Date.now()) {
-    return hit.data;
-  }
-  map.delete(key);
-  return null;
-};
-
-const setCache = <T>(map: Map<string, CacheEntry<T>>, key: string, data: T) => {
-  map.set(key, { data, expiresAt: Date.now() + CACHE_TTL_MS });
-};
-
-const invalidateAllCaches = () => {
-  companyPeriodCache.clear();
-  employeePeriodCache.clear();
-};
-
-const invalidateEmployeePeriod = (employeeId: string, periodId: string) => {
-  employeePeriodCache.delete(`${employeeId}:${periodId}`);
-};
-
-const invalidateCompanyPeriod = (companyId: string, periodId: string) => {
-  companyPeriodCache.delete(`${companyId}:${periodId}`);
-};
-
-/**
- * ✅ SERVICIO DE NOVEDADES REPARADO - FASE 3 CRÍTICA
- * Implementación real para conectar con base de datos
+ * ✅ SERVICIO DE NOVEDADES SIMPLIFICADO - SIN CACHE COMPLEJO
+ * Implementación directa sin cache en memoria que causaba bloqueos
  */
 export class NovedadesEnhancedService {
   
-  // ✅ NUEVO: Método para obtener novedades por empresa y período (con caché y sin auto-fix)
+  // ✅ Obtener novedades por empresa y período (simplificado)
   static async getNovedades(companyId: string, periodId: string): Promise<AppPayrollNovedad[]> {
     try {
-      const cacheKey = `${companyId}:${periodId}`;
-      const cached = getCache(companyPeriodCache, cacheKey);
-      if (cached) {
-        console.log('⚡ Cache hit getNovedades', { companyId, periodId, count: cached.length });
-        return cached;
-      }
-
-      console.log(`🔍 Obteniendo novedades para empresa ${companyId} en período ${periodId}`);
-      
       const { data: novedades, error } = await supabase
         .from('payroll_novedades')
         .select('*')
@@ -130,11 +85,7 @@ export class NovedadesEnhancedService {
         return [];
       }
 
-      console.log(`✅ Novedades encontradas: ${novedades?.length || 0}`);
       const mapped = (novedades || []).map(mapDbRowToApp);
-
-      // Guardar en caché
-      setCache(companyPeriodCache, cacheKey, mapped);
       return mapped;
       
     } catch (error) {
@@ -143,18 +94,9 @@ export class NovedadesEnhancedService {
     }
   }
   
-  // ✅ NUEVO: Obtener por empleado+período con caché y sin auto-fix
+  // ✅ Obtener por empleado+período (simplificado)
   static async getNovedadesByEmployee(employeeId: string, periodId: string): Promise<AppPayrollNovedad[]> {
     try {
-      const cacheKey = `${employeeId}:${periodId}`;
-      const cached = getCache(employeePeriodCache, cacheKey);
-      if (cached) {
-        console.log('⚡ Cache hit getNovedadesByEmployee', { employeeId, periodId, count: cached.length });
-        return cached;
-      }
-
-      console.log(`🔍 Obteniendo novedades para empleado ${employeeId} en período ${periodId}`);
-      
       const { data: novedades, error } = await supabase
         .from('payroll_novedades')
         .select('*')
@@ -166,11 +108,7 @@ export class NovedadesEnhancedService {
         return [];
       }
 
-      console.log(`✅ Novedades encontradas: ${novedades?.length || 0}`);
       const mapped = (novedades || []).map(mapDbRowToApp);
-
-      // Guardar en caché
-      setCache(employeePeriodCache, cacheKey, mapped);
       return mapped;
       
     } catch (error) {
@@ -181,9 +119,6 @@ export class NovedadesEnhancedService {
 
   static async createNovedad(novedadData: CreateNovedadData): Promise<AppPayrollNovedad | null> {
     try {
-      console.log('➕ Creando nueva novedad:', novedadData);
-      
-      // ✅ CORRECCIÓN: Usar el tipo correcto y obtener company_id si no viene
       let companyId = novedadData.company_id;
       
       if (!companyId) {
@@ -250,14 +185,7 @@ export class NovedadesEnhancedService {
         console.warn('⚠️ No se pudo registrar acción de auditoría:', auditError);
       }
 
-      console.log('✅ Novedad creada exitosamente');
-      const mapped = mapDbRowToApp(novedad);
-
-      // ✅ Invalidar cachés específicos
-      invalidateEmployeePeriod(novedad.empleado_id, novedad.periodo_id);
-      invalidateCompanyPeriod(novedad.company_id, novedad.periodo_id);
-
-      return mapped;
+      return mapDbRowToApp(novedad);
       
     } catch (error) {
       console.error('💥 Error crítico creando novedad:', error);
@@ -267,8 +195,6 @@ export class NovedadesEnhancedService {
 
   static async updateNovedad(novedadId: string, updates: Partial<CreateNovedadData>): Promise<AppPayrollNovedad | null> {
     try {
-      console.log(`🔄 Actualizando novedad ${novedadId}:`, updates);
-      
       const { data: novedad, error } = await supabase
         .from('payroll_novedades')
         .update(updates as any)
@@ -281,14 +207,7 @@ export class NovedadesEnhancedService {
         throw error;
       }
 
-      console.log('✅ Novedad actualizada exitosamente');
-      const mapped = mapDbRowToApp(novedad);
-
-      // ✅ Invalidar cachés específicos
-      invalidateEmployeePeriod(novedad.empleado_id, novedad.periodo_id);
-      invalidateCompanyPeriod(novedad.company_id, novedad.periodo_id);
-
-      return mapped;
+      return mapDbRowToApp(novedad);
       
     } catch (error) {
       console.error('💥 Error crítico actualizando novedad:', error);
@@ -298,15 +217,6 @@ export class NovedadesEnhancedService {
 
   static async deleteNovedad(novedadId: string): Promise<void> {
     try {
-      console.log(`🗑️ Eliminando novedad ${novedadId}`);
-      
-      // Obtener datos mínimos para invalidar caché
-      const { data: existing } = await supabase
-        .from('payroll_novedades')
-        .select('id, empleado_id, periodo_id, company_id')
-        .eq('id', novedadId)
-        .maybeSingle();
-
       const { error } = await supabase
         .from('payroll_novedades')
         .delete()
@@ -315,17 +225,6 @@ export class NovedadesEnhancedService {
       if (error) {
         console.error('❌ Error eliminando novedad:', error);
         throw error;
-      }
-
-      console.log('✅ Novedad eliminada exitosamente');
-
-      // ✅ Invalidar cachés específicos (si teníamos el registro)
-      if (existing) {
-        invalidateEmployeePeriod(existing.empleado_id, existing.periodo_id);
-        invalidateCompanyPeriod(existing.company_id, existing.periodo_id);
-      } else {
-        // fallback
-        invalidateAllCaches();
       }
       
     } catch (error) {
