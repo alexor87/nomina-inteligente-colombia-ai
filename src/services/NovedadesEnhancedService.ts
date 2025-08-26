@@ -67,14 +67,56 @@ const mapDbRowToApp = (n: any): AppPayrollNovedad => {
 };
 
 /**
+ * ✅ Caché KISS en memoria para lecturas frecuentes
+ */
+type CacheEntry<T> = { data: T; expiresAt: number };
+const CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutos
+
+const companyPeriodCache = new Map<string, CacheEntry<AppPayrollNovedad[]>>();
+const employeePeriodCache = new Map<string, CacheEntry<AppPayrollNovedad[]>>();
+
+const getCache = <T>(map: Map<string, CacheEntry<T>>, key: string): T | null => {
+  const hit = map.get(key);
+  if (hit && hit.expiresAt > Date.now()) {
+    return hit.data;
+  }
+  map.delete(key);
+  return null;
+};
+
+const setCache = <T>(map: Map<string, CacheEntry<T>>, key: string, data: T) => {
+  map.set(key, { data, expiresAt: Date.now() + CACHE_TTL_MS });
+};
+
+const invalidateAllCaches = () => {
+  companyPeriodCache.clear();
+  employeePeriodCache.clear();
+};
+
+const invalidateEmployeePeriod = (employeeId: string, periodId: string) => {
+  employeePeriodCache.delete(`${employeeId}:${periodId}`);
+};
+
+const invalidateCompanyPeriod = (companyId: string, periodId: string) => {
+  companyPeriodCache.delete(`${companyId}:${periodId}`);
+};
+
+/**
  * ✅ SERVICIO DE NOVEDADES REPARADO - FASE 3 CRÍTICA
  * Implementación real para conectar con base de datos
  */
 export class NovedadesEnhancedService {
   
-  // ✅ NUEVO: Método para obtener novedades por empresa y período
+  // ✅ NUEVO: Método para obtener novedades por empresa y período (con caché y sin auto-fix)
   static async getNovedades(companyId: string, periodId: string): Promise<AppPayrollNovedad[]> {
     try {
+      const cacheKey = `${companyId}:${periodId}`;
+      const cached = getCache(companyPeriodCache, cacheKey);
+      if (cached) {
+        console.log('⚡ Cache hit getNovedades', { companyId, periodId, count: cached.length });
+        return cached;
+      }
+
       console.log(`🔍 Obteniendo novedades para empresa ${companyId} en período ${periodId}`);
       
       const { data: novedades, error } = await supabase
@@ -88,39 +130,12 @@ export class NovedadesEnhancedService {
         return [];
       }
 
-      // ✅ Auto-fix: corregir constitutividad para horas extra/recargos que quedaron en false por defecto previo
-      const toFixIds: string[] = (novedades || [])
-        .filter(n => {
-          const shouldBeTrue = getDefaultConstitutivoByType(n.tipo_novedad as DatabaseNovedadType);
-          const isHEoRecargo = n.tipo_novedad === 'horas_extra' || n.tipo_novedad === 'recargo_nocturno';
-          const explicitFalse = (n as any).constitutivo_salario === false;
-          return isHEoRecargo && shouldBeTrue && explicitFalse;
-        })
-        .map(n => n.id as unknown as string);
-
-      if (toFixIds.length > 0) {
-        console.log('🛠️ Corrigiendo constitutividad en DB para registros:', toFixIds);
-        const { error: updateError } = await supabase
-          .from('payroll_novedades')
-          .update({ constitutivo_salario: true })
-          .in('id', toFixIds);
-
-        if (updateError) {
-          console.warn('⚠️ No se pudo aplicar auto-fix de constitutividad:', updateError);
-        } else {
-          // Reflejar el cambio en memoria
-          (novedades || []).forEach(n => {
-            if (toFixIds.includes(n.id as unknown as string)) {
-              (n as any).constitutivo_salario = true;
-            }
-          });
-          console.log('✅ Auto-fix aplicado en constitutividad (horas extra / recargos = TRUE)');
-        }
-      }
-
       console.log(`✅ Novedades encontradas: ${novedades?.length || 0}`);
-      // ✅ Mapeo a tipo de la app con base_calculo parseado
-      return (novedades || []).map(mapDbRowToApp);
+      const mapped = (novedades || []).map(mapDbRowToApp);
+
+      // Guardar en caché
+      setCache(companyPeriodCache, cacheKey, mapped);
+      return mapped;
       
     } catch (error) {
       console.error('💥 Error crítico en getNovedades:', error);
@@ -128,8 +143,16 @@ export class NovedadesEnhancedService {
     }
   }
   
+  // ✅ NUEVO: Obtener por empleado+período con caché y sin auto-fix
   static async getNovedadesByEmployee(employeeId: string, periodId: string): Promise<AppPayrollNovedad[]> {
     try {
+      const cacheKey = `${employeeId}:${periodId}`;
+      const cached = getCache(employeePeriodCache, cacheKey);
+      if (cached) {
+        console.log('⚡ Cache hit getNovedadesByEmployee', { employeeId, periodId, count: cached.length });
+        return cached;
+      }
+
       console.log(`🔍 Obteniendo novedades para empleado ${employeeId} en período ${periodId}`);
       
       const { data: novedades, error } = await supabase
@@ -143,38 +166,12 @@ export class NovedadesEnhancedService {
         return [];
       }
 
-      // ✅ Auto-fix: igual que en getNovedades, corregir falsos heredados
-      const toFixIds: string[] = (novedades || [])
-        .filter(n => {
-          const shouldBeTrue = getDefaultConstitutivoByType(n.tipo_novedad as DatabaseNovedadType);
-          const isHEoRecargo = n.tipo_novedad === 'horas_extra' || n.tipo_novedad === 'recargo_nocturno';
-          const explicitFalse = (n as any).constitutivo_salario === false;
-          return isHEoRecargo && shouldBeTrue && explicitFalse;
-        })
-        .map(n => n.id as unknown as string);
-
-      if (toFixIds.length > 0) {
-        console.log('🛠️ Corrigiendo constitutividad en DB para registros (empleado):', toFixIds);
-        const { error: updateError } = await supabase
-          .from('payroll_novedades')
-          .update({ constitutivo_salario: true })
-          .in('id', toFixIds);
-
-        if (updateError) {
-          console.warn('⚠️ No se pudo aplicar auto-fix de constitutividad (empleado):', updateError);
-        } else {
-          (novedades || []).forEach(n => {
-            if (toFixIds.includes(n.id as unknown as string)) {
-              (n as any).constitutivo_salario = true;
-            }
-          });
-          console.log('✅ Auto-fix aplicado (empleado) en constitutividad');
-        }
-      }
-
       console.log(`✅ Novedades encontradas: ${novedades?.length || 0}`);
-      // ✅ Mapeo a tipo de la app con base_calculo parseado
-      return (novedades || []).map(mapDbRowToApp);
+      const mapped = (novedades || []).map(mapDbRowToApp);
+
+      // Guardar en caché
+      setCache(employeePeriodCache, cacheKey, mapped);
+      return mapped;
       
     } catch (error) {
       console.error('💥 Error crítico en getNovedadesByEmployee:', error);
@@ -205,7 +202,6 @@ export class NovedadesEnhancedService {
         throw new Error('No se pudo determinar la empresa');
       }
 
-      // ✅ Nuevo: determinar constitutivo por defecto según tipo SOLO cuando no viene explícito
       const constitutivo =
         typeof novedadData.constitutivo_salario === 'boolean'
           ? novedadData.constitutivo_salario
@@ -225,7 +221,7 @@ export class NovedadesEnhancedService {
         fecha_fin: novedadData.fecha_fin,
         base_calculo: novedadData.base_calculo,
         subtipo: novedadData.subtipo,
-        constitutivo_salario: constitutivo // ✅ ya no "|| false", respeta explícito y aplica default normativo
+        constitutivo_salario: constitutivo
       };
 
       const { data: novedad, error } = await supabase
@@ -239,7 +235,6 @@ export class NovedadesEnhancedService {
         throw error;
       }
 
-      // Log manual audit action for business context
       try {
         const { PayrollAuditEnhancedService } = await import('@/services/PayrollAuditEnhancedService');
         await PayrollAuditEnhancedService.logManualAction(novedad.id, 'ADJUSTMENT', {
@@ -256,7 +251,13 @@ export class NovedadesEnhancedService {
       }
 
       console.log('✅ Novedad creada exitosamente');
-      return mapDbRowToApp(novedad);
+      const mapped = mapDbRowToApp(novedad);
+
+      // ✅ Invalidar cachés específicos
+      invalidateEmployeePeriod(novedad.empleado_id, novedad.periodo_id);
+      invalidateCompanyPeriod(novedad.company_id, novedad.periodo_id);
+
+      return mapped;
       
     } catch (error) {
       console.error('💥 Error crítico creando novedad:', error);
@@ -281,7 +282,13 @@ export class NovedadesEnhancedService {
       }
 
       console.log('✅ Novedad actualizada exitosamente');
-      return mapDbRowToApp(novedad);
+      const mapped = mapDbRowToApp(novedad);
+
+      // ✅ Invalidar cachés específicos
+      invalidateEmployeePeriod(novedad.empleado_id, novedad.periodo_id);
+      invalidateCompanyPeriod(novedad.company_id, novedad.periodo_id);
+
+      return mapped;
       
     } catch (error) {
       console.error('💥 Error crítico actualizando novedad:', error);
@@ -293,6 +300,13 @@ export class NovedadesEnhancedService {
     try {
       console.log(`🗑️ Eliminando novedad ${novedadId}`);
       
+      // Obtener datos mínimos para invalidar caché
+      const { data: existing } = await supabase
+        .from('payroll_novedades')
+        .select('id, empleado_id, periodo_id, company_id')
+        .eq('id', novedadId)
+        .maybeSingle();
+
       const { error } = await supabase
         .from('payroll_novedades')
         .delete()
@@ -304,6 +318,15 @@ export class NovedadesEnhancedService {
       }
 
       console.log('✅ Novedad eliminada exitosamente');
+
+      // ✅ Invalidar cachés específicos (si teníamos el registro)
+      if (existing) {
+        invalidateEmployeePeriod(existing.empleado_id, existing.periodo_id);
+        invalidateCompanyPeriod(existing.company_id, existing.periodo_id);
+      } else {
+        // fallback
+        invalidateAllCaches();
+      }
       
     } catch (error) {
       console.error('💥 Error crítico eliminando novedad:', error);
@@ -311,4 +334,3 @@ export class NovedadesEnhancedService {
     }
   }
 }
-

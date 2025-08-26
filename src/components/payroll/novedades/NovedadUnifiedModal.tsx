@@ -11,7 +11,6 @@ import { NovedadPrestamosConsolidatedForm } from './forms/NovedadPrestamosConsol
 import { NovedadDeduccionesConsolidatedForm } from './forms/NovedadDeduccionesConsolidatedForm';
 import { NovedadRetefuenteForm } from './forms/NovedadRetefuenteForm';
 import { NovedadTypeSelector, NovedadCategory } from './NovedadTypeSelector';
-import { NovedadExistingList } from './NovedadExistingList';
 import { NovedadType, CreateNovedadData } from '@/types/novedades-enhanced';
 import { useToast } from '@/hooks/use-toast';
 import { NovedadRecargoConsolidatedForm } from './forms/NovedadRecargoConsolidatedForm';
@@ -21,6 +20,11 @@ import { useNovedadBackendCalculation } from '@/hooks/useNovedadBackendCalculati
 import { VacationAbsenceForm } from '@/components/vacations/VacationAbsenceForm';
 import { VacationAbsenceFormData, VacationAbsenceType } from '@/types/vacations';
 import { useVacationEmployees } from '@/hooks/useVacationEmployees';
+import { LoadingState } from '@/components/ui/LoadingState';
+
+const NovedadExistingList = React.lazy(() =>
+  import('./NovedadExistingList').then(mod => ({ default: mod.NovedadExistingList }))
+);
 
 interface NovedadUnifiedModalProps {
   open: boolean;
@@ -468,7 +472,6 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
             periodEndDate={periodEndDate}
           />
         );
-      
       case 'recargo_nocturno':
         return (
           <NovedadRecargoConsolidatedForm 
@@ -478,20 +481,15 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
             periodEndDate={periodEndDate}
           />
         );
-        
       case 'bonificacion':
         return <NovedadBonificacionesConsolidatedForm {...baseProps} />;
-        
       case 'otros_ingresos':
         return <NovedadIngresosAdicionalesConsolidatedForm {...baseProps} />;
-        
       case 'libranza':
         return <NovedadPrestamosConsolidatedForm {...baseProps} />;
-        
       case 'descuento_voluntario':
       case 'multa':
         return <NovedadDeduccionesConsolidatedForm {...baseProps} />;
-
       case 'retencion_fuente':
         return (
           <NovedadRetefuenteForm
@@ -500,7 +498,6 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
             employeeSalary={employeeSalary || 0}
           />
         );
-
       default:
         return (
           <div className="p-6 text-center">
@@ -516,15 +513,17 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   const renderContent = () => {
     if (currentStep === 'list' && employeeId && periodId) {
       return (
-        <NovedadExistingList
-          employeeId={employeeId}
-          periodId={periodId}
-          employeeName={employeeName}
-          onAddNew={handleAddNew}
-          onClose={handleClose}
-          refreshTrigger={refreshTrigger}
-          onEmployeeNovedadesChange={onEmployeeNovedadesChange}
-        />
+        <React.Suspense fallback={<div className="p-6"><LoadingState message="Cargando novedades..." /></div>}>
+          <NovedadExistingList
+            employeeId={employeeId}
+            periodId={periodId}
+            employeeName={employeeName}
+            onAddNew={handleAddNew}
+            onClose={handleClose}
+            refreshTrigger={refreshTrigger}
+            onEmployeeNovedadesChange={onEmployeeNovedadesChange}
+          />
+        </React.Suspense>
       );
     }
 
@@ -543,7 +542,6 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       return renderNovedadForm();
     }
 
-    // ✅ MODIFICADO: Pasar hideEmployeeSelection={true} para ocultar dropdown
     if (currentStep === 'absence' && selectedAbsenceType && employeeId) {
       console.log('🎯 DEBUG: Renderizando VacationAbsenceForm con:', { 
         employeeId, 
@@ -568,7 +566,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
 
     return (
       <div className="p-6 text-center">
-        <p className="text-gray-500">Cargando...</p>
+        <LoadingState message="Cargando..." />
       </div>
     );
   };

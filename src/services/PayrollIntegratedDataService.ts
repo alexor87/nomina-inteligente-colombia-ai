@@ -1,8 +1,25 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { DisplayNovedad, convertNovedadToDisplay } from '@/types/vacation-integration';
 import { NovedadesEnhancedService } from './NovedadesEnhancedService';
 import { NovedadesCalculationService } from './NovedadesCalculationService';
+
+// ✅ Caché KISS en memoria para datos integrados por empleado+período
+type DisplayCacheEntry = { data: DisplayNovedad[]; expiresAt: number };
+const DISPLAY_TTL_MS = 2 * 60 * 1000; // 2 minutos
+const displayCache = new Map<string, DisplayCacheEntry>();
+
+const getDisplayCache = (key: string): DisplayNovedad[] | null => {
+  const hit = displayCache.get(key);
+  if (hit && hit.expiresAt > Date.now()) {
+    return hit.data;
+  }
+  displayCache.delete(key);
+  return null;
+};
+
+const setDisplayCache = (key: string, data: DisplayNovedad[]) => {
+  displayCache.set(key, { data, expiresAt: Date.now() + DISPLAY_TTL_MS });
+};
 
 export class PayrollIntegratedDataService {
   static async getEmployeePeriodData(
@@ -10,6 +27,13 @@ export class PayrollIntegratedDataService {
     periodId: string
   ): Promise<DisplayNovedad[]> {
     try {
+      const cacheKey = `${employeeId}:${periodId}`;
+      const cached = getDisplayCache(cacheKey);
+      if (cached) {
+        console.log('⚡ Cache hit PayrollIntegratedDataService.getEmployeePeriodData', { employeeId, periodId, count: cached.length });
+        return cached;
+      }
+
       console.log('🔍 PayrollIntegratedDataService - PROFESSIONAL: Obteniendo datos unificados con valores normativos:', {
         employeeId,
         periodId
@@ -78,6 +102,9 @@ export class PayrollIntegratedDataService {
         novedades: sortedData.filter(item => item.origen === 'novedades').length,
         valoresCalculados: breakdown.length
       });
+
+      // ✅ Guardar en caché para aperturas sucesivas del modal
+      setDisplayCache(cacheKey, sortedData);
 
       return sortedData;
 
