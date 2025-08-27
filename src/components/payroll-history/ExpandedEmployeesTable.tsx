@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { PendingNovedad, EmployeeNovedadPreview } from '@/types/pending-adjustments';
+import { formatPreviewCurrency } from '@/utils/pendingAdjustmentsPreview';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, FileText, Mail } from 'lucide-react';
@@ -26,8 +28,9 @@ interface ExpandedEmployeesTableProps {
   onAddNovedad: (employeeId: string) => void;
   onEditNovedad: (novedad: PayrollNovedad) => void;
   canEdit: boolean;
-  pendingNovedades?: PayrollNovedad[];
-  onPendingNovedadesChange?: (novedades: PayrollNovedad[]) => void;
+  pendingNovedades?: PendingNovedad[];
+  getPendingCount?: (employeeId: string) => number;
+  calculateEmployeePreview?: (employee: any) => EmployeeNovedadPreview;
 }
 
 export const ExpandedEmployeesTable = ({
@@ -37,7 +40,8 @@ export const ExpandedEmployeesTable = ({
   onEditNovedad,
   canEdit,
   pendingNovedades = [],
-  onPendingNovedadesChange
+  getPendingCount,
+  calculateEmployeePreview
 }: ExpandedEmployeesTableProps) => {
   const [sendingEmails, setSendingEmails] = useState<Record<string, boolean>>({});
 
@@ -46,13 +50,15 @@ export const ExpandedEmployeesTable = ({
   };
 
   const getPendingNovedadesCount = (employeeId: string): number => {
-    // For this component, we don't track pending changes directly
-    // The main page handles the pending logic
-    return 0;
+    return getPendingCount ? getPendingCount(employeeId) : 0;
   };
 
-  const getEmployeePreview = (employee: ExpandedEmployee) => {
-    // For this simplified component, no pending changes preview
+  const getEmployeePreview = (employee: ExpandedEmployee): EmployeeNovedadPreview => {
+    if (calculateEmployeePreview) {
+      return calculateEmployeePreview(employee);
+    }
+    
+    // Default preview with no changes
     return {
       hasPending: false,
       pendingCount: 0,
@@ -206,25 +212,30 @@ export const ExpandedEmployeesTable = ({
                       )}
                     </TableCell>
                     
-                    <TableCell className="text-center font-medium">
-                      <div className="flex items-center justify-center gap-2">
-                        {canEdit && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-8 w-8 p-0 rounded-full border-dashed border-2 border-blue-300 text-blue-600 hover:border-blue-500 hover:text-blue-700 hover:bg-blue-50"
-                            onClick={() => onAddNovedad(employee.id)}
-                          >
-                            <Plus className="h-4 w-4" />
-                          </Button>
-                        )}
-                        {(novedadesCount > 0) && (
-                          <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                            {novedadesCount}
-                          </Badge>
-                        )}
-                      </div>
-                    </TableCell>
+                     <TableCell className="text-center font-medium">
+                       <div className="flex items-center justify-center gap-2">
+                         {canEdit && (
+                           <Button
+                             size="sm"
+                             variant="outline"
+                             className="h-8 w-8 p-0 rounded-full border-dashed border-2 border-blue-300 text-blue-600 hover:border-blue-500 hover:text-blue-700 hover:bg-blue-50"
+                             onClick={() => onAddNovedad(employee.id)}
+                           >
+                             <Plus className="h-4 w-4" />
+                           </Button>
+                         )}
+                         {(novedadesCount > 0) && (
+                           <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                             {novedadesCount}
+                           </Badge>
+                         )}
+                         {preview.pendingCount > 0 && (
+                           <Badge variant="secondary" className="bg-orange-100 text-orange-800 animate-pulse text-xs">
+                             +{preview.pendingCount}
+                           </Badge>
+                         )}
+                       </div>
+                     </TableCell>
                     
                     <TableCell className="bg-blue-100 text-right">
                       {preview.hasPending ? (
