@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Plus, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useNovedades } from '@/hooks/useNovedades';
+import { useCurrentCompany } from '@/hooks/useCurrentCompany';
+import { usePayrollNovedadesUnified } from '@/hooks/usePayrollNovedadesUnified';
 
 interface Novedad {
   id: string;
@@ -29,57 +29,29 @@ export const NovedadesSimpleList: React.FC<NovedadesSimpleListProps> = ({
   onAddNovedad,
   refreshTrigger = 0
 }) => {
-  const [novedades, setNovedades] = useState<Novedad[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
-  const { deleteNovedad: deleteNovedadHook } = useNovedades(periodId);
+  const { companyId } = useCurrentCompany();
+  
+  // Use unified hook for consistent query management
+  const { 
+    novedades, 
+    isLoading, 
+    deleteNovedad: deleteNovedadHook 
+  } = usePayrollNovedadesUnified({
+    companyId,
+    periodId,
+    employeeId
+  });
 
-  // Cargar novedades
-  const loadNovedades = async () => {
-    if (!employeeId || !periodId) return;
-
-    setIsLoading(true);
-    try {
-      console.log('📋 Cargando novedades:', { employeeId, periodId });
-
-      const { data, error } = await supabase
-        .from('payroll_novedades')
-        .select('*')
-        .eq('empleado_id', employeeId)
-        .eq('periodo_id', periodId)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error cargando novedades:', error);
-        return;
-      }
-
-      console.log('✅ Novedades cargadas:', data?.length || 0);
-      setNovedades(data || []);
-
-    } catch (error) {
-      console.error('Error en loadNovedades:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Eliminar novedad usando hook unified para invalidar caches
+  // Eliminar novedad usando hook unified
   const deleteNovedad = async (novedadId: string) => {
     try {
-      const result = await deleteNovedadHook(novedadId);
+      await deleteNovedadHook(novedadId);
       
-      if (result.success) {
-        // Actualizar estado local inmediatamente
-        setNovedades(prev => prev.filter(n => n.id !== novedadId));
-        
-        toast({
-          title: "Novedad eliminada",
-          description: "La novedad se eliminó correctamente",
-        });
-      } else {
-        throw new Error(result.error || 'Error eliminando novedad');
-      }
+      toast({
+        title: "Novedad eliminada",
+        description: "La novedad se eliminó correctamente",
+      });
 
     } catch (error: any) {
       console.error('Error eliminando novedad:', error);
@@ -90,11 +62,6 @@ export const NovedadesSimpleList: React.FC<NovedadesSimpleListProps> = ({
       });
     }
   };
-
-  // Efectos
-  useEffect(() => {
-    loadNovedades();
-  }, [employeeId, periodId, refreshTrigger]);
 
   // Formatear tipo de novedad para mostrar
   const formatTipoNovedad = (tipo: string, subtipo?: string) => {
@@ -156,7 +123,7 @@ export const NovedadesSimpleList: React.FC<NovedadesSimpleListProps> = ({
         </Button>
       </div>
 
-      {novedades.length === 0 ? (
+      {!novedades || novedades.length === 0 ? (
         <p className="text-xs text-gray-500">Sin novedades</p>
       ) : (
         <div className="space-y-1">
