@@ -285,16 +285,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
   };
 
   const handleCloseNovedadModal = async () => {
-    if (selectedEmployee) {
-      if (!novedadChangedRef.current) {
-        console.log('⏳ Esperando sincronización final de BD antes de cerrar modal...');
-        await new Promise(resolve => setTimeout(resolve, 300));
-        console.log('🔄 Sincronización al cerrar modal (no hubo cambio previo explícito) para:', selectedEmployee.name);
-        await onEmployeeNovedadesChange(selectedEmployee.id);
-      } else {
-        console.log('✅ Saltando recarga al cerrar modal: ya se recargó por el cambio en novedades');
-      }
-    }
+    console.log('🚪 Cerrando modal de novedades');
     setNovedadModalOpen(false);
     setSelectedEmployee(null);
     novedadChangedRef.current = false;
@@ -316,9 +307,9 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
       });
       
       if (result) {
+        console.log('✅ Novedad creada exitosamente - marcando cambio para evitar recarga duplicada');
+        novedadChangedRef.current = true;
         handleCloseNovedadModal();
-        
-        console.log('✅ Novedad creada y sincronizada exitosamente');
       }
     } catch (error) {
       console.error('❌ Error en creación de novedad:', error);
