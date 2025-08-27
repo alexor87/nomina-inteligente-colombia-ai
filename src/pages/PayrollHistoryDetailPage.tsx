@@ -1,51 +1,54 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableFooter,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { MoreVertical, Edit, Copy, Trash, FileText, XCircle } from "lucide-react"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { XCircle, ArrowLeft } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { toast } from "@/hooks/use-toast"
-import { useToast as useToastHook } from "@/hooks/use-toast"
-import { Separator } from "@/components/ui/separator"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { usePayrollNovedadesUnified } from '@/hooks/usePayrollNovedadesUnified';
 import { PayrollNovedad as PayrollNovedadEnhanced } from '@/types/novedades-enhanced';
 import { PayrollNovedad } from '@/types/novedades';
-import { CreateNovedadData } from '@/services/NovedadesEnhancedService';
-import { PeriodEmployeesTable } from '@/components/payroll-history/PeriodEmployeesTable';
 import { EmployeeUnifiedService } from '@/services/EmployeeUnifiedService';
+import { PeriodHeader } from '@/components/payroll-history/PeriodHeader';
+import { PeriodSummaryCards } from '@/components/payroll-history/PeriodSummaryCards';
+import { ExpandedEmployeesTable } from '@/components/payroll-history/ExpandedEmployeesTable';
+import { supabase } from '@/integrations/supabase/client';
+import { formatCurrency } from '@/lib/utils';
+
+interface PeriodData {
+  id: string;
+  periodo: string;
+  fecha_inicio: string;
+  fecha_fin: string;
+  tipo_periodo: string;
+  empleados_count: number;
+  total_devengado: number;
+  total_deducciones: number;
+  total_neto: number;
+  estado: string;
+}
+
+interface ExpandedEmployee {
+  id: string;
+  nombre: string;
+  apellido: string;
+  salario_base: number;
+  ibc: number;
+  dias_trabajados: number;
+  total_devengado: number;
+  total_deducciones: number;
+  neto_pagado: number;
+  payroll_id: string;
+}
 
 export default function PayrollHistoryDetailPage() {
   const { periodId } = useParams<{ periodId: string }>();
   const navigate = useNavigate();
-  const [employees, setEmployees] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<ExpandedEmployee[]>([]);
+  const [periodData, setPeriodData] = useState<PeriodData | null>(null);
   const [isLoadingEmployees, setIsLoadingEmployees] = useState(false);
+  const [isLoadingPeriod, setIsLoadingPeriod] = useState(false);
 
   // Load novedades for the period
   const {
@@ -53,6 +56,39 @@ export default function PayrollHistoryDetailPage() {
     isLoading: isLoadingNovedades,
     refetch: refetchNovedades
   } = usePayrollNovedadesUnified({ periodId: periodId || '', enabled: !!periodId });
+
+  // Load period data
+  useEffect(() => {
+    const loadPeriodData = async () => {
+      if (!periodId) return;
+      
+      setIsLoadingPeriod(true);
+      try {
+        const { data, error } = await supabase
+          .from('payroll_periods_real')
+          .select('*')
+          .eq('id', periodId)
+          .single();
+
+        if (error) {
+          throw error;
+        }
+
+        setPeriodData(data);
+      } catch (error) {
+        console.error('Error loading period data:', error);
+        toast({
+          title: "Error",
+          description: "No se pudieron cargar los datos del período",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoadingPeriod(false);
+      }
+    };
+
+    loadPeriodData();
+  }, [periodId]);
 
   // Load employees for the period
   useEffect(() => {
@@ -62,7 +98,22 @@ export default function PayrollHistoryDetailPage() {
       setIsLoadingEmployees(true);
       try {
         const employeesData = await EmployeeUnifiedService.getEmployeesForPeriod(periodId);
-        setEmployees(employeesData);
+        
+        // Transform to expanded format with payroll data
+        const expandedEmployees: ExpandedEmployee[] = employeesData.map((emp: any) => ({
+          id: emp.id,
+          nombre: emp.name?.split(' ')[0] || emp.nombre || '',
+          apellido: emp.name?.split(' ').slice(1).join(' ') || emp.apellido || '',
+          salario_base: emp.salarioBase || emp.salario_base || 0,
+          ibc: emp.ibc || emp.salarioBase || emp.salario_base || 0,
+          dias_trabajados: emp.diasTrabajados || emp.dias_trabajados || 30,
+          total_devengado: emp.totalDevengado || emp.total_devengado || emp.salarioBase || 0,
+          total_deducciones: emp.totalDeducciones || emp.total_deducciones || 0,
+          neto_pagado: emp.netoPagado || emp.neto_pagado || (emp.totalDevengado || emp.salarioBase || 0) - (emp.totalDeducciones || 0),
+          payroll_id: emp.payrollId || emp.payroll_id || emp.id
+        }));
+        
+        setEmployees(expandedEmployees);
       } catch (error) {
         console.error('Error loading employees:', error);
         toast({
@@ -120,60 +171,94 @@ export default function PayrollHistoryDetailPage() {
     return grouped;
   }, [novedades]);
 
-  return (
-    <>
+  // Format period header
+  const formatPeriodHeader = () => {
+    if (!periodData) return { title: '', dateRange: '' };
+    
+    const startDate = new Date(periodData.fecha_inicio);
+    const endDate = new Date(periodData.fecha_fin);
+    
+    const formatDate = (date: Date) => {
+      const day = date.getDate();
+      const month = date.getMonth() + 1;
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`;
+    };
+    
+    return {
+      title: periodData.periodo,
+      dateRange: `${formatDate(startDate)} - ${formatDate(endDate)}`
+    };
+  };
+
+  const { title, dateRange } = formatPeriodHeader();
+
+  if (!periodId) {
+    return (
       <div className="container py-10">
-        <Card>
-          <CardHeader>
-            <CardTitle>Detalle del Período de Nómina</CardTitle>
-            <CardDescription>
-              Aquí puedes ver y gestionar las novedades del período seleccionado.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {periodId ? (
-              <>
-                <Alert>
-                  <AlertTitle>Período seleccionado: {periodId}</AlertTitle>
-                  <AlertDescription>
-                    Estás viendo las novedades del período con ID: {periodId}.
-                  </AlertDescription>
-                </Alert>
-
-                <Separator className="my-4" />
-
-                <div>
-                  <h3 className="text-lg font-semibold mb-4">Empleados Liquidados</h3>
-                  {isLoadingEmployees ? (
-                    <p>Cargando empleados...</p>
-                  ) : (
-                    <PeriodEmployeesTable
-                      employees={employees}
-                      novedades={novedadesByEmployee}
-                      onAddNovedad={handleAddNovedad}
-                      onEditNovedad={handleEditNovedad}
-                      canEdit={true}
-                    />
-                  )}
-                </div>
-
-
-                <Button variant="secondary" onClick={handleGoBack}>
-                  Volver a la Lista de Períodos
-                </Button>
-              </>
-            ) : (
-              <Alert variant="destructive">
-                <XCircle className="h-4 w-4" />
-                <AlertTitle>Error</AlertTitle>
-                <AlertDescription>
-                  No se ha especificado un período válido.
-                </AlertDescription>
-              </Alert>
-            )}
-          </CardContent>
-        </Card>
+        <Alert variant="destructive">
+          <XCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>
+            No se ha especificado un período válido.
+          </AlertDescription>
+        </Alert>
       </div>
-    </>
+    );
+  }
+
+  if (isLoadingPeriod || !periodData) {
+    return (
+      <div className="container py-10">
+        <p>Cargando datos del período...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container py-6 max-w-7xl">
+      <div className="flex items-center gap-4 mb-6">
+        <Button variant="ghost" onClick={handleGoBack} className="flex items-center gap-2">
+          <ArrowLeft className="h-4 w-4" />
+          Volver
+        </Button>
+      </div>
+
+      <PeriodHeader period={title} dateRange={dateRange} />
+      
+      <PeriodSummaryCards
+        periodType={periodData.tipo_periodo}
+        employeesCount={periodData.empleados_count}
+        totalDevengado={periodData.total_devengado}
+        totalNeto={periodData.total_neto}
+      />
+
+      <Tabs defaultValue="employees" className="w-full">
+        <TabsList className="grid w-full grid-cols-2 max-w-md">
+          <TabsTrigger value="employees">Empleados</TabsTrigger>
+          <TabsTrigger value="audit">Auditoría</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="employees" className="mt-6">
+          {isLoadingEmployees ? (
+            <p>Cargando empleados...</p>
+          ) : (
+            <ExpandedEmployeesTable
+              employees={employees}
+              novedades={novedadesByEmployee}
+              onAddNovedad={handleAddNovedad}
+              onEditNovedad={handleEditNovedad}
+              canEdit={true}
+            />
+          )}
+        </TabsContent>
+        
+        <TabsContent value="audit" className="mt-6">
+          <div className="text-center py-8 text-muted-foreground">
+            <p>Los registros de auditoría estarán disponibles próximamente.</p>
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
   );
 }
