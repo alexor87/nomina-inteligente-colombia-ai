@@ -9,7 +9,6 @@ import { usePayrollLiquidationSimplified } from '@/hooks/usePayrollLiquidationSi
 import { useSimplePeriodSelection } from '@/hooks/useSimplePeriodSelection';
 import { EmployeeAddModal } from '@/components/payroll/modals/EmployeeAddModal';
 import { useCurrentCompany } from '@/hooks/useCurrentCompany';
-import { PayrollCleanupService } from '@/services/PayrollCleanupService';
 
 import { SelectablePeriod } from '@/services/payroll/SimplePeriodService';
 import { PayrollProgressIndicator } from '@/components/payroll/liquidation/PayrollProgressIndicator';
