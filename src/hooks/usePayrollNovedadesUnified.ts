@@ -300,18 +300,22 @@ export const usePayrollNovedadesUnified = (
       setIsDeleting(true);
       console.log('🔄 Eliminando novedad:', id);
       
+      // ✅ MEJORADO: Obtener la novedad antes de eliminarla para saber el empleado afectado
+      const novedadToDelete = novedades.find(n => n.id === id);
+      const affectedEmployeeId = novedadToDelete?.empleado_id;
+      
       await NovedadesEnhancedService.deleteNovedad(id);
-      return id;
+      return { deletedId: id, employeeId: affectedEmployeeId };
     },
-    onSuccess: (deletedId) => {
-      console.log('✅ Novedad eliminada exitosamente:', deletedId);
+    onSuccess: ({ deletedId, employeeId }) => {
+      console.log('✅ Novedad eliminada exitosamente:', deletedId, 'Empleado afectado:', employeeId);
       
       // Actualizar cache local de la query actual
       queryClient.setQueryData(queryKey, (old: any[] = []) => {
         return old.filter(item => item.id !== deletedId);
       });
 
-      // ✅ NUEVO: Purga defensiva del cache por empleado (si no sabemos el empleado, removemos de todos)
+      // ✅ MEJORADO: Purga específica del cache por empleado y forzar refresco
       setEmployeeNovedadesCache(prev => {
         const updated: Record<string, PayrollNovedad[]> = {};
         Object.entries(prev).forEach(([empId, list]) => {
@@ -320,10 +324,22 @@ export const usePayrollNovedadesUnified = (
         return updated;
       });
 
-      // Forzar recálculo dependiente (triggers en tablas)
-      setLastRefreshTime(Date.now());
+      // ✅ CRÍTICO: Si conocemos el empleado afectado, refrescar su cache específicamente
+      if (employeeId) {
+        console.log('🔄 Refrescando cache específico del empleado:', employeeId);
+        refreshEmployeeNovedades(employeeId).then(() => {
+          console.log('✅ Cache del empleado actualizado exitosamente');
+        }).catch(err => {
+          console.error('❌ Error refrescando cache del empleado:', err);
+        });
+      }
+
+      // Forzar recálculo dependiente (triggers en tablas) - CRÍTICO PARA SINCRONIZACIÓN
+      const newRefreshTime = Date.now();
+      setLastRefreshTime(newRefreshTime);
+      console.log('⏰ Nuevo lastRefreshTime establecido:', newRefreshTime);
       
-      // Invalidar todas las queries relacionadas con novedades
+      // ✅ MEJORADO: Invalidación más agresiva y específica
       queryClient.invalidateQueries({ 
         queryKey: ['novedades'],
         exact: false 
@@ -332,6 +348,14 @@ export const usePayrollNovedadesUnified = (
         queryKey: ['payroll-novedades-unified'],
         exact: false 
       });
+      
+      // ✅ NUEVO: Invalidar específicamente las queries de empleado si lo conocemos
+      if (employeeId) {
+        queryClient.invalidateQueries({
+          queryKey: ['novedades', 'employee', employeeId],
+          exact: false
+        });
+      }
       
       toast({
         title: "✅ Novedad eliminada",
