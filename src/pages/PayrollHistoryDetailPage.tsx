@@ -35,8 +35,11 @@ import { toast } from "@/hooks/use-toast"
 import { useToast as useToastHook } from "@/hooks/use-toast"
 import { Separator } from "@/components/ui/separator"
 import { usePayrollNovedadesUnified } from '@/hooks/usePayrollNovedadesUnified';
-import { PayrollNovedad } from '@/types/novedades-enhanced';
+import { PayrollNovedad as PayrollNovedadEnhanced } from '@/types/novedades-enhanced';
+import { PayrollNovedad } from '@/types/novedades';
 import { CreateNovedadData } from '@/services/NovedadesEnhancedService';
+import { PeriodEmployeesTable } from '@/components/payroll-history/PeriodEmployeesTable';
+import { EmployeeUnifiedService } from '@/services/EmployeeUnifiedService';
 import {
   Dialog,
   DialogContent,
@@ -87,6 +90,8 @@ export default function PayrollHistoryDetailPage() {
   const { periodId } = useParams<{ periodId: string }>();
   const navigate = useNavigate();
   const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null);
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [isLoadingEmployees, setIsLoadingEmployees] = useState(false);
 
   // ✅ FIXED: Use correct hook signature and destructure createNovedad
   const {
@@ -98,7 +103,31 @@ export default function PayrollHistoryDetailPage() {
     refetch: refetchNovedades
   } = usePayrollNovedadesUnified({ periodId: periodId || '', enabled: !!periodId });
 
-  const [open, setOpen] = React.useState(false)
+  const [open, setOpen] = React.useState(false);
+
+  // Load employees for the period
+  useEffect(() => {
+    const loadEmployees = async () => {
+      if (!periodId) return;
+      
+      setIsLoadingEmployees(true);
+      try {
+        const employeesData = await EmployeeUnifiedService.getEmployeesForPeriod(periodId);
+        setEmployees(employeesData);
+      } catch (error) {
+        console.error('Error loading employees:', error);
+        toast({
+          title: "Error",
+          description: "No se pudieron cargar los empleados del período",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoadingEmployees(false);
+      }
+    };
+
+    loadEmployees();
+  }, [periodId]);
 
   const form = useForm<z.infer<typeof taxSchema>>({
     resolver: zodResolver(taxSchema),
@@ -139,6 +168,44 @@ export default function PayrollHistoryDetailPage() {
     }
   };
 
+  const handleAddNovedad = (employeeId: string) => {
+    setSelectedEmployee(employeeId);
+    setOpen(true);
+  };
+
+  const handleEditNovedad = (novedad: PayrollNovedad) => {
+    // Implementation for editing novedad
+    console.log('Edit novedad:', novedad);
+  };
+
+  // Group novedades by employee (convert to basic PayrollNovedad type)
+  const novedadesByEmployee = React.useMemo(() => {
+    const grouped: Record<string, PayrollNovedad[]> = {};
+    novedades.forEach((novedad) => {
+      if (!grouped[novedad.empleado_id]) {
+        grouped[novedad.empleado_id] = [];
+      }
+      // Convert enhanced novedad to basic novedad type
+      const basicNovedad: PayrollNovedad = {
+        id: novedad.id,
+        company_id: novedad.company_id,
+        empleado_id: novedad.empleado_id,
+        periodo_id: novedad.periodo_id,
+        tipo_novedad: novedad.tipo_novedad as any, // Type conversion
+        subtipo: novedad.subtipo || '',
+        valor: novedad.valor,
+        fecha_inicio: novedad.fecha_inicio,
+        fecha_fin: novedad.fecha_fin,
+        observacion: novedad.observacion || '',
+        dias: novedad.dias || 0,
+        created_at: novedad.created_at,
+        updated_at: novedad.updated_at
+      };
+      grouped[novedad.empleado_id].push(basicNovedad);
+    });
+    return grouped;
+  }, [novedades]);
+
   return (
     <>
       <div className="container py-10">
@@ -162,16 +229,17 @@ export default function PayrollHistoryDetailPage() {
                 <Separator className="my-4" />
 
                 <div>
-                  <h2>Seleccionar Empleado</h2>
-                  <Input
-                    type="text"
-                    placeholder="Buscar empleado por ID"
-                    onChange={(e) => handleEmployeeSelection(e.target.value)}
-                  />
-                  {selectedEmployee && (
-                    <Badge variant="outline">
-                      Empleado seleccionado: {selectedEmployee}
-                    </Badge>
+                  <h3 className="text-lg font-semibold mb-4">Empleados Liquidados</h3>
+                  {isLoadingEmployees ? (
+                    <p>Cargando empleados...</p>
+                  ) : (
+                    <PeriodEmployeesTable
+                      employees={employees}
+                      novedades={novedadesByEmployee}
+                      onAddNovedad={handleAddNovedad}
+                      onEditNovedad={handleEditNovedad}
+                      canEdit={true}
+                    />
                   )}
                 </div>
 
