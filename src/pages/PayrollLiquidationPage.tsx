@@ -12,7 +12,7 @@ import { usePayrollLiquidation } from '@/hooks/usePayrollLiquidation';
 import { useSimplePeriodSelection } from '@/hooks/useSimplePeriodSelection';
 import { EmployeeAddModal } from '@/components/payroll/modals/EmployeeAddModal';
 import { useCurrentCompany } from '@/hooks/useCurrentCompany';
-import { PayrollCleanupService } from '@/services/PayrollCleanupService';
+
 import { PeriodCleanupDialog } from '@/components/payroll/PeriodCleanupDialog';
 import { PayrollSuccessModal } from '@/components/payroll/modals/PayrollSuccessModal';
 import { SelectablePeriod } from '@/services/payroll/SimplePeriodService';
@@ -54,10 +54,6 @@ const PayrollLiquidationPage = () => {
     markCurrentPeriodAsLiquidated
   } = useSimplePeriodSelection(companyId || '');
 
-  // Limpiar períodos abandonados al montar
-  useEffect(() => {
-    PayrollCleanupService.cleanupAbandonedPeriods();
-  }, []);
 
   const handlePeriodSelection = async (period: SelectablePeriod) => {
     console.log('🎯 Período seleccionado desde UI:', period.label);

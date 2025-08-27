@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { NovedadesEnhancedService, CreateNovedadData } from '@/services/NovedadesEnhancedService';
 import { PayrollNovedad } from '@/types/novedades-enhanced';
@@ -101,7 +101,7 @@ export const usePayrollNovedadesUnified = (
   });
 
   // ✅ RESTORED: Load novedades totals for multiple employees
-  const loadNovedadesTotals = async (employeeIds: string[]) => {
+  const loadNovedadesTotals = useCallback(async (employeeIds: string[]) => {
     if (!periodId) return;
     
     console.log('📊 Loading novedades totals for employees:', employeeIds);
@@ -119,10 +119,10 @@ export const usePayrollNovedadesUnified = (
     }
     
     setLastRefreshTime(Date.now());
-  };
+  }, [periodId]);
 
   // ✅ RESTORED: Get employee novedades totals
-  const getEmployeeNovedades = (employeeId: string) => {
+  const getEmployeeNovedades = useCallback((employeeId: string) => {
     const employeeNovedades = employeeNovedadesCache[employeeId] || [];
     
     let devengos = 0;
@@ -140,10 +140,10 @@ export const usePayrollNovedadesUnified = (
     const totalNeto = devengos - deducciones;
     
     return { totalNeto, devengos, deducciones };
-  };
+  }, [employeeNovedadesCache]);
 
   // ✅ RESTORED: Refresh employee novedades
-  const refreshEmployeeNovedades = async (employeeId: string) => {
+  const refreshEmployeeNovedades = useCallback(async (employeeId: string) => {
     if (!periodId) return;
     
     try {
@@ -156,10 +156,10 @@ export const usePayrollNovedadesUnified = (
     } catch (error) {
       console.error(`Error refreshing novedades for employee ${employeeId}:`, error);
     }
-  };
+  }, [periodId]);
 
   // ✅ RESTORED: Get employee novedades list
-  const getEmployeeNovedadesList = async (employeeId: string): Promise<PayrollNovedad[]> => {
+  const getEmployeeNovedadesList = useCallback(async (employeeId: string): Promise<PayrollNovedad[]> => {
     if (!periodId) return [];
     
     try {
@@ -169,7 +169,7 @@ export const usePayrollNovedadesUnified = (
       console.error(`Error getting novedades list for employee ${employeeId}:`, error);
       return [];
     }
-  };
+  }, [periodId]);
 
   // Mutation para crear novedad
   const createMutation = useMutation({

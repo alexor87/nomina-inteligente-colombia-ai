@@ -68,6 +68,10 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
     transportAllowance: number; 
   }>>({});
   const novedadChangedRef = useRef(false);
+  const isRecalculatingRef = useRef(false);
+  const lastRecalcAtRef = useRef(0);
+  const lastPersistedHashRef = useRef('');
+  const prevKeyRef = useRef('');
   const { toast } = useToast();
   const { companyId } = useCurrentCompany();
 
@@ -92,16 +96,34 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
   };
 
   useEffect(() => {
-    if (employees.length > 0 && currentPeriodId) {
+    const currentKey = `${employees.length}-${currentPeriodId}`;
+    if (employees.length > 0 && currentPeriodId && prevKeyRef.current !== currentKey) {
       console.log('📊 Cargando novedades para empleados, período:', currentPeriodId);
       const employeeIds = employees.map(emp => emp.id);
       loadNovedadesTotals(employeeIds);
+      prevKeyRef.current = currentKey;
     }
   }, [employees, currentPeriodId, loadNovedadesTotals]);
 
   useEffect(() => {
     const recalculateAllEmployees = async () => {
+      // Re-entrancy protection
+      if (isRecalculatingRef.current) {
+        console.log('⚠️ Recálculo ya en progreso, saltando...');
+        return;
+      }
+
+      // Throttling - minimum 1 second between recalculations
+      const now = Date.now();
+      if (now - lastRecalcAtRef.current < 1000) {
+        console.log('⏰ Throttling recálculo, muy pronto desde el último');
+        return;
+      }
+
       if (!currentPeriodId || employees.length === 0) return;
+
+      isRecalculatingRef.current = true;
+      lastRecalcAtRef.current = now;
 
       console.log('🔄 Recalculando empleados con auxilio de transporte correcto...');
       const newCalculations: Record<string, { 
@@ -214,19 +236,24 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
 
       setEmployeeCalculations(newCalculations);
 
-      if (updateEmployeeCalculationsInDB && Object.keys(newCalculations).length > 0) {
+      // Only persist if calculations have changed
+      const calculationsHash = JSON.stringify(newCalculations);
+      if (updateEmployeeCalculationsInDB && Object.keys(newCalculations).length > 0 && lastPersistedHashRef.current !== calculationsHash) {
         console.log('💾 Activando persistencia automática de cálculos...');
         try {
           await updateEmployeeCalculationsInDB(newCalculations);
+          lastPersistedHashRef.current = calculationsHash;
           console.log('✅ Cálculos persistidos automáticamente en BD');
         } catch (error) {
           console.error('❌ Error persistiendo cálculos:', error);
         }
       }
+
+      isRecalculatingRef.current = false;
     };
 
     recalculateAllEmployees();
-  }, [employees, currentPeriodId, lastRefreshTime, getEmployeeNovedadesList, updateEmployeeCalculationsInDB, year]);
+  }, [employees.length, currentPeriodId, lastRefreshTime, year]);
 
   const periodForCalculation = {
     tipo_periodo: (currentPeriod?.tipo_periodo || 'quincenal') as 'quincenal' | 'mensual',
