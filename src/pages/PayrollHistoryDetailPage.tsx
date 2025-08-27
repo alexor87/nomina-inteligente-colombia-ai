@@ -7,12 +7,16 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { toast } from "@/hooks/use-toast"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { usePayrollNovedadesUnified } from '@/hooks/usePayrollNovedadesUnified';
-import { PayrollNovedad as PayrollNovedadEnhanced } from '@/types/novedades-enhanced';
+import { PayrollNovedad as PayrollNovedadEnhanced, CreateNovedadData } from '@/types/novedades-enhanced';
 import { PayrollNovedad } from '@/types/novedades';
 import { PayrollHistoryService, PayrollPeriodData, PayrollEmployeeData } from '@/services/PayrollHistoryService';
 import { PeriodSummaryCards } from '@/components/payroll-history/PeriodSummaryCards';
 import { ExpandedEmployeesTable } from '@/components/payroll-history/ExpandedEmployeesTable';
 import { formatCurrency } from '@/lib/utils';
+import { PendingNovedad, PeriodState } from '@/types/pending-adjustments';
+import { PendingNovedadesService, PendingAdjustmentData } from '@/services/PendingNovedadesService';
+import { ConfirmAdjustmentModal } from '@/components/payroll/corrections/ConfirmAdjustmentModal';
+import { NovedadUnifiedModal } from '@/components/payroll/novedades/NovedadUnifiedModal';
 
 // Use PayrollPeriodData from service instead of local interface
 
@@ -36,14 +40,21 @@ export default function PayrollHistoryDetailPage() {
   const [periodData, setPeriodData] = useState<PayrollPeriodData | null>(null);
   const [isLoadingEmployees, setIsLoadingEmployees] = useState(false);
   const [isLoadingPeriod, setIsLoadingPeriod] = useState(false);
-  const [pendingNovedades, setPendingNovedades] = useState<PayrollNovedad[]>([]);
-  const [isSavingNovedades, setIsSavingNovedades] = useState(false);
+  
+  // States for pending adjustments logic
+  const [pendingNovedades, setPendingNovedades] = useState<PendingNovedad[]>([]);
+  const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
+  const [selectedEmployeeName, setSelectedEmployeeName] = useState<string>('');
+  const [isApplyingAdjustments, setIsApplyingAdjustments] = useState(false);
 
   // Load novedades for the period
   const {
     novedades,
     isLoading: isLoadingNovedades,
-    refetch: refetchNovedades
+    refetch: refetchNovedades,
+    createNovedad
   } = usePayrollNovedadesUnified({ periodId: periodId || '', enabled: !!periodId });
 
   // Load period data
@@ -116,9 +127,12 @@ export default function PayrollHistoryDetailPage() {
     navigate('/app/payroll-history');
   };
 
+  // Handle adding novedad - detect period state and show appropriate modal
   const handleAddNovedad = (employeeId: string) => {
-    // Navigate to add novedad for specific employee
-    console.log('Add novedad for employee:', employeeId);
+    const employeeData = employees.find(e => e.id === employeeId);
+    setSelectedEmployeeId(employeeId);
+    setSelectedEmployeeName(employeeData ? `${employeeData.nombre} ${employeeData.apellido}` : '');
+    setShowAdjustmentModal(true);
   };
 
   const handleEditNovedad = (novedad: PayrollNovedad) => {
@@ -126,28 +140,116 @@ export default function PayrollHistoryDetailPage() {
     console.log('Edit novedad:', novedad);
   };
 
-  const handleSaveNovedades = async () => {
-    if (pendingNovedades.length === 0) return;
-    
-    setIsSavingNovedades(true);
+  // CORE LOGIC: Differentiate between open and closed periods
+  const handleNovedadSubmit = async (data: CreateNovedadData) => {
     try {
-      // TODO: Implement save logic
-      console.log('Saving novedades:', pendingNovedades);
-      toast({
-        title: "Éxito",
-        description: `Se guardaron ${pendingNovedades.length} novedades`,
-      });
-      setPendingNovedades([]);
-      refetchNovedades();
+      // 🔵 CLOSED PERIOD: Add to pending adjustments
+      if (periodData?.estado === 'cerrado') {
+        const employeeData = employees.find(e => e.id === selectedEmployeeId);
+        
+        const newPendingNovedad: PendingNovedad = {
+          employee_id: selectedEmployeeId,
+          employee_name: employeeData ? `${employeeData.nombre} ${employeeData.apellido}` : selectedEmployeeName,
+          tipo_novedad: data.tipo_novedad,
+          valor: data.valor || 0,
+          observacion: data.observacion,
+          novedadData: data
+        };
+        
+        setPendingNovedades(prev => [...prev, newPendingNovedad]);
+        setShowAdjustmentModal(false);
+        
+        toast({
+          title: "Novedad agregada",
+          description: "La novedad se agregó a la lista de ajustes pendientes",
+        });
+      } else {
+        // 🟢 OPEN PERIOD: Apply immediately
+        await createNovedad(data);
+        handleAdjustmentSuccess();
+      }
     } catch (error) {
-      console.error('Error saving novedades:', error);
+      console.error('❌ Error creating novedad:', error);
+      throw error;
+    }
+  };
+
+  // Handle successful adjustment application
+  const handleAdjustmentSuccess = () => {
+    setShowAdjustmentModal(false);
+    refetchNovedades();
+    loadPeriodDetail();
+    
+    toast({
+      title: "✅ Éxito",
+      description: "La novedad se aplicó correctamente",
+    });
+  };
+
+  // Load period detail data
+  const loadPeriodDetail = async () => {
+    if (!periodId) return;
+    
+    try {
+      const data = await PayrollHistoryService.getPeriodData(periodId);
+      setPeriodData(data);
+    } catch (error) {
+      console.error('Error reloading period data:', error);
+    }
+  };
+
+  // Apply pending adjustments with justification
+  const handleApplyPendingAdjustments = async (justification: string) => {
+    if (!periodId || pendingNovedades.length === 0) return;
+
+    try {
+      setIsApplyingAdjustments(true);
+
+      // Group by employee and apply via service
+      const employeeAdjustments = pendingNovedades.reduce((acc, novedad) => {
+        if (!acc[novedad.employee_id]) {
+          acc[novedad.employee_id] = [];
+        }
+        acc[novedad.employee_id].push(novedad);
+        return acc;
+      }, {} as Record<string, PendingNovedad[]>);
+      
+      for (const [employeeId, novedades] of Object.entries(employeeAdjustments)) {
+        const adjustmentData: PendingAdjustmentData = {
+          periodId,
+          employeeId,
+          employeeName: novedades[0].employee_name,
+          justification,
+          novedades: novedades.map(n => n.novedadData)
+        };
+
+        const result = await PendingNovedadesService.applyPendingAdjustments(adjustmentData);
+        
+        if (!result.success) {
+          throw new Error(result.message);
+        }
+      }
+
+      // Clear pending and reload
+      setPendingNovedades([]);
+      setShowConfirmModal(false);
+      loadPeriodDetail();
+      refetchNovedades();
+      
       toast({
-        title: "Error",
-        description: "No se pudieron guardar las novedades",
-        variant: "destructive",
+        title: "✅ Ajustes aplicados",
+        description: "Los ajustes se aplicaron correctamente y se regeneraron los comprobantes",
+      });
+
+    } catch (error) {
+      console.error('❌ Error applying adjustments:', error);
+      toast({
+        title: "❌ Error",
+        description: error instanceof Error ? error.message : "Error aplicando ajustes",
+        variant: "destructive"
       });
     } finally {
-      setIsSavingNovedades(false);
+      setIsApplyingAdjustments(false);
     }
   };
 
@@ -270,10 +372,10 @@ export default function PayrollHistoryDetailPage() {
               </Badge>
               <Button 
                 className="bg-warning hover:bg-warning/90 text-warning-foreground"
-                onClick={handleSaveNovedades}
-                disabled={isSavingNovedades}
+                onClick={() => setShowConfirmModal(true)}
+                disabled={isApplyingAdjustments}
               >
-                {isSavingNovedades ? "Guardando..." : "Guardar Novedades"}
+                {isApplyingAdjustments ? "Aplicando..." : "Aplicar Ajustes"}
               </Button>
             </div>
           )}
@@ -326,8 +428,6 @@ export default function PayrollHistoryDetailPage() {
                 onAddNovedad={handleAddNovedad}
                 onEditNovedad={handleEditNovedad}
                 canEdit={true}
-                pendingNovedades={pendingNovedades}
-                onPendingNovedadesChange={setPendingNovedades}
               />
             )}
           </TabsContent>
@@ -343,6 +443,31 @@ export default function PayrollHistoryDetailPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Novedad Modal */}
+      <NovedadUnifiedModal
+        open={showAdjustmentModal}
+        setOpen={setShowAdjustmentModal}
+        employeeId={selectedEmployeeId}
+        employeeSalary={employees.find(e => e.id === selectedEmployeeId)?.salario_base}
+        periodId={periodId}
+        onSubmit={handleNovedadSubmit}
+        onClose={() => setShowAdjustmentModal(false)}
+        selectedNovedadType={null}
+        mode={periodData?.estado === 'cerrado' ? 'ajustes' : 'liquidacion'}
+        startDate={periodData?.fecha_inicio}
+        endDate={periodData?.fecha_fin}
+      />
+
+      {/* Confirmation Modal for Adjustments */}
+      <ConfirmAdjustmentModal
+        isOpen={showConfirmModal}
+        onClose={() => setShowConfirmModal(false)}
+        onConfirm={handleApplyPendingAdjustments}
+        pendingNovedades={pendingNovedades}
+        periodName={periodData?.periodo || ''}
+        isLoading={isApplyingAdjustments}
+      />
     </div>
   );
 }

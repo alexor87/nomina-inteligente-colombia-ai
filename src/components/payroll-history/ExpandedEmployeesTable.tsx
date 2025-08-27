@@ -46,44 +46,22 @@ export const ExpandedEmployeesTable = ({
   };
 
   const getPendingNovedadesCount = (employeeId: string): number => {
-    return pendingNovedades.filter(n => n.empleado_id === employeeId).length;
+    // For this component, we don't track pending changes directly
+    // The main page handles the pending logic
+    return 0;
   };
 
   const getEmployeePreview = (employee: ExpandedEmployee) => {
-    const pendingCount = getPendingNovedadesCount(employee.id);
-    const hasPending = pendingCount > 0;
-    
-    if (!hasPending) {
-      return {
-        hasPending: false,
-        pendingCount: 0,
-        originalDevengado: employee.total_devengado,
-        newDevengado: employee.total_devengado,
-        originalDeducciones: employee.total_deducciones,
-        newDeducciones: employee.total_deducciones,
-        originalNeto: employee.neto_pagado,
-        newNeto: employee.neto_pagado
-      };
-    }
-
-    // Calculate pending changes (mock calculation)
-    const pendingDevengado = pendingNovedades
-      .filter(n => n.empleado_id === employee.id)
-      .reduce((sum, n) => sum + (n.valor > 0 ? n.valor : 0), 0);
-    
-    const pendingDeducciones = pendingNovedades
-      .filter(n => n.empleado_id === employee.id)
-      .reduce((sum, n) => sum + (n.valor < 0 ? Math.abs(n.valor) : 0), 0);
-
+    // For this simplified component, no pending changes preview
     return {
-      hasPending: true,
-      pendingCount,
+      hasPending: false,
+      pendingCount: 0,
       originalDevengado: employee.total_devengado,
-      newDevengado: employee.total_devengado + pendingDevengado,
+      newDevengado: employee.total_devengado,
       originalDeducciones: employee.total_deducciones,
-      newDeducciones: employee.total_deducciones + pendingDeducciones,
+      newDeducciones: employee.total_deducciones,
       originalNeto: employee.neto_pagado,
-      newNeto: employee.neto_pagado + pendingDevengado - pendingDeducciones
+      newNeto: employee.neto_pagado
     };
   };
 
@@ -164,8 +142,8 @@ export const ExpandedEmployeesTable = ({
                         </div>
                       </div>
                       {preview.hasPending && (
-                        <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800 mt-1">
-                          {preview.pendingCount} pendiente{preview.pendingCount > 1 ? 's' : ''}
+                        <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800 mt-1 animate-pulse">
+                          Ajustes pendientes
                         </Badge>
                       )}
                     </TableCell>
@@ -240,9 +218,9 @@ export const ExpandedEmployeesTable = ({
                             <Plus className="h-4 w-4" />
                           </Button>
                         )}
-                        {(novedadesCount > 0 || preview.pendingCount > 0) && (
+                        {(novedadesCount > 0) && (
                           <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                            {novedadesCount + preview.pendingCount}
+                            {novedadesCount}
                           </Badge>
                         )}
                       </div>

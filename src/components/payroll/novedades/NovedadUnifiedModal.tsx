@@ -498,12 +498,12 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
           <>
             <DialogHeader>
               <DialogTitle>
-                {mode === 'ajustes' ? 'Registrar Ajuste de Nómina' : 'Agregar Novedad'}
+                {mode === 'ajustes' ? '📝 Agregar Ajuste' : '📋 Gestionar Novedades'}
               </DialogTitle>
               <DialogDescription>
                 {mode === 'ajustes' 
-                  ? 'Registra un ajuste manual para el empleado en este período.'
-                  : 'Completa los campos para agregar una novedad al empleado.'
+                  ? 'Este ajuste será aplicado tras confirmación con justificación.'
+                  : 'Gestione las novedades de nómina para este empleado.'
                 }
               </DialogDescription>
               {employeeFullName && (
