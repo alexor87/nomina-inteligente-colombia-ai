@@ -107,13 +107,15 @@ export const useNovedades = (periodId: string) => {
   const deleteNovedad = useCallback(async (id: string) => {
     try {
       await NovedadesEnhancedService.deleteNovedad(id);
+      // Invalidate all novedades-related queries so other modules (e.g., liquidation) refresh automatically
+      queryClient.invalidateQueries({ queryKey: ['novedades'], exact: false });
       await refetch();
       return { success: true };
     } catch (error: any) {
       console.error('Error deleting novedad:', error);
       return { success: false, error: error.message };
     }
-  }, [refetch]);
+  }, [refetch, queryClient]);
 
   // SOLUCIÓN KISS: Usar servicio simplificado que ya no duplica datos
   const loadIntegratedNovedades = useCallback(async (employeeId: string): Promise<DisplayNovedad[]> => {

@@ -100,6 +100,11 @@ export const usePayrollNovedadesUnified = (
     refetchOnWindowFocus: false
   });
 
+  // Sincroniza lastRefreshTime cuando cambia la lista por invalidaciones externas
+  useEffect(() => {
+    setLastRefreshTime(Date.now());
+  }, [novedades?.length]);
+
   // ✅ RESTORED: Load novedades totals for multiple employees
   const loadNovedadesTotals = useCallback(async (employeeIds: string[]) => {
     if (!periodId) return;
