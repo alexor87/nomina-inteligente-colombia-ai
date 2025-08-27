@@ -1,5 +1,6 @@
 import React from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Calendar, Users, DollarSign } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 
 interface PeriodSummaryCardsProps {
@@ -7,44 +8,57 @@ interface PeriodSummaryCardsProps {
   employeesCount: number;
   totalDevengado: number;
   totalNeto: number;
+  totalDeducciones: number;
 }
 
 export const PeriodSummaryCards = ({
   periodType,
   employeesCount,
   totalDevengado,
-  totalNeto
+  totalNeto,
+  totalDeducciones
 }: PeriodSummaryCardsProps) => {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
       <Card>
-        <CardContent className="p-4">
-          <div className="text-sm text-muted-foreground">Tipo</div>
-          <div className="text-lg font-semibold capitalize">{periodType}</div>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Tipo</CardTitle>
+          <Calendar className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold capitalize">{periodType}</div>
         </CardContent>
       </Card>
       
       <Card>
-        <CardContent className="p-4">
-          <div className="text-sm text-muted-foreground">Empleados</div>
-          <div className="text-lg font-semibold">{employeesCount}</div>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Empleados</CardTitle>
+          <Users className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{employeesCount}</div>
         </CardContent>
       </Card>
       
       <Card>
-        <CardContent className="p-4">
-          <div className="text-sm text-muted-foreground">Total Devengado</div>
-          <div className="text-lg font-semibold text-green-600">
-            {formatCurrency(totalDevengado)}
-          </div>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Total Devengado</CardTitle>
+          <DollarSign className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold text-green-600">{formatCurrency(totalDevengado)}</div>
         </CardContent>
       </Card>
       
       <Card>
-        <CardContent className="p-4">
-          <div className="text-sm text-muted-foreground">Total Neto</div>
-          <div className="text-lg font-semibold text-blue-600">
-            {formatCurrency(totalNeto)}
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Total Neto</CardTitle>
+          <DollarSign className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold text-blue-600">{formatCurrency(totalNeto)}</div>
+          <div className="text-xs text-muted-foreground">
+            Deducciones: {formatCurrency(totalDeducciones)}
           </div>
         </CardContent>
       </Card>

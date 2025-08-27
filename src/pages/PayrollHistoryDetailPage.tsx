@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { XCircle, ArrowLeft } from "lucide-react"
+import { XCircle, ArrowLeft, Users, History } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { toast } from "@/hooks/use-toast"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -10,7 +10,6 @@ import { usePayrollNovedadesUnified } from '@/hooks/usePayrollNovedadesUnified';
 import { PayrollNovedad as PayrollNovedadEnhanced } from '@/types/novedades-enhanced';
 import { PayrollNovedad } from '@/types/novedades';
 import { PayrollHistoryService, PayrollPeriodData, PayrollEmployeeData } from '@/services/PayrollHistoryService';
-import { PeriodHeader } from '@/components/payroll-history/PeriodHeader';
 import { PeriodSummaryCards } from '@/components/payroll-history/PeriodSummaryCards';
 import { ExpandedEmployeesTable } from '@/components/payroll-history/ExpandedEmployeesTable';
 import { formatCurrency } from '@/lib/utils';
@@ -37,6 +36,8 @@ export default function PayrollHistoryDetailPage() {
   const [periodData, setPeriodData] = useState<PayrollPeriodData | null>(null);
   const [isLoadingEmployees, setIsLoadingEmployees] = useState(false);
   const [isLoadingPeriod, setIsLoadingPeriod] = useState(false);
+  const [pendingNovedades, setPendingNovedades] = useState<PayrollNovedad[]>([]);
+  const [isSavingNovedades, setIsSavingNovedades] = useState(false);
 
   // Load novedades for the period
   const {
@@ -125,6 +126,31 @@ export default function PayrollHistoryDetailPage() {
     console.log('Edit novedad:', novedad);
   };
 
+  const handleSaveNovedades = async () => {
+    if (pendingNovedades.length === 0) return;
+    
+    setIsSavingNovedades(true);
+    try {
+      // TODO: Implement save logic
+      console.log('Saving novedades:', pendingNovedades);
+      toast({
+        title: "Éxito",
+        description: `Se guardaron ${pendingNovedades.length} novedades`,
+      });
+      setPendingNovedades([]);
+      refetchNovedades();
+    } catch (error) {
+      console.error('Error saving novedades:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron guardar las novedades",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingNovedades(false);
+    }
+  };
+
   // Group novedades by employee (convert to basic PayrollNovedad type)
   const novedadesByEmployee = React.useMemo(() => {
     const grouped: Record<string, PayrollNovedad[]> = {};
@@ -191,56 +217,132 @@ export default function PayrollHistoryDetailPage() {
 
   if (isLoadingPeriod || !periodData) {
     return (
-      <div className="container py-10">
-        <p>Cargando datos del período...</p>
+      <div className="px-6 py-6">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Cargando historial...</p>
+          </div>
+        </div>
       </div>
     );
   }
 
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const day = date.getDate();
+    const month = date.getMonth() + 1;
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+
+  const fechaInicio = periodData ? formatDate(periodData.fecha_inicio) : '';
+  const fechaFin = periodData ? formatDate(periodData.fecha_fin) : '';
+
   return (
-    <div className="container py-6 max-w-7xl">
-      <div className="flex items-center gap-4 mb-6">
-        <Button variant="ghost" onClick={handleGoBack} className="flex items-center gap-2">
-          <ArrowLeft className="h-4 w-4" />
-          Volver
-        </Button>
+    <div className="min-h-screen bg-background">
+      {/* Header Section */}
+      <div className="px-6 py-6 space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button 
+              variant="outline" 
+              size="sm"
+              className="flex items-center gap-2"
+              onClick={handleGoBack}
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Volver
+            </Button>
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">{title}</h1>
+              <p className="text-muted-foreground">
+                {fechaInicio} - {fechaFin}
+              </p>
+            </div>
+          </div>
+          
+          {/* Botón de novedades pendientes (solo si hay) */}
+          {pendingNovedades.length > 0 && (
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="animate-pulse">
+                {pendingNovedades.length} novedades pendientes
+              </Badge>
+              <Button 
+                className="bg-warning hover:bg-warning/90 text-warning-foreground"
+                onClick={handleSaveNovedades}
+                disabled={isSavingNovedades}
+              >
+                {isSavingNovedades ? "Guardando..." : "Guardar Novedades"}
+              </Button>
+            </div>
+          )}
+        </div>
+        
+        {/* Summary Cards */}
+        <PeriodSummaryCards
+          periodType={periodData.tipo_periodo}
+          employeesCount={periodData.empleados_count}
+          totalDevengado={periodData.total_devengado}
+          totalNeto={periodData.total_neto}
+          totalDeducciones={periodData.total_deducciones || 0}
+        />
       </div>
 
-      <PeriodHeader period={title} dateRange={dateRange} />
-      
-      <PeriodSummaryCards
-        periodType={periodData.tipo_periodo}
-        employeesCount={periodData.empleados_count}
-        totalDevengado={periodData.total_devengado}
-        totalNeto={periodData.total_neto}
-      />
-
-      <Tabs defaultValue="employees" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 max-w-md">
-          <TabsTrigger value="employees">Empleados</TabsTrigger>
-          <TabsTrigger value="audit">Auditoría</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="employees" className="mt-6">
-          {isLoadingEmployees ? (
-            <p>Cargando empleados...</p>
-          ) : (
-            <ExpandedEmployeesTable
-              employees={employees}
-              novedades={novedadesByEmployee}
-              onAddNovedad={handleAddNovedad}
-              onEditNovedad={handleEditNovedad}
-              canEdit={true}
-            />
-          )}
-        </TabsContent>
-        
-        <TabsContent value="audit" className="mt-6">
-          <div className="text-center py-8 text-muted-foreground">
-            <p>Los registros de auditoría estarán disponibles próximamente.</p>
-          </div>
-        </TabsContent>
-      </Tabs>
+      {/* Content Section */}
+      <div className="px-6 space-y-6">
+        <Tabs defaultValue="employees" className="space-y-4">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="employees" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Empleados
+            </TabsTrigger>
+            <TabsTrigger value="audit" className="flex items-center gap-2">
+              <History className="h-4 w-4" />
+              Auditoría
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="employees">
+            {isLoadingEmployees ? (
+              <div className="flex items-center justify-center min-h-[200px]">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto mb-2"></div>
+                  <p className="text-sm text-muted-foreground">Cargando empleados...</p>
+                </div>
+              </div>
+            ) : employees.length === 0 ? (
+              <div className="text-center py-12">
+                <Users className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium mb-2">Sin empleados liquidados</h3>
+                <p className="text-sm text-muted-foreground">
+                  No hay empleados liquidados en este período.
+                </p>
+              </div>
+            ) : (
+              <ExpandedEmployeesTable
+                employees={employees}
+                novedades={novedadesByEmployee}
+                onAddNovedad={handleAddNovedad}
+                onEditNovedad={handleEditNovedad}
+                canEdit={true}
+                pendingNovedades={pendingNovedades}
+                onPendingNovedadesChange={setPendingNovedades}
+              />
+            )}
+          </TabsContent>
+          
+          <TabsContent value="audit">
+            <div className="text-center py-12">
+              <History className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-medium mb-2">Auditoría no disponible</h3>
+              <p className="text-sm text-muted-foreground">
+                Los registros de auditoría estarán disponibles próximamente.
+              </p>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   );
 }
