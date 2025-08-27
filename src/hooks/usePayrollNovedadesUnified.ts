@@ -210,6 +210,10 @@ export const usePayrollNovedadesUnified = (
         queryKey: ['novedades'],
         exact: false 
       });
+      queryClient.invalidateQueries({ 
+        queryKey: ['payroll-novedades-unified'],
+        exact: false 
+      });
       
       toast({
         title: "✅ Novedad creada",
@@ -266,6 +270,10 @@ export const usePayrollNovedadesUnified = (
         queryKey: ['novedades'],
         exact: false 
       });
+      queryClient.invalidateQueries({ 
+        queryKey: ['payroll-novedades-unified'],
+        exact: false 
+      });
       
       toast({
         title: "✅ Novedad actualizada",
@@ -318,6 +326,10 @@ export const usePayrollNovedadesUnified = (
       // Invalidar todas las queries relacionadas con novedades
       queryClient.invalidateQueries({ 
         queryKey: ['novedades'],
+        exact: false 
+      });
+      queryClient.invalidateQueries({ 
+        queryKey: ['payroll-novedades-unified'],
         exact: false 
       });
       

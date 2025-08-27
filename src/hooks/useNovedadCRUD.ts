@@ -1,6 +1,7 @@
 
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 import type { Database } from '@/integrations/supabase/types';
 
 interface CreateNovedadData {
@@ -21,6 +22,7 @@ interface CreateNovedadData {
 
 export const useNovedadCRUD = () => {
   const [isLoading, setIsLoading] = useState(false);
+  const queryClient = useQueryClient();
 
   const createNovedad = async (data: CreateNovedadData) => {
     setIsLoading(true);
@@ -50,6 +52,10 @@ export const useNovedadCRUD = () => {
         return { success: false, error: error.message };
       }
 
+      // Invalidate queries to update all modules
+      queryClient.invalidateQueries({ queryKey: ['novedades'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['payroll-novedades-unified'], exact: false });
+
       return { success: true, data: result };
     } catch (error: any) {
       console.error('Error creating novedad:', error);
@@ -74,6 +80,10 @@ export const useNovedadCRUD = () => {
         return { success: false, error: error.message };
       }
 
+      // Invalidate queries to update all modules
+      queryClient.invalidateQueries({ queryKey: ['novedades'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['payroll-novedades-unified'], exact: false });
+
       return { success: true, data: result };
     } catch (error: any) {
       console.error('Error updating novedad:', error);
@@ -95,6 +105,10 @@ export const useNovedadCRUD = () => {
         console.error('Error deleting novedad:', error);
         return { success: false, error: error.message };
       }
+
+      // Invalidate queries to update all modules
+      queryClient.invalidateQueries({ queryKey: ['novedades'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['payroll-novedades-unified'], exact: false });
 
       return { success: true };
     } catch (error: any) {

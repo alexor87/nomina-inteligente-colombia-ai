@@ -94,6 +94,9 @@ export const useNovedades = (periodId: string) => {
     try {
       const result = await NovedadesEnhancedService.updateNovedad(id, data);
       if (result) {
+        // Invalidate all novedades-related queries so other modules (e.g., liquidation) refresh automatically
+        queryClient.invalidateQueries({ queryKey: ['novedades'], exact: false });
+        queryClient.invalidateQueries({ queryKey: ['payroll-novedades-unified'], exact: false });
         await refetch();
         return { success: true, data: result };
       }
@@ -102,13 +105,14 @@ export const useNovedades = (periodId: string) => {
       console.error('Error updating novedad:', error);
       return { success: false, error: error.message };
     }
-  }, [refetch]);
+  }, [refetch, queryClient]);
 
   const deleteNovedad = useCallback(async (id: string) => {
     try {
       await NovedadesEnhancedService.deleteNovedad(id);
       // Invalidate all novedades-related queries so other modules (e.g., liquidation) refresh automatically
       queryClient.invalidateQueries({ queryKey: ['novedades'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['payroll-novedades-unified'], exact: false });
       await refetch();
       return { success: true };
     } catch (error: any) {

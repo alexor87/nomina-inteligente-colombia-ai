@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Plus, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useNovedades } from '@/hooks/useNovedades';
 
 interface Novedad {
   id: string;
@@ -31,6 +32,7 @@ export const NovedadesSimpleList: React.FC<NovedadesSimpleListProps> = ({
   const [novedades, setNovedades] = useState<Novedad[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const { deleteNovedad: deleteNovedadHook } = useNovedades(periodId);
 
   // Cargar novedades
   const loadNovedades = async () => {
@@ -62,28 +64,28 @@ export const NovedadesSimpleList: React.FC<NovedadesSimpleListProps> = ({
     }
   };
 
-  // Eliminar novedad
+  // Eliminar novedad usando hook unified para invalidar caches
   const deleteNovedad = async (novedadId: string) => {
     try {
-      const { error } = await supabase
-        .from('payroll_novedades')
-        .delete()
-        .eq('id', novedadId);
-
-      if (error) throw error;
-
-      setNovedades(prev => prev.filter(n => n.id !== novedadId));
+      const result = await deleteNovedadHook(novedadId);
       
-      toast({
-        title: "Novedad eliminada",
-        description: "La novedad se eliminó correctamente",
-      });
+      if (result.success) {
+        // Actualizar estado local inmediatamente
+        setNovedades(prev => prev.filter(n => n.id !== novedadId));
+        
+        toast({
+          title: "Novedad eliminada",
+          description: "La novedad se eliminó correctamente",
+        });
+      } else {
+        throw new Error(result.error || 'Error eliminando novedad');
+      }
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error eliminando novedad:', error);
       toast({
         title: "Error",
-        description: "No se pudo eliminar la novedad",
+        description: error.message || "No se pudo eliminar la novedad",
         variant: "destructive",
       });
     }
