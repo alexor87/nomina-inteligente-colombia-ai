@@ -1,8 +1,10 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { NovedadesEnhancedService, CreateNovedadData } from '@/services/NovedadesEnhancedService';
 import { PayrollNovedad } from '@/types/novedades-enhanced';
 import { useToast } from '@/hooks/use-toast';
+import { useEmployeeNovedadesCacheStore } from '@/stores/employeeNovedadesCacheStore';
 
 export interface UsePayrollNovedadesUnifiedOptions {
   companyId?: string;
@@ -22,7 +24,6 @@ export interface UsePayrollNovedadesUnifiedReturn {
   isUpdating: boolean;
   isDeleting: boolean;
   refetch: () => void;
-  // ✅ RESTORED: Missing methods that were causing build errors
   loadNovedadesTotals: (employeeIds: string[]) => void;
   getEmployeeNovedades: (employeeId: string) => { totalNeto: number; devengos: number; deducciones: number };
   refreshEmployeeNovedades: (employeeId: string) => Promise<void>;
@@ -53,9 +54,10 @@ const transformNovedadForQuery = (novedad: PayrollNovedad) => ({
 });
 
 /**
- * ✅ HOOK UNIFICADO - FASE 3 CRÍTICA
+ * ✅ HOOK UNIFICADO - FASE 4 CRÍTICA CON STORE GLOBAL
  * Hook consolidado para manejar todas las operaciones de novedades
  * Funciona tanto para empresa+período como para empleado específico
+ * Usa store global para sincronización perfecta entre componentes
  */
 export const usePayrollNovedadesUnified = (
   optionsOrPeriodId: UsePayrollNovedadesUnifiedOptions | string
@@ -65,8 +67,16 @@ export const usePayrollNovedadesUnified = (
   const [isCreating, setIsCreating] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [lastRefreshTime, setLastRefreshTime] = useState(Date.now());
-  const [employeeNovedadesCache, setEmployeeNovedadesCache] = useState<Record<string, PayrollNovedad[]>>({});
+
+  // ✅ NUEVO: Usar store global en lugar de estado local
+  const {
+    employeeNovedadesCache,
+    lastRefreshTime,
+    setEmployeeNovedades,
+    updateEmployeeNovedades,
+    removeNovedadFromCache,
+    setLastRefreshTime
+  } = useEmployeeNovedadesCacheStore();
 
   // ✅ FIXED: Handle both string and options parameter
   const options: UsePayrollNovedadesUnifiedOptions = typeof optionsOrPeriodId === 'string' 
@@ -100,40 +110,35 @@ export const usePayrollNovedadesUnified = (
     refetchOnWindowFocus: false
   });
 
-  // Sincroniza lastRefreshTime cuando cambia la lista por invalidaciones externas
-  useEffect(() => {
-    setLastRefreshTime(Date.now());
-  }, [novedades?.length]);
-
   // ✅ RESTORED: Load novedades totals for multiple employees
   const loadNovedadesTotals = useCallback(async (employeeIds: string[]) => {
     if (!periodId) return;
     
     console.log('📊 Loading novedades totals for employees:', employeeIds);
     
+    const updates: Record<string, PayrollNovedad[]> = {};
+    
     for (const employeeId of employeeIds) {
       try {
         const employeeNovedades = await NovedadesEnhancedService.getNovedadesByEmployee(employeeId, periodId);
-        setEmployeeNovedadesCache(prev => ({
-          ...prev,
-          [employeeId]: employeeNovedades
-        }));
+        updates[employeeId] = employeeNovedades;
       } catch (error) {
         console.error(`Error loading novedades for employee ${employeeId}:`, error);
       }
     }
     
-    setLastRefreshTime(Date.now());
-  }, [periodId]);
+    // ✅ NUEVO: Actualizar store global de una vez
+    updateEmployeeNovedades(updates);
+  }, [periodId, updateEmployeeNovedades]);
 
-  // ✅ RESTORED: Get employee novedades totals
+  // ✅ RESTORED: Get employee novedades totals usando store global
   const getEmployeeNovedades = useCallback((employeeId: string) => {
-    const employeeNovedades = employeeNovedadesCache[employeeId] || [];
+    const employeeNovedadesList = employeeNovedadesCache[employeeId] || [];
     
     let devengos = 0;
     let deducciones = 0;
     
-    employeeNovedades.forEach(novedad => {
+    employeeNovedadesList.forEach(novedad => {
       const valor = Number(novedad.valor || 0);
       if (valor >= 0) {
         devengos += valor;
@@ -144,24 +149,28 @@ export const usePayrollNovedadesUnified = (
     
     const totalNeto = devengos - deducciones;
     
+    console.log('🧮 Global Store: Calculando totales para empleado:', employeeId, {
+      novedadesCount: employeeNovedadesList.length,
+      devengos,
+      deducciones,
+      totalNeto
+    });
+    
     return { totalNeto, devengos, deducciones };
   }, [employeeNovedadesCache]);
 
-  // ✅ RESTORED: Refresh employee novedades
+  // ✅ RESTORED: Refresh employee novedades usando store global
   const refreshEmployeeNovedades = useCallback(async (employeeId: string) => {
     if (!periodId) return;
     
     try {
+      console.log('🔄 Refrescando novedades específicas del empleado:', employeeId);
       const employeeNovedades = await NovedadesEnhancedService.getNovedadesByEmployee(employeeId, periodId);
-      setEmployeeNovedadesCache(prev => ({
-        ...prev,
-        [employeeId]: employeeNovedades
-      }));
-      setLastRefreshTime(Date.now());
+      setEmployeeNovedades(employeeId, employeeNovedades);
     } catch (error) {
       console.error(`Error refreshing novedades for employee ${employeeId}:`, error);
     }
-  }, [periodId]);
+  }, [periodId, setEmployeeNovedades]);
 
   // ✅ RESTORED: Get employee novedades list
   const getEmployeeNovedadesList = useCallback(async (employeeId: string): Promise<PayrollNovedad[]> => {
@@ -201,7 +210,7 @@ export const usePayrollNovedadesUnified = (
         return [...old, transformedNovedad];
       });
       
-      // Update employee cache
+      // ✅ NUEVO: Update global store
       if (newNovedad.empleado_id) {
         refreshEmployeeNovedades(newNovedad.empleado_id);
       }
@@ -261,7 +270,7 @@ export const usePayrollNovedadesUnified = (
         );
       });
       
-      // Update employee cache
+      // ✅ NUEVO: Update global store
       if (updatedNovedad.empleado_id) {
         refreshEmployeeNovedades(updatedNovedad.empleado_id);
       }
@@ -294,13 +303,13 @@ export const usePayrollNovedadesUnified = (
     }
   });
 
-  // Mutation para eliminar novedad
+  // ✅ MEJORADO: Mutation para eliminar novedad con store global
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       setIsDeleting(true);
       console.log('🔄 Eliminando novedad:', id);
       
-      // ✅ MEJORADO: Obtener la novedad antes de eliminarla para saber el empleado afectado
+      // Obtener la novedad antes de eliminarla para saber el empleado afectado
       const novedadToDelete = novedades.find(n => n.id === id);
       const affectedEmployeeId = novedadToDelete?.empleado_id;
       
@@ -315,20 +324,15 @@ export const usePayrollNovedadesUnified = (
         return old.filter(item => item.id !== deletedId);
       });
 
-      // ✅ MEJORADO: Purga específica del cache por empleado y forzar refresco
-      setEmployeeNovedadesCache(prev => {
-        const updated: Record<string, PayrollNovedad[]> = {};
-        Object.entries(prev).forEach(([empId, list]) => {
-          updated[empId] = list.filter(n => n.id !== deletedId);
-        });
-        return updated;
-      });
+      // ✅ CRÍTICO: Actualizar store global inmediatamente
+      console.log('🏪 Removiendo novedad del store global:', deletedId);
+      removeNovedadFromCache(deletedId);
 
       // ✅ CRÍTICO: Si conocemos el empleado afectado, refrescar su cache específicamente
       if (employeeId) {
-        console.log('🔄 Refrescando cache específico del empleado:', employeeId);
+        console.log('🔄 Refrescando cache específico del empleado en store global:', employeeId);
         refreshEmployeeNovedades(employeeId).then(() => {
-          console.log('✅ Cache del empleado actualizado exitosamente');
+          console.log('✅ Cache del empleado actualizado exitosamente en store global');
         }).catch(err => {
           console.error('❌ Error refrescando cache del empleado:', err);
         });
@@ -337,7 +341,7 @@ export const usePayrollNovedadesUnified = (
       // Forzar recálculo dependiente (triggers en tablas) - CRÍTICO PARA SINCRONIZACIÓN
       const newRefreshTime = Date.now();
       setLastRefreshTime(newRefreshTime);
-      console.log('⏰ Nuevo lastRefreshTime establecido:', newRefreshTime);
+      console.log('⏰ Nuevo lastRefreshTime establecido en store global:', newRefreshTime);
       
       // ✅ MEJORADO: Invalidación más agresiva y específica
       queryClient.invalidateQueries({ 
@@ -419,11 +423,10 @@ export const usePayrollNovedadesUnified = (
     isUpdating,
     isDeleting,
     refetch,
-    // ✅ RESTORED: Missing methods
     loadNovedadesTotals,
     getEmployeeNovedades,
     refreshEmployeeNovedades,
-    lastRefreshTime,
+    lastRefreshTime, // ✅ NUEVO: Viene del store global
     getEmployeeNovedadesList
   };
 };
