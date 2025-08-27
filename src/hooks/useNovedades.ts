@@ -10,6 +10,7 @@ import { DisplayNovedad } from '@/types/vacation-integration';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from './use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useEmployeeNovedadesCacheStore } from '@/stores/employeeNovedadesCacheStore';
 
 export const useNovedades = (periodId: string) => {
   const { toast } = useToast();
@@ -108,15 +109,25 @@ export const useNovedades = (periodId: string) => {
   }, [refetch, queryClient]);
 
   const deleteNovedad = useCallback(async (id: string) => {
+    const { removeNovedadFromCache, setLastRefreshTime } = useEmployeeNovedadesCacheStore.getState();
+    
     try {
+      console.log('🗑️ useNovedades: Eliminando novedad y actualizando cache global:', id);
       await NovedadesEnhancedService.deleteNovedad(id);
+      
+      // Update global cache store
+      removeNovedadFromCache(id);
+      setLastRefreshTime(Date.now());
+      
       // Invalidate all novedades-related queries so other modules (e.g., liquidation) refresh automatically
       queryClient.invalidateQueries({ queryKey: ['novedades'], exact: false });
       queryClient.invalidateQueries({ queryKey: ['payroll-novedades-unified'], exact: false });
       await refetch();
+      
+      console.log('✅ useNovedades: Novedad eliminada y cache actualizado');
       return { success: true };
     } catch (error: any) {
-      console.error('Error deleting novedad:', error);
+      console.error('❌ useNovedades: Error deleting novedad:', error);
       return { success: false, error: error.message };
     }
   }, [refetch, queryClient]);

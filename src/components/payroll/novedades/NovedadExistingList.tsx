@@ -10,6 +10,7 @@ import { DisplayNovedad, SeparatedTotals } from '@/types/vacation-integration';
 import { useToast } from '@/hooks/use-toast';
 import { VacationAbsenceDetailModal } from '@/components/vacations/VacationAbsenceDetailModal';
 import { supabase } from '@/integrations/supabase/client';
+import { useEmployeeNovedadesCacheStore } from '@/stores/employeeNovedadesCacheStore';
 
 interface NovedadExistingListProps {
   employeeId: string;
@@ -146,6 +147,8 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
   };
 
   const handleDeleteByOrigin = async (item: DisplayNovedad) => {
+    const { setLastRefreshTime } = useEmployeeNovedadesCacheStore.getState();
+    
     if (item.origen === 'vacaciones') {
       if (item.status !== 'pendiente') {
         toast({
@@ -158,6 +161,8 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
 
       if (window.confirm('¿Estás seguro de que deseas eliminar esta ausencia?')) {
         try {
+          console.log('🗑️ NovedadExistingList: Eliminando ausencia y actualizando cache global:', item.id);
+          
           const { error } = await supabase
             .from('employee_vacation_periods')
             .delete()
@@ -166,6 +171,10 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
           if (error) throw error;
 
           setIntegratedData(prev => prev.filter(n => n.id !== item.id));
+          
+          // Update global cache store to trigger liquidation recalculation
+          setLastRefreshTime(Date.now());
+          console.log('✅ NovedadExistingList: Ausencia eliminada y cache actualizado');
           
           if (onEmployeeNovedadesChange) {
             await onEmployeeNovedadesChange(employeeId);
@@ -176,7 +185,7 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
             description: "La ausencia se ha eliminado correctamente",
           });
         } catch (error) {
-          console.error('Error eliminando ausencia:', error);
+          console.error('❌ NovedadExistingList: Error eliminando ausencia:', error);
           toast({
             title: "Error",
             description: "No se pudo eliminar la ausencia",
@@ -187,6 +196,7 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
     } else {
       if (window.confirm('¿Estás seguro de que deseas eliminar esta novedad?')) {
         try {
+          console.log('🗑️ NovedadExistingList: Eliminando novedad (useNovedades se encarga del cache):', item.id);
           await deleteNovedad(item.id);
           setIntegratedData(prev => prev.filter(n => n.id !== item.id));
           
@@ -199,6 +209,7 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
             description: "La novedad se ha eliminado correctamente",
           });
         } catch (error) {
+          console.error('❌ NovedadExistingList: Error eliminando novedad:', error);
           toast({
             title: "Error",
             description: "No se pudo eliminar la novedad",
@@ -222,7 +233,11 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
   };
 
   const handleDeleteVacation = async (vacationId: string) => {
+    const { setLastRefreshTime } = useEmployeeNovedadesCacheStore.getState();
+    
     try {
+      console.log('🗑️ NovedadExistingList: Eliminando ausencia desde modal y actualizando cache global:', vacationId);
+      
       const { error } = await supabase
         .from('employee_vacation_periods')
         .delete()
@@ -231,6 +246,10 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
       if (error) throw error;
 
       setIntegratedData(prev => prev.filter(n => n.id !== vacationId));
+      
+      // Update global cache store to trigger liquidation recalculation
+      setLastRefreshTime(Date.now());
+      console.log('✅ NovedadExistingList: Ausencia eliminada desde modal y cache actualizado');
       
       if (onEmployeeNovedadesChange) {
         await onEmployeeNovedadesChange(employeeId);
@@ -243,7 +262,7 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
       
       setVacationDetailModal({ isOpen: false, vacation: null });
     } catch (error) {
-      console.error('Error eliminando ausencia:', error);
+      console.error('❌ NovedadExistingList: Error eliminando ausencia desde modal:', error);
       toast({
         title: "Error",
         description: "No se pudo eliminar la ausencia",

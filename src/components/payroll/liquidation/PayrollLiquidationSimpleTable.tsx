@@ -69,6 +69,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
   }>>({});
   const novedadChangedRef = useRef(false);
   const isRecalculatingRef = useRef(false);
+  const pendingRecalcRef = useRef(false);
   const lastRecalcAtRef = useRef(0);
   const lastPersistedHashRef = useRef('');
   const prevKeyRef = useRef('');
@@ -108,11 +109,15 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
 
   useEffect(() => {
     const recalculateAllEmployees = async () => {
-      // Re-entrancy protection
+      // Re-entrancy protection with pending queue
       if (isRecalculatingRef.current) {
-        console.log('⚠️ Recálculo ya en progreso, saltando...');
+        console.log('⏳ Recálculo en progreso, marcando como pendiente...');
+        pendingRecalcRef.current = true;
         return;
       }
+
+      // Reset pending flag and start recalculation
+      pendingRecalcRef.current = false;
 
       // Throttling - minimum 1 second between recalculations
       const now = Date.now();
@@ -251,6 +256,12 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
       }
 
       isRecalculatingRef.current = false;
+      
+      // Check if there's a pending recalculation
+      if (pendingRecalcRef.current) {
+        console.log('🔄 Ejecutando recálculo pendiente...');
+        setTimeout(recalculateAllEmployees, 100);
+      }
     };
 
     recalculateAllEmployees();
