@@ -9,25 +9,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { usePayrollNovedadesUnified } from '@/hooks/usePayrollNovedadesUnified';
 import { PayrollNovedad as PayrollNovedadEnhanced } from '@/types/novedades-enhanced';
 import { PayrollNovedad } from '@/types/novedades';
-import { EmployeeUnifiedService } from '@/services/EmployeeUnifiedService';
+import { PayrollHistoryService, PayrollPeriodData, PayrollEmployeeData } from '@/services/PayrollHistoryService';
 import { PeriodHeader } from '@/components/payroll-history/PeriodHeader';
 import { PeriodSummaryCards } from '@/components/payroll-history/PeriodSummaryCards';
 import { ExpandedEmployeesTable } from '@/components/payroll-history/ExpandedEmployeesTable';
-import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency } from '@/lib/utils';
 
-interface PeriodData {
-  id: string;
-  periodo: string;
-  fecha_inicio: string;
-  fecha_fin: string;
-  tipo_periodo: string;
-  empleados_count: number;
-  total_devengado: number;
-  total_deducciones: number;
-  total_neto: number;
-  estado: string;
-}
+// Use PayrollPeriodData from service instead of local interface
 
 interface ExpandedEmployee {
   id: string;
@@ -46,7 +34,7 @@ export default function PayrollHistoryDetailPage() {
   const { periodId } = useParams<{ periodId: string }>();
   const navigate = useNavigate();
   const [employees, setEmployees] = useState<ExpandedEmployee[]>([]);
-  const [periodData, setPeriodData] = useState<PeriodData | null>(null);
+  const [periodData, setPeriodData] = useState<PayrollPeriodData | null>(null);
   const [isLoadingEmployees, setIsLoadingEmployees] = useState(false);
   const [isLoadingPeriod, setIsLoadingPeriod] = useState(false);
 
@@ -64,16 +52,7 @@ export default function PayrollHistoryDetailPage() {
       
       setIsLoadingPeriod(true);
       try {
-        const { data, error } = await supabase
-          .from('payroll_periods_real')
-          .select('*')
-          .eq('id', periodId)
-          .single();
-
-        if (error) {
-          throw error;
-        }
-
+        const data = await PayrollHistoryService.getPeriodData(periodId);
         setPeriodData(data);
       } catch (error) {
         console.error('Error loading period data:', error);
@@ -97,23 +76,26 @@ export default function PayrollHistoryDetailPage() {
       
       setIsLoadingEmployees(true);
       try {
-        const employeesData = await EmployeeUnifiedService.getEmployeesForPeriod(periodId);
+        const payrollEmployees = await PayrollHistoryService.getPeriodEmployees(periodId);
         
-        // Transform to expanded format with payroll data
-        const expandedEmployees: ExpandedEmployee[] = employeesData.map((emp: any) => ({
-          id: emp.id,
-          nombre: emp.name?.split(' ')[0] || emp.nombre || '',
-          apellido: emp.name?.split(' ').slice(1).join(' ') || emp.apellido || '',
-          salario_base: emp.salarioBase || emp.salario_base || 0,
-          ibc: emp.ibc || emp.salarioBase || emp.salario_base || 0,
-          dias_trabajados: emp.diasTrabajados || emp.dias_trabajados || 30,
-          total_devengado: emp.totalDevengado || emp.total_devengado || emp.salarioBase || 0,
-          total_deducciones: emp.totalDeducciones || emp.total_deducciones || 0,
-          neto_pagado: emp.netoPagado || emp.neto_pagado || (emp.totalDevengado || emp.salarioBase || 0) - (emp.totalDeducciones || 0),
-          payroll_id: emp.payrollId || emp.payroll_id || emp.id
+        // Transform PayrollEmployeeData to ExpandedEmployee format
+        const expandedEmployees: ExpandedEmployee[] = payrollEmployees.map((emp: PayrollEmployeeData) => ({
+          id: emp.employee_id, // Use employee_id as the main id for novedades lookup
+          nombre: emp.nombre,
+          apellido: emp.apellido,
+          salario_base: emp.salario_base,
+          ibc: PayrollHistoryService.calculateIBC(emp.salario_base, emp.dias_trabajados),
+          dias_trabajados: emp.dias_trabajados,
+          total_devengado: emp.total_devengado,
+          total_deducciones: emp.total_deducciones,
+          neto_pagado: emp.neto_pagado,
+          payroll_id: emp.id // This is the payroll record id
         }));
         
         setEmployees(expandedEmployees);
+        
+        console.log('✅ Loaded employees from payrolls table:', expandedEmployees.length);
+        console.log('Sample employee:', expandedEmployees[0]);
       } catch (error) {
         console.error('Error loading employees:', error);
         toast({
@@ -130,7 +112,7 @@ export default function PayrollHistoryDetailPage() {
   }, [periodId]);
 
   const handleGoBack = () => {
-    navigate('/payroll/history');
+    navigate('/app/payroll-history');
   };
 
   const handleAddNovedad = (employeeId: string) => {
