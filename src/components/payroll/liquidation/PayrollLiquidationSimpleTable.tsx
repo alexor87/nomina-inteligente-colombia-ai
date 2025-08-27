@@ -84,6 +84,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
     lastRefreshTime,
     getEmployeeNovedadesList
   } = usePayrollNovedadesUnified({ 
+    companyId,
     periodId: currentPeriodId || '', 
     enabled: !!currentPeriodId 
   });
