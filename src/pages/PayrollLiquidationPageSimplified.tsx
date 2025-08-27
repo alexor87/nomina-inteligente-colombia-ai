@@ -132,11 +132,6 @@ const PayrollLiquidationPageSimplified = () => {
     };
   };
 
-  // Limpiar períodos abandonados al montar
-  useEffect(() => {
-    PayrollCleanupService.cleanupAbandonedPeriods();
-  }, []);
-
   // ✅ MÉTODO SIMPLIFICADO: Solo cargar empleados
   const handlePeriodSelection = async (period: SelectablePeriod) => {
     console.log('🎯 Período seleccionado:', period.label);
