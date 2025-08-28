@@ -145,7 +145,7 @@ export const usePendingAdjustments = ({ periodId, companyId }: UsePendingAdjustm
     };
   }, [getPendingForEmployee]);
 
-  // Apply all pending adjustments
+  // Apply all pending adjustments with full re-liquidation
   const applyPendingAdjustments = useCallback(async (
     justification: string,
     periodData: any,
@@ -161,6 +161,7 @@ export const usePendingAdjustments = ({ periodId, companyId }: UsePendingAdjustm
     }
 
     setIsApplying(true);
+    console.log('🔄 Applying pending adjustments with re-liquidation...');
     
     try {
       // Group pending adjustments by employee
@@ -168,60 +169,59 @@ export const usePendingAdjustments = ({ periodId, companyId }: UsePendingAdjustm
         const employeeId = pending.employee_id;
         if (!groups[employeeId]) {
           groups[employeeId] = {
-            employee_id: employeeId,
-            employee_name: pending.employee_name,
+            employeeId: employeeId,
+            employeeName: pending.employee_name,
             novedades: []
           };
         }
-        groups[employeeId].novedades.push(pending.novedadData);
+        groups[employeeId].novedades.push(pending);
         return groups;
-      }, {} as Record<string, { employee_id: string; employee_name: string; novedades: CreateNovedadData[] }>);
+      }, {} as Record<string, { employeeId: string; employeeName: string; novedades: PendingNovedad[] }>);
 
-      // Apply adjustments for each employee
-      let totalAdjustments = 0;
-      let totalEmployees = 0;
-      const results = [];
-
-      for (const group of Object.values(employeeGroups)) {
-        const adjustmentData: PendingAdjustmentData = {
-          periodId: periodData.id,
-          employeeId: group.employee_id,
-          employeeName: group.employee_name,
-          justification,
-          novedades: group.novedades
-        };
-
-        const result = await PendingNovedadesService.applyPendingAdjustments(adjustmentData);
-        results.push(result);
-        
-        if (result.success) {
-          totalAdjustments += result.total_adjustments || 0;
-          totalEmployees += result.affected_employees || 0;
-        } else {
-          throw new Error(`Error procesando ${group.employee_name}: ${result.message}`);
-        }
-      }
-      
-      clearAllPending();
-      
-      toast({
-        title: "✅ Ajustes aplicados exitosamente",
-        description: `Se aplicaron ${totalAdjustments} ajustes a ${totalEmployees} empleados`,
-        className: "border-green-200 bg-green-50"
+      // Apply adjustments using the new re-liquidation service
+      const result = await PendingNovedadesService.applyPendingAdjustments({
+        periodId: periodData.id,
+        periodo: periodData.periodo,
+        companyId,
+        employeeGroups: Object.values(employeeGroups),
+        justification
       });
-      
-      return { success: true, results, totalAdjustments, totalEmployees };
-      
-    } catch (error: any) {
-      console.error('❌ Error applying pending adjustments:', error);
-      
+
+      if (result.success) {
+        // Clear pending adjustments
+        clearAllPending();
+        
+        // Show enhanced success message with re-liquidation details
+        const details = [];
+        if (result.employeesAffected) details.push(`${result.employeesAffected} empleados`);
+        if (result.correctionsApplied) details.push(`${result.correctionsApplied} correcciones`);
+        if (result.periodReopened) details.push('período reabierto temporalmente');
+        
+        toast({
+          title: "✅ Re-liquidación Completada",
+          description: `${result.adjustmentsApplied} ajustes aplicados y período reliquidado: ${details.join(', ')}`,
+          className: "border-green-200 bg-green-50"
+        });
+
+        console.log('✅ Re-liquidation completed successfully:', result);
+        return { success: true, ...result };
+      } else {
+        toast({
+          title: "❌ Error en Re-liquidación",
+          description: result.message,
+          variant: "destructive"
+        });
+        console.error('❌ Error in re-liquidation:', result);
+        return { success: false };
+      }
+    } catch (error) {
+      console.error('❌ Error in applyPendingAdjustments:', error);
       toast({
-        title: "Error aplicando ajustes",
-        description: error.message || "No se pudieron aplicar los ajustes",
+        title: "❌ Error Inesperado",
+        description: "Ocurrió un error al aplicar los ajustes y reliquidar",
         variant: "destructive"
       });
-      
-      return { success: false, error: error.message };
+      return { success: false };
     } finally {
       setIsApplying(false);
     }

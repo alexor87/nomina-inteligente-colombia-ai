@@ -1,200 +1,131 @@
 import { supabase } from '@/integrations/supabase/client';
-import { CreateNovedadData } from '@/types/novedades-enhanced';
+import { PendingNovedad } from '@/types/pending-adjustments';
 
-export interface PendingAdjustmentData {
+// Interface for the data required to apply adjustments with re-liquidation
+interface PendingAdjustmentData {
   periodId: string;
-  employeeId: string;
-  employeeName: string;
+  periodo: string;
+  companyId: string;
+  employeeGroups: {
+    employeeId: string;
+    employeeName: string;
+    novedades: PendingNovedad[];
+  }[];
   justification: string;
-  novedades: CreateNovedadData[];
 }
 
-export interface AdjustmentResult {
+// Interface for the result of applying adjustments with re-liquidation
+interface AdjustmentResult {
   success: boolean;
   message: string;
-  affected_employees?: number;
-  total_adjustments?: number;
-  vouchers_regenerated?: string[];
+  employeesAffected?: number;
+  adjustmentsApplied?: number;
+  correctionsApplied?: number;
+  vouchersRegenerated?: number;
+  periodReopened?: boolean;
 }
 
 export class PendingNovedadesService {
   
   /**
-   * Apply all pending novelties to a closed period
-   * This includes creating audit logs, recalculating totals, and regenerating vouchers
+   * Apply all pending novelties to a closed period with full re-liquidation
+   * This triggers a complete atomic re-liquidation using the Edge Function
    */
   static async applyPendingAdjustments(data: PendingAdjustmentData): Promise<AdjustmentResult> {
     try {
-      console.log('🔄 Aplicando ajustes pendientes:', data);
+      console.log('🔄 Applying pending adjustments with full re-liquidation...', {
+        period: data.periodo,
+        employees: data.employeeGroups.length,
+        totalAdjustments: data.employeeGroups.reduce((sum, group) => sum + group.novedades.length, 0)
+      });
 
-      // Validate and fix company_id before proceeding
-      for (const novedadData of data.novedades) {
-        if (!novedadData.company_id) {
-          // Get company_id from user profile as fallback
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user) {
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('company_id')
-              .eq('user_id', user.id)
-              .single();
-            
-            if (profile?.company_id) {
-              novedadData.company_id = profile.company_id;
-            } else {
-              throw new Error('No se pudo obtener el company_id del usuario');
+      // Validate company_id
+      if (!data.companyId) {
+        throw new Error('Company ID is required');
+      }
+
+      let adjustmentsApplied = 0;
+
+      // First, create all the novedades
+      for (const group of data.employeeGroups) {
+        try {
+          // Create novedades for each employee
+          for (const novedad of group.novedades) {
+            const { error: novedadError } = await supabase
+              .from('payroll_novedades')
+              .insert({
+                company_id: data.companyId,
+                empleado_id: novedad.employee_id,
+                periodo_id: data.periodId,
+                tipo_novedad: novedad.novedadData.tipo_novedad as any, // Cast to match DB enum
+                subtipo: novedad.novedadData.subtipo,
+                valor: novedad.novedadData.valor || novedad.valor,
+                observacion: `${novedad.novedadData.observacion || novedad.observacion || ''} - Ajuste aplicado: ${data.justification}`.trim(),
+                fecha_inicio: novedad.novedadData.fecha_inicio,
+                fecha_fin: novedad.novedadData.fecha_fin,
+                dias: novedad.novedadData.dias,
+                horas: novedad.novedadData.horas,
+                constitutivo_salario: novedad.novedadData.constitutivo_salario,
+                base_calculo: typeof novedad.novedadData.base_calculo === 'object' 
+                  ? JSON.stringify(novedad.novedadData.base_calculo) 
+                  : novedad.novedadData.base_calculo,
+                creado_por: (await supabase.auth.getUser()).data.user?.id
+              });
+
+            if (novedadError) {
+              console.error('Error creating novedad:', novedadError);
+              continue;
             }
-          } else {
-            throw new Error('Usuario no autenticado');
+
+            adjustmentsApplied++;
           }
+        } catch (employeeError) {
+          console.error(`Error processing employee ${group.employeeId}:`, employeeError);
         }
       }
 
-      // Step 1: Create all novelties in a single transaction
-      const createdNovedades = [];
-      for (const novedadData of data.novedades) {
-        // Prepare insert data with proper field mapping
-        const insertData = {
-          company_id: novedadData.company_id,
-          empleado_id: data.employeeId,
-          periodo_id: data.periodId,
-          tipo_novedad: novedadData.tipo_novedad as any, // Type assertion for DB enum
-          subtipo: novedadData.subtipo || null,
-          fecha_inicio: novedadData.fecha_inicio || null,
-          fecha_fin: novedadData.fecha_fin || null,
-          dias: novedadData.dias || null,
-          horas: novedadData.horas || null,
-          valor: novedadData.valor || null,
-          observacion: novedadData.observacion || null,
-          constitutivo_salario: novedadData.constitutivo_salario || false,
-          base_calculo: typeof novedadData.base_calculo === 'object' 
-            ? JSON.stringify(novedadData.base_calculo) 
-            : (novedadData.base_calculo || null),
-          creado_por: (await supabase.auth.getUser()).data.user?.id || null
-        };
+      // Now trigger the complete re-liquidation via Edge Function
+      const affectedEmployeeIds = data.employeeGroups.map(g => g.employeeId);
+      
+      const { data: reliquidationResult, error: reliquidationError } = await supabase.functions.invoke(
+        'reliquidate-period-adjustments',
+        {
+          body: {
+            periodId: data.periodId,
+            affectedEmployeeIds,
+            justification: data.justification,
+            options: {
+              reliquidateScope: 'affected',
+              regenerateVouchers: false, // Don't auto-regenerate, just mark as needing regeneration
+              sendEmails: false
+            }
+          }
+        }
+      );
 
-        const { data: novedad, error } = await supabase
-          .from('payroll_novedades')
-          .insert(insertData)
-          .select()
-          .single();
-
-        if (error) throw error;
-        createdNovedades.push(novedad);
+      if (reliquidationError) {
+        console.error('❌ Re-liquidation error:', reliquidationError);
+        throw new Error(`Re-liquidation failed: ${reliquidationError.message}`);
       }
 
-      // Step 2: Create correction audit record
-      const user = await supabase.auth.getUser();
-      const userEmail = user.data.user?.email || 'Usuario desconocido';
-
-      const { error: correctionError } = await supabase
-        .from('payroll_period_corrections')
-        .insert({
-          company_id: data.novedades[0]?.company_id,
-          period_id: data.periodId,
-          employee_id: data.employeeId,
-          correction_type: 'adjustment',
-          concept: 'Ajuste período cerrado',
-          justification: data.justification,
-          new_value: data.novedades.reduce((sum, n) => sum + (n.valor || 0), 0),
-          value_difference: data.novedades.reduce((sum, n) => sum + (n.valor || 0), 0),
-          created_by: user.data.user?.id
-        });
-
-      if (correctionError) {
-        console.error('Error creating correction log:', correctionError);
-      }
-
-      // Step 3: Recalculate period totals
-      await this.recalculatePeriodTotals(data.periodId);
-
-      // Step 4: Mark vouchers for regeneration (placeholder)
-      const vouchersToRegenerate = [`voucher-${data.employeeId}`];
+      console.log('✅ Re-liquidation completed:', reliquidationResult);
 
       return {
         success: true,
-        message: `Se aplicaron ${data.novedades.length} ajustes correctamente. Los comprobantes se regenerarán automáticamente.`,
-        affected_employees: 1,
-        total_adjustments: data.novedades.length,
-        vouchers_regenerated: vouchersToRegenerate
+        message: `Successfully applied ${adjustmentsApplied} adjustments and re-liquidated ${reliquidationResult.employeesAffected} employees`,
+        employeesAffected: reliquidationResult.employeesAffected,
+        adjustmentsApplied,
+        correctionsApplied: reliquidationResult.correctionsApplied,
+        vouchersRegenerated: reliquidationResult.vouchersRegenerated,
+        periodReopened: reliquidationResult.periodReopened
       };
 
     } catch (error) {
       console.error('❌ Error applying adjustments:', error);
       return {
         success: false,
-        message: error instanceof Error ? error.message : 'Error desconocido al aplicar ajustes'
+        message: `Error applying adjustments: ${error.message}`
       };
-    }
-  }
-
-  /**
-   * Recalculate period totals after adjustments
-   */
-  private static async recalculatePeriodTotals(periodId: string): Promise<void> {
-    try {
-      // Get all payrolls for the period
-      const { data: payrolls, error: payrollsError } = await supabase
-        .from('payrolls')
-        .select('id, employee_id, total_devengado, total_deducciones, neto_pagado')
-        .eq('period_id', periodId);
-
-      if (payrollsError) throw payrollsError;
-
-      // For each payroll, get novelties and recalculate
-      for (const payroll of payrolls || []) {
-        const { data: novedades, error: novedadesError } = await supabase
-          .from('payroll_novedades')
-          .select('valor, tipo_novedad')
-          .eq('empleado_id', payroll.employee_id)
-          .eq('periodo_id', periodId);
-
-        if (novedadesError) continue;
-
-        // Calculate novelty adjustments
-        const totalAdjustments = novedades?.reduce((sum, n) => sum + (n.valor || 0), 0) || 0;
-        
-        // Update payroll record
-        await supabase
-          .from('payrolls')
-          .update({
-            total_devengado: payroll.total_devengado + (totalAdjustments > 0 ? totalAdjustments : 0),
-            total_deducciones: payroll.total_deducciones + (totalAdjustments < 0 ? Math.abs(totalAdjustments) : 0),
-            neto_pagado: payroll.neto_pagado + totalAdjustments,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', payroll.id);
-      }
-
-      // Update period totals
-      const { data: updatedPayrolls } = await supabase
-        .from('payrolls')
-        .select('total_devengado, total_deducciones, neto_pagado')
-        .eq('period_id', periodId);
-
-      if (updatedPayrolls) {
-        const totals = updatedPayrolls.reduce(
-          (acc, p) => ({
-            total_devengado: acc.total_devengado + (p.total_devengado || 0),
-            total_deducciones: acc.total_deducciones + (p.total_deducciones || 0),
-            total_neto: acc.total_neto + (p.neto_pagado || 0)
-          }),
-          { total_devengado: 0, total_deducciones: 0, total_neto: 0 }
-        );
-
-        await supabase
-          .from('payroll_periods_real')
-          .update({
-            total_devengado: totals.total_devengado,
-            total_deducciones: totals.total_deducciones,
-            total_neto: totals.total_neto,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', periodId);
-      }
-
-    } catch (error) {
-      console.error('Error recalculating period totals:', error);
     }
   }
 
@@ -225,8 +156,8 @@ export class PendingNovedadesService {
           user_id: user.data.user.id,
           company_id: profile.company_id,
           type: 'period_adjustment',
-          title: 'Ajustes aplicados al período',
-          message: `Se aplicaron ${adjustmentCount} ajustes a ${employeeCount} empleado(s). Los comprobantes han sido regenerados.`,
+          title: 'Re-liquidación completada',
+          message: `Se aplicaron ${adjustmentCount} ajustes y se reliquidaron ${employeeCount} empleado(s). Los comprobantes han sido marcados para regeneración.`,
           reference_id: periodId
         });
 
@@ -235,3 +166,5 @@ export class PendingNovedadesService {
     }
   }
 }
+
+export type { PendingAdjustmentData, AdjustmentResult };
