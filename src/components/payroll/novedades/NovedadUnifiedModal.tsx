@@ -125,11 +125,8 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       setSelectedType(selectedNovedadType);
       setCurrentStep('form');
     } else {
-      if (mode === 'ajustes') {
-        setCurrentStep('selector');
-      } else {
-        setCurrentStep('list');
-      }
+      // Always start in 'list' step to show existing novedades first
+      setCurrentStep('list');
       setSelectedType(null);
     }
   }, [selectedNovedadType, open, mode]);
@@ -195,14 +192,11 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   };
 
   const handleBackToList = () => {
-    if (mode === 'ajustes') {
-      handleClose();
-    } else {
-      setCurrentStep('list');
-      setSelectedType(null);
-      setSelectedAbsenceType(null);
-      setRefreshTrigger(Date.now());
-    }
+    // Always go back to list step, regardless of mode
+    setCurrentStep('list');
+    setSelectedType(null);
+    setSelectedAbsenceType(null);
+    setRefreshTrigger(Date.now());
   };
 
   const handleAddNew = () => {
