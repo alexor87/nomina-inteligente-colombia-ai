@@ -431,6 +431,14 @@ export default function PayrollHistoryDetailPage() {
         startDate={periodData?.fecha_inicio}
         endDate={periodData?.fecha_fin}
         companyId={periodData?.company_id || ''}
+        currentLiquidatedValues={employees.find(e => e.id === selectedEmployeeId) ? {
+          salario_base: employees.find(e => e.id === selectedEmployeeId)!.salario_base,
+          ibc: employees.find(e => e.id === selectedEmployeeId)!.ibc,
+          dias_trabajados: employees.find(e => e.id === selectedEmployeeId)!.dias_trabajados,
+          total_devengado: employees.find(e => e.id === selectedEmployeeId)!.total_devengado,
+          total_deducciones: employees.find(e => e.id === selectedEmployeeId)!.total_deducciones,
+          neto_pagado: employees.find(e => e.id === selectedEmployeeId)!.neto_pagado
+        } : undefined}
       />
 
       {/* Confirmation Modal for Adjustments */}

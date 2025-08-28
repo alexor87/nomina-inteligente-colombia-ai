@@ -22,6 +22,16 @@ import { VacationAbsenceFormData, VacationAbsenceType } from '@/types/vacations'
 import { useVacationEmployees } from '@/hooks/useVacationEmployees';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { NovedadExistingList } from './NovedadExistingList';
+import { formatCurrency } from '@/lib/utils';
+
+interface EmployeeLiquidatedValues {
+  salario_base: number;
+  ibc: number;
+  dias_trabajados: number;
+  total_devengado: number;
+  total_deducciones: number;
+  neto_pagado: number;
+}
 
 interface NovedadUnifiedModalProps {
   open: boolean;
@@ -37,6 +47,7 @@ interface NovedadUnifiedModalProps {
   endDate?: string;
   mode?: 'liquidacion' | 'ajustes';
   companyId?: string | null;
+  currentLiquidatedValues?: EmployeeLiquidatedValues;
 }
 
 const categoryToNovedadType: Record<NovedadCategory, NovedadType> = {
@@ -74,7 +85,8 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   startDate,
   endDate,
   mode = 'liquidacion',
-  companyId
+  companyId,
+  currentLiquidatedValues
 }) => {
   const [currentStep, setCurrentStep] = useState<'list' | 'selector' | 'form' | 'absence'>('list');
   const [selectedType, setSelectedType] = useState<NovedadType | null>(selectedNovedadType);
@@ -428,48 +440,102 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     }
   };
 
+  const renderCurrentValues = () => {
+    if (!currentLiquidatedValues || mode !== 'ajustes') return null;
+
+    return (
+      <div className="mb-6 p-4 bg-muted/30 rounded-lg border">
+        <h4 className="text-sm font-semibold mb-3 text-muted-foreground">📊 Valores Actuales Liquidados</h4>
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Salario Base:</span>
+              <span className="font-medium">{formatCurrency(currentLiquidatedValues.salario_base)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">IBC:</span>
+              <span className="font-medium">{formatCurrency(currentLiquidatedValues.ibc)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Días Trabajados:</span>
+              <span className="font-medium">{currentLiquidatedValues.dias_trabajados}</span>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="text-green-600">Total Devengado:</span>
+              <span className="font-semibold text-green-600">{formatCurrency(currentLiquidatedValues.total_devengado)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-red-600">Total Deducciones:</span>
+              <span className="font-semibold text-red-600">{formatCurrency(currentLiquidatedValues.total_deducciones)}</span>
+            </div>
+            <div className="flex justify-between border-t pt-2">
+              <span className="text-blue-600 font-medium">Neto Pagado:</span>
+              <span className="font-bold text-blue-600">{formatCurrency(currentLiquidatedValues.neto_pagado)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderContent = () => {
     if (currentStep === 'list' && employeeId && periodId) {
       return (
-        <NovedadExistingList
-          employeeId={employeeId}
-          periodId={periodId}
-          employeeName={employeeName}
-          onAddNew={handleAddNew}
-          onClose={handleClose}
-          refreshTrigger={refreshTrigger}
-          onEmployeeNovedadesChange={onEmployeeNovedadesChange}
-        />
+        <div>
+          {renderCurrentValues()}
+          <NovedadExistingList
+            employeeId={employeeId}
+            periodId={periodId}
+            employeeName={employeeName}
+            onAddNew={handleAddNew}
+            onClose={handleClose}
+            refreshTrigger={refreshTrigger}
+            onEmployeeNovedadesChange={onEmployeeNovedadesChange}
+          />
+        </div>
       );
     }
 
     if (currentStep === 'selector') {
       return (
-        <NovedadTypeSelector
-          onClose={handleBackToList}
-          onSelectCategory={handleCategorySelect}
-          employeeName={employeeName}
-          mode={mode}
-        />
+        <div>
+          {renderCurrentValues()}
+          <NovedadTypeSelector
+            onClose={handleBackToList}
+            onSelectCategory={handleCategorySelect}
+            employeeName={employeeName}
+            mode={mode}
+          />
+        </div>
       );
     }
 
     if (currentStep === 'form') {
-      return renderNovedadForm();
+      return (
+        <div>
+          {renderCurrentValues()}
+          {renderNovedadForm()}
+        </div>
+      );
     }
 
     if (currentStep === 'absence' && selectedAbsenceType && employeeId) {
       return (
-        <VacationAbsenceForm
-          isOpen={true}
-          onClose={handleBackToSelector}
-          onSubmit={handleAbsenceSubmit}
-          isSubmitting={isSubmitting}
-          preselectedEmployeeId={employeeId}
-          editingVacation={null}
-          useCustomModal={false}
-          hideEmployeeSelection={true}
-        />
+        <div>
+          {renderCurrentValues()}
+          <VacationAbsenceForm
+            isOpen={true}
+            onClose={handleBackToSelector}
+            onSubmit={handleAbsenceSubmit}
+            isSubmitting={isSubmitting}
+            preselectedEmployeeId={employeeId}
+            editingVacation={null}
+            useCustomModal={false}
+            hideEmployeeSelection={true}
+          />
+        </div>
       );
     }
 
