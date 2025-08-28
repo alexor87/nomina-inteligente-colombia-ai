@@ -25,12 +25,29 @@ interface ExpandedEmployee {
   id: string;
   nombre: string;
   apellido: string;
+  cedula: string;
+  cargo: string;
+  eps: string;
+  afp: string;
   salario_base: number;
   ibc: number;
   dias_trabajados: number;
   total_devengado: number;
   total_deducciones: number;
   neto_pagado: number;
+  auxilio_transporte: number;
+  salud_empleado: number;
+  pension_empleado: number;
+  horas_extra: number;
+  bonificaciones: number;
+  comisiones: number;
+  cesantias: number;
+  prima: number;
+  vacaciones: number;
+  incapacidades: number;
+  otros_devengos: number;
+  descuentos_varios: number;
+  retencion_fuente: number;
   payroll_id: string;
 }
 
@@ -95,44 +112,61 @@ export default function PayrollHistoryDetailPage() {
   }, [periodId]);
 
   // Load employees for the period
-  useEffect(() => {
-    const loadEmployees = async () => {
-      if (!periodId) return;
+  const loadEmployees = async () => {
+    if (!periodId) return;
+    
+    setIsLoadingEmployees(true);
+    try {
+      const payrollEmployees = await PayrollHistoryService.getPeriodEmployees(periodId);
       
-      setIsLoadingEmployees(true);
-      try {
-        const payrollEmployees = await PayrollHistoryService.getPeriodEmployees(periodId);
-        
-        // Transform PayrollEmployeeData to ExpandedEmployee format
-        const expandedEmployees: ExpandedEmployee[] = payrollEmployees.map((emp: PayrollEmployeeData) => ({
-          id: emp.employee_id, // Use employee_id as the main id for novedades lookup
-          nombre: emp.nombre,
-          apellido: emp.apellido,
-          salario_base: emp.salario_base,
-          ibc: PayrollHistoryService.calculateIBC(emp.salario_base, emp.dias_trabajados),
-          dias_trabajados: emp.dias_trabajados,
-          total_devengado: emp.total_devengado,
-          total_deducciones: emp.total_deducciones,
-          neto_pagado: emp.neto_pagado,
-          payroll_id: emp.id // This is the payroll record id
-        }));
-        
-        setEmployees(expandedEmployees);
-        
-        console.log('✅ Loaded employees from payrolls table:', expandedEmployees.length);
-        console.log('Sample employee:', expandedEmployees[0]);
-      } catch (error) {
-        console.error('Error loading employees:', error);
-        toast({
-          title: "Error",
-          description: "No se pudieron cargar los empleados del período",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoadingEmployees(false);
-      }
-    };
+      // Transform PayrollEmployeeData to ExpandedEmployee format
+      const expandedEmployees: ExpandedEmployee[] = payrollEmployees.map((emp: PayrollEmployeeData) => ({
+        id: emp.employee_id, // Use employee_id as the main id for novedades lookup
+        nombre: emp.nombre,
+        apellido: emp.apellido,
+        cedula: emp.cedula,
+        cargo: emp.cargo,
+        eps: emp.eps,
+        afp: emp.afp,
+        salario_base: emp.salario_base,
+        ibc: emp.ibc || 0, // Use actual IBC from database
+        dias_trabajados: emp.dias_trabajados,
+        total_devengado: emp.total_devengado,
+        total_deducciones: emp.total_deducciones,
+        neto_pagado: emp.neto_pagado,
+        auxilio_transporte: emp.auxilio_transporte,
+        salud_empleado: emp.salud_empleado,
+        pension_empleado: emp.pension_empleado,
+        horas_extra: emp.horas_extra,
+        bonificaciones: emp.bonificaciones,
+        comisiones: emp.comisiones,
+        cesantias: emp.cesantias,
+        prima: emp.prima,
+        vacaciones: emp.vacaciones,
+        incapacidades: emp.incapacidades,
+        otros_devengos: emp.otros_devengos,
+        descuentos_varios: emp.descuentos_varios,
+        retencion_fuente: emp.retencion_fuente,
+        payroll_id: emp.id // This is the payroll record id
+      }));
+      
+      setEmployees(expandedEmployees);
+      
+      console.log('✅ Loaded employees from payrolls table:', expandedEmployees.length);
+      console.log('Sample employee:', expandedEmployees[0]);
+    } catch (error) {
+      console.error('Error loading employees:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los empleados del período",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingEmployees(false);
+    }
+  };
 
+  useEffect(() => {
     loadEmployees();
   }, [periodId]);
 
@@ -215,7 +249,8 @@ export default function PayrollHistoryDetailPage() {
       
       if (result.success) {
         setShowConfirmModal(false);
-        loadPeriodDetail();
+        await loadPeriodDetail();
+        await loadEmployees(); // Refresh employee data to show updated IBC
         refetchNovedades();
       }
     } catch (error) {

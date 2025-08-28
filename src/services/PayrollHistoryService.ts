@@ -25,9 +25,13 @@ export interface PayrollEmployeeData {
   total_devengado: number;
   total_deducciones: number;
   neto_pagado: number;
+  ibc: number;
   auxilio_transporte: number;
   salud_empleado: number;
   pension_empleado: number;
+  health_deduction: number;
+  pension_deduction: number;
+  transport_allowance: number;
   horas_extra: number;
   bonificaciones: number;
   comisiones: number;
@@ -111,9 +115,13 @@ export class PayrollHistoryService {
         total_devengado: payroll.total_devengado || 0,
         total_deducciones: payroll.total_deducciones || 0,
         neto_pagado: payroll.neto_pagado || 0,
+        ibc: payroll.ibc || 0,
         auxilio_transporte: payroll.auxilio_transporte || 0,
         salud_empleado: payroll.salud_empleado || 0,
         pension_empleado: payroll.pension_empleado || 0,
+        health_deduction: payroll.health_deduction || 0,
+        pension_deduction: payroll.pension_deduction || 0,
+        transport_allowance: payroll.transport_allowance || 0,
         horas_extra: payroll.horas_extra || 0,
         bonificaciones: payroll.bonificaciones || 0,
         comisiones: payroll.comisiones || 0,
