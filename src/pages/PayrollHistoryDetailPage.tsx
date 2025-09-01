@@ -18,6 +18,8 @@ import { PendingNovedadesService, PendingAdjustmentData } from '@/services/Pendi
 import { ConfirmAdjustmentModal } from '@/components/payroll/corrections/ConfirmAdjustmentModal';
 import { NovedadUnifiedModal } from '@/components/payroll/novedades/NovedadUnifiedModal';
 import { PayrollRecalculationService } from '@/services/PayrollRecalculationService';
+import { NovedadesEnhancedService } from '@/services/NovedadesEnhancedService';
+import { PendingAdjustmentsService } from '@/services/PendingAdjustmentsService';
 import { usePendingAdjustments } from '@/hooks/usePendingAdjustments';
 
 // Use PayrollPeriodData from service instead of local interface
@@ -220,31 +222,44 @@ export default function PayrollHistoryDetailPage() {
     console.log('Edit novedad:', novedad);
   };
 
-  // CORE LOGIC: Differentiate between open and closed periods
-  const handleNovedadSubmit = async (data: CreateNovedadData) => {
+  const handleNovedadSubmit = async (novedadData: CreateNovedadData): Promise<{ isPending?: boolean } | void> => {
+    if (!periodData) return;
+
     try {
-      // 🔵 CLOSED PERIOD: Add to pending adjustments
-      if (periodData?.estado === 'cerrado') {
-        const employeeData = employees.find(e => e.id === selectedEmployeeId);
-        
-        const newPendingNovedad: PendingNovedad = {
-          employee_id: selectedEmployeeId,
-          employee_name: employeeData ? `${employeeData.nombre} ${employeeData.apellido}` : selectedEmployeeName,
-          tipo_novedad: data.tipo_novedad,
-          valor: data.valor || 0,
-          observacion: data.observacion,
-          novedadData: data
+      if (periodData.estado === 'cerrado') {
+        // Save to database for closed periods
+        const pendingNovedad: PendingNovedad = {
+          employee_id: novedadData.empleado_id,
+          employee_name: `${employees.find(emp => emp.id === novedadData.empleado_id)?.nombre || ''} ${employees.find(emp => emp.id === novedadData.empleado_id)?.apellido || ''}`.trim(),
+          tipo_novedad: novedadData.tipo_novedad,
+          valor: novedadData.valor,
+          observacion: novedadData.observacion,
+          novedadData: novedadData
         };
+
+        // Save to database
+        await PendingAdjustmentsService.savePendingAdjustment(pendingNovedad);
         
-        addPendingNovedad(newPendingNovedad);
-        setShowAdjustmentModal(false);
+        // Also add to local state for immediate display
+        addPendingNovedad(pendingNovedad);
+        
+        return { isPending: true };
       } else {
-        // 🟢 OPEN PERIOD: Apply immediately
-        await createNovedad(data);
-        handleAdjustmentSuccess();
+        // Apply immediately for open periods
+        await NovedadesEnhancedService.createNovedad(novedadData);
+        
+        // Refresh novedades
+        await refetchNovedades();
+        
+        return { isPending: false };
       }
     } catch (error) {
-      console.error('❌ Error creating novedad:', error);
+      console.error('Error submitting novedad:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo registrar la novedad",
+        variant: "destructive",
+      });
       throw error;
     }
   };

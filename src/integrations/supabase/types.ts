@@ -1743,6 +1743,92 @@ export type Database = {
           },
         ]
       }
+      pending_payroll_adjustments: {
+        Row: {
+          company_id: string
+          created_at: string | null
+          created_by: string | null
+          dias: number | null
+          employee_id: string
+          employee_name: string
+          fecha_fin: string | null
+          fecha_inicio: string | null
+          id: string
+          novedad_data: Json
+          observacion: string | null
+          period_id: string
+          subtipo: string | null
+          tipo_novedad: string
+          updated_at: string | null
+          valor: number
+        }
+        Insert: {
+          company_id: string
+          created_at?: string | null
+          created_by?: string | null
+          dias?: number | null
+          employee_id: string
+          employee_name: string
+          fecha_fin?: string | null
+          fecha_inicio?: string | null
+          id?: string
+          novedad_data: Json
+          observacion?: string | null
+          period_id: string
+          subtipo?: string | null
+          tipo_novedad: string
+          updated_at?: string | null
+          valor?: number
+        }
+        Update: {
+          company_id?: string
+          created_at?: string | null
+          created_by?: string | null
+          dias?: number | null
+          employee_id?: string
+          employee_name?: string
+          fecha_fin?: string | null
+          fecha_inicio?: string | null
+          id?: string
+          novedad_data?: Json
+          observacion?: string | null
+          period_id?: string
+          subtipo?: string | null
+          tipo_novedad?: string
+          updated_at?: string | null
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_pending_adjustments_company"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_pending_adjustments_employee"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_pending_adjustments_employee"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees_limited"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_pending_adjustments_period"
+            columns: ["period_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_periods_real"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null

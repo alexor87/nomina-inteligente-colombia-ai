@@ -39,7 +39,7 @@ interface NovedadUnifiedModalProps {
   employeeId: string | undefined;
   employeeSalary: number | undefined;
   periodId: string | undefined;
-  onSubmit: (data: CreateNovedadData) => Promise<void>;
+  onSubmit: (data: CreateNovedadData) => Promise<{ isPending?: boolean } | void>;
   onClose?: () => void;
   selectedNovedadType: NovedadType | null;
   onEmployeeNovedadesChange?: (employeeId: string) => Promise<void>;
@@ -296,7 +296,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
         observacion: formData.observations
       };
       
-      await onSubmit(novedadData);
+      const result = await onSubmit(novedadData);
 
       await new Promise(resolve => setTimeout(resolve, 300));
 
@@ -308,13 +308,24 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
         setRefreshTrigger(Date.now());
       }
 
-      toast({
-        title: "✅ Éxito",
-        description: `${formData.type === 'incapacidad' && valorCalculado > 0 
-          ? `Incapacidad calculada correctamente ($${valorCalculado.toLocaleString()})` 
-          : 'Ausencia registrada correctamente'} en el módulo de novedades`,
-        className: "border-green-200 bg-green-50"
-      });
+      // Show different messages based on submission result
+      if (result && 'isPending' in result && result.isPending) {
+        toast({
+          title: "⏳ Ajuste Pendiente",
+          description: `${formData.type === 'incapacidad' && valorCalculado > 0 
+            ? `Incapacidad agregada como ajuste pendiente ($${valorCalculado.toLocaleString()})` 
+            : 'Ausencia agregada como ajuste pendiente'}. El período está cerrado, se aplicará cuando confirmes los ajustes.`,
+          className: "border-yellow-200 bg-yellow-50"
+        });
+      } else {
+        toast({
+          title: "✅ Éxito",
+          description: `${formData.type === 'incapacidad' && valorCalculado > 0 
+            ? `Incapacidad calculada correctamente ($${valorCalculado.toLocaleString()})` 
+            : 'Ausencia registrada correctamente'} en el módulo de novedades`,
+          className: "border-green-200 bg-green-50"
+        });
+      }
 
     } catch (error: any) {
       toast({
@@ -341,6 +352,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     try {
       const isArrayData = Array.isArray(formData);
       const dataArray = isArrayData ? formData : [formData];
+      let hasPendingSubmissions = false;
       
       for (const entry of dataArray) {
         const submitData: CreateNovedadData = {
@@ -358,7 +370,12 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
           base_calculo: entry.base_calculo || undefined
         };
 
-        await onSubmit(submitData);
+        const result = await onSubmit(submitData);
+        
+        // Track if any submission was pending
+        if (result && 'isPending' in result && result.isPending) {
+          hasPendingSubmissions = true;
+        }
       }
       
       await new Promise(resolve => setTimeout(resolve, 300));
@@ -370,7 +387,29 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
         setSelectedType(null);
         setRefreshTrigger(Date.now());
       }
-      
+      const totalValue = isArrayData 
+        ? dataArray.reduce((sum, entry) => sum + (entry.valor || 0), 0)
+        : (formData.valor || 0);
+
+      // Show different messages based on submission results
+      if (hasPendingSubmissions) {
+        toast({
+          title: "⏳ Ajustes Pendientes",
+          description: isArrayData 
+            ? `${dataArray.length} ajustes agregados como pendientes (Total: $${totalValue.toLocaleString()}). El período está cerrado, se aplicarán cuando confirmes los ajustes.`
+            : "Novedad agregada como ajuste pendiente. El período está cerrado, se aplicará cuando confirmes los ajustes.",
+          className: "border-yellow-200 bg-yellow-50"
+        });
+      } else {
+        toast({
+          title: "✅ Éxito",
+          description: isArrayData 
+            ? `${dataArray.length} novedades registradas correctamente (Total: $${totalValue.toLocaleString()})`
+            : "Novedad registrada correctamente",
+          className: "border-green-200 bg-green-50"
+        });
+      }
+
     } catch (error: any) {
       toast({
         title: "Error",

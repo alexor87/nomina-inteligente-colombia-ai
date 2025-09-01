@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, Edit, Plus, Eye, ExternalLink } from 'lucide-react';
+import { Trash2, Edit, Plus, Eye, ExternalLink, Clock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useNovedades } from '@/hooks/useNovedades';
 import { DisplayNovedad, SeparatedTotals } from '@/types/vacation-integration';
@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { VacationAbsenceDetailModal } from '@/components/vacations/VacationAbsenceDetailModal';
 import { supabase } from '@/integrations/supabase/client';
 import { useEmployeeNovedadesCacheStore } from '@/stores/employeeNovedadesCacheStore';
+import { PendingAdjustmentsService, PendingAdjustmentRecord } from '@/services/PendingAdjustmentsService';
 
 interface NovedadExistingListProps {
   employeeId: string;
@@ -32,6 +33,7 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
   onEmployeeNovedadesChange
 }) => {
   const [integratedData, setIntegratedData] = useState<DisplayNovedad[]>([]);
+  const [pendingAdjustments, setPendingAdjustments] = useState<PendingAdjustmentRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [vacationDetailModal, setVacationDetailModal] = useState<{
     isOpen: boolean;
@@ -74,8 +76,15 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
   const fetchIntegratedData = async () => {
     try {
       setLoading(true);
+      
+      // Load regular integrated data
       const result = await loadIntegratedNovedades(employeeId);
       setIntegratedData(result);
+      
+      // Load pending adjustments for this employee
+      const pending = await PendingAdjustmentsService.getPendingAdjustmentsForEmployee(employeeId, periodId);
+      setPendingAdjustments(pending);
+      
     } catch (error) {
       console.error('Error cargando datos integrados:', error);
       toast({
@@ -84,6 +93,7 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
         variant: "destructive",
       });
       setIntegratedData([]);
+      setPendingAdjustments([]);
     } finally {
       setLoading(false);
     }
@@ -279,9 +289,35 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
     }).format(value);
   };
 
-  const getSeparatedTotals = (): SeparatedTotals => {
+  // Convert pending adjustments to display format
+  const convertPendingToDisplay = (pending: PendingAdjustmentRecord[]): DisplayNovedad[] => {
+    return pending.map(p => ({
+      id: p.id,
+      origen: 'pending_adjustment' as any,
+      tipo_novedad: p.tipo_novedad as any,
+      subtipo: p.subtipo,
+      valor: p.valor,
+      dias: p.dias || 0,
+      fecha_inicio: p.fecha_inicio,
+      fecha_fin: p.fecha_fin,
+      observacion: p.observacion,
+      isConfirmed: false, // Pending adjustments are never confirmed
+      badgeLabel: formatTipoNovedad(p.tipo_novedad, p.subtipo),
+      badgeColor: 'bg-orange-100 text-orange-800',
+      badgeIcon: '⏳',
+      statusColor: 'border-orange-200 text-orange-700',
+      status: 'pendiente',
+      canEdit: false,
+      canDelete: true,
+      created_at: p.created_at,
+      updated_at: p.updated_at
+    }));
+  };
+
+  const getSeparatedTotals = (): SeparatedTotals & { pending: { devengos: number; deducciones: number; neto: number; count: number } } => {
     const confirmed = integratedData.filter(n => n.isConfirmed);
     const estimated = integratedData.filter(n => !n.isConfirmed);
+    const pending = convertPendingToDisplay(pendingAdjustments);
 
     return {
       confirmed: {
@@ -295,12 +331,54 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
         deducciones: Math.abs(estimated.filter(n => n.valor < 0).reduce((sum, n) => sum + n.valor, 0)),
         neto: estimated.reduce((sum, n) => sum + n.valor, 0),
         count: estimated.length
+      },
+      pending: {
+        devengos: pending.filter(n => n.valor > 0).reduce((sum, n) => sum + n.valor, 0),
+        deducciones: Math.abs(pending.filter(n => n.valor < 0).reduce((sum, n) => sum + n.valor, 0)),
+        neto: pending.reduce((sum, n) => sum + n.valor, 0),
+        count: pending.length
       }
     };
   };
 
+  // Handle deletion of pending adjustments
+  const handleDeletePendingAdjustment = async (adjustmentId: string) => {
+    if (window.confirm('¿Estás seguro de que deseas eliminar este ajuste pendiente?')) {
+      try {
+        await PendingAdjustmentsService.deletePendingAdjustment(adjustmentId);
+        setPendingAdjustments(prev => prev.filter(p => p.id !== adjustmentId));
+        
+        toast({
+          title: "Ajuste eliminado",
+          description: "El ajuste pendiente se ha eliminado correctamente",
+        });
+      } catch (error) {
+        console.error('❌ Error eliminando ajuste pendiente:', error);
+        toast({
+          title: "Error",
+          description: "No se pudo eliminar el ajuste pendiente",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
   const getActionButtons = (item: DisplayNovedad) => {
-    if (item.origen === 'vacaciones') {
+    if (item.origen === 'pending_adjustment' as any) {
+      return (
+        <div className="flex gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-red-600 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
+            onClick={() => handleDeletePendingAdjustment(item.id)}
+            title="Eliminar ajuste pendiente"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      );
+    } else if (item.origen === 'vacaciones') {
       return (
         <div className="flex gap-1">
           <Button
@@ -378,7 +456,10 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
           <div>
             <h2 className="text-xl font-semibold text-gray-900">Novedades y Ausencias de {employeeName}</h2>
             <p className="text-sm text-gray-600 mt-1">
-              Vista integrada • {integratedData.length} elemento{integratedData.length !== 1 ? 's' : ''}
+              Vista integrada • {integratedData.length} novedad{integratedData.length !== 1 ? 'es' : ''} 
+              {pendingAdjustments.length > 0 && (
+                <> • {pendingAdjustments.length} ajuste{pendingAdjustments.length !== 1 ? 's' : ''} pendiente{pendingAdjustments.length !== 1 ? 's' : ''}</>
+              )}
             </p>
           </div>
           <Button onClick={onAddNew} className="bg-blue-600 hover:bg-blue-700">
@@ -387,7 +468,7 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
           </Button>
         </div>
 
-        {integratedData.length === 0 ? (
+        {integratedData.length === 0 && pendingAdjustments.length === 0 ? (
           <Card className="border-dashed">
             <CardContent className="pt-6 pb-6 text-center">
               <div className="text-gray-400 mb-4">
@@ -471,6 +552,7 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
             </div>
 
             <div className="space-y-3">
+              {/* Regular novedades */}
               {integratedData.map((item) => (
                 <Card key={`${item.origen}-${item.id}`} className={`hover:shadow-md transition-shadow ${!item.isConfirmed ? 'border-yellow-200 bg-yellow-50' : ''}`}>
                   <CardContent className="pt-4">
@@ -546,6 +628,57 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
                         <div className="flex justify-end sm:justify-center">
                           {getActionButtons(item)}
                         </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+              
+              {/* Pending adjustments */}
+              {convertPendingToDisplay(pendingAdjustments).map((item) => (
+                <Card key={`pending-${item.id}`} className="border-orange-200 bg-orange-50 hover:shadow-md transition-shadow">
+                  <CardContent className="pt-4">
+                    <div className="grid grid-cols-12 gap-4 items-center">
+                      <div className="col-span-12 sm:col-span-4 lg:col-span-3">
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Badge className="bg-orange-100 text-orange-800 border-orange-200">
+                              <Clock className="h-3 w-3 mr-1" />
+                              {item.badgeLabel}
+                            </Badge>
+                            <Badge variant="outline" className="border-orange-200 text-orange-700">
+                              Pendiente
+                            </Badge>
+                          </div>
+                          {item.fecha_inicio && item.fecha_fin && (
+                            <p className="text-xs text-orange-600">
+                              {new Date(item.fecha_inicio).toLocaleDateString('es-CO')} - {new Date(item.fecha_fin).toLocaleDateString('es-CO')}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="col-span-12 sm:col-span-2 lg:col-span-2 text-center">
+                        <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800">
+                          {item.dias} día{item.dias !== 1 ? 's' : ''}
+                        </Badge>
+                      </div>
+                      
+                      <div className="col-span-12 sm:col-span-3 lg:col-span-4">
+                        <div className="text-right">
+                          <div className={`text-lg font-bold ${item.valor >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {formatCurrency(item.valor)}
+                          </div>
+                          {item.observacion && (
+                            <p className="text-xs text-orange-600 mt-1 truncate" title={item.observacion}>
+                              {item.observacion}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="col-span-12 sm:col-span-3 lg:col-span-3 text-right">
+                        {getActionButtons(item)}
                       </div>
                     </div>
                   </CardContent>
