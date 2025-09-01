@@ -87,7 +87,8 @@ export class ClosedPeriodAdjustmentService {
       empleado_id: employeeId,
       periodo_id: periodId,
       company_id: companyId,
-      tipo_novedad: adjustmentData.amount > 0 ? 'bonificacion' : ('deduccion_especial' as NovedadType),
+      tipo_novedad: adjustmentData.amount > 0 ? 'bonificacion' : ('descuento_voluntario' as NovedadType),
+      subtipo: adjustmentData.amount > 0 ? undefined : 'especial',
       valor: Math.abs(adjustmentData.amount),
       observacion: `AJUSTE CORRECTIVO: ${adjustmentData.justification}`,
       constitutivo_salario: false
@@ -157,7 +158,8 @@ export class ClosedPeriodAdjustmentService {
       empleado_id: employeeId,
       periodo_id: activePeriod.id,
       company_id: companyId,
-      tipo_novedad: adjustmentData.amount > 0 ? 'bonificacion' : ('deduccion_especial' as NovedadType),
+      tipo_novedad: adjustmentData.amount > 0 ? 'bonificacion' : ('descuento_voluntario' as NovedadType),
+      subtipo: adjustmentData.amount > 0 ? undefined : 'especial',
       valor: Math.abs(adjustmentData.amount),
       observacion: `AJUSTE COMPENSATORIO: ${adjustmentData.concept}. ${adjustmentData.justification || 'Aplicado en período activo'}`,
       constitutivo_salario: false

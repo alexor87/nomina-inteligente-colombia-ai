@@ -4,7 +4,7 @@ import { Database, Tables } from '@/integrations/supabase/types';
 import { NOVEDAD_CATEGORIES, PayrollNovedad as AppPayrollNovedad, BaseCalculoData } from '@/types/novedades-enhanced';
 
 // ✅ USAR TIPO DIRECTO DE LA BASE DE DATOS
-type DatabaseNovedadType = Database['public']['Enums']['novedad_type'] | 'deduccion_especial';
+type DatabaseNovedadType = Database['public']['Enums']['novedad_type'];
 type DbNovedadRow = Tables<'payroll_novedades'>;
 
 export interface CreateNovedadData {
