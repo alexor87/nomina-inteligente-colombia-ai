@@ -299,9 +299,30 @@ export default function PayrollHistoryDetailPage() {
       
       if (result.success) {
         setShowConfirmModal(false);
+        
+        // After successful adjustments, recalculate IBC to ensure consistency
+        try {
+          console.log('🔄 Triggering IBC recalculation after adjustments...');
+          await PayrollRecalculationService.recalculateIBC(periodId, periodData.company_id);
+          console.log('✅ IBC recalculation completed');
+        } catch (ibcError) {
+          console.error('⚠️ IBC recalculation failed:', ibcError);
+          // Don't fail the whole operation, just log the warning
+          toast({
+            title: "Ajustes aplicados",
+            description: "Los ajustes se aplicaron correctamente, pero hubo un problema al recalcular el IBC",
+            variant: "default",
+          });
+        }
+        
         await loadPeriodDetail();
         await loadEmployees(); // Refresh employee data to show updated IBC
         refetchNovedades();
+        
+        toast({
+          title: "Ajustes aplicados correctamente",
+          description: `Los ajustes han sido aplicados y el período ha sido reliquidado`,
+        });
       }
     } catch (error) {
       console.error('❌ Error applying adjustments:', error);

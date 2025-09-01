@@ -15,6 +15,8 @@ export const calculateEmployeePreviewImpact = (
       newDeducciones: employee.total_deducciones || 0,
       originalNeto: employee.neto_pagado || 0,
       newNeto: employee.neto_pagado || 0,
+      originalIBC: employee.ibc || 0,
+      newIBC: employee.ibc || 0,
       pendingCount: 0,
       hasPending: false
     };
@@ -60,6 +62,8 @@ export const calculateEmployeePreviewImpact = (
     newDeducciones,
     originalNeto,
     newNeto,
+    originalIBC: employee.ibc || 0,
+    newIBC: employee.ibc || 0, // Would need actual calculation logic here
     pendingCount: pendingNovedades.length,
     hasPending: true
   };

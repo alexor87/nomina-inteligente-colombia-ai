@@ -67,7 +67,9 @@ export const ExpandedEmployeesTable = ({
       originalDeducciones: employee.total_deducciones,
       newDeducciones: employee.total_deducciones,
       originalNeto: employee.neto_pagado,
-      newNeto: employee.neto_pagado
+      newNeto: employee.neto_pagado,
+      originalIBC: employee.ibc,
+      newIBC: employee.ibc
     };
   };
 
@@ -161,9 +163,23 @@ export const ExpandedEmployeesTable = ({
                     </TableCell>
                     
                     <TableCell className="text-right">
-                      <span className="font-medium text-foreground">
-                        {formatCurrency(employee.ibc)}
-                      </span>
+                      {preview.hasPending && preview.newIBC !== preview.originalIBC ? (
+                        <div className="space-y-1">
+                          <div className="text-muted-foreground line-through text-sm">
+                            {formatCurrency(preview.originalIBC)}
+                          </div>
+                          <div className="font-semibold text-purple-600">
+                            {formatCurrency(preview.newIBC)}
+                            <span className="text-xs ml-1">
+                              ({preview.newIBC > preview.originalIBC ? '+' : ''}{formatCurrency(preview.newIBC - preview.originalIBC)})
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="font-medium text-foreground">
+                          {formatCurrency(employee.ibc)}
+                        </span>
+                      )}
                     </TableCell>
                     
                     <TableCell className="text-center">

@@ -60,18 +60,27 @@ Deno.serve(async (req) => {
           // Get novedades for this employee in this period
           const { data: novedades } = await supabaseClient
             .from('payroll_novedades')
-            .select('tipo_novedad, valor')
+            .select('tipo_novedad, valor, constitutivo_salario, dias')
             .eq('periodo_id', data.period_id)
             .eq('empleado_id', payroll.employee_id)
 
-          // Calculate constitutive novedades
+          // Calculate constitutive novedades (only those marked as constitutivo_salario)
           const constitutiveTypes = ['horas_extra', 'recargo_nocturno', 'recargo_dominical', 'comision', 'bonificacion', 'vacaciones', 'licencia_remunerada', 'auxilio_conectividad']
           const novedadesConstitutivas = (novedades || [])
-            .filter(n => constitutiveTypes.includes(n.tipo_novedad))
+            .filter(n => constitutiveTypes.includes(n.tipo_novedad) && n.constitutivo_salario === true)
             .reduce((sum, n) => sum + (n.valor || 0), 0)
 
-          // Calculate exact proportional IBC: (base_salary / 30 * dias_trabajados) + constitutive_novedades
-          const ibcBase = (salarioBase / 30) * diasTrabajados
+          // Calculate non-remunerated days (reduce effective working days)
+          const nonRemuneratedTypes = ['ausencia', 'licencia_no_remunerada', 'incapacidad']
+          const nonRemuneratedDays = (novedades || [])
+            .filter(n => nonRemuneratedTypes.includes(n.tipo_novedad))
+            .reduce((sum, n) => sum + (n.dias || 0), 0)
+
+          // Calculate effective working days
+          const effectiveDays = Math.max(0, diasTrabajados - nonRemuneratedDays)
+          
+          // Calculate exact proportional IBC: (base_salary / 30 * effective_days) + constitutive_novedades
+          const ibcBase = (salarioBase / 30) * effectiveDays
           let ibc = ibcBase + novedadesConstitutivas
           
           // Apply maximum cap only (25 SMMLV) - no minimum to preserve exact calculation
@@ -83,7 +92,7 @@ Deno.serve(async (req) => {
           const healthDeduction = ibc * 0.04
           const pensionDeduction = ibc * 0.04
 
-          console.log(`📊 Recalculating employee ${payroll.employee_id}: IBC ${ibc} (was: ${payroll.ibc})`)
+          console.log(`📊 Recalculating employee ${payroll.employee_id}: IBC ${ibc} (was: ${payroll.ibc}), effective days: ${effectiveDays}, constitutive: ${novedadesConstitutivas}`)
 
           // Update payroll with corrected values
           const { error: updateError } = await supabaseClient

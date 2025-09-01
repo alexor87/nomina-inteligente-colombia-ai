@@ -101,6 +101,8 @@ export const usePendingAdjustments = ({ periodId, companyId }: UsePendingAdjustm
         newDeducciones: employee.total_deducciones || 0,
         originalNeto: employee.neto_pagado || 0,
         newNeto: employee.neto_pagado || 0,
+        originalIBC: employee.ibc || 0,
+        newIBC: employee.ibc || 0,
         pendingCount: 0,
         hasPending: false
       };
@@ -109,13 +111,25 @@ export const usePendingAdjustments = ({ periodId, companyId }: UsePendingAdjustm
     // Calculate adjustments from pending novedades
     let devengoAdjustment = 0;
     let deduccionAdjustment = 0;
+    let constitutiveIBCAdjustment = 0;
+    let nonRemuneratedDays = 0;
 
     pending.forEach(p => {
       const valor = p.valor || 0;
+      const dias = p.novedadData?.dias || 0;
       
-      // Classify novedad types (simplified logic - you might need more specific rules)
+      // Classify novedad types
       const isDeduction = [
         'descuento_voluntario', 'multa', 'libranza', 'retencion_fuente'
+      ].includes(p.tipo_novedad);
+      
+      const isConstitutiveIBC = [
+        'horas_extra', 'recargo_nocturno', 'recargo_dominical', 'comision', 
+        'bonificacion', 'vacaciones', 'licencia_remunerada', 'auxilio_conectividad'
+      ].includes(p.tipo_novedad);
+      
+      const isNonRemunerated = [
+        'ausencia', 'licencia_no_remunerada', 'incapacidad'
       ].includes(p.tipo_novedad);
       
       if (isDeduction) {
@@ -123,15 +137,39 @@ export const usePendingAdjustments = ({ periodId, companyId }: UsePendingAdjustm
       } else {
         devengoAdjustment += valor;
       }
+      
+      // IBC constitutive adjustments (for remunerative novelties)
+      if (isConstitutiveIBC && p.novedadData?.constitutivo_salario) {
+        constitutiveIBCAdjustment += valor;
+      }
+      
+      // Count non-remunerated days for IBC calculation
+      if (isNonRemunerated) {
+        nonRemuneratedDays += dias;
+      }
     });
 
     const originalDevengado = employee.total_devengado || 0;
     const originalDeducciones = employee.total_deducciones || 0;
     const originalNeto = employee.neto_pagado || 0;
+    const originalIBC = employee.ibc || 0;
 
     const newDevengado = originalDevengado + devengoAdjustment;
     const newDeducciones = originalDeducciones + deduccionAdjustment;
     const newNeto = originalNeto + devengoAdjustment - deduccionAdjustment;
+    
+    // Calculate new IBC with adjustments
+    const salarioBase = employee.salario_base || 0;
+    const diasTrabajados = employee.dias_trabajados || 30;
+    const effectiveDays = Math.max(0, diasTrabajados - nonRemuneratedDays);
+    
+    // Recalculate IBC: (salario_base / 30 * effective_days) + constitutive_adjustments
+    const ibcBase = (salarioBase / 30) * effectiveDays;
+    let newIBC = ibcBase + constitutiveIBCAdjustment;
+    
+    // Apply maximum cap (25 SMMLV)
+    const SMMLV_2025 = 1300000;
+    newIBC = Math.min(newIBC, SMMLV_2025 * 25);
 
     return {
       originalDevengado,
@@ -140,6 +178,8 @@ export const usePendingAdjustments = ({ periodId, companyId }: UsePendingAdjustm
       newDeducciones,
       originalNeto,
       newNeto,
+      originalIBC,
+      newIBC: Math.round(newIBC),
       pendingCount: pending.length,
       hasPending: true
     };

@@ -24,6 +24,8 @@ export interface EmployeeNovedadPreview {
   newDeducciones: number;
   originalNeto: number;
   newNeto: number;
+  originalIBC: number;
+  newIBC: number;
   pendingCount: number;
   hasPending: boolean;
 }
