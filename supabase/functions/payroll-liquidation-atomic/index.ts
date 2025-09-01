@@ -83,18 +83,68 @@ serve(async (req) => {
         throw new Error(`Error updating period status: ${periodUpdateError.message}`)
       }
 
-      // Actualizar estado de payrolls
-      const { error: payrollUpdateError } = await supabaseClient
+      // Get payroll data with employee info for IBC calculation
+      const { data: payrollsData, error: payrollsDataError } = await supabaseClient
         .from('payrolls')
-        .update({ 
-          estado: 'procesada',
-          updated_at: new Date().toISOString() 
-        })
+        .select(`
+          *,
+          employees!inner(salario_base)
+        `)
         .eq('period_id', data.period_id)
         .eq('company_id', data.company_id)
 
-      if (payrollUpdateError) {
-        throw new Error(`Error updating payrolls: ${payrollUpdateError.message}`)
+      if (payrollsDataError) {
+        throw new Error(`Error fetching payrolls data: ${payrollsDataError.message}`)
+      }
+
+      // Process each payroll to calculate and store accurate IBC
+      for (const payroll of payrollsData || []) {
+        try {
+          const salarioBase = payroll.employees?.salario_base || 0
+          const diasTrabajados = payroll.dias_trabajados || 30
+          
+          // Get novedades for this employee in this period
+          const { data: novedades } = await supabaseClient
+            .from('payroll_novedades')
+            .select('tipo_novedad, valor')
+            .eq('periodo_id', data.period_id)
+            .eq('empleado_id', payroll.employee_id)
+
+          // Calculate constitutive novedades
+          const constitutiveTypes = ['horas_extra', 'recargo_nocturno', 'recargo_dominical', 'comision', 'bonificacion', 'vacaciones', 'licencia_remunerada', 'auxilio_conectividad']
+          const novedadesConstitutivas = (novedades || [])
+            .filter(n => constitutiveTypes.includes(n.tipo_novedad))
+            .reduce((sum, n) => sum + (n.valor || 0), 0)
+
+          // Calculate proportional IBC: (base_salary / 30 * dias_trabajados) + constitutive_novedades
+          const ibcBase = (salarioBase / 30) * diasTrabajados
+          let ibc = ibcBase + novedadesConstitutivas
+          
+          // Apply caps (min 1 SMMLV, max 25 SMMLV)
+          const SMMLV_2025 = 1300000
+          ibc = Math.max(SMMLV_2025, Math.min(ibc, SMMLV_2025 * 25))
+
+          // Calculate other fields
+          const transportAllowance = salarioBase <= (SMMLV_2025 * 2) ? (200000 / 30) * diasTrabajados : 0
+          const healthDeduction = ibc * 0.04
+          const pensionDeduction = ibc * 0.04
+
+          // Update payroll with calculated values
+          await supabaseClient
+            .from('payrolls')
+            .update({ 
+              estado: 'procesada',
+              ibc: Math.round(ibc),
+              auxilio_transporte: Math.round(transportAllowance),
+              salud_empleado: Math.round(healthDeduction),
+              pension_empleado: Math.round(pensionDeduction),
+              updated_at: new Date().toISOString() 
+            })
+            .eq('id', payroll.id)
+
+        } catch (employeeError) {
+          console.error(`Error processing payroll ${payroll.id}:`, employeeError)
+        }
       }
 
       // Contar registros procesados

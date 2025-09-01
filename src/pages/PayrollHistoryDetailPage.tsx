@@ -123,18 +123,18 @@ export default function PayrollHistoryDetailPage() {
     try {
       const payrollEmployees = await PayrollHistoryService.getPeriodEmployees(periodId);
       
-      // Transform PayrollEmployeeData to ExpandedEmployee format
-      const expandedEmployees: ExpandedEmployee[] = payrollEmployees.map((emp: PayrollEmployeeData) => ({
-        id: emp.employee_id, // Use employee_id as the main id for novedades lookup
-        nombre: emp.nombre,
-        apellido: emp.apellido,
-        cedula: emp.cedula,
-        cargo: emp.cargo,
-        eps: emp.eps,
-        afp: emp.afp,
-        salario_base: emp.salario_base,
-        ibc: emp.ibc || 0, // Use actual IBC from database
-        dias_trabajados: emp.dias_trabajados,
+        // Transform PayrollEmployeeData to ExpandedEmployee format
+        const expandedEmployees: ExpandedEmployee[] = payrollEmployees.map((emp: PayrollEmployeeData) => ({
+          id: emp.employee_id, // Use employee_id as the main id for novedades lookup
+          nombre: emp.nombre,
+          apellido: emp.apellido,
+          cedula: emp.cedula,
+          cargo: emp.cargo,
+          eps: emp.eps,
+          afp: emp.afp,
+          salario_base: emp.salario_base,
+          ibc: emp.ibc || PayrollHistoryService.calculateIBC(emp.salario_base, emp.dias_trabajados), // Use stored IBC or calculate proportional fallback
+          dias_trabajados: emp.dias_trabajados,
         total_devengado: emp.total_devengado,
         total_deducciones: emp.total_deducciones,
         neto_pagado: emp.neto_pagado,
