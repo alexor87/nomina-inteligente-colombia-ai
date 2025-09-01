@@ -85,7 +85,11 @@ export default function PayrollHistoryDetailPage() {
     isLoading: isLoadingNovedades,
     refetch: refetchNovedades,
     createNovedad
-  } = usePayrollNovedadesUnified({ periodId: periodId || '', enabled: !!periodId });
+  } = usePayrollNovedadesUnified({ 
+    companyId: periodData?.company_id, 
+    periodId: periodId || '', 
+    enabled: !!periodData?.company_id && !!periodId 
+  });
 
   // Load period data
   useEffect(() => {
