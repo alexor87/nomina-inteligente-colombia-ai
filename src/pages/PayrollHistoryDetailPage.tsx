@@ -22,6 +22,7 @@ import { PayrollRecalculationService } from '@/services/PayrollRecalculationServ
 import { NovedadesEnhancedService } from '@/services/NovedadesEnhancedService';
 import { PendingAdjustmentsService } from '@/services/PendingAdjustmentsService';
 import { usePendingAdjustments } from '@/hooks/usePendingAdjustments';
+import { PeriodAuditSummaryComponent } from '@/components/payroll/audit/PeriodAuditSummary';
 
 // Use PayrollPeriodData from service instead of local interface
 
@@ -546,13 +547,10 @@ export default function PayrollHistoryDetailPage() {
           </TabsContent>
           
           <TabsContent value="audit">
-            <div className="text-center py-12">
-              <History className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium mb-2">Auditoría no disponible</h3>
-              <p className="text-sm text-muted-foreground">
-                Los registros de auditoría estarán disponibles próximamente.
-              </p>
-            </div>
+            <PeriodAuditSummaryComponent 
+              periodId={periodId || ''} 
+              periodName={periodData?.periodo || ''} 
+            />
           </TabsContent>
         </Tabs>
       </div>
