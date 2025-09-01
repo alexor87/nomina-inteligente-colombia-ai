@@ -201,10 +201,10 @@ Deno.serve(async (req) => {
             total_deducciones: newCalculation.totalDeducciones,
             neto_pagado: newCalculation.netoPagado,
             ibc: newCalculation.ibc,
-            health_deduction: newCalculation.healthDeduction,
-            pension_deduction: newCalculation.pensionDeduction,
-            transport_allowance: newCalculation.transportAllowance,
-            employer_contributions: newCalculation.employerContributions,
+            salud_empleado: newCalculation.healthDeduction,
+            pension_empleado: newCalculation.pensionDeduction,
+            auxilio_transporte: newCalculation.transportAllowance,
+            fondo_solidaridad: newCalculation.solidarityFund,
             updated_at: new Date().toISOString()
           })
           .eq('id', currentPayroll.id);
@@ -429,7 +429,8 @@ function calculateEmployeePayroll(
     healthDeduction,
     pensionDeduction,
     transportAllowance,
-    employerContributions
+    employerContributions,
+    solidarityFund
   };
 }
 

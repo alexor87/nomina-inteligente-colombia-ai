@@ -246,6 +246,7 @@ export class PayrollAtomicService {
             total_devengado: calcs.grossPay,
             total_deducciones: calcs.healthDeduction + calcs.pensionDeduction,
             neto_pagado: calcs.netPay,
+            ibc: calcs.ibc,
             estado: 'procesada',
             detalle_calculo: calcs
           },

@@ -1596,6 +1596,7 @@ export type Database = {
           horas_extra: number | null
           horas_extra_diurnas: number | null
           horas_extra_nocturnas: number | null
+          ibc: number | null
           id: string
           incapacidades: number | null
           intereses_cesantias: number | null
@@ -1640,6 +1641,7 @@ export type Database = {
           horas_extra?: number | null
           horas_extra_diurnas?: number | null
           horas_extra_nocturnas?: number | null
+          ibc?: number | null
           id?: string
           incapacidades?: number | null
           intereses_cesantias?: number | null
@@ -1684,6 +1686,7 @@ export type Database = {
           horas_extra?: number | null
           horas_extra_diurnas?: number | null
           horas_extra_nocturnas?: number | null
+          ibc?: number | null
           id?: string
           incapacidades?: number | null
           intereses_cesantias?: number | null
