@@ -40,8 +40,10 @@ const PayrollLiquidationPageSimple = () => {
   const handlePeriodSelection = async (period: SelectablePeriod & { year?: string }) => {
     console.log('🎯 Período seleccionado:', period.label, 'Año:', period.year);
     setSelectedPeriod(period);
+    console.log('🔍 DEBUG - Before loadEmployees, currentPeriodId:', currentPeriodId);
     // ✅ NUEVO: Pasar el año al cargar empleados
     await loadEmployees(period.startDate, period.endDate, period.year);
+    console.log('🔍 DEBUG - After loadEmployees, currentPeriodId:', currentPeriodId);
   };
 
   const handleLiquidate = async () => {
@@ -140,13 +142,18 @@ const PayrollLiquidationPageSimple = () => {
                   <Users className="h-4 w-4 mr-2" />
                   Agregar Empleado
                 </Button>
+                {/* DEBUG: Show button state */}
                 <Button 
-                  onClick={() => setShowNoveltyImportDrawer(true)}
+                  onClick={() => {
+                    console.log('🔍 DEBUG - Abriendo importador, currentPeriodId:', currentPeriodId);
+                    setShowNoveltyImportDrawer(true);
+                  }}
                   variant="outline"
-                  disabled={!currentPeriodId}
+                  disabled={false} // Always enabled for debugging
+                  title={!currentPeriodId ? 'Advertencia: Se creará el período automáticamente' : 'Importar novedades al período actual'}
                 >
                   <Upload className="h-4 w-4 mr-2" />
-                  Importar Novedades
+                  Importar Novedades {!currentPeriodId && '⚠️'}
                 </Button>
                 <Button 
                   onClick={handleLiquidate}
@@ -181,7 +188,7 @@ const PayrollLiquidationPageSimple = () => {
       />
 
       {/* Novelty Import Drawer */}
-      {selectedPeriod && currentPeriodId && companyId && (
+      {selectedPeriod && companyId && (
         <NoveltyImportDrawer
           isOpen={showNoveltyImportDrawer}
           onClose={() => setShowNoveltyImportDrawer(false)}
@@ -191,7 +198,7 @@ const PayrollLiquidationPageSimple = () => {
             employees.forEach(emp => refreshEmployeeNovedades(emp.id));
           }}
           companyId={companyId}
-          periodId={currentPeriodId}
+          periodId={currentPeriodId || 'create-new'} // Allow drawer to handle period creation
           periodStartDate={selectedPeriod.startDate}
           periodEndDate={selectedPeriod.endDate}
         />

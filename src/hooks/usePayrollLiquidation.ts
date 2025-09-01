@@ -78,7 +78,9 @@ export const usePayrollLiquidation = () => {
       
       // ✅ CORREGIDO: Obtener o crear período usando el servicio
       const periodId = await PayrollLiquidationService.ensurePeriodExists(startDate, endDate);
+      console.log('🔍 DEBUG - ensurePeriodExists returned periodId:', periodId);
       setCurrentPeriodId(periodId);
+      console.log('🔍 DEBUG - currentPeriodId set to:', periodId);
 
       // ✅ CORREGIDO: Mapear datos con valores ya calculados correctamente
       const mappedEmployees = employeesData.map(employee => ({
