@@ -60,14 +60,15 @@ Deno.serve(async (req) => {
           // Get novedades for this employee in this period
           const { data: novedades } = await supabaseClient
             .from('payroll_novedades')
-            .select('tipo_novedad, valor, constitutivo_salario, dias')
+            .select('tipo_novedad, valor, constitutivo_salario, dias, company_id')
             .eq('periodo_id', data.period_id)
             .eq('empleado_id', payroll.employee_id)
 
-          // Calculate constitutive novedades (only those marked as constitutivo_salario)
-          const constitutiveTypes = ['horas_extra', 'recargo_nocturno', 'recargo_dominical', 'comision', 'bonificacion', 'vacaciones', 'licencia_remunerada', 'auxilio_conectividad']
+          // Unified IBC constitutive logic: always constitutive OR explicitly marked
+          const alwaysConstitutiveTypes = ['horas_extra', 'recargo_nocturno', 'recargo_dominical', 'comision', 'bonificacion', 'vacaciones', 'licencia_remunerada']
           const novedadesConstitutivas = (novedades || [])
-            .filter(n => constitutiveTypes.includes(n.tipo_novedad) && n.constitutivo_salario === true)
+            .filter(n => n.company_id === data.company_id) // Security: filter by company
+            .filter(n => alwaysConstitutiveTypes.includes(n.tipo_novedad) || n.constitutivo_salario === true)
             .reduce((sum, n) => sum + (n.valor || 0), 0)
 
           // Calculate non-remunerated days (reduce effective working days)
@@ -92,7 +93,10 @@ Deno.serve(async (req) => {
           const healthDeduction = ibc * 0.04
           const pensionDeduction = ibc * 0.04
 
-          console.log(`📊 Recalculating employee ${payroll.employee_id}: IBC ${ibc} (was: ${payroll.ibc}), effective days: ${effectiveDays}, constitutive: ${novedadesConstitutivas}`)
+          console.log(`📊 Recalculating employee ${payroll.employee_id}: IBC ${ibc} (was: ${payroll.ibc})`)
+          console.log(`   - Base salary: ${salarioBase}, Days worked: ${diasTrabajados}, Effective days: ${effectiveDays}`)
+          console.log(`   - IBC base: ${ibcBase}, Constitutive novelties: ${novedadesConstitutivas}`)
+          console.log(`   - Novelties found: ${(novedades || []).length}, Company filtered: ${(novedades || []).filter(n => n.company_id === data.company_id).length}`)
 
           // Update payroll with corrected values
           const { error: updateError } = await supabaseClient

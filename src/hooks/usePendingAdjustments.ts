@@ -123,10 +123,11 @@ export const usePendingAdjustments = ({ periodId, companyId }: UsePendingAdjustm
         'descuento_voluntario', 'multa', 'libranza', 'retencion_fuente'
       ].includes(p.tipo_novedad);
       
-      const isConstitutiveIBC = [
+      // Core constitutive types (always constitutive by nature)
+      const alwaysConstitutiveTypes = [
         'horas_extra', 'recargo_nocturno', 'recargo_dominical', 'comision', 
-        'bonificacion', 'vacaciones', 'licencia_remunerada', 'auxilio_conectividad'
-      ].includes(p.tipo_novedad);
+        'bonificacion', 'vacaciones', 'licencia_remunerada'
+      ];
       
       const isNonRemunerated = [
         'ausencia', 'licencia_no_remunerada', 'incapacidad'
@@ -138,8 +139,11 @@ export const usePendingAdjustments = ({ periodId, companyId }: UsePendingAdjustm
         devengoAdjustment += valor;
       }
       
-      // IBC constitutive adjustments (for remunerative novelties)
-      if (isConstitutiveIBC && p.novedadData?.constitutivo_salario) {
+      // Unified IBC constitutive logic: always constitutive OR explicitly marked
+      const isConstitutiveForIBC = alwaysConstitutiveTypes.includes(p.tipo_novedad) || 
+                                   p.novedadData?.constitutivo_salario === true;
+      
+      if (isConstitutiveForIBC) {
         constitutiveIBCAdjustment += valor;
       }
       

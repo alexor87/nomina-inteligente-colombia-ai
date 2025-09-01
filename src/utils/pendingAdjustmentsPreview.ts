@@ -55,6 +55,50 @@ export const calculateEmployeePreviewImpact = (
   const newDeducciones = originalDeducciones + deduccionAdjustment;
   const newNeto = newDevengado - newDeducciones;
 
+  // Calculate IBC impact from pending novedades
+  let constitutiveIBCAdjustment = 0;
+  let nonRemuneratedDays = 0;
+
+  pendingNovedades.forEach(pending => {
+    const valor = pending.valor || 0;
+    const dias = pending.novedadData?.dias || 0;
+    
+    // Core constitutive types (always constitutive by nature)
+    const alwaysConstitutiveTypes = [
+      'horas_extra', 'recargo_nocturno', 'recargo_dominical', 'comision', 
+      'bonificacion', 'vacaciones', 'licencia_remunerada'
+    ];
+    
+    const isNonRemunerated = [
+      'ausencia', 'licencia_no_remunerada', 'incapacidad'
+    ].includes(pending.tipo_novedad);
+    
+    // Unified IBC constitutive logic: always constitutive OR explicitly marked
+    const isConstitutiveForIBC = alwaysConstitutiveTypes.includes(pending.tipo_novedad) || 
+                                 pending.novedadData?.constitutivo_salario === true;
+    
+    if (isConstitutiveForIBC) {
+      constitutiveIBCAdjustment += valor;
+    }
+    
+    if (isNonRemunerated) {
+      nonRemuneratedDays += dias;
+    }
+  });
+
+  // Calculate new IBC with adjustments
+  const salarioBase = employee.salario_base || 0;
+  const diasTrabajados = employee.dias_trabajados || 30;
+  const effectiveDays = Math.max(0, diasTrabajados - nonRemuneratedDays);
+  
+  // Recalculate IBC: (salario_base / 30 * effective_days) + constitutive_adjustments
+  const ibcBase = (salarioBase / 30) * effectiveDays;
+  let newIBC = ibcBase + constitutiveIBCAdjustment;
+  
+  // Apply maximum cap (25 SMMLV)
+  const SMMLV_2025 = 1300000;
+  newIBC = Math.min(newIBC, SMMLV_2025 * 25);
+
   return {
     originalDevengado,
     newDevengado,
@@ -63,7 +107,7 @@ export const calculateEmployeePreviewImpact = (
     originalNeto,
     newNeto,
     originalIBC: employee.ibc || 0,
-    newIBC: employee.ibc || 0, // Would need actual calculation logic here
+    newIBC: Math.round(newIBC),
     pendingCount: pendingNovedades.length,
     hasPending: true
   };
