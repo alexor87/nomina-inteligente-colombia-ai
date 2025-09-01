@@ -459,6 +459,18 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       case 'descuento_voluntario':
       case 'multa':
         return <NovedadDeduccionesConsolidatedForm {...baseProps} />;
+      case 'incapacidad':
+        return (
+          <NovedadIncapacidadForm
+            onBack={handleBackToSelector}
+            onSubmit={handleFormSubmit}
+            employeeSalary={employeeSalary || 0}
+            isSubmitting={isSubmitting}
+            periodoFecha={getPeriodDate()}
+            periodStartDate={periodStartDate}
+            periodEndDate={periodEndDate}
+          />
+        );
       case 'retencion_fuente':
         return (
           <NovedadRetefuenteForm
