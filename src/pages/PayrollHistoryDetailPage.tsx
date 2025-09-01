@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { XCircle, ArrowLeft, Users, History } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { toast } from "@/hooks/use-toast"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { usePayrollNovedadesUnified } from '@/hooks/usePayrollNovedadesUnified';
@@ -79,6 +80,7 @@ export default function PayrollHistoryDetailPage() {
   
   const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showDiscardModal, setShowDiscardModal] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
   const [selectedEmployeeName, setSelectedEmployeeName] = useState<string>('');
 
@@ -306,6 +308,33 @@ export default function PayrollHistoryDetailPage() {
     }
   };
 
+  // Discard all pending changes
+  const handleDiscardChanges = async () => {
+    if (!periodId) return;
+
+    try {
+      // Clear from database
+      await PendingAdjustmentsService.clearPendingAdjustmentsForPeriod(periodId);
+      
+      // Clear from local state
+      clearAllPending();
+      
+      setShowDiscardModal(false);
+      
+      toast({
+        title: "Ajustes descartados",
+        description: "Todos los ajustes pendientes han sido eliminados",
+      });
+    } catch (error) {
+      console.error('Error discarding changes:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron descartar los ajustes",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Group novedades by employee (convert to basic PayrollNovedad type)
   const novedadesByEmployee = React.useMemo(() => {
     const grouped: Record<string, PayrollNovedad[]> = {};
@@ -424,6 +453,13 @@ export default function PayrollHistoryDetailPage() {
                 {totalPendingCount} novedades pendientes
               </Badge>
               <Button 
+                variant="destructive"
+                onClick={() => setShowDiscardModal(true)}
+                disabled={isApplying}
+              >
+                Descartar cambios
+              </Button>
+              <Button 
                 className="bg-warning hover:bg-warning/90 text-warning-foreground"
                 onClick={() => setShowConfirmModal(true)}
                 disabled={isApplying}
@@ -533,6 +569,28 @@ export default function PayrollHistoryDetailPage() {
         periodName={periodData?.periodo || ''}
         isLoading={isApplying}
       />
+
+      {/* Discard changes confirmation modal */}
+      <AlertDialog open={showDiscardModal} onOpenChange={setShowDiscardModal}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Descartar todos los ajustes?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción eliminará permanentemente todas las {totalPendingCount} novedades pendientes. 
+              La nómina volverá a su estado original. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDiscardChanges}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Descartar cambios
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
