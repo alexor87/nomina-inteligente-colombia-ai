@@ -210,7 +210,7 @@ export const NovedadRecargoConsolidatedForm: React.FC<NovedadRecargoConsolidated
     const labels = {
       'nocturno': 'Recargo Nocturno',
       'dominical': 'Recargo Dominical', 
-      'nocturno_dominical': 'Nocturno Dominical'
+      'nocturno_dominical': 'Recargo Nocturno Dominical'
     };
     
     return `${labels[tipo as keyof typeof labels] || tipo} (${tipoEncontrado.porcentaje})`;
@@ -276,7 +276,7 @@ export const NovedadRecargoConsolidatedForm: React.FC<NovedadRecargoConsolidated
                         <div className="font-medium">
                           {tipo.value === 'nocturno' ? 'Recargo Nocturno' : 
                            tipo.value === 'dominical' ? 'Recargo Dominical' :
-                           'Nocturno Dominical'} ({tipo.porcentaje})
+                           'Recargo Nocturno Dominical'} ({tipo.porcentaje})
                         </div>
                         <div className="text-xs text-gray-500">{tipo.descripcion}</div>
                       </div>

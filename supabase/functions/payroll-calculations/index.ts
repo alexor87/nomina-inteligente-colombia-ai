@@ -107,12 +107,26 @@ const calcularValorHoraRecargoBase = (salarioMensual: number, fecha: Date): numb
   return valorHora;
 };
 
-// Factor legal para horas extra (KISS: mantener dominical/festivo = 1.75 como venía en negocio)
+// ✅ Factor legal para horas extra COMPLETO - Cumplimiento normativo total
 const getOvertimeFactor = (subtipoRaw?: string): number => {
   const s = String(subtipoRaw || '').toLowerCase().trim();
-  if (s === 'nocturnas') return 1.75;           // Extra nocturna (75%)
-  if (s === 'dominicales' || s === 'festivas') return 1.75; // Mantener negocio actual
-  return 1.25; // Diurnas: 25%
+  
+  // Horas extra nocturnas (75%)
+  if (s === 'nocturnas' || s === 'nocturna') return 1.75;
+  
+  // Horas extra dominicales/festivas (75% = 1.75 factor)
+  if (s === 'dominicales' || s === 'dominical') return 1.75;
+  if (s === 'festivas' || s === 'festiva') return 1.75;
+  
+  // Casos específicos del frontend
+  if (s === 'dominicales_diurnas' || s === 'dominical_diurna') return 1.75;
+  if (s === 'dominicales_nocturnas' || s === 'dominical_nocturna') return 1.75;
+  if (s === 'festivas_diurnas' || s === 'festiva_diurna') return 1.75;
+  if (s === 'festivas_nocturnas' || s === 'festiva_nocturna') return 1.75;
+  if (s === 'nocturna_dominical') return 1.75;
+  
+  // Horas extra diurnas (25%)
+  return 1.25;
 };
 
 // Normalizador simple
@@ -612,15 +626,29 @@ async function calculateSingleNovedad(supabase: any, data: any) {
 
   } else if (tipoNovedad === 'recargo_nocturno') {
     const horasNum = Number(horas || 0);
-    const recargo = 0.35;
-    valor = Math.round(valorHoraRecargoBase * horasNum * recargo);
-    factorCalculo = recargo;
-    detalleCalculo = `Recargo nocturno: ${horasNum} h × $${Math.round(valorHoraRecargoBase).toLocaleString()} × 0.35 = $${valor.toLocaleString()}`;
+    // ✅ Factor dinámico basado en subtipo - Cumplimiento normativo
+    let factorRecargo = 0.35; // Default: nocturno ordinario (35%)
+    let tipoDescripcion = 'nocturno';
+    
+    const s = String(subtipo || '').toLowerCase().trim();
+    if (s === 'dominical' || s === 'nocturno_dominical') {
+      factorRecargo = 1.15; // ✅ CORRECCIÓN CRÍTICA: 115% para nocturno dominical
+      tipoDescripcion = 'nocturno dominical';
+    } else if (s === 'nocturno') {
+      factorRecargo = 0.35; // 35% para nocturno ordinario
+      tipoDescripcion = 'nocturno';
+    }
+    
+    valor = Math.round(valorHoraRecargoBase * horasNum * factorRecargo);
+    factorCalculo = factorRecargo;
+    detalleCalculo = `Recargo ${tipoDescripcion}: ${horasNum} h × $${Math.round(valorHoraRecargoBase).toLocaleString()} × ${factorRecargo} = $${valor.toLocaleString()}`;
 
-    console.log('🌙 calculateSingleNovedad recargo nocturno:', {
+    console.log('🌙 calculateSingleNovedad recargo (CORREGIDO):', {
+      subtipo,
       horasNum,
       baseRecargo: Math.round(valorHoraRecargoBase),
-      recargo,
+      factorRecargo,
+      tipoDescripcion,
       valor
     });
 

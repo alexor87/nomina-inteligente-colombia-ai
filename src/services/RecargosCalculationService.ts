@@ -6,6 +6,8 @@
  * - Sin dependencias cruzadas
  */
 
+import { getHourlyDivisorForRecargos } from '../utils/jornadaLegal';
+
 export interface RecargoCalculationInput {
   salarioBase: number;
   tipoRecargo: 'nocturno' | 'dominical' | 'nocturno_dominical';
@@ -106,11 +108,12 @@ export class RecargosCalculationService {
       throw new Error(`Error calculando factor para tipo de recargo: ${tipoRecargo}`);
     }
     
-    // ✅ FÓRMULA UNIFICADA: Salario × Factor × Horas ÷ (30 × 7.333)
-    const divisorAleluya = 30 * 7.333;
-    const valorRecargo = Math.round((salarioBase * factorInfo.factorTotal * horas) / divisorAleluya);
-    const valorHora = salarioBase / divisorAleluya;
-    const detalleCalculo = `${tipoRecargo}: (${salarioBase.toLocaleString()} × ${factorInfo.factorTotal} × ${horas}h) ÷ ${divisorAleluya} = ${valorRecargo.toLocaleString()}`;
+    // ✅ CORRECCIÓN CRÍTICA: Usar divisor horario dinámico según jornada legal
+    const divisorDinamico = getHourlyDivisorForRecargos(fechaPeriodo);
+    
+    const valorRecargo = Math.round((salarioBase * factorInfo.factorTotal * horas) / divisorDinamico);
+    const valorHora = salarioBase / divisorDinamico;
+    const detalleCalculo = `${tipoRecargo}: (${salarioBase.toLocaleString()} × ${factorInfo.factorTotal} × ${horas}h) ÷ ${divisorDinamico} = ${valorRecargo.toLocaleString()}`;
     
     return {
       valorHora: Math.round(valorHora),
@@ -118,9 +121,9 @@ export class RecargosCalculationService {
       valorRecargo,
       detalleCalculo,
       jornadaInfo: {
-        horasSemanales: 44,
-        horasMensuales: 220,
-        divisorHorario: 220,
+        horasSemanales: 44, // ✅ Mantener referencia, pero usar divisor dinámico
+        horasMensuales: divisorDinamico,
+        divisorHorario: divisorDinamico,
         fechaVigencia: fechaPeriodo
       },
       factorInfo: {
