@@ -19,6 +19,7 @@ interface NoveltyColumnMappingStepProps {
     columns: string[];
     rows: any[];
     totalRows?: number;
+    mapping?: Record<string, string>;
   };
   onNext: (step: ImportStep) => void;
   onBack: () => void;

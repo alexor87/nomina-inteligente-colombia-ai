@@ -117,15 +117,6 @@ export class NoveltyImportService {
       valor: noveltyData.valor
     });
 
-    // Map deduccion_especial to descuento_voluntario for DB compatibility
-    let mappedTipoNovedad = noveltyData.tipo_novedad;
-    let mappedSubtipo = noveltyData.subtipo;
-    
-    if (noveltyData.tipo_novedad === 'deduccion_especial') {
-      mappedTipoNovedad = 'descuento_voluntario' as NovedadType;
-      mappedSubtipo = noveltyData.subtipo || 'especial';
-    }
-
     // Insert the novelty using the existing service pattern
     const { data, error } = await supabase
       .from('payroll_novedades')
@@ -133,8 +124,8 @@ export class NoveltyImportService {
         company_id: noveltyData.company_id,
         empleado_id: noveltyData.empleado_id,
         periodo_id: noveltyData.periodo_id,
-        tipo_novedad: mappedTipoNovedad,
-        subtipo: mappedSubtipo,
+        tipo_novedad: noveltyData.tipo_novedad,
+        subtipo: noveltyData.subtipo,
         fecha_inicio: noveltyData.fecha_inicio,
         fecha_fin: noveltyData.fecha_fin,
         dias: noveltyData.dias,

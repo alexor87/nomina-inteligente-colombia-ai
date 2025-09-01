@@ -6,6 +6,15 @@ import { NoveltyColumnMappingStep } from './NoveltyColumnMappingStep';
 import { NoveltyValidationPreviewStep } from './NoveltyValidationPreviewStep';
 import { NoveltyImportConfirmationStep } from './NoveltyImportConfirmationStep';
 
+interface ImportData {
+  file: File;
+  columns: string[];
+  rows: any[];
+  mapping?: Record<string, string>;
+  validationResults?: Record<number, any>;
+  totalRows?: number;
+}
+
 interface NoveltyImportDrawerProps {
   isOpen: boolean;
   onClose: () => void;
@@ -107,9 +116,9 @@ export const NoveltyImportDrawer = ({
             />
           )}
 
-          {currentStep.step === 'validation' && currentStep.data && (
+          {currentStep.step === 'validation' && currentStep.data && currentStep.data.mapping && (
             <NoveltyValidationPreviewStep
-              data={currentStep.data}
+              data={currentStep.data as ImportData & { mapping: Record<string, string> }}
               onNext={handleStepChange}
               onBack={() => setCurrentStep({ 
                 step: 'mapping', 
@@ -121,9 +130,9 @@ export const NoveltyImportDrawer = ({
             />
           )}
 
-          {currentStep.step === 'confirmation' && currentStep.data && (
+          {currentStep.step === 'confirmation' && currentStep.data && currentStep.data.mapping && (
             <NoveltyImportConfirmationStep
-              data={currentStep.data}
+              data={currentStep.data as ImportData & { mapping: Record<string, string> }}
               onComplete={handleImportComplete}
               onBack={() => setCurrentStep({ 
                 step: 'validation', 

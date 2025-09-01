@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calculator, Users, Loader2 } from 'lucide-react';
+import { Calculator, Users, Loader2, Upload } from 'lucide-react';
 import { PayrollLiquidationTable } from '@/components/payroll/liquidation/PayrollLiquidationTable';
 import { SimplePeriodSelector } from '@/components/payroll/SimplePeriodSelector';
 import { EmployeeAddModal } from '@/components/payroll/modals/EmployeeAddModal';
 import { PayrollSuccessModal } from '@/components/payroll/modals/PayrollSuccessModal';
+import { NoveltyImportDrawer } from '@/components/payroll/novelties-import/NoveltyImportDrawer';
 import { useCurrentCompany } from '@/hooks/useCurrentCompany';
 import { usePayrollLiquidation } from '@/hooks/usePayrollLiquidation';
 import { SelectablePeriod } from '@/services/payroll/SimplePeriodService';
@@ -15,6 +16,7 @@ import { useYear } from '@/contexts/YearContext';
 const PayrollLiquidationPageSimple = () => {
   const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState<SelectablePeriod | null>(null);
+  const [showNoveltyImportDrawer, setShowNoveltyImportDrawer] = useState(false);
   
   const { companyId } = useCurrentCompany();
   const navigate = useNavigate();
@@ -139,6 +141,14 @@ const PayrollLiquidationPageSimple = () => {
                   Agregar Empleado
                 </Button>
                 <Button 
+                  onClick={() => setShowNoveltyImportDrawer(true)}
+                  variant="outline"
+                  disabled={!currentPeriodId}
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Importar Novedades
+                </Button>
+                <Button 
                   onClick={handleLiquidate}
                   disabled={employees.length === 0 || isLiquidating}
                   className="bg-green-600 hover:bg-green-700"
@@ -169,6 +179,23 @@ const PayrollLiquidationPageSimple = () => {
         currentEmployeeIds={employees.map(emp => emp.id)}
         companyId={companyId || ''}
       />
+
+      {/* Novelty Import Drawer */}
+      {selectedPeriod && currentPeriodId && companyId && (
+        <NoveltyImportDrawer
+          isOpen={showNoveltyImportDrawer}
+          onClose={() => setShowNoveltyImportDrawer(false)}
+          onImportComplete={() => {
+            setShowNoveltyImportDrawer(false);
+            // Refresh novedades for all employees
+            employees.forEach(emp => refreshEmployeeNovedades(emp.id));
+          }}
+          companyId={companyId}
+          periodId={currentPeriodId}
+          periodStartDate={selectedPeriod.startDate}
+          periodEndDate={selectedPeriod.endDate}
+        />
+      )}
 
       {/* Success Modal */}
       {showSuccessModal && liquidationResult && (

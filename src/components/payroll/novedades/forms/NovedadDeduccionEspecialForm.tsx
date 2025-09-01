@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, MinusCircle, Info, AlertTriangle, Loader2 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { useNovedadBackendCalculation } from '@/hooks/useNovedadBackendCalculation';
+import { NovedadType } from '@/types/novedades-enhanced';
 
 interface NovedadDeduccionEspecialFormProps {
   onBack: () => void;
@@ -53,7 +54,7 @@ export const NovedadDeduccionEspecialForm: React.FC<NovedadDeduccionEspecialForm
   useEffect(() => {
     if (tipoDeduccion && valorDeduccion && parseFloat(valorDeduccion) > 0) {
       calculateNovedad({
-        tipoNovedad: 'deduccion_especial',
+        tipoNovedad: 'descuento_voluntario' as NovedadType,
         subtipo: tipoDeduccion,
         salarioBase: employeeSalary,
         valorManual: parseFloat(valorDeduccion),
@@ -70,7 +71,7 @@ export const NovedadDeduccionEspecialForm: React.FC<NovedadDeduccionEspecialForm
     if (!tipoDeduccion || !valorDeduccion || parseFloat(valorDeduccion) <= 0) return;
 
     onSubmit({
-      tipo_novedad: 'deduccion_especial',
+      tipo_novedad: 'descuento_voluntario' as NovedadType,
       subtipo: tipoDeduccion,
       valor: parseFloat(valorDeduccion),
       observacion: observacion || calculationResult?.detalleCalculo

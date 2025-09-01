@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Loader2, Users, Upload } from 'lucide-react';
 import { PayrollEmployee, NovedadForIBC } from '@/types/payroll';
 import { NovedadUnifiedModal } from '@/components/payroll/novedades/NovedadUnifiedModal';
 import { usePayrollNovedadesUnified } from '@/hooks/usePayrollNovedadesUnified';
@@ -23,6 +23,7 @@ import { useToast } from '@/hooks/use-toast';
 import { PayrollCalculationBackendService } from '@/services/PayrollCalculationBackendService';
 import { convertNovedadesToIBC } from '@/utils/payrollCalculationsBackend';
 import { PayrollCalculationService } from '@/services/PayrollCalculationService';
+import { NoveltyImportDrawer } from '@/components/payroll/novelties-import/NoveltyImportDrawer';
 
 interface PayrollLiquidationSimpleTableProps {
   employees: PayrollEmployee[];
@@ -58,6 +59,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
   const [selectedEmployee, setSelectedEmployee] = useState<PayrollEmployee | null>(null);
   const [novedadModalOpen, setNovedadModalOpen] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState<PayrollEmployee | null>(null);
+  const [showNoveltyImportDrawer, setShowNoveltyImportDrawer] = useState(false);
   const [employeeCalculations, setEmployeeCalculations] = useState<Record<string, { 
     totalToPay: number; 
     ibc: number; 

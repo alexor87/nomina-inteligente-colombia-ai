@@ -89,7 +89,6 @@ export type NovedadType =
   | 'fondo_solidaridad'
   | 'retencion_fuente'
   | 'libranza'
-  | 'deduccion_especial'
   | 'ausencia'
   | 'multa'
   | 'descuento_voluntario';
@@ -111,7 +110,6 @@ export const NOVEDAD_TYPE_LABELS: Record<NovedadType, string> = {
   fondo_solidaridad: 'Fondo de Solidaridad',
   retencion_fuente: 'Retención en la Fuente',
   libranza: 'Libranza',
-  deduccion_especial: 'Deducción Especial',
   ausencia: 'Ausencia',
   multa: 'Multa',
   descuento_voluntario: 'Descuento Voluntario'

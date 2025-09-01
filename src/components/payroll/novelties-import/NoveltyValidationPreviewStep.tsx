@@ -28,6 +28,7 @@ interface NoveltyValidationPreviewStepProps {
     rows: any[];
     mapping: Record<string, string>;
     totalRows?: number;
+    validationResults?: Record<number, any>;
   };
   onNext: (step: ImportStep) => void;
   onBack: () => void;
