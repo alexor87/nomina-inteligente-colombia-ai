@@ -7,7 +7,7 @@ import { FileUploadStep } from './import/FileUploadStep';
 import { ColumnMappingStep } from './import/ColumnMappingStep';
 import { ValidationPreviewStep } from './import/ValidationPreviewStep';
 import { ImportConfirmationStep } from './import/ImportConfirmationStep';
-import { X } from 'lucide-react';
+
 
 export interface ImportedRow {
   [key: string]: any;
@@ -87,14 +87,9 @@ export const ImportEmployeesDrawer = ({ isOpen, onClose, onImportComplete }: Imp
     <Sheet open={isOpen} onOpenChange={handleClose}>
       <SheetContent side="right" className="w-full sm:max-w-2xl lg:max-w-4xl">
         <SheetHeader className="border-b pb-4 mb-6">
-          <div className="flex items-center justify-between">
-            <SheetTitle className="text-xl font-semibold">
-              Importar desde Excel o CSV
-            </SheetTitle>
-            <Button variant="ghost" size="sm" onClick={handleClose}>
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
+          <SheetTitle className="text-xl font-semibold">
+            Importar desde Excel o CSV
+          </SheetTitle>
           <div className="mt-4">
             <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
               <span>{getStepTitle()}</span>
