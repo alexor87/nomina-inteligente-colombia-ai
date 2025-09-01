@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calculator, Users, Settings, RotateCcw } from 'lucide-react';
+import { Calculator, Users, Settings, RotateCcw, Upload } from 'lucide-react';
 import { PayrollLiquidationTable } from '@/components/payroll/liquidation/PayrollLiquidationTable';
 import { SimplePeriodSelector } from '@/components/payroll/SimplePeriodSelector';
 import { AutoSaveIndicator } from '@/components/payroll/AutoSaveIndicator';
 import { usePayrollLiquidationSimplified } from '@/hooks/usePayrollLiquidationSimplified';
 import { useSimplePeriodSelection } from '@/hooks/useSimplePeriodSelection';
 import { EmployeeAddModal } from '@/components/payroll/modals/EmployeeAddModal';
+import { NoveltyImportDrawer } from '@/components/payroll/novelties-import/NoveltyImportDrawer';
 import { useCurrentCompany } from '@/hooks/useCurrentCompany';
 
 import { SelectablePeriod } from '@/services/payroll/SimplePeriodService';
@@ -26,6 +27,7 @@ import type { PayrollSummary } from '@/types/payroll';
 
 const PayrollLiquidationPageSimplified = () => {
   const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false);
+  const [showNoveltyImportDrawer, setShowNoveltyImportDrawer] = useState(false);
   
   const [showReliquidationDialog, setShowReliquidationDialog] = useState(false);
   const [showRecoveryPanel, setShowRecoveryPanel] = useState(false);
@@ -418,6 +420,14 @@ const PayrollLiquidationPageSimplified = () => {
                   Agregar Empleado
                 </Button>
                 <Button 
+                  onClick={() => setShowNoveltyImportDrawer(true)}
+                  variant="outline"
+                  disabled={isLoading || !currentPeriodId || isRemovingEmployee}
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Importar Novedades
+                </Button>
+                <Button 
                   onClick={handleLiquidate}
                   disabled={isLiquidating || !canProceedWithLiquidation || isRemovingEmployee || (useExhaustiveValidation && !exhaustiveValidationResults?.canProceed)}
                   className={periodAlreadyLiquidated ? "bg-orange-600 hover:bg-orange-700" : ""}
@@ -462,6 +472,21 @@ const PayrollLiquidationPageSimplified = () => {
         onAddEmployees={handleAddEmployees}
         currentEmployeeIds={employees.map(emp => emp.id)}
         companyId={companyId || ''}
+      />
+
+      <NoveltyImportDrawer
+        isOpen={showNoveltyImportDrawer}
+        onClose={() => setShowNoveltyImportDrawer(false)}
+        companyId={companyId || ''}
+        periodId={currentPeriodId || ''}
+        periodStartDate={selectedPeriod?.startDate || ''}
+        periodEndDate={selectedPeriod?.endDate || ''}
+        onImportComplete={() => {
+          console.log('✅ Import completed, refreshing employees...');
+          if (selectedPeriod) {
+            loadEmployees(selectedPeriod.startDate, selectedPeriod.endDate);
+          }
+        }}
       />
 
       <ReliquidationDialog

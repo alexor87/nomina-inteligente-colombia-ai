@@ -75,34 +75,7 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
   const calculatedDays = calculateDaysBetween(formData.fecha_inicio, formData.fecha_fin);
   const isValidRange = isValidDateRange(formData.fecha_inicio, formData.fecha_fin);
 
-  // ✅ NUEVA FUNCIÓN: Calcular valor de incapacidad según normativa
-  const calculateIncapacityValue = useCallback((days: number, subtipo: string): number => {
-    if (days <= 0 || !employeeSalary) return 0;
-    
-    const dailySalary = employeeSalary / 30;
-    
-    switch (subtipo) {
-      case 'general':
-        // ✅ NORMATIVA CORREGIDA: Días 1-2 al 100%, días 3+ al 66.67%
-        if (days <= 2) {
-          return dailySalary * days; // 100% todos los días
-        } else {
-          // Días 1-2 al 100% + días 3+ al 66.67%
-          const first2Days = dailySalary * 2; // 100%
-          const remainingDays = dailySalary * (days - 2) * 0.6667; // 66.67%
-          return first2Days + remainingDays;
-        }
-      
-      case 'laboral':
-        // ARL paga desde día 1 al 100%
-        return dailySalary * days;
-      
-      default:
-        return 0;
-    }
-  }, [employeeSalary]);
-
-  // ✅ CORRECCIÓN: Cálculo automático cuando cambien fechas o subtipo
+  // ✅ CORRECCIÓN: Usar cálculo backend en lugar de local
   useEffect(() => {
     // Advertir si el rango se sale del período, pero no bloquear
     if (formData.fecha_inicio && formData.fecha_fin && isValidRange) {
@@ -117,23 +90,36 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
       setDateRangeError('');
     }
 
-    // ✅ NUEVO CÁLCULO LOCAL CON NORMATIVA CORRECTA
-    if (calculatedDays > 0 && isValidRange && formData.subtipo && employeeSalary > 0) {
-      const calculatedValue = calculateIncapacityValue(calculatedDays, formData.subtipo);
-      
-      console.log('🏥 Calculating incapacity locally:', {
+    // ✅ USAR BACKEND CALCULATION EN LUGAR DE CÁLCULO LOCAL
+    if (calculatedDays > 0 && isValidRange && formData.subtipo && employeeSalary > 0 && periodoFecha) {
+      console.log('🏥 Using backend calculation for incapacity:', {
         subtipo: formData.subtipo,
         dias: calculatedDays,
         salario: employeeSalary,
-        valor: calculatedValue,
+        periodoFecha: periodoFecha.toISOString(),
         fechaInicio: formData.fecha_inicio,
         fechaFin: formData.fecha_fin
       });
       
-      setFormData(prev => ({ 
-        ...prev, 
-        valor: Math.round(calculatedValue)
-      }));
+      // Usar el backend para calcular con políticas correctas
+      calculateNovedadDebounced(
+        {
+          tipoNovedad: 'incapacidad' as NovedadType,
+          subtipo: formData.subtipo,
+          salarioBase: employeeSalary,
+          dias: calculatedDays,
+          fechaPeriodo: periodoFecha.toISOString()
+        },
+        (result) => {
+          if (result && result.valor) {
+            console.log('✅ Backend calculation result for incapacity:', result);
+            setFormData(prev => ({ 
+              ...prev, 
+              valor: Math.round(result.valor)
+            }));
+          }
+        }
+      );
     } else if (calculatedDays === 0 || !isValidRange) {
       // ✅ Limpiar valor cuando no hay días válidos
       setFormData(prev => ({ 
@@ -141,7 +127,7 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
         valor: 0 
       }));
     }
-  }, [formData.subtipo, formData.fecha_inicio, formData.fecha_fin, calculatedDays, isValidRange, employeeSalary, calculateIncapacityValue, periodStartDate, periodEndDate]);
+  }, [formData.subtipo, formData.fecha_inicio, formData.fecha_fin, calculatedDays, isValidRange, employeeSalary, periodoFecha, calculateNovedadDebounced, periodStartDate, periodEndDate]);
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -193,11 +179,12 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
 
   const currentSubtipoInfo = getSubtipoInfo(formData.subtipo);
 
-  // ✅ NUEVA FUNCIÓN: Calcular desglose para UI
+  // ✅ CALCULAR DESGLOSE CORRECTO CON SMLDV (solo para mostrar en UI)
   const getIncapacityBreakdown = (days: number, subtipo: string) => {
     if (days <= 0 || subtipo !== 'general') return null;
     
     const dailySalary = employeeSalary / 30;
+    const smldv = 1423500 / 30; // SMLDV 2025
     
     if (days <= 2) {
       return {
@@ -209,14 +196,17 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
       };
     } else {
       const employerAmount = dailySalary * 2; // Días 1-2 al 100%
-      const epsAmount = dailySalary * (days - 2) * 0.6667; // Días 3+ al 66.67%
+      const daily66 = dailySalary * 0.6667; // 66.67%
+      const appliedDaily = Math.max(daily66, smldv); // Con piso SMLDV
+      const epsAmount = appliedDaily * (days - 2); // Días 3+ con piso
       
       return {
         employerDays: 2,
         employerAmount,
         epsDays: days - 2,
         epsAmount,
-        total: employerAmount + epsAmount
+        total: employerAmount + epsAmount,
+        hasSmldvFloor: appliedDaily > daily66 // Indica si se aplicó el piso
       };
     }
   };
@@ -362,7 +352,7 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
           />
         </div>
 
-        {/* ✅ NUEVO: Desglose detallado para incapacidad general */}
+        {/* ✅ DESGLOSE DETALLADO CORREGIDO CON SMLDV */}
         {breakdown && formData.subtipo === 'general' && (
           <div className="bg-white p-4 rounded border border-blue-200">
             <h5 className="text-sm font-medium text-gray-700 mb-3">Desglose Normativo (Incapacidad General)</h5>
@@ -373,8 +363,13 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
               </div>
               {breakdown.epsDays > 0 && (
                 <div className="flex justify-between">
-                  <span>Días 3-{calculatedDays} (EPS al 66.67%):</span>
+                  <span>Días 3-{calculatedDays} (EPS al 66.67%{breakdown.hasSmldvFloor ? ' + piso SMLDV' : ''}):</span>
                   <span className="font-medium">{formatCurrency(breakdown.epsAmount)}</span>
+                </div>
+              )}
+              {breakdown.hasSmldvFloor && (
+                <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded">
+                  ℹ️ Se aplicó el piso de Salario Mínimo Legal Diario Vigente (SMLDV = ${Math.round(1423500/30).toLocaleString()})
                 </div>
               )}
               <div className="border-t pt-2 flex justify-between font-semibold">

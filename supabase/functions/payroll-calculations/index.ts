@@ -413,6 +413,7 @@ async function calculateNovedadesTotals(supabase: any, data: any) {
 
   let totalDevengos = 0;
   let totalDeducciones = 0;
+  const breakdown = []; // ✅ NUEVO: Array de breakdown detallado
 
   // ✅ Bases de hora correctas según normativa
   const fecha = fechaPeriodo ? new Date(fechaPeriodo) : new Date();
@@ -431,6 +432,7 @@ async function calculateNovedadesTotals(supabase: any, data: any) {
     const { tipo_novedad, subtipo, valor: valorOriginal, dias, horas } = novedad;
 
     let valorCalculado = valorOriginal || 0;
+    let detalleCalculo = '';
 
     if (tipo_novedad === 'incapacidad') {
       // ✅ Recalcular incapacidades con política de empresa
@@ -442,16 +444,36 @@ async function calculateNovedadesTotals(supabase: any, data: any) {
         config.salarioMinimo
       );
 
+      const diasInt = Number(dias || 0);
+      const normalized = normalizeIncapacitySubtype(subtipo);
+      const appliedDailyRaw = valorDiario * 0.6667;
+      const smldv = config.salarioMinimo / 30;
+
+      detalleCalculo = normalized === 'laboral'
+        ? `Incapacidad laboral (ARL): ${diasInt} días × $${Math.round(valorDiario).toLocaleString()} = $${valorCalculado.toLocaleString()}`
+        : policy.incapacity_policy === 'from_day1_66_with_floor'
+          ? `Incapacidad general (política día 1 con piso): ${diasInt} días × máx(66.67% diario=$${Math.round(appliedDailyRaw).toLocaleString()}, SMLDV=$${Math.round(smldv).toLocaleString()}) = $${valorCalculado.toLocaleString()}`
+          : diasInt <= 2
+            ? `Incapacidad general estándar: ${diasInt} días × $${Math.round(valorDiario).toLocaleString()} = $${valorCalculado.toLocaleString()}`
+            : (() => {
+                const remaining = diasInt - 2;
+                const appliedDaily = Math.max(appliedDailyRaw, smldv);
+                const first2 = Math.round(valorDiario * 2);
+                const rest = Math.round(appliedDaily * remaining);
+                return `Incapacidad general estándar: 2d×$${Math.round(valorDiario).toLocaleString()} + ${remaining}d×máx(66.67% diario=$${Math.round(appliedDailyRaw).toLocaleString()}, SMLDV=$${Math.round(smldv).toLocaleString()}) = $${(first2 + rest).toLocaleString()}`
+              })();
+
       console.log('🏥 Totals incapacidad calculada:', {
         valorOriginal,
         valorCalculado,
-        detalleCalculo: `Incapacidad ${normalizeIncapacitySubtype(subtipo)} (política ${policy.incapacity_policy === 'from_day1_66_with_floor' ? 'día 1 con piso' : 'estándar'}): ${dias} días`
+        detalleCalculo
       });
     } else if (tipo_novedad === 'horas_extra') {
       const horasNum = Number(horas || 0);
       if (horasNum > 0) {
         const factor = getOvertimeFactor(subtipo);
         valorCalculado = Math.round(valorHoraExtraBase * horasNum * factor);
+        detalleCalculo = `Horas extra ${subtipo || 'diurnas'}: ${horasNum} h × $${Math.round(valorHoraExtraBase).toLocaleString()} × ${factor} = $${valorCalculado.toLocaleString()}`;
 
         console.log('🛠️ Horas extra (normativa):', {
           subtipo,
@@ -467,6 +489,7 @@ async function calculateNovedadesTotals(supabase: any, data: any) {
       if (horasNum > 0) {
         const recargo = 0.35;
         valorCalculado = Math.round(valorHoraRecargoBase * horasNum * recargo);
+        detalleCalculo = `Recargo nocturno: ${horasNum} h × $${Math.round(valorHoraRecargoBase).toLocaleString()} × 0.35 = $${valorCalculado.toLocaleString()}`;
 
         console.log('🌙 Recargo nocturno:', {
           horasNum,
@@ -476,6 +499,15 @@ async function calculateNovedadesTotals(supabase: any, data: any) {
         });
       }
     }
+
+    // ✅ NUEVO: Agregar al breakdown detallado
+    breakdown.push({
+      tipo_novedad,
+      subtipo: subtipo || 'default',
+      valorOriginal,
+      valorCalculado,
+      detalleCalculo
+    });
 
     // Clasificar como devengo o deducción
     if (['incapacidad', 'horas_extra', 'bonificacion', 'comision', 'prima', 'recargo_nocturno'].includes(tipo_novedad)) {
@@ -494,7 +526,8 @@ async function calculateNovedadesTotals(supabase: any, data: any) {
     totalDevengos: Math.round(totalDevengos),
     totalDeducciones: Math.round(totalDeducciones),
     totalNeto: Math.round(totalNeto),
-    itemsProcessed: novedades.length
+    itemsProcessed: novedades.length,
+    breakdown // ✅ NUEVO: Incluir breakdown detallado
   };
 
   console.log('✅ BACKEND: Totales (policy-aware + jornada legal):', result);
