@@ -72,14 +72,48 @@ export const PeriodAuditSummaryComponent: React.FC<PeriodAuditSummaryProps> = ({
     }).format(value);
   };
 
+  // Consolidate audit entries to show only final applied changes
+  const consolidateAuditEntries = (entries: PeriodAuditSummary[]): PeriodAuditSummary[] => {
+    // Group by employee + novedad_type
+    const grouped = entries.reduce((acc, entry) => {
+      const key = `${entry.employee_name}-${entry.novedad_type || 'unknown'}`;
+      if (!acc[key]) {
+        acc[key] = [];
+      }
+      acc[key].push(entry);
+      return acc;
+    }, {} as Record<string, PeriodAuditSummary[]>);
+
+    // For each group, get the most recent entry and filter out deleted ones
+    const consolidated: PeriodAuditSummary[] = [];
+    
+    Object.values(grouped).forEach(group => {
+      // Sort by created_at to get the most recent
+      const sortedGroup = group.sort((a, b) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+      
+      const mostRecent = sortedGroup[0];
+      
+      // Only include if the most recent action is not DELETE
+      if (mostRecent.action !== 'DELETE') {
+        consolidated.push(mostRecent);
+      }
+    });
+
+    return consolidated;
+  };
+
+  const consolidatedEntries = consolidateAuditEntries(auditSummary);
+
   const getTotalAdjustments = () => {
-    return auditSummary.reduce((sum, entry) => sum + (entry.value_change || 0), 0);
+    return consolidatedEntries.reduce((sum, entry) => sum + (entry.value_change || 0), 0);
   };
 
   const exportAuditReport = () => {
     const csvContent = [
       ['Empleado', 'Tipo Novedad', 'Acción', 'Cambio Valor', 'Usuario', 'Fecha'].join(','),
-      ...auditSummary.map(entry => [
+      ...consolidatedEntries.map(entry => [
         entry.employee_name,
         entry.novedad_type || 'N/A',
         PayrollAuditEnhancedService.getActionDescription(entry.action),
@@ -92,7 +126,7 @@ export const PeriodAuditSummaryComponent: React.FC<PeriodAuditSummaryProps> = ({
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `auditoria-${periodName}-${format(new Date(), 'dd-MM-yyyy')}.csv`;
+    link.download = `auditoria-aplicada-${periodName}-${format(new Date(), 'dd-MM-yyyy')}.csv`;
     link.click();
   };
 
@@ -115,7 +149,7 @@ export const PeriodAuditSummaryComponent: React.FC<PeriodAuditSummaryProps> = ({
             Auditoría de Ajustes - {periodName}
           </CardTitle>
           <div className="flex items-center gap-2">
-            {auditSummary.length > 0 && (
+            {consolidatedEntries.length > 0 && (
               <Button
                 variant="outline"
                 size="sm"
@@ -123,17 +157,17 @@ export const PeriodAuditSummaryComponent: React.FC<PeriodAuditSummaryProps> = ({
                 className="flex items-center gap-2"
               >
                 <Download className="w-4 h-4" />
-                Exportar
+                Exportar Aplicados
               </Button>
             )}
           </div>
         </div>
       </CardHeader>
       <CardContent>
-        {auditSummary.length === 0 ? (
+        {consolidatedEntries.length === 0 ? (
           <div className="text-center py-8">
             <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-500">No hay cambios registrados en este período</p>
+            <p className="text-gray-500">No hay ajustes aplicados en este período</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -142,9 +176,9 @@ export const PeriodAuditSummaryComponent: React.FC<PeriodAuditSummaryProps> = ({
               <Card className="bg-blue-50">
                 <CardContent className="p-4">
                   <div className="text-2xl font-bold text-blue-700">
-                    {auditSummary.length}
+                    {consolidatedEntries.length}
                   </div>
-                  <div className="text-sm text-blue-600">Total de cambios</div>
+                  <div className="text-sm text-blue-600">Ajustes aplicados</div>
                 </CardContent>
               </Card>
               <Card className="bg-green-50">
@@ -152,13 +186,13 @@ export const PeriodAuditSummaryComponent: React.FC<PeriodAuditSummaryProps> = ({
                   <div className="text-2xl font-bold text-green-700">
                     {formatCurrency(getTotalAdjustments())}
                   </div>
-                  <div className="text-sm text-green-600">Impacto total</div>
+                  <div className="text-sm text-green-600">Impacto neto</div>
                 </CardContent>
               </Card>
               <Card className="bg-purple-50">
                 <CardContent className="p-4">
                   <div className="text-2xl font-bold text-purple-700">
-                    {new Set(auditSummary.map(entry => entry.employee_name)).size}
+                    {new Set(consolidatedEntries.map(entry => entry.employee_name)).size}
                   </div>
                   <div className="text-sm text-purple-600">Empleados afectados</div>
                 </CardContent>
@@ -170,7 +204,7 @@ export const PeriodAuditSummaryComponent: React.FC<PeriodAuditSummaryProps> = ({
             {/* Audit Entries */}
             <ScrollArea className="h-96">
               <div className="space-y-3">
-                {auditSummary.map((entry, index) => (
+                {consolidatedEntries.map((entry, index) => (
                   <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border">
                     <div className="flex items-center gap-4">
                       {getActionIcon(entry.action)}
