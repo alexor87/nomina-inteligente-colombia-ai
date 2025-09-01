@@ -5,13 +5,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Search, Plus, Filter, Download, Mail, MoreVertical, Edit, Trash2, Undo2 } from 'lucide-react';
+import { Search, Plus, Filter, Download, Mail, MoreVertical, Edit, Trash2, Undo2, Upload } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useEmployeeList } from '@/hooks/useEmployeeList';
 import { EmployeeUnified } from '@/types/employee-unified';
 import { EmployeeService } from '@/services/EmployeeService';
 import { EmployeeBulkActions } from './EmployeeBulkActions';
+import { ImportEmployeesDrawer } from './ImportEmployeesDrawer';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 
@@ -48,6 +49,7 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
   const [deletedEmployees, setDeletedEmployees] = useState<EmployeeUnified[]>([]);
   const [isUpdating, setIsUpdating] = useState(false);
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
+  const [showImportDrawer, setShowImportDrawer] = useState(false);
 
   const getStatusBadge = (status: string) => {
     const variants = {
@@ -295,6 +297,10 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
                 <Filter className="w-4 h-4 mr-2" />
                 Filtros
               </Button>
+              <Button variant="outline" onClick={() => setShowImportDrawer(true)}>
+                <Upload className="w-4 h-4 mr-2" />
+                Importar Excel
+              </Button>
               <Button onClick={() => navigate('/app/employees/create')}>
                 <Plus className="w-4 h-4 mr-2" />
                 Nuevo Empleado
@@ -535,6 +541,16 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Import Employees Drawer */}
+      <ImportEmployeesDrawer 
+        isOpen={showImportDrawer}
+        onClose={() => setShowImportDrawer(false)}
+        onImportComplete={() => {
+          refreshEmployees();
+          setShowImportDrawer(false);
+        }}
+      />
     </div>
   );
 };
