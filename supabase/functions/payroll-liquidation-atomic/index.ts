@@ -116,13 +116,15 @@ serve(async (req) => {
             .filter(n => constitutiveTypes.includes(n.tipo_novedad))
             .reduce((sum, n) => sum + (n.valor || 0), 0)
 
-          // Calculate proportional IBC: (base_salary / 30 * dias_trabajados) + constitutive_novedades
+          // Calculate exact proportional IBC: (base_salary / 30 * dias_trabajados) + constitutive_novedades
           const ibcBase = (salarioBase / 30) * diasTrabajados
           let ibc = ibcBase + novedadesConstitutivas
           
-          // Apply caps (min 1 SMMLV, max 25 SMMLV)
+          // Apply maximum cap only (25 SMMLV) - no minimum to preserve exact calculation
           const SMMLV_2025 = 1300000
-          ibc = Math.max(SMMLV_2025, Math.min(ibc, SMMLV_2025 * 25))
+          ibc = Math.min(ibc, SMMLV_2025 * 25)
+          
+          console.log(`🧮 IBC calculation for employee ${payroll.employee_id}: base=${ibcBase}, novedades=${novedadesConstitutivas}, final=${ibc}`)
 
           // Calculate other fields
           const transportAllowance = salarioBase <= (SMMLV_2025 * 2) ? (200000 / 30) * diasTrabajados : 0

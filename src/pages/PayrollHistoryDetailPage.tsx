@@ -17,6 +17,7 @@ import { PendingNovedad, PeriodState } from '@/types/pending-adjustments';
 import { PendingNovedadesService, PendingAdjustmentData } from '@/services/PendingNovedadesService';
 import { ConfirmAdjustmentModal } from '@/components/payroll/corrections/ConfirmAdjustmentModal';
 import { NovedadUnifiedModal } from '@/components/payroll/novedades/NovedadUnifiedModal';
+import { PayrollRecalculationService } from '@/services/PayrollRecalculationService';
 import { usePendingAdjustments } from '@/hooks/usePendingAdjustments';
 
 // Use PayrollPeriodData from service instead of local interface
@@ -115,6 +116,34 @@ export default function PayrollHistoryDetailPage() {
     loadPeriodData();
   }, [periodId]);
 
+  // Trigger IBC recalculation for this specific period if needed
+  useEffect(() => {
+    const recalculateIBC = async () => {
+      if (periodData?.id === '570c775d-a680-425c-9566-d6e38ae7f729' && periodData?.company_id) {
+        try {
+          console.log('🔧 Running IBC fix for affected period...');
+          const result = await PayrollRecalculationService.recalculateIBC(periodData.id, periodData.company_id);
+          
+          if (result.success) {
+            console.log('✅ IBC recalculation completed:', result);
+            // Reload employees to show corrected IBC
+            await loadEmployees();
+            toast({
+              title: "IBC Corregido",
+              description: `IBC recalculado para ${result.employees_processed} empleados`,
+            });
+          }
+        } catch (error) {
+          console.error('❌ IBC recalculation failed:', error);
+        }
+      }
+    };
+
+    if (periodData) {
+      recalculateIBC();
+    }
+  }, [periodData]);
+
   // Load employees for the period
   const loadEmployees = async () => {
     if (!periodId) return;
@@ -133,7 +162,7 @@ export default function PayrollHistoryDetailPage() {
           eps: emp.eps,
           afp: emp.afp,
           salario_base: emp.salario_base,
-          ibc: emp.ibc || PayrollHistoryService.calculateIBC(emp.salario_base, emp.dias_trabajados), // Use stored IBC or calculate proportional fallback
+          ibc: emp.ibc || 0, // Use stored IBC as source of truth
           dias_trabajados: emp.dias_trabajados,
         total_devengado: emp.total_devengado,
         total_deducciones: emp.total_deducciones,
