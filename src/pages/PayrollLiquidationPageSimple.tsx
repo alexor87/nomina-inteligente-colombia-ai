@@ -128,6 +128,32 @@ const PayrollLiquidationPageSimple = () => {
         </Card>
       )}
 
+      {/* DEBUG: State info */}
+      <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+        <p className="text-sm text-yellow-800">
+          🔍 DEBUG - employees.length: {employees.length}, selectedPeriod: {selectedPeriod ? 'YES' : 'NO'}, currentPeriodId: {currentPeriodId || 'NULL'}
+        </p>
+      </div>
+      
+      {/* DEBUG: Botón de Importar Novedades SIEMPRE VISIBLE */}
+      {selectedPeriod && (
+        <div className="mb-4">
+          <Button 
+            onClick={() => {
+              console.log('🔍 DEBUG - Abriendo importador, currentPeriodId:', currentPeriodId);
+              setShowNoveltyImportDrawer(true);
+            }}
+            variant="outline"
+            className="mb-2"
+            title={!currentPeriodId ? 'Advertencia: Se creará el período automáticamente' : 'Importar novedades al período actual'}
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            Importar Novedades {!currentPeriodId && '⚠️'}
+          </Button>
+          <p className="text-xs text-muted-foreground">DEBUG: Botón siempre visible cuando hay período seleccionado</p>
+        </div>
+      )}
+
       {/* Tabla de Empleados */}
       {employees.length > 0 && selectedPeriod && (
         <Card>
@@ -141,19 +167,6 @@ const PayrollLiquidationPageSimple = () => {
                 >
                   <Users className="h-4 w-4 mr-2" />
                   Agregar Empleado
-                </Button>
-                {/* DEBUG: Show button state */}
-                <Button 
-                  onClick={() => {
-                    console.log('🔍 DEBUG - Abriendo importador, currentPeriodId:', currentPeriodId);
-                    setShowNoveltyImportDrawer(true);
-                  }}
-                  variant="outline"
-                  disabled={false} // Always enabled for debugging
-                  title={!currentPeriodId ? 'Advertencia: Se creará el período automáticamente' : 'Importar novedades al período actual'}
-                >
-                  <Upload className="h-4 w-4 mr-2" />
-                  Importar Novedades {!currentPeriodId && '⚠️'}
                 </Button>
                 <Button 
                   onClick={handleLiquidate}
