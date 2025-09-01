@@ -2,20 +2,12 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { CheckCircle, XCircle, AlertCircle, FileText, Clock, ArrowLeft } from 'lucide-react';
+import { CheckCircle, XCircle, AlertCircle, FileText, Clock, ArrowLeft, Users } from 'lucide-react';
+import { ImportStep, ImportData } from '@/types/import-shared';
 import { useToast } from '@/hooks/use-toast';
 import { NoveltyImportService } from '@/services/NoveltyImportService';
 import { NOVEDAD_TYPE_LABELS, NovedadType } from '@/types/novedades-enhanced';
 import { formatCurrency } from '@/lib/utils';
-
-interface ImportData {
-  file: File;
-  columns: string[];
-  rows: any[];
-  mapping: Record<string, string>;
-  validationResults?: Record<number, any>;
-  totalRows?: number;
-}
 
 interface NoveltyImportConfirmationStepProps {
   data: ImportData;
@@ -36,27 +28,25 @@ interface ImportResult {
   }>;
 }
 
-export const NoveltyImportConfirmationStep = ({ 
-  data, 
-  onComplete, 
+export const NoveltyImportConfirmationStep: React.FC<NoveltyImportConfirmationStepProps> = ({
+  data,
+  onComplete,
   onBack,
   companyId,
   periodId 
-}: NoveltyImportConfirmationStepProps) => {
-  const [isImporting, setIsImporting] = useState(false);
-  const [importProgress, setImportProgress] = useState(0);
-  const [importResult, setImportResult] = useState<ImportResult | null>(null);
-  const [currentImportStep, setCurrentImportStep] = useState('');
+}) => {
   const { toast } = useToast();
+  const [isImporting, setIsImporting] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [results, setResults] = useState<ImportResult | null>(null);
 
   const handleImport = async () => {
     setIsImporting(true);
-    setImportProgress(0);
-    setCurrentImportStep('Preparando importación...');
-
-    try {
+    setProgress(0);
+    
+    try {      
       // Prepare novelty data for import
-      const noveltiesData = data.rows.map((row, index) => ({
+      const noveltiesData = (data.validRows || []).map((row, index) => ({
         empleado_id: row._employeeId,
         company_id: companyId,
         periodo_id: periodId,
@@ -78,50 +68,38 @@ export const NoveltyImportConfirmationStep = ({
         periodId,
         sampleData: noveltiesData[0]
       });
-
-      setCurrentImportStep(`Importando ${noveltiesData.length} novedades...`);
       
       // Import novelties in batches
       const result = await NoveltyImportService.importNovelties(
         noveltiesData,
         (progress, step) => {
-          setImportProgress(progress);
-          setCurrentImportStep(step);
+          setProgress(progress);
         }
       );
 
-      setImportResult(result);
+      setResults(result);
 
       if (result.success && result.imported > 0) {
         toast({
-          title: "✅ Importación Completada",
+          title: "Importación completada",
           description: `Se importaron ${result.imported} novedades exitosamente`,
           className: "border-green-200 bg-green-50"
         });
-      } else {
+      }
+
+      if (result.failed > 0) {
         toast({
-          title: "⚠️ Importación con Errores",
-          description: `Solo se importaron ${result.imported} de ${data.rows.length} novedades`,
+          title: "Algunas novedades no se importaron",
+          description: `${result.failed} novedades tuvieron errores`,
           variant: "destructive"
         });
       }
 
-    } catch (error) {
-      console.error('❌ Error durante la importación:', error);
-      setImportResult({
-        success: false,
-        imported: 0,
-        failed: data.rows.length,
-        errors: [{
-          row: 0,
-          error: error instanceof Error ? error.message : 'Error desconocido',
-          data: {}
-        }]
-      });
-
+    } catch (error: any) {
+      console.error('Error during import:', error);
       toast({
-        title: "❌ Error en la Importación",
-        description: "Ocurrió un error durante la importación de novedades",
+        title: "Error en la importación",
+        description: error.message || "Error inesperado durante la importación",
         variant: "destructive"
       });
     } finally {
@@ -129,14 +107,14 @@ export const NoveltyImportConfirmationStep = ({
     }
   };
 
-  const handleFinish = () => {
+  const handleComplete = () => {
     onComplete();
   };
 
   const getSummaryByType = () => {
     const summary: Record<string, { count: number; totalValue: number }> = {};
     
-    data.rows.forEach(row => {
+    (data.validRows || []).forEach(row => {
       const type = row.tipo_novedad as NovedadType;
       if (!summary[type]) {
         summary[type] = { count: 0, totalValue: 0 };
@@ -153,149 +131,101 @@ export const NoveltyImportConfirmationStep = ({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-semibold mb-2">Confirmar Importación</h3>
-        <p className="text-gray-600">
-          Revisa el resumen antes de proceder con la importación
-        </p>
-      </div>
-
-      {/* Import Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <FileText className="h-5 w-5 text-blue-600" />
-              <div>
-                <div className="text-2xl font-bold text-blue-600">{data.rows.length}</div>
-                <div className="text-sm text-gray-600">Novedades a Importar</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <Clock className="h-5 w-5 text-green-600" />
-              <div>
-                <div className="text-2xl font-bold text-green-600">{Object.keys(summary).length}</div>
-                <div className="text-sm text-gray-600">Tipos de Novedad</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <div className="text-lg font-bold text-purple-600">{formatCurrency(totalValue)}</div>
-              <div className="text-sm text-gray-600">Valor Total</div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Breakdown by Novelty Type */}
       <Card>
         <CardHeader>
-          <CardTitle>Resumen por Tipo de Novedad</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="w-5 h-5" />
+            Confirmación de Importación
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {Object.entries(summary).map(([type, data]) => (
-              <div key={type} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg">
+                <CheckCircle className="w-8 h-8 text-green-600" />
                 <div>
-                  <div className="font-medium">
-                    {NOVEDAD_TYPE_LABELS[type as NovedadType] || type}
-                  </div>
-                  <div className="text-sm text-gray-600">
-                    {data.count} {data.count === 1 ? 'novedad' : 'novedades'}
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="font-semibold">{formatCurrency(data.totalValue)}</div>
+                  <p className="font-semibold text-green-800">Válidos</p>
+                  <p className="text-2xl font-bold text-green-900">{data.validRows?.length || 0}</p>
                 </div>
               </div>
-            ))}
+
+              <div className="flex items-center gap-3 p-3 bg-red-50 rounded-lg">
+                <XCircle className="w-8 h-8 text-red-600" />
+                <div>
+                  <p className="font-semibold text-red-800">Inválidos</p>
+                  <p className="text-2xl font-bold text-red-900">{data.invalidRows?.length || 0}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
+                <Users className="w-8 h-8 text-blue-600" />
+                <div>
+                  <p className="font-semibold text-blue-800">Total</p>
+                  <p className="text-2xl font-bold text-blue-900">{data.totalRows || 0}</p>
+                </div>
+              </div>
+            </div>
+
+            {(data.invalidRows?.length || 0) > 0 && (
+              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertCircle className="w-5 h-5 text-yellow-600" />
+                  <p className="font-semibold text-yellow-800">
+                    Atención: {data.invalidRows?.length} novedades no se importarán
+                  </p>
+                </div>
+                <p className="text-sm text-yellow-700">
+                  Las novedades con errores no serán incluidas en la importación. 
+                  Puedes corregir los errores en tu archivo y volver a intentar.
+                </p>
+              </div>
+            )}
+
+            {isImporting && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-blue-600" />
+                  <span className="font-medium">Importando novedades...</span>
+                </div>
+                <Progress value={progress} className="h-2" />
+                <p className="text-sm text-gray-600">
+                  {Math.round(progress)}% completado
+                </p>
+              </div>
+            )}
+
+            {results && (
+              <div className="space-y-3 p-4 bg-gray-50 rounded-lg">
+                <h4 className="font-semibold">Resultados de la importación:</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="w-5 h-5 text-green-600" />
+                    <span>Exitosos: {results.imported}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <XCircle className="w-5 h-5 text-red-600" />
+                    <span>Fallidos: {results.failed}</span>
+                  </div>
+                </div>
+                
+                {results.errors.length > 0 && (
+                  <div className="mt-3">
+                    <h5 className="font-medium text-red-800 mb-2">Errores:</h5>
+                    <div className="max-h-32 overflow-y-auto space-y-1">
+                      {results.errors.map((error, index) => (
+                        <p key={index} className="text-sm text-red-700">
+                          • {error.error}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Import Progress */}
-      {isImporting && (
-        <Card>
-          <CardContent className="p-6">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="font-medium">Progreso de Importación</span>
-                <span className="text-sm text-gray-600">{importProgress}%</span>
-              </div>
-              <Progress value={importProgress} className="h-3" />
-              <div className="text-sm text-gray-600">{currentImportStep}</div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Import Results */}
-      {importResult && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              {importResult.success ? (
-                <CheckCircle className="h-5 w-5 text-green-600" />
-              ) : (
-                <XCircle className="h-5 w-5 text-red-600" />
-              )}
-              <span>Resultado de la Importación</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                <div className="flex items-center space-x-2">
-                  <CheckCircle className="h-4 w-4 text-green-600" />
-                  <span className="text-green-800 font-medium">
-                    {importResult.imported} novedades importadas
-                  </span>
-                </div>
-              </div>
-              
-              {importResult.failed > 0 && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                  <div className="flex items-center space-x-2">
-                    <XCircle className="h-4 w-4 text-red-600" />
-                    <span className="text-red-800 font-medium">
-                      {importResult.failed} novedades fallidas
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {importResult.errors.length > 0 && (
-              <div className="space-y-2">
-                <h5 className="font-medium text-red-800">Errores encontrados:</h5>
-                <div className="max-h-32 overflow-y-auto space-y-1">
-                  {importResult.errors.slice(0, 5).map((error, index) => (
-                    <div key={index} className="text-sm text-red-700 bg-red-50 p-2 rounded">
-                      Fila {error.row + 1}: {error.error}
-                    </div>
-                  ))}
-                  {importResult.errors.length > 5 && (
-                    <div className="text-sm text-gray-600">
-                      ... y {importResult.errors.length - 5} errores más
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Action Buttons */}
       <div className="flex justify-between">
         <Button 
           variant="outline" 
@@ -303,22 +233,20 @@ export const NoveltyImportConfirmationStep = ({
           disabled={isImporting}
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Anterior
+          Volver
         </Button>
         
-        <div className="space-x-2">
-          {!importResult && !isImporting && (
+        <div className="flex gap-3">
+          {results ? (
+            <Button onClick={handleComplete}>
+              Finalizar
+            </Button>
+          ) : (
             <Button 
               onClick={handleImport}
-              className="bg-green-600 hover:bg-green-700"
+              disabled={isImporting || (data.validRows?.length || 0) === 0}
             >
-              Importar {data.rows.length} Novedades
-            </Button>
-          )}
-          
-          {importResult && (
-            <Button onClick={handleFinish}>
-              Finalizar
+              {isImporting ? 'Importando...' : `Importar ${data.validRows?.length || 0} novedades`}
             </Button>
           )}
         </div>

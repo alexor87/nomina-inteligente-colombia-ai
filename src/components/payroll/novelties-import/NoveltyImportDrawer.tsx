@@ -1,19 +1,12 @@
 import { useState } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Progress } from '@/components/ui/progress';
-import { NoveltyFileUploadStep, ImportStep } from './NoveltyFileUploadStep';
+import { NoveltyFileUploadStep } from './NoveltyFileUploadStep';
+import { ImportStep, ImportData } from '@/types/import-shared';
 import { NoveltyColumnMappingStep } from './NoveltyColumnMappingStep';
 import { NoveltyValidationPreviewStep } from './NoveltyValidationPreviewStep';
 import { NoveltyImportConfirmationStep } from './NoveltyImportConfirmationStep';
 
-interface ImportData {
-  file: File;
-  columns: string[];
-  rows: any[];
-  mapping?: Record<string, string>;
-  validationResults?: Record<number, any>;
-  totalRows?: number;
-}
 
 interface NoveltyImportDrawerProps {
   isOpen: boolean;

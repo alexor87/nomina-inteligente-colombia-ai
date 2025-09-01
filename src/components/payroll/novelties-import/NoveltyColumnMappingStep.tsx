@@ -3,203 +3,186 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { ArrowLeft, ArrowRight, AlertTriangle } from 'lucide-react';
-import { ImportStep } from './NoveltyFileUploadStep';
-import { 
-  NOVELTY_FIELD_MAPPINGS, 
-  getRequiredNoveltyFields, 
-  getOptionalNoveltyFields,
-  NoveltyFieldMappingConfig 
-} from './NoveltyFieldMapping';
+import { ImportStep, ImportData } from '@/types/import-shared';
+import { NOVELTY_FIELD_MAPPINGS, getRequiredNoveltyFields, getOptionalNoveltyFields } from './NoveltyFieldMapping';
+import { SharedColumnMappingProgressIndicators } from '@/components/shared/import/SharedColumnMappingProgressIndicators';
 import { NoveltyFieldMappingForm } from './NoveltyFieldMappingForm';
-import { NoveltyDataPreviewTable } from './NoveltyDataPreviewTable';
+import { SharedDataPreviewTable } from '@/components/shared/import/SharedDataPreviewTable';
 
 interface NoveltyColumnMappingStepProps {
-  data: {
-    file: File;
-    columns: string[];
-    rows: any[];
-    totalRows?: number;
-    mapping?: Record<string, string>;
-  };
+  data: ImportData;
   onNext: (step: ImportStep) => void;
   onBack: () => void;
 }
 
 export const NoveltyColumnMappingStep = ({ data, onNext, onBack }: NoveltyColumnMappingStepProps) => {
   const [mappings, setMappings] = useState<Record<string, string>>(() => {
-    // Auto-detect mappings based on column names
-    const autoMappings: Record<string, string> = {};
+    // Auto-detect common novelty field mappings
+    const initialMappings: Record<string, string> = {};
+    const { columns = [] } = data;
     
-    const columnMappings: Record<string, string[]> = {
-      'employee_identification': ['identificacion', 'cedula', 'documento', 'empleado', 'employee', 'id_empleado', 'email'],
-      'tipo_novedad': ['tipo', 'novedad', 'tipo_novedad', 'concepto', 'type'],
-      'valor': ['valor', 'monto', 'amount', 'value', 'importe'],
-      'subtipo': ['subtipo', 'subtype', 'categoria', 'subcategoria'],
-      'fecha_inicio': ['fecha_inicio', 'inicio', 'start_date', 'fecha_desde', 'desde'],
-      'fecha_fin': ['fecha_fin', 'fin', 'end_date', 'fecha_hasta', 'hasta'],
-      'dias': ['dias', 'days', 'cantidad_dias', 'num_dias'],
-      'horas': ['horas', 'hours', 'cantidad_horas', 'num_horas'],
-      'observacion': ['observacion', 'observaciones', 'comentario', 'notes', 'description'],
-      'constitutivo_salario': ['constitutivo', 'constitutivo_salario', 'ibc', 'salary_component']
-    };
-
-    data.columns.forEach(column => {
+    columns.forEach(column => {
       const normalizedColumn = column.toLowerCase().trim();
-      
-      for (const [fieldKey, patterns] of Object.entries(columnMappings)) {
-        if (patterns.some(pattern => normalizedColumn.includes(pattern))) {
-          autoMappings[fieldKey] = column;
-          break;
+      NOVELTY_FIELD_MAPPINGS.forEach(fieldConfig => {
+        const fieldKey = fieldConfig.key;
+        if (fieldKey === 'employee_identification' && (
+          normalizedColumn.includes('identificacion') || 
+          normalizedColumn.includes('cedula') || 
+          normalizedColumn.includes('empleado')
+        )) {
+          if (!initialMappings[fieldKey]) {
+            initialMappings[fieldKey] = column;
+          }
+        } else if (fieldKey === 'tipo_novedad' && (
+          normalizedColumn.includes('tipo') || 
+          normalizedColumn.includes('novedad')
+        )) {
+          if (!initialMappings[fieldKey]) {
+            initialMappings[fieldKey] = column;
+          }
+        } else if (fieldKey === 'valor' && normalizedColumn.includes('valor')) {
+          if (!initialMappings[fieldKey]) {
+            initialMappings[fieldKey] = column;
+          }
         }
-      }
+      });
     });
 
-    return autoMappings;
+    console.log('🔗 Auto-detected mappings:', initialMappings);
+    return initialMappings;
   });
-
+  
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+
+  const { columns = [], rows = [] } = data;
+  const requiredFields = getRequiredNoveltyFields();
+  const optionalFields = getOptionalNoveltyFields();
 
   const handleMappingChange = (targetField: string, sourceColumn: string) => {
     setMappings(prev => {
-      // Remove any existing mapping to this source column
-      const newMappings = Object.fromEntries(
-        Object.entries(prev).filter(([_, value]) => value !== sourceColumn)
-      );
+      const newMappings = { ...prev };
       
-      // Add the new mapping
-      if (sourceColumn) {
+      // Remove any existing mapping to this source column
+      Object.keys(newMappings).forEach(key => {
+        if (newMappings[key] === sourceColumn) {
+          delete newMappings[key];
+        }
+      });
+      
+      // Set new mapping
+      if (sourceColumn && sourceColumn !== 'none') {
         newMappings[targetField] = sourceColumn;
+      } else {
+        delete newMappings[targetField];
       }
       
       return newMappings;
     });
-    
-    // Clear validation errors when mappings change
+
+    // Clear validation errors when mapping changes
     setValidationErrors([]);
   };
 
-  const validateMappings = (): string[] => {
+  const validateMappings = () => {
     const errors: string[] = [];
-    const requiredFields = getRequiredNoveltyFields();
-    const usedColumns = Object.values(mappings);
     
     // Check required fields
-    for (const field of requiredFields) {
+    requiredFields.forEach(field => {
       if (!mappings[field.key]) {
-        errors.push(`El campo requerido "${field.label}" debe ser mapeado`);
+        errors.push(`El campo requerido "${field.label}" debe estar mapeado`);
       }
-    }
-    
-    // Check for duplicate column mappings
-    const duplicates = usedColumns.filter((column, index) => 
-      column && usedColumns.indexOf(column) !== index
-    );
-    
+    });
+
+    // Check for duplicate mappings
+    const usedColumns = Object.values(mappings);
+    const duplicates = usedColumns.filter((column, index) => usedColumns.indexOf(column) !== index);
     if (duplicates.length > 0) {
-      errors.push(`Las siguientes columnas están mapeadas múltiples veces: ${duplicates.join(', ')}`);
+      errors.push('No se pueden mapear múltiples campos a la misma columna');
     }
-    
-    return errors;
+
+    setValidationErrors(errors);
+    return errors.length === 0;
   };
 
   const handleNext = () => {
-    const errors = validateMappings();
-    
-    if (errors.length > 0) {
-      setValidationErrors(errors);
+    if (!validateMappings()) {
       return;
     }
 
-    // Transform data based on mappings
-    const transformedRows = data.rows.map((row, rowIndex) => {
-      const transformedRow: Record<string, any> = { _originalIndex: rowIndex };
+    // Transform data with mappings
+    const transformedRows = rows.map(row => {
+      const transformedRow: any = { ...row };
       
-      Object.entries(mappings).forEach(([fieldKey, columnName]) => {
-        const columnIndex = data.columns.indexOf(columnName);
-        if (columnIndex !== -1) {
-          let value = row[columnIndex];
+      Object.keys(mappings).forEach(targetField => {
+        const sourceColumn = mappings[targetField];
+        if (sourceColumn && row[sourceColumn] !== undefined) {
+          let value = row[sourceColumn];
           
-          // Basic type conversion
-          const field = NOVELTY_FIELD_MAPPINGS.find(f => f.key === fieldKey);
-          if (field && value !== null && value !== undefined && value !== '') {
-            if (field.type === 'number') {
-              value = parseFloat(String(value)) || 0;
-            } else if (field.type === 'boolean') {
-              value = String(value).toLowerCase() === 'true' || String(value) === '1';
-            } else {
-              value = String(value).trim();
-            }
+          // Basic type conversions
+          if (targetField === 'valor' || targetField === 'dias' || targetField === 'horas') {
+            const numericValue = parseFloat(String(value).replace(/[^\d.-]/g, ''));
+            transformedRow[targetField] = isNaN(numericValue) ? value : numericValue;
+          } else if (targetField === 'constitutivo_salario') {
+            transformedRow[targetField] = String(value).toLowerCase() === 'true' || String(value).toLowerCase() === 'sí' || String(value).toLowerCase() === 'si';
+          } else {
+            transformedRow[targetField] = value;
           }
-          
-          transformedRow[fieldKey] = value;
         }
       });
       
       return transformedRow;
     });
 
-    console.log('📊 Datos transformados para validación:', {
-      totalRows: transformedRows.length,
-      mappings,
-      sampleRow: transformedRows[0]
-    });
-
     onNext({
       step: 'validation',
       data: {
         ...data,
-        rows: transformedRows,
-        mapping: mappings
+        mappings: Object.keys(mappings).map(targetField => ({
+          sourceColumn: mappings[targetField],
+          targetField,
+          isRequired: requiredFields.some(f => f.key === targetField),
+          validation: 'valid' as const,
+        })),
+        validRows: transformedRows,
+        invalidRows: [],
+        mapping: mappings,
+        totalRows: rows.length
       }
     });
   };
 
-  const getUsedColumns = (): string[] => {
-    return Object.values(mappings).filter(Boolean);
+  const getUsedColumns = () => {
+    return Object.values(mappings);
   };
 
-  const getMappedFieldsCount = (): number => {
+  const getMappedFieldsCount = () => {
     return Object.keys(mappings).length;
   };
 
-  const getRequiredMappedCount = (): number => {
-    const requiredFields = getRequiredNoveltyFields();
+  const getRequiredMappedCount = () => {
     return requiredFields.filter(field => mappings[field.key]).length;
   };
 
   return (
     <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-semibold mb-2">Mapear Columnas</h3>
+      <div className="text-center">
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+          Mapear Columnas
+        </h3>
         <p className="text-gray-600">
-          Relaciona las columnas de tu archivo con los campos del sistema
+          Asocia las columnas de tu archivo con los campos del sistema
         </p>
       </div>
 
-      {/* Progress indicators */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
-          <div className="text-2xl font-bold text-blue-600">
-            {getRequiredMappedCount()}/{getRequiredNoveltyFields().length}
-          </div>
-          <div className="text-sm text-blue-600">Campos Requeridos</div>
-        </div>
-        <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
-          <div className="text-2xl font-bold text-green-600">
-            {getMappedFieldsCount()}
-          </div>
-          <div className="text-sm text-green-600">Total Mapeados</div>
-        </div>
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-center">
-          <div className="text-2xl font-bold text-gray-600">
-            {data.totalRows || data.rows.length}
-          </div>
-          <div className="text-sm text-gray-600">Novedades a Importar</div>
-        </div>
-      </div>
+      <SharedColumnMappingProgressIndicators
+        totalColumns={columns.length}
+        requiredMappedCount={getRequiredMappedCount()}
+        totalRequiredFields={requiredFields.length}
+        totalMappedFields={getMappedFieldsCount()}
+      />
 
       {validationErrors.length > 0 && (
-        <Alert>
+        <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
             <div className="space-y-1">
@@ -212,31 +195,26 @@ export const NoveltyColumnMappingStep = ({ data, onNext, onBack }: NoveltyColumn
       )}
 
       <NoveltyFieldMappingForm
-        requiredFields={getRequiredNoveltyFields()}
-        optionalFields={getOptionalNoveltyFields()}
-        columns={data.columns}
+        requiredFields={requiredFields}
+        optionalFields={optionalFields}
+        columns={columns}
         mappings={mappings}
         usedColumns={getUsedColumns()}
         onMappingChange={handleMappingChange}
       />
 
-      <Separator />
+      <SharedDataPreviewTable columns={columns} rows={rows} />
 
-      <NoveltyDataPreviewTable
-        columns={data.columns}
-        rows={data.rows.slice(0, 5)}
-        mappings={mappings}
-      />
+      <Separator />
 
       <div className="flex justify-between">
         <Button variant="outline" onClick={onBack}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Anterior
         </Button>
-        
         <Button 
           onClick={handleNext}
-          disabled={getRequiredMappedCount() < getRequiredNoveltyFields().length}
+          disabled={getRequiredMappedCount() < requiredFields.length}
         >
           Continuar
           <ArrowRight className="h-4 w-4 ml-2" />

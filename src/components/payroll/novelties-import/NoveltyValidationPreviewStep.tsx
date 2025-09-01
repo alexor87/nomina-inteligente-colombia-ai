@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ArrowLeft, CheckCircle, XCircle, AlertTriangle, Download } from 'lucide-react';
-import { ImportStep } from './NoveltyFileUploadStep';
+import { ImportStep, ImportData } from '@/types/import-shared';
 import { NOVEDAD_TYPE_LABELS, NovedadType } from '@/types/novedades-enhanced';
 import { NOVELTY_VALIDATION_RULES } from './NoveltyFieldMapping';
 import { formatCurrency } from '@/lib/utils';
@@ -22,14 +22,7 @@ interface ValidationResult {
 }
 
 interface NoveltyValidationPreviewStepProps {
-  data: {
-    file: File;
-    columns: string[];
-    rows: any[];
-    mapping: Record<string, string>;
-    totalRows?: number;
-    validationResults?: Record<number, any>;
-  };
+  data: ImportData & { mapping: Record<string, string> };
   onNext: (step: ImportStep) => void;
   onBack: () => void;
   companyId: string;
@@ -209,13 +202,6 @@ export const NoveltyValidationPreviewStep = ({
     return data.rows.filter((_, index) => !validationResults[index]?.isValid);
   };
 
-  const getRowsWithWarnings = () => {
-    return data.rows.filter((_, index) => 
-      validationResults[index]?.isValid && 
-      validationResults[index]?.warnings?.length > 0
-    );
-  };
-
   const downloadErrors = () => {
     const invalidRows = data.rows.map((row, index) => {
       const validation = validationResults[index];
@@ -263,8 +249,14 @@ export const NoveltyValidationPreviewStep = ({
       step: 'confirmation',
       data: {
         ...data,
-        rows: processedRows,
-        validationResults: validationResults
+        validRows: processedRows,
+        invalidRows: getInvalidRows(),
+        errors: getInvalidRows().map((_, index) => `Fila ${index + 1}: ${validationResults[data.rows.indexOf(getInvalidRows()[index])]?.errors?.join(', ')}`),
+        mapping: data.mappings?.reduce((acc: any, m: any) => {
+          acc[m.sourceColumn] = m.targetField;
+          return acc;
+        }, {}) || data.mapping,
+        totalRows: data.rows.length
       }
     });
   };
@@ -275,67 +267,68 @@ export const NoveltyValidationPreviewStep = ({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-semibold mb-2">Validación de Datos</h3>
+      <div className="text-center">
+        <h3 className="text-lg font-medium text-gray-900 mb-2">
+          Validación de datos
+        </h3>
         <p className="text-gray-600">
-          Revisión de novedades antes de la importación
+          Revisa los datos antes de importar
         </p>
       </div>
 
-      {/* Validation Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <div className="text-2xl font-bold text-blue-600">{data.rows.length}</div>
-              <div className="text-sm text-gray-600">Total</div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <CheckCircle className="h-5 w-5 text-green-600" />
+          <CardContent className="pt-6">
+            <div className="text-center">
               <div className="text-2xl font-bold text-green-600">{validCount}</div>
-              <div className="text-sm text-gray-600">Válidas</div>
+              <div className="text-sm text-gray-600">Registros válidos</div>
             </div>
           </CardContent>
         </Card>
-        
         <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <XCircle className="h-5 w-5 text-red-600" />
+          <CardContent className="pt-6">
+            <div className="text-center">
               <div className="text-2xl font-bold text-red-600">{invalidCount}</div>
-              <div className="text-sm text-gray-600">Con Errores</div>
+              <div className="text-sm text-gray-600">Registros con errores</div>
             </div>
           </CardContent>
         </Card>
-        
         <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <AlertTriangle className="h-5 w-5 text-yellow-600" />
-              <div className="text-2xl font-bold text-yellow-600">{warningCount}</div>
-              <div className="text-sm text-gray-600">Advertencias</div>
+          <CardContent className="pt-6">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-blue-600">{data.rows.length}</div>
+              <div className="text-sm text-gray-600">Total registros</div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Validation Results Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>Resultados de Validación</span>
-            {invalidCount > 0 && (
+      {invalidCount > 0 && (
+        <Card className="border-red-200">
+          <CardHeader className="bg-red-50">
+            <CardTitle className="text-red-800 flex items-center justify-between">
+              <div className="flex items-center">
+                <XCircle className="h-5 w-5 mr-2" />
+                Errores encontrados
+              </div>
               <Button variant="outline" size="sm" onClick={downloadErrors}>
                 <Download className="h-4 w-4 mr-2" />
                 Descargar Errores
               </Button>
-            )}
-          </CardTitle>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <p className="text-sm text-gray-600 mb-3">
+              Se encontraron {invalidCount} registros con errores. 
+              Puedes continuar e importar solo los registros válidos, o corregir el archivo.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Vista previa de datos (primeras 5 filas)</CardTitle>
         </CardHeader>
         <CardContent>
           {isValidating ? (
@@ -344,31 +337,54 @@ export const NoveltyValidationPreviewStep = ({
               <p>Validando novedades...</p>
             </div>
           ) : (
-            <div className="overflow-x-auto max-h-96">
+            <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Estado</TableHead>
+                    <TableHead>Fila</TableHead>
                     <TableHead>Empleado</TableHead>
                     <TableHead>Tipo Novedad</TableHead>
                     <TableHead>Valor</TableHead>
-                    <TableHead>Observaciones/Errores</TableHead>
+                    <TableHead>Estado</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.rows.map((row, index) => {
+                  {data.rows.slice(0, 5).map((row, index) => {
                     const validation = validationResults[index];
                     
                     return (
                       <TableRow key={index}>
+                        <TableCell>{row._rowIndex}</TableCell>
+                        <TableCell>
+                          <div>
+                            <div className="truncate max-w-32">
+                              {row.employee_identification || '-'}
+                            </div>
+                            {validation?.employeeData && (
+                              <div className="text-xs text-gray-500">
+                                {validation.employeeData.name}
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="truncate max-w-32">
+                            {row.tipo_novedad ? (
+                              NOVEDAD_TYPE_LABELS[row.tipo_novedad as NovedadType] || row.tipo_novedad
+                            ) : '-'}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {typeof row.valor === 'number' ? formatCurrency(row.valor) : 'N/A'}
+                        </TableCell>
                         <TableCell>
                           {validation?.isValid ? (
-                            <Badge variant="default" className="bg-green-100 text-green-800">
+                            <Badge className="bg-green-100 text-green-800">
                               <CheckCircle className="h-3 w-3 mr-1" />
-                              Válida
+                              Válido
                             </Badge>
                           ) : (
-                            <Badge variant="destructive">
+                            <Badge className="bg-red-100 text-red-800">
                               <XCircle className="h-3 w-3 mr-1" />
                               Error
                             </Badge>
@@ -378,46 +394,6 @@ export const NoveltyValidationPreviewStep = ({
                               <AlertTriangle className="h-3 w-3 mr-1" />
                               Advertencia
                             </Badge>
-                          )}
-                        </TableCell>
-                        
-                        <TableCell>
-                          <div>
-                            <div>{row.employee_identification || 'N/A'}</div>
-                            {validation?.employeeData && (
-                              <div className="text-xs text-gray-500">
-                                {validation.employeeData.name}
-                              </div>
-                            )}
-                          </div>
-                        </TableCell>
-                        
-                        <TableCell>
-                          {row.tipo_novedad ? (
-                            <span>{NOVEDAD_TYPE_LABELS[row.tipo_novedad as NovedadType] || row.tipo_novedad}</span>
-                          ) : (
-                            <span className="text-gray-400">No especificado</span>
-                          )}
-                        </TableCell>
-                        
-                        <TableCell>
-                          {typeof row.valor === 'number' ? formatCurrency(row.valor) : 'N/A'}
-                        </TableCell>
-                        
-                        <TableCell className="max-w-xs">
-                          {validation?.errors && validation.errors.length > 0 && (
-                            <div className="space-y-1">
-                              {validation.errors.map((error, i) => (
-                                <div key={i} className="text-xs text-red-600">• {error}</div>
-                              ))}
-                            </div>
-                          )}
-                          {validation?.warnings && validation.warnings.length > 0 && (
-                            <div className="space-y-1">
-                              {validation.warnings.map((warning, i) => (
-                                <div key={i} className="text-xs text-yellow-600">⚠ {warning}</div>
-                              ))}
-                            </div>
                           )}
                         </TableCell>
                       </TableRow>
@@ -433,22 +409,17 @@ export const NoveltyValidationPreviewStep = ({
       <div className="flex justify-between">
         <Button variant="outline" onClick={onBack}>
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Anterior
+          Volver al mapeo
         </Button>
-        
-        <div className="space-x-2">
-          {invalidCount > 0 && (
-            <span className="text-sm text-red-600">
-              {invalidCount} filas con errores deben corregirse
-            </span>
-          )}
-          <Button 
-            onClick={handleNext}
-            disabled={validCount === 0 || isValidating}
-          >
-            Continuar con {validCount} novedades válidas
-          </Button>
-        </div>
+        <Button 
+          onClick={handleNext}
+          disabled={validCount === 0}
+        >
+          {invalidCount > 0 
+            ? `Importar ${validCount} registros válidos`
+            : `Importar todos los registros (${validCount})`
+          }
+        </Button>
       </div>
     </div>
   );
