@@ -50,7 +50,16 @@ const getTiposRecargoLocal = (fechaPeriodo: Date = new Date()) => {
         }
         
       case 'nocturno_dominical':
-        return { factor: 1.15, porcentaje: '115%', descripcion: 'Recargo nocturno dominical (domingo 9:00 PM - 6:00 AM)' };
+        // ✅ CORRECCIÓN: Cálculo dinámico nocturno + dominical vigente
+        const factorDominical = fecha < new Date('2025-07-01') ? 0.75 : 
+                                fecha < new Date('2026-07-01') ? 0.80 :
+                                fecha < new Date('2027-07-01') ? 0.90 : 1.00;
+        const factorTotal = 0.35 + factorDominical;
+        return { 
+          factor: factorTotal, 
+          porcentaje: `${Math.round(factorTotal * 100)}%`, 
+          descripcion: `Recargo nocturno dominical (domingo 9:00 PM - 6:00 AM) - ${Math.round(factorTotal * 100)}%`
+        };
         
       default:
         return { factor: 0.0, porcentaje: '0%', descripcion: 'Tipo no válido' };

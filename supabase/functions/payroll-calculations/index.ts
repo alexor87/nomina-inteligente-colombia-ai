@@ -118,12 +118,12 @@ const getOvertimeFactor = (subtipoRaw?: string): number => {
   if (s === 'dominicales' || s === 'dominical') return 1.75;
   if (s === 'festivas' || s === 'festiva') return 1.75;
   
-  // Casos específicos del frontend
-  if (s === 'dominicales_diurnas' || s === 'dominical_diurna') return 1.75;
-  if (s === 'dominicales_nocturnas' || s === 'dominical_nocturna') return 1.75;
-  if (s === 'festivas_diurnas' || s === 'festiva_diurna') return 1.75;
-  if (s === 'festivas_nocturnas' || s === 'festiva_nocturna') return 1.75;
-  if (s === 'nocturna_dominical') return 1.75;
+  // Casos específicos del frontend - ✅ CORRECCIÓN: Factores dominicales correctos
+  if (s === 'dominicales_diurnas' || s === 'dominical_diurna') return 2.0; // 100%
+  if (s === 'dominicales_nocturnas' || s === 'dominical_nocturna') return 2.5; // 150%
+  if (s === 'festivas_diurnas' || s === 'festiva_diurna') return 2.0; // 100%
+  if (s === 'festivas_nocturnas' || s === 'festiva_nocturna') return 2.5; // 150%
+  if (s === 'nocturna_dominical') return 2.5; // 150%
   
   // Horas extra diurnas (25%)
   return 1.25;
@@ -524,7 +524,7 @@ async function calculateNovedadesTotals(supabase: any, data: any) {
     });
 
     // Clasificar como devengo o deducción
-    if (['incapacidad', 'horas_extra', 'bonificacion', 'comision', 'prima', 'recargo_nocturno'].includes(tipo_novedad)) {
+    if (['incapacidad', 'horas_extra', 'bonificacion', 'comision', 'prima', 'recargo_nocturno', 'recargo_dominical'].includes(tipo_novedad)) {
       totalDevengos += valorCalculado;
     } else if (['descuento', 'prestamo', 'multa'].includes(tipo_novedad)) {
       totalDeducciones += valorCalculado;
@@ -624,21 +624,38 @@ async function calculateSingleNovedad(supabase: any, data: any) {
       valor
     });
 
-  } else if (tipoNovedad === 'recargo_nocturno') {
+  } else if (tipoNovedad === 'recargo_nocturno' || tipoNovedad === 'recargo_dominical') {
     const horasNum = Number(horas || 0);
-    // ✅ Factor dinámico basado en subtipo - Cumplimiento normativo
+    // ✅ CORRECCIÓN: Factor dinámico basado en subtipo y fecha
     let factorRecargo = 0.35; // Default: nocturno ordinario (35%)
     let tipoDescripcion = 'nocturno';
     
-    const s = String(subtipo || '').toLowerCase().trim();
-    if (s === 'dominical' || s === 'nocturno_dominical') {
-      factorRecargo = 1.15; // ✅ CORRECCIÓN CRÍTICA: 115% para nocturno dominical
-      tipoDescripcion = 'nocturno dominical';
-    } else if (s === 'nocturno') {
-      factorRecargo = 0.35; // 35% para nocturno ordinario
-      tipoDescripcion = 'nocturno';
+    if (tipoNovedad === 'recargo_dominical') {
+      // ✅ NUEVO: Recargo dominical puro con factores progresivos
+      if (fecha < new Date('2025-07-01')) {
+        factorRecargo = 0.75; // 75%
+      } else if (fecha < new Date('2026-07-01')) {
+        factorRecargo = 0.80; // 80%
+      } else if (fecha < new Date('2027-07-01')) {
+        factorRecargo = 0.90; // 90%
+      } else {
+        factorRecargo = 1.00; // 100%
+      }
+      tipoDescripcion = 'dominical';
+    } else {
+      const s = String(subtipo || '').toLowerCase().trim();
+      if (s === 'dominical' || s === 'nocturno_dominical') {
+        // ✅ CORRECCIÓN CRÍTICA: Nocturno (35%) + Dominical vigente
+        const factorDominical = fecha < new Date('2025-07-01') ? 0.75 : 
+                                 fecha < new Date('2026-07-01') ? 0.80 :
+                                 fecha < new Date('2027-07-01') ? 0.90 : 1.00;
+        factorRecargo = 0.35 + factorDominical; // Máximo 110%
+        tipoDescripcion = 'nocturno dominical';
+      } else if (s === 'nocturno') {
+        factorRecargo = 0.35; // 35% para nocturno ordinario
+        tipoDescripcion = 'nocturno';
+      }
     }
-    
     valor = Math.round(valorHoraRecargoBase * horasNum * factorRecargo);
     factorCalculo = factorRecargo;
     detalleCalculo = `Recargo ${tipoDescripcion}: ${horasNum} h × $${Math.round(valorHoraRecargoBase).toLocaleString()} × ${factorRecargo} = $${valor.toLocaleString()}`;
@@ -678,11 +695,11 @@ async function calculateSingleNovedad(supabase: any, data: any) {
     detalleCalculo,
     jornadaInfo: {
       horasSemanales: j.horasSemanales,
-      horasMensuales: tipoNovedad === 'recargo_nocturno' ? horasMensualesRecargos : j.horasMensuales,
-      divisorHorario: tipoNovedad === 'recargo_nocturno' ? horasMensualesRecargos : (j.horasSemanales / 6),
-      valorHoraOrdinaria: Math.round(tipoNovedad === 'recargo_nocturno' ? valorHoraRecargoBase : valorHoraExtraBase),
+      horasMensuales: (tipoNovedad === 'recargo_nocturno' || tipoNovedad === 'recargo_dominical') ? horasMensualesRecargos : j.horasMensuales,
+      divisorHorario: (tipoNovedad === 'recargo_nocturno' || tipoNovedad === 'recargo_dominical') ? horasMensualesRecargos : (j.horasSemanales / 6),
+      valorHoraOrdinaria: Math.round((tipoNovedad === 'recargo_nocturno' || tipoNovedad === 'recargo_dominical') ? valorHoraRecargoBase : valorHoraExtraBase),
       ley: 'Ley 2101 de 2021',
-      descripcion: tipoNovedad === 'recargo_nocturno'
+      descripcion: (tipoNovedad === 'recargo_nocturno' || tipoNovedad === 'recargo_dominical')
         ? 'Cálculo de recargo con divisor mensual legal (220h desde 01/07/2025)'
         : 'Cálculo de hora extra con horas por día (jornada legal vigente)'
     }

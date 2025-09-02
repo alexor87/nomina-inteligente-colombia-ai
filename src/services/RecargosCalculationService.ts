@@ -81,10 +81,14 @@ export class RecargosCalculationService {
         }
         
       case 'nocturno_dominical':
+        // ✅ CORRECCIÓN: Nocturno (35%) + Dominical vigente = 110% máximo
+        const factorDominical = fecha < new Date('2025-07-01') ? 0.75 : 
+                                fecha < new Date('2026-07-01') ? 0.80 :
+                                fecha < new Date('2027-07-01') ? 0.90 : 1.00;
         return {
-          factorTotal: 1.15,
-          porcentaje: '115%',
-          normativa: 'Recargo nocturno dominical - Factor total según CST'
+          factorTotal: 0.35 + factorDominical, // Nocturno + Dominical vigente
+          porcentaje: `${Math.round((0.35 + factorDominical) * 100)}%`,
+          normativa: `CST Art. 168 + Ley 2466/2025 - Nocturno (35%) + Dominical vigente (${Math.round(factorDominical * 100)}%)`
         };
         
       default:
