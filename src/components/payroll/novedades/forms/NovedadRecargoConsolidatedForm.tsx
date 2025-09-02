@@ -36,7 +36,7 @@ const getTiposRecargoLocal = (fechaPeriodo: Date = new Date()) => {
   const getFactorTotal = (tipo: string) => {
     switch (tipo) {
       case 'nocturno':
-        return { factor: 0.35, porcentaje: '35%', descripcion: 'Recargo nocturno (10:00 PM - 6:00 AM)' };
+        return { factor: 0.35, porcentaje: '35%', descripcion: 'Recargo nocturno (9:00 PM - 6:00 AM)' };
         
       case 'dominical':
         if (fecha < new Date('2025-07-01')) {
@@ -50,7 +50,7 @@ const getTiposRecargoLocal = (fechaPeriodo: Date = new Date()) => {
         }
         
       case 'nocturno_dominical':
-        return { factor: 1.15, porcentaje: '115%', descripcion: 'Recargo nocturno dominical (domingo 10:00 PM - 6:00 AM)' };
+        return { factor: 1.15, porcentaje: '115%', descripcion: 'Recargo nocturno dominical (domingo 9:00 PM - 6:00 AM)' };
         
       default:
         return { factor: 0.0, porcentaje: '0%', descripcion: 'Tipo no válido' };

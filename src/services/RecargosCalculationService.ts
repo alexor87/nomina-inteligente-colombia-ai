@@ -149,7 +149,7 @@ export class RecargosCalculationService {
       {
         tipo: 'nocturno',
         ...this.getFactorRecargoTotal('nocturno', fechaPeriodo),
-        descripcion: 'Recargo nocturno (10:00 PM - 6:00 AM)'
+        descripcion: 'Recargo nocturno (9:00 PM - 6:00 AM)'
       },
       {
         tipo: 'dominical',
@@ -159,7 +159,7 @@ export class RecargosCalculationService {
       {
         tipo: 'nocturno_dominical',
         ...this.getFactorRecargoTotal('nocturno_dominical', fechaPeriodo),
-        descripcion: 'Recargo nocturno dominical (domingo 10:00 PM - 6:00 AM)'
+        descripcion: 'Recargo nocturno dominical (domingo 9:00 PM - 6:00 AM)'
       }
     ].map(item => ({
       tipo: item.tipo,
