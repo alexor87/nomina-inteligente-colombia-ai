@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { calcularValorNovedad } from '@/types/novedades';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -76,6 +77,8 @@ export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsol
     if (!tipo || horas <= 0 || !fecha) return 0;
 
     try {
+      console.log('🧮 Calculando horas extra con backend (consistencia total):', { tipo, horas, fecha });
+      
       // Convert fecha string to Date object for backend calculation
       const fechaCalculo = new Date(fecha);
       
@@ -87,10 +90,28 @@ export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsol
         fechaPeriodo: typeof fechaCalculo === 'string' ? fechaCalculo : fechaCalculo.toISOString() // Use specific entry date instead of periodoFecha
       });
 
-      return result?.valor || 0;
+      if (result?.valor) {
+        console.log('✅ Valor calculado por backend:', result.valor);
+        return result.valor;
+      }
+
+      // ✅ Fallback mejorado: usar función local con jornada legal dinámica
+      console.log('⚠️ Fallback: Usando cálculo local con jornada legal dinámica');
+      const fechaPeriodo = new Date(fecha);
+      const calculoLocal = calcularValorNovedad('horas_extra', tipo, employeeSalary, undefined, horas, fechaPeriodo);
+      
+      console.log('📊 Cálculo local con jornada legal dinámica:', calculoLocal);
+      return calculoLocal.valor;
+      
     } catch (error) {
-      console.error('Error calculating hours extra:', error);
-      return 0;
+      console.error('❌ Error calculando horas extra:', error);
+      
+      // Fallback con jornada legal dinámica
+      const fechaPeriodo = new Date(fecha);
+      const calculoLocal = calcularValorNovedad('horas_extra', tipo, employeeSalary, undefined, horas, fechaPeriodo);
+      
+      console.log('🔄 Fallback por error - cálculo local con jornada legal dinámica:', calculoLocal);
+      return calculoLocal.valor;
     }
   };
 

@@ -231,6 +231,7 @@ export const HORAS_EXTRA_FACTORS = {
 
 // ✅ FUNCIÓN ACTUALIZADA PARA USAR SERVICIO UNIFICADO
 import { RecargosCalculationService } from '@/services/RecargosCalculationService';
+import { calcularValorHoraExtra } from '@/utils/jornadaLegal';
 
 export const calcularValorNovedad = (
   tipoNovedad: NovedadType,
@@ -266,13 +267,23 @@ export const calcularValorNovedad = (
   switch (tipoNovedad) {
     case 'horas_extra':
       if (horas && horas > 0 && subtipo) {
-        console.log('Calculando horas extra - subtipo:', subtipo);
+        console.log('🧮 Calculando horas extra con jornada legal dinámica - subtipo:', subtipo);
         const factor = HORAS_EXTRA_FACTORS[subtipo as keyof typeof HORAS_EXTRA_FACTORS];
         if (factor) {
           console.log('Factor aplicado:', factor);
-          const tarifaHora = salarioBase / 240; // 30 días × 8 horas
+          // ✅ CORRECCIÓN CRÍTICA: Usar valor hora extra dinámico según jornada legal
+          const tarifaHora = calcularValorHoraExtra(salarioBase, fechaPeriodo || new Date());
           valor = Math.round(tarifaHora * factor * horas);
           factorCalculo = factor;
+          
+          console.log('✅ Cálculo con jornada legal dinámica:', {
+            salarioBase,
+            fechaPeriodo: fechaPeriodo?.toISOString().split('T')[0],
+            tarifaHora,
+            factor,
+            horas,
+            valorCalculado: valor
+          });
           
           // Mejorar detalle del cálculo según el tipo
           let tipoDescripcion = '';
@@ -299,8 +310,8 @@ export const calcularValorNovedad = (
               tipoDescripcion = `Horas extra ${subtipo}`;
           }
           
-          detalleCalculo = `${tipoDescripcion}: (${salarioBase.toLocaleString()} ÷ 240) × ${factor} × ${horas} horas = ${valor.toLocaleString()}`;
-          console.log('Resultado horas extra:', { tarifaHora, factor, horas, valor });
+          detalleCalculo = `${tipoDescripcion}: (${salarioBase.toLocaleString()} ÷ jornada legal) × ${factor} × ${horas} horas = ${valor.toLocaleString()}`;
+          console.log('✅ Resultado horas extra con jornada legal dinámica:', { tarifaHora, factor, horas, valor });
         } else {
           console.log('❌ Factor no encontrado para subtipo:', subtipo);
           detalleCalculo = 'Subtipo de horas extra no válido';
