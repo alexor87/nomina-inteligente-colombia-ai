@@ -26,6 +26,7 @@ interface VoucherPreviewModalProps {
     email?: string;
     logo_url?: string;
   } | null;
+  payrollId?: string; // Optional payroll ID for historical data
 }
 
 export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
@@ -33,7 +34,8 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
   onClose,
   employee,
   period,
-  companyInfo
+  companyInfo,
+  payrollId
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
@@ -55,13 +57,13 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
     try {
       console.log('🚀 INICIANDO DESCARGA PDF NATIVO para:', employee.name);
       console.log('🔍 Employee object received in modal:', employee);
-      console.log('🔍 Employee.id (payroll record ID):', employee.id);
-      console.log('🔍 Employee.id type:', typeof employee.id);
+      console.log('🔍 PayrollId prop:', payrollId);
+      console.log('🔍 Employee.id (fallback):', employee.id);
       
-      // NEW FORMAT: Send payrollId to get real database data
-      const requestBody = {
-        payrollId: employee.id // This should be the payroll record ID, not employee ID
-      };
+      // Use payrollId if provided (for historical data), otherwise use employee data
+      const requestBody = payrollId 
+        ? { payrollId: payrollId }
+        : { employee, period, returnBase64: false };
 
       console.log('📤 Enviando request al generador nativo:', JSON.stringify(requestBody, null, 2));
 

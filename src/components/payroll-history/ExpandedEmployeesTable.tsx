@@ -76,6 +76,7 @@ export const ExpandedEmployeesTable = ({
   // Voucher preview modal state
   const [showVoucherPreview, setShowVoucherPreview] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<PayrollEmployee | null>(null);
+  const [selectedPayrollId, setSelectedPayrollId] = useState<string | null>(null);
   
   // Get company details for voucher
   const { companyDetails } = useCompanyDetails();
@@ -178,8 +179,9 @@ export const ExpandedEmployeesTable = ({
       // Transform to PayrollEmployee format
       const payrollEmployee = transformPayrollHistoryToEmployee(historyData);
       
-      // Set selected employee and show modal
+      // Set selected employee, payroll ID and show modal
       setSelectedEmployee(payrollEmployee);
+      setSelectedPayrollId(employee.payroll_id);
       setShowVoucherPreview(true);
       
     } catch (error) {
@@ -410,6 +412,7 @@ export const ExpandedEmployeesTable = ({
         onClose={() => {
           setShowVoucherPreview(false);
           setSelectedEmployee(null);
+          setSelectedPayrollId(null);
         }}
         employee={selectedEmployee}
         period={periodData ? {
@@ -417,6 +420,7 @@ export const ExpandedEmployeesTable = ({
           endDate: periodData.fecha_fin,
           type: periodData.tipo_periodo
         } : null}
+        payrollId={selectedPayrollId}
         companyInfo={companyDetails ? {
           razon_social: companyDetails.razon_social,
           nit: companyDetails.nit,
