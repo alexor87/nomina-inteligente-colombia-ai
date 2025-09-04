@@ -8,17 +8,38 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Plus, FileText, Mail } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { PayrollNovedad } from '@/types/novedades';
+import { VoucherPreviewModal } from '@/components/payroll/modals/VoucherPreviewModal';
+import { transformPayrollHistoryToEmployee, PayrollHistoryData } from '@/utils/payrollDataTransformer';
+import { useCompanyDetails } from '@/hooks/useCompanyDetails';
+import { PayrollEmployee } from '@/types/payroll';
 
 interface ExpandedEmployee {
   id: string;
   nombre: string;
   apellido: string;
+  cedula: string;
+  cargo: string;
+  eps: string;
+  afp: string;
   salario_base: number;
   ibc: number;
   dias_trabajados: number;
   total_devengado: number;
   total_deducciones: number;
   neto_pagado: number;
+  auxilio_transporte: number;
+  salud_empleado: number;
+  pension_empleado: number;
+  horas_extra: number;
+  bonificaciones: number;
+  comisiones: number;
+  cesantias: number;
+  prima: number;
+  vacaciones: number;
+  incapacidades: number;
+  otros_devengos: number;
+  descuentos_varios: number;
+  retencion_fuente: number;
   payroll_id: string;
 }
 
@@ -31,6 +52,12 @@ interface ExpandedEmployeesTableProps {
   pendingNovedades?: PendingNovedad[];
   getPendingCount?: (employeeId: string) => number;
   calculateEmployeePreview?: (employee: any) => EmployeeNovedadPreview;
+  // New props for voucher preview functionality
+  periodData?: {
+    fecha_inicio: string;
+    fecha_fin: string;
+    tipo_periodo: string;
+  };
 }
 
 export const ExpandedEmployeesTable = ({
@@ -41,9 +68,17 @@ export const ExpandedEmployeesTable = ({
   canEdit,
   pendingNovedades = [],
   getPendingCount,
-  calculateEmployeePreview
+  calculateEmployeePreview,
+  periodData
 }: ExpandedEmployeesTableProps) => {
   const [sendingEmails, setSendingEmails] = useState<Record<string, boolean>>({});
+  
+  // Voucher preview modal state
+  const [showVoucherPreview, setShowVoucherPreview] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState<PayrollEmployee | null>(null);
+  
+  // Get company details for voucher
+  const { companyDetails } = useCompanyDetails();
 
   const getNovedadesCount = (employeeId: string): number => {
     return novedades[employeeId]?.length || 0;
@@ -90,8 +125,66 @@ export const ExpandedEmployeesTable = ({
   };
 
   const handleDownloadPDF = (employeeId: string, employeeName: string) => {
-    console.log(`Downloading PDF for ${employeeName}`);
-    // Mock PDF download
+    const employee = employees.find(emp => emp.id === employeeId);
+    if (!employee || !periodData) {
+      console.error('Employee or period data not found');
+      return;
+    }
+
+    try {
+      // Transform ExpandedEmployee to PayrollHistoryData format
+      const historyData: PayrollHistoryData = {
+        employee_id: employee.id,
+        employee_name: employee.nombre,
+        employee_lastname: employee.apellido,
+        total_devengado: employee.total_devengado,
+        total_deducciones: employee.total_deducciones,
+        neto_pagado: employee.neto_pagado,
+        salario_base: employee.salario_base,
+        dias_trabajados: employee.dias_trabajados,
+        ibc: employee.ibc,
+        auxilio_transporte: employee.auxilio_transporte,
+        salud_empleado: employee.salud_empleado,
+        pension_empleado: employee.pension_empleado,
+        horas_extra: employee.horas_extra,
+        bonificaciones: employee.bonificaciones,
+        comisiones: employee.comisiones,
+        cesantias: employee.cesantias,
+        prima: employee.prima,
+        vacaciones: employee.vacaciones,
+        incapacidades: employee.incapacidades,
+        otros_devengos: employee.otros_devengos,
+        otros_descuentos: employee.descuentos_varios, // Map descuentos_varios to otros_descuentos
+        retencion_fuente: employee.retencion_fuente,
+        completeEmployeeData: {
+          id: employee.id,
+          nombre: employee.nombre,
+          apellido: employee.apellido,
+          cedula: employee.cedula || 'N/A',
+          email: '',
+          telefono: '',
+          cargo: employee.cargo || 'N/A',
+          salario_base: employee.salario_base,
+          banco: '',
+          tipo_cuenta: '',
+          numero_cuenta: '',
+          eps: employee.eps || 'N/A',
+          afp: employee.afp || 'N/A',
+          arl: 'N/A',
+          caja_compensacion: 'N/A'
+        }
+      };
+
+      // Transform to PayrollEmployee format
+      const payrollEmployee = transformPayrollHistoryToEmployee(historyData);
+      
+      // Set selected employee and show modal
+      setSelectedEmployee(payrollEmployee);
+      setShowVoucherPreview(true);
+      
+    } catch (error) {
+      console.error('Error transforming employee data:', error);
+    }
   };
 
   return (
@@ -310,6 +403,29 @@ export const ExpandedEmployeesTable = ({
           </Table>
         </div>
       </CardContent>
+      
+      {/* Voucher Preview Modal */}
+      <VoucherPreviewModal
+        isOpen={showVoucherPreview}
+        onClose={() => {
+          setShowVoucherPreview(false);
+          setSelectedEmployee(null);
+        }}
+        employee={selectedEmployee}
+        period={periodData ? {
+          startDate: periodData.fecha_inicio,
+          endDate: periodData.fecha_fin,
+          type: periodData.tipo_periodo
+        } : null}
+        companyInfo={companyDetails ? {
+          razon_social: companyDetails.razon_social,
+          nit: companyDetails.nit,
+          direccion: companyDetails.direccion,
+          ciudad: companyDetails.ciudad,
+          telefono: companyDetails.telefono,
+          email: companyDetails.email
+        } : null}
+      />
     </Card>
   );
 };

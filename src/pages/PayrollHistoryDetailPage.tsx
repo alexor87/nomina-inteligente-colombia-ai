@@ -533,16 +533,17 @@ export default function PayrollHistoryDetailPage() {
                 </p>
               </div>
             ) : (
-              <ExpandedEmployeesTable
-                employees={employees}
-                novedades={novedadesByEmployee}
-                onAddNovedad={handleAddNovedad}
-                onEditNovedad={handleEditNovedad}
-                canEdit={true}
-                pendingNovedades={pendingNovedades}
-                getPendingCount={getPendingCount}
-                calculateEmployeePreview={calculateEmployeePreview}
-              />
+        <ExpandedEmployeesTable
+          employees={employees}
+          novedades={novedadesByEmployee}
+          onAddNovedad={handleAddNovedad}
+          onEditNovedad={handleEditNovedad}
+          canEdit={true}
+          pendingNovedades={pendingNovedades}
+          getPendingCount={getPendingCount}
+          calculateEmployeePreview={calculateEmployeePreview}
+          periodData={periodData}
+        />
             )}
           </TabsContent>
           
