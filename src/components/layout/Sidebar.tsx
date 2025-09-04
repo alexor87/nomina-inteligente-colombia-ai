@@ -14,7 +14,8 @@ import {
   ChevronLeft,
   Menu,
   Calendar,
-  PiggyBank
+  PiggyBank,
+  Building2
 } from 'lucide-react';
 
 const navigation = [
@@ -91,12 +92,8 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 min-h-[60px] flex-shrink-0">
         {!collapsed && (
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 flex items-center justify-center">
-              <img 
-                src="/lovable-uploads/b727a0b1-b3cc-4682-a86d-29eb5e60af4a.png" 
-                alt="Nómina Logo" 
-                className="w-full h-full object-contain"
-              />
+            <div className="w-10 h-10 flex items-center justify-center bg-primary/10 rounded-lg">
+              <Building2 className="h-6 w-6 text-primary" />
             </div>
             <span className="text-lg font-semibold text-gray-900">Nómina</span>
           </div>
