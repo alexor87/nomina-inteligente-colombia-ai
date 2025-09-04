@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Calculator, Menu, X } from 'lucide-react';
+import { Building2, Menu, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const ModernHeader = () => {
@@ -20,8 +20,8 @@ const ModernHeader = () => {
       <nav className="container mx-auto px-6">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center">
-            <Calculator className="h-8 w-8 text-blue-600" />
-            <span className="ml-2 text-xl font-bold text-gray-900">Finppi Nómina</span>
+            <Building2 className="h-8 w-8 text-blue-600" />
+            <span className="ml-2 text-xl font-bold text-gray-900">Nómina Inteligente</span>
           </div>
           
           {/* Desktop Navigation */}

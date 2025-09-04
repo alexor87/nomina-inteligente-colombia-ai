@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Calculator, Mail, Phone, MapPin } from 'lucide-react';
+import { Building2, Mail, Phone, MapPin } from 'lucide-react';
 
 const ModernFooter = () => {
   return (
@@ -10,8 +10,8 @@ const ModernFooter = () => {
           {/* Company Info */}
           <div className="lg:col-span-1">
             <div className="flex items-center mb-4">
-              <Calculator className="h-8 w-8 text-blue-400" />
-              <span className="ml-2 text-xl font-bold">Finppi Nómina</span>
+              <Building2 className="h-8 w-8 text-blue-400" />
+              <span className="ml-2 text-xl font-bold">Nómina Inteligente</span>
             </div>
             <p className="text-gray-400 mb-6 leading-relaxed">
               La plataforma de nómina más avanzada de Colombia. 
@@ -20,7 +20,7 @@ const ModernFooter = () => {
             <div className="space-y-2 text-gray-400">
               <div className="flex items-center">
                 <Mail className="h-4 w-4 mr-3" />
-                <span>soporte@finppi.com</span>
+                <span>soporte@nomina.com</span>
               </div>
               <div className="flex items-center">
                 <Phone className="h-4 w-4 mr-3" />
@@ -70,7 +70,7 @@ const ModernFooter = () => {
         <div className="border-t border-gray-800 mt-12 pt-8">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <p className="text-gray-400 text-sm">
-              © 2024 Finppi Nómina. Todos los derechos reservados.
+              © 2024 Nómina Inteligente. Todos los derechos reservados.
             </p>
             <div className="flex space-x-6 mt-4 md:mt-0">
               <a href="#" className="text-gray-400 hover:text-white text-sm transition-colors">

@@ -479,8 +479,8 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
           </div>
           
           <div className="text-center text-xs text-gray-600 space-y-1">
-            <p>Este documento fue generado con <span className="font-semibold text-blue-800">Finppi</span> – Software de Nómina y Seguridad Social</p>
-            <p><a href="https://www.finppi.com" className="text-blue-600 hover:underline">www.finppi.com</a></p>
+            <p>Este documento fue generado con <span className="font-semibold text-blue-800">Nómina Inteligente</span> – Software de Nómina y Seguridad Social</p>
+            <p><a href="https://www.nomina.com" className="text-blue-600 hover:underline">www.nomina.com</a></p>
             <p className="mt-2">Generado el {new Date().toLocaleString('es-CO')} - <span className="text-green-600 font-semibold">Valores Históricos Reales</span></p>
           </div>
         </div>

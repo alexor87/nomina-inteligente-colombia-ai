@@ -167,7 +167,7 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
       {!collapsed && (
         <div className="px-4 py-3 border-t border-gray-100 bg-gray-50/50">
           <div className="text-xs text-gray-500 text-center">
-            <span className="font-medium">Finppi</span>
+            <span className="font-medium">Nómina</span>
             <div className="mt-1">Gestión de nómina</div>
           </div>
         </div>
