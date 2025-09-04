@@ -55,42 +55,79 @@ export interface EfficiencyMetric {
 }
 
 export class DashboardService {
-  static async getCurrentCompanyId(): Promise<string | null> {
+  // In-memory caches to speed up dashboard loads
+  private static companyIdCache: { value: string | null; expiresAt: number } | null = null;
+  private static companyIdInFlight: Promise<string | null> | null = null;
+
+  private static metricsCache: Record<string, { data: DashboardMetrics; expiresAt: number }> = {};
+  private static recentEmployeesCache: Record<string, { data: RecentEmployee[]; expiresAt: number }> = {};
+  private static activityCache: Record<string, { data: DashboardActivity[]; expiresAt: number }> = {};
+  private static trendsCache: Record<string, { data: MonthlyPayrollTrend[]; expiresAt: number }> = {};
+  private static efficiencyCache: Record<string, { data: EfficiencyMetric[]; expiresAt: number }> = {};
+
+  // Cache TTLs (in ms)
+  private static TTL = {
+    companyId: 10 * 60 * 1000, // 10 minutes
+    metrics: 5 * 60 * 1000,    // 5 minutes
+    recent: 2 * 60 * 1000,     // 2 minutes
+    activity: 2 * 60 * 1000,   // 2 minutes
+    trends: 5 * 60 * 1000,     // 5 minutes
+    efficiency: 60 * 1000      // 1 minute
+  } as const;
+
+  private static now() {
+    return Date.now();
+  }
+
+  static async getCurrentCompanyId(force = false): Promise<string | null> {
     try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError || !user) {
-        console.log('No authenticated user found:', userError);
-        return null;
+      // Use cached company_id if available and not expired
+      if (!force && this.companyIdCache && this.companyIdCache.expiresAt > this.now()) {
+        return this.companyIdCache.value;
       }
 
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('user_id', user.id)
-        .maybeSingle();
-      
-      if (error) {
-        console.error('Error getting user profile:', error);
-        return null;
+      // Deduplicate concurrent requests
+      if (this.companyIdInFlight) {
+        return this.companyIdInFlight;
       }
 
-      if (!profile?.company_id) {
-        console.warn('User profile found but no company_id assigned');
-        return null;
-      }
+      this.companyIdInFlight = (async () => {
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError || !user) {
+          console.log('No authenticated user found:', userError);
+          return null;
+        }
 
-      return profile.company_id;
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('company_id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        
+        if (error) {
+          console.error('Error getting user profile:', error);
+          return null;
+        }
+
+        const value = profile?.company_id || null;
+        this.companyIdCache = { value, expiresAt: this.now() + this.TTL.companyId };
+        return value;
+      })();
+
+      const result = await this.companyIdInFlight;
+      this.companyIdInFlight = null;
+      return result;
     } catch (error) {
       console.error('Error getting current company ID:', error);
+      this.companyIdInFlight = null;
       return null;
     }
   }
 
-  static async getDashboardMetrics(): Promise<DashboardMetrics> {
+  static async getDashboardMetrics(options?: { force?: boolean }): Promise<DashboardMetrics> {
     try {
-      const companyId = await this.getCurrentCompanyId();
+      const companyId = await this.getCurrentCompanyId(options?.force);
       if (!companyId) {
-        console.log('No company ID found, returning default metrics');
         return {
           totalEmployees: 0,
           activeEmployees: 0,
@@ -106,59 +143,70 @@ export class DashboardService {
         };
       }
 
-      // Obtener total de empleados activos
-      const { count: totalEmpleados } = await supabase
-        .from('employees')
-        .select('*', { count: 'exact', head: true })
-        .eq('company_id', companyId)
-        .eq('estado', 'activo');
+      // Serve from cache when valid
+      const cacheKey = companyId;
+      const cached = this.metricsCache[cacheKey];
+      if (!options?.force && cached && cached.expiresAt > this.now()) {
+        return cached.data;
+      }
 
-      // Obtener total de nóminas procesadas
-      const { count: nominasProcesadas } = await supabase
-        .from('payrolls')
-        .select('*', { count: 'exact', head: true })
-        .eq('company_id', companyId)
-        .in('estado', ['procesada', 'pagada']);
-
-      // Obtener alertas de alta prioridad
-      const { count: alertasLegales } = await supabase
-        .from('dashboard_alerts')
-        .select('*', { count: 'exact', head: true })
-        .eq('company_id', companyId)
-        .eq('priority', 'high')
-        .eq('dismissed', false);
-
-      // Calcular gastos de nómina del último mes
       const lastMonth = new Date();
       lastMonth.setMonth(lastMonth.getMonth() - 1);
-      
-      const { data: payrollData } = await supabase
-        .from('payrolls')
-        .select('neto_pagado')
-        .eq('company_id', companyId)
-        .gte('created_at', lastMonth.toISOString())
-        .in('estado', ['procesada', 'pagada']);
 
-      const gastosNomina = payrollData?.reduce((sum, payroll) => 
-        sum + (parseFloat(payroll.neto_pagado?.toString() || '0')), 0) || 0;
+      const [
+        employeesCountRes,
+        payrollsProcessedCountRes,
+        alertsCountRes,
+        payrollDataRes
+      ] = await Promise.all([
+        supabase
+          .from('employees')
+          .select('*', { count: 'estimated', head: true })
+          .eq('company_id', companyId)
+          .eq('estado', 'activo'),
+        supabase
+          .from('payrolls')
+          .select('*', { count: 'estimated', head: true })
+          .eq('company_id', companyId)
+          .in('estado', ['procesada', 'pagada']),
+        supabase
+          .from('dashboard_alerts')
+          .select('*', { count: 'estimated', head: true })
+          .eq('company_id', companyId)
+          .eq('priority', 'high')
+          .eq('dismissed', false),
+        supabase
+          .from('payrolls')
+          .select('neto_pagado')
+          .eq('company_id', companyId)
+          .gte('created_at', lastMonth.toISOString())
+          .in('estado', ['procesada', 'pagada'])
+      ]);
 
-      const totalEmpleadosCount = totalEmpleados || 0;
-      const nominasProcesadasCount = nominasProcesadas || 0;
-      const alertasLegalesCount = alertasLegales || 0;
+      const totalEmpleados = employeesCountRes?.count || 0;
+      const nominasProcesadas = payrollsProcessedCountRes?.count || 0;
+      const alertasLegales = alertsCountRes?.count || 0;
+      const gastosNomina = payrollDataRes?.data?.reduce(
+        (sum: number, payroll: any) => sum + (parseFloat(payroll.neto_pagado?.toString() || '0')),
+        0
+      ) || 0;
 
-      return {
-        totalEmployees: totalEmpleadosCount,
-        activeEmployees: totalEmpleadosCount,
+      const result: DashboardMetrics = {
+        totalEmployees: totalEmpleados,
+        activeEmployees: totalEmpleados,
         pendingPayrolls: 0,
         monthlyPayrollTotal: gastosNomina,
         complianceScore: 85,
-        alerts: alertasLegalesCount,
-        totalEmpleados: totalEmpleadosCount,
-        nominasProcesadas: nominasProcesadasCount,
-        alertasLegales: alertasLegalesCount,
-        gastosNomina: gastosNomina,
+        alerts: alertasLegales,
+        totalEmpleados,
+        nominasProcesadas,
+        alertasLegales,
+        gastosNomina,
         tendenciaMensual: 5.2
       };
+
+      this.metricsCache[cacheKey] = { data: result, expiresAt: this.now() + this.TTL.metrics };
+      return result;
     } catch (error) {
       console.error('Error fetching dashboard metrics:', error);
       return {
@@ -177,10 +225,16 @@ export class DashboardService {
     }
   }
 
-  static async getRecentEmployees(): Promise<RecentEmployee[]> {
+  static async getRecentEmployees(options?: { force?: boolean }): Promise<RecentEmployee[]> {
     try {
-      const companyId = await this.getCurrentCompanyId();
+      const companyId = await this.getCurrentCompanyId(options?.force);
       if (!companyId) return [];
+
+      const cacheKey = companyId;
+      const cached = this.recentEmployeesCache[cacheKey];
+      if (!options?.force && cached && cached.expiresAt > this.now()) {
+        return cached.data;
+      }
 
       const { data, error } = await supabase
         .from('employees')
@@ -191,57 +245,61 @@ export class DashboardService {
 
       if (error) throw error;
 
-      return data?.map(employee => ({
+      const mapped = data?.map(employee => ({
         id: employee.id,
         name: `${employee.nombre} ${employee.apellido}`,
         position: employee.cargo || 'Sin cargo',
         dateAdded: new Date(employee.created_at).toLocaleDateString('es-ES'),
         status: employee.estado as 'activo' | 'pendiente' | 'inactivo'
       })) || [];
+
+      this.recentEmployeesCache[cacheKey] = { data: mapped, expiresAt: this.now() + this.TTL.recent };
+      return mapped;
     } catch (error) {
       console.error('Error fetching recent employees:', error);
       return [];
     }
   }
 
-  static async getDashboardActivity(): Promise<DashboardActivity[]> {
+  static async getDashboardActivity(options?: { force?: boolean }): Promise<DashboardActivity[]> {
     try {
-      const companyId = await this.getCurrentCompanyId();
+      const companyId = await this.getCurrentCompanyId(options?.force);
       if (!companyId) return [];
 
-      // Get recent payroll activity
-      const { data: payrollActivity } = await supabase
-        .from('payrolls')
-        .select('created_at, estado, employees(nombre, apellido)')
-        .eq('company_id', companyId)
-        .order('created_at', { ascending: false })
-        .limit(5);
+      const cacheKey = companyId;
+      const cached = this.activityCache[cacheKey];
+      if (!options?.force && cached && cached.expiresAt > this.now()) {
+        return cached.data;
+      }
 
-      // Get recent employee activity
-      const { data: employeeActivity } = await supabase
-        .from('employees')
-        .select('created_at, nombre, apellido, estado')
-        .eq('company_id', companyId)
-        .order('created_at', { ascending: false })
-        .limit(3);
+      const [payrollRes, employeeRes] = await Promise.all([
+        supabase
+          .from('payrolls')
+          .select('created_at, estado')
+          .eq('company_id', companyId)
+          .order('created_at', { ascending: false })
+          .limit(5),
+        supabase
+          .from('employees')
+          .select('created_at, nombre, apellido, estado')
+          .eq('company_id', companyId)
+          .order('created_at', { ascending: false })
+          .limit(3)
+      ]);
 
       const activities: DashboardActivity[] = [];
 
-      // Add payroll activities
-      payrollActivity?.forEach(payroll => {
-        if (payroll.employees) {
-          activities.push({
-            id: `payroll-${payroll.created_at}`,
-            action: `Procesó nómina para ${payroll.employees.nombre} ${payroll.employees.apellido}`,
-            user: 'Sistema',
-            timestamp: payroll.created_at,
-            type: 'payroll'
-          });
-        }
+      payrollRes.data?.forEach((payroll: any) => {
+        activities.push({
+          id: `payroll-${payroll.created_at}`,
+          action: `Nómina ${payroll.estado}`,
+          user: 'Sistema',
+          timestamp: payroll.created_at,
+          type: 'payroll'
+        });
       });
 
-      // Add employee activities
-      employeeActivity?.forEach(employee => {
+      employeeRes.data?.forEach((employee: any) => {
         activities.push({
           id: `employee-${employee.created_at}`,
           action: `Nuevo empleado: ${employee.nombre} ${employee.apellido}`,
@@ -251,10 +309,12 @@ export class DashboardService {
         });
       });
 
-      return activities
+      const result = activities
         .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
         .slice(0, 8);
 
+      this.activityCache[cacheKey] = { data: result, expiresAt: this.now() + this.TTL.activity };
+      return result;
     } catch (error) {
       console.error('Error fetching dashboard activity:', error);
       return [];
@@ -263,10 +323,16 @@ export class DashboardService {
 
   // NUEVAS FUNCIONES CON DATOS REALES
 
-  static async getMonthlyPayrollTrends(): Promise<MonthlyPayrollTrend[]> {
+  static async getMonthlyPayrollTrends(options?: { force?: boolean }): Promise<MonthlyPayrollTrend[]> {
     try {
-      const companyId = await this.getCurrentCompanyId();
+      const companyId = await this.getCurrentCompanyId(options?.force);
       if (!companyId) return [];
+
+      const cacheKey = companyId;
+      const cached = this.trendsCache[cacheKey];
+      if (!options?.force && cached && cached.expiresAt > this.now()) {
+        return cached.data;
+      }
 
       const { data, error } = await supabase
         .from('payrolls')
@@ -300,7 +366,9 @@ export class DashboardService {
         return acc;
       }, {} as Record<string, MonthlyPayrollTrend>);
 
-      return Object.values(groupedData || {}).slice(0, 6);
+      const result = Object.values(groupedData || {}).slice(0, 6);
+      this.trendsCache[cacheKey] = { data: result, expiresAt: this.now() + this.TTL.trends };
+      return result;
     } catch (error) {
       console.error('Error fetching monthly payroll trends:', error);
       return [];
@@ -353,42 +421,51 @@ export class DashboardService {
     }
   }
 
-  static async getEfficiencyMetrics(): Promise<EfficiencyMetric[]> {
+  static async getEfficiencyMetrics(options?: { force?: boolean }): Promise<EfficiencyMetric[]> {
     try {
-      const companyId = await this.getCurrentCompanyId();
+      const companyId = await this.getCurrentCompanyId(options?.force);
       if (!companyId) return [];
 
-      // Get current month data
+      const cacheKey = companyId;
+      const cached = this.efficiencyCache[cacheKey];
+      if (!options?.force && cached && cached.expiresAt > this.now()) {
+        return cached.data;
+      }
+
+      // Compute date ranges
       const currentMonth = new Date();
       currentMonth.setDate(1);
-      
-      const { data: currentData } = await supabase
-        .from('payrolls')
-        .select('total_devengado, total_deducciones, neto_pagado')
-        .eq('company_id', companyId)
-        .gte('created_at', currentMonth.toISOString())
-        .in('estado', ['procesada', 'pagada']);
-
-      // Get previous month data
       const previousMonth = new Date(currentMonth);
       previousMonth.setMonth(previousMonth.getMonth() - 1);
-      
-      const { data: previousData } = await supabase
-        .from('payrolls')
-        .select('total_devengado, total_deducciones, neto_pagado')
-        .eq('company_id', companyId)
-        .gte('created_at', previousMonth.toISOString())
-        .lt('created_at', currentMonth.toISOString())
-        .in('estado', ['procesada', 'pagada']);
 
-      const currentTotal = currentData?.reduce((sum, p) => sum + parseFloat(p.neto_pagado?.toString() || '0'), 0) || 0;
-      const previousTotal = previousData?.reduce((sum, p) => sum + parseFloat(p.neto_pagado?.toString() || '0'), 0) || 0;
+      const [currentRes, previousRes] = await Promise.all([
+        supabase
+          .from('payrolls')
+          .select('total_devengado, total_deducciones, neto_pagado')
+          .eq('company_id', companyId)
+          .gte('created_at', currentMonth.toISOString())
+          .in('estado', ['procesada', 'pagada']),
+        supabase
+          .from('payrolls')
+          .select('total_devengado, total_deducciones, neto_pagado')
+          .eq('company_id', companyId)
+          .gte('created_at', previousMonth.toISOString())
+          .lt('created_at', currentMonth.toISOString())
+          .in('estado', ['procesada', 'pagada'])
+      ]);
+
+      const currentData = currentRes.data || [];
+      const previousData = previousRes.data || [];
+
+      const currentTotal = currentData.reduce((sum, p: any) => sum + parseFloat(p.neto_pagado?.toString() || '0'), 0) || 0;
+      const previousTotal = previousData.reduce((sum, p: any) => sum + parseFloat(p.neto_pagado?.toString() || '0'), 0) || 0;
       const change = previousTotal > 0 ? ((currentTotal - previousTotal) / previousTotal) * 100 : 0;
 
-      const avgSalaryChange = currentData && previousData ? 
-        ((currentTotal / currentData.length) - (previousTotal / previousData.length)) / (previousTotal / previousData.length) * 100 : 0;
+      const avgSalaryCurrent = currentData.length ? currentTotal / currentData.length : 0;
+      const avgSalaryPrev = previousData.length ? previousTotal / previousData.length : 0;
+      const avgSalaryChange = avgSalaryPrev > 0 ? ((avgSalaryCurrent - avgSalaryPrev) / avgSalaryPrev) * 100 : 0;
 
-      return [
+      const result: EfficiencyMetric[] = [
         {
           metric: 'Costo Total Nómina',
           value: currentTotal,
@@ -397,17 +474,20 @@ export class DashboardService {
         },
         {
           metric: 'Salario Promedio',
-          value: currentData?.length ? currentTotal / currentData.length : 0,
+          value: avgSalaryCurrent,
           change: avgSalaryChange,
           unit: 'COP'
         },
         {
           metric: 'Empleados Procesados',
-          value: currentData?.length || 0,
-          change: ((currentData?.length || 0) - (previousData?.length || 0)) / Math.max(previousData?.length || 1, 1) * 100,
+          value: currentData.length || 0,
+          change: ((currentData.length || 0) - (previousData.length || 0)) / Math.max(previousData.length || 1, 1) * 100,
           unit: 'empleados'
         }
       ];
+
+      this.efficiencyCache[cacheKey] = { data: result, expiresAt: this.now() + this.TTL.efficiency };
+      return result;
     } catch (error) {
       console.error('Error fetching efficiency metrics:', error);
       return [];

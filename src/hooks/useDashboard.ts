@@ -36,11 +36,11 @@ export const useDashboard = () => {
         trendsData,
         efficiencyData
       ] = await Promise.all([
-        DashboardService.getDashboardMetrics(),
-        DashboardService.getRecentEmployees(),
-        DashboardService.getDashboardActivity(),
-        DashboardService.getMonthlyPayrollTrends(),
-        DashboardService.getEfficiencyMetrics()
+        DashboardService.getDashboardMetrics({ force: isRefresh }),
+        DashboardService.getRecentEmployees({ force: isRefresh }),
+        DashboardService.getDashboardActivity({ force: isRefresh }),
+        DashboardService.getMonthlyPayrollTrends({ force: isRefresh }),
+        DashboardService.getEfficiencyMetrics({ force: isRefresh })
       ]);
 
       setMetrics(metricsData);
