@@ -24,12 +24,12 @@ interface HorasExtraEntry {
 }
 
 const tiposHorasExtra = [
-  { value: 'diurnas', label: 'Diurnas (25%)', factor: 1.25 },
-  { value: 'nocturnas', label: 'Nocturnas (75%)', factor: 1.75 },
-  { value: 'dominicales_diurnas', label: 'Dominicales Diurnas (100%)', factor: 2.0 },
-  { value: 'dominicales_nocturnas', label: 'Dominicales Nocturnas (150%)', factor: 2.5 },
-  { value: 'festivas_diurnas', label: 'Festivas Diurnas (100%)', factor: 2.0 },
-  { value: 'festivas_nocturnas', label: 'Festivas Nocturnas (150%)', factor: 2.5 }
+  { value: 'diurnas', label: 'Diurnas', factor: 1.25 },
+  { value: 'nocturnas', label: 'Nocturnas', factor: 1.75 },
+  { value: 'dominicales_diurnas', label: 'Dominicales Diurnas', factor: 2.0 },
+  { value: 'dominicales_nocturnas', label: 'Dominicales Nocturnas', factor: 2.5 },
+  { value: 'festivas_diurnas', label: 'Festivas Diurnas', factor: 2.0 },
+  { value: 'festivas_nocturnas', label: 'Festivas Nocturnas', factor: 2.5 }
 ];
 
 interface NovedadHorasExtraConsolidatedFormProps {
