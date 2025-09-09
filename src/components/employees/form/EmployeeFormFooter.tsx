@@ -50,7 +50,7 @@ export const EmployeeFormFooter = ({
     }
   };
 
-  const isMainButtonDisabled = isLoading || (completionPercentage < 80 && !isDraft);
+  const isMainButtonDisabled = isLoading || (completionPercentage < 100 && !isDraft);
   console.log('🔥 Main button disabled?', isMainButtonDisabled, 'Reasons:', {
     isLoading,
     completionTooLow: completionPercentage < 80 && !isDraft,

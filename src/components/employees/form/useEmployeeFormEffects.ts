@@ -21,8 +21,8 @@ export const useEmployeeFormEffects = (
   // Calculate completion percentage
   useEffect(() => {
     const requiredFields = [
-      'cedula', 'nombre', 'apellido', 'email', 'salarioBase', 'tipoContrato', 
-      'fechaIngreso', 'banco', 'numeroCuenta', 'titularCuenta', 'tipoCotizanteId'
+      'cedula', 'tipoDocumento', 'nombre', 'apellido', 'salarioBase', 
+      'tipoContrato', 'fechaIngreso', 'periodicidadPago'
     ];
     
     const completedFields = requiredFields.filter(field => {
