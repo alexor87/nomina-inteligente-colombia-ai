@@ -80,6 +80,7 @@ export const LaborInfoSection: React.FC<LaborInfoSectionProps> = ({
             type="select"
             control={control!}
             errors={errors}
+            required
             options={[
               { value: 'mensual', label: 'Mensual' },
               { value: 'quincenal', label: 'Quincenal' },

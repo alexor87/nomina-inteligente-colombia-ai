@@ -227,7 +227,7 @@ export const PersonalInfoSection: React.FC<PersonalInfoSectionProps> = ({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="email">Email *</Label>
+            <Label htmlFor="email">Email</Label>
             <Controller
               name="email"
               control={control}
