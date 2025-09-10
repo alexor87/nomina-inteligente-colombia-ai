@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { PendingNovedad, EmployeeNovedadPreview } from '@/types/pending-adjustments';
@@ -51,7 +51,7 @@ interface ExpandedEmployeesTableProps {
   canEdit: boolean;
   pendingNovedades?: PendingNovedad[];
   getPendingCount?: (employeeId: string) => number;
-  calculateEmployeePreview?: (employee: any) => EmployeeNovedadPreview;
+  calculateEmployeePreview?: (employee: any) => Promise<EmployeeNovedadPreview>;
   // New props for voucher preview functionality
   periodData?: {
     fecha_inicio: string;
@@ -72,6 +72,8 @@ export const ExpandedEmployeesTable = ({
   periodData
 }: ExpandedEmployeesTableProps) => {
   const [sendingEmails, setSendingEmails] = useState<Record<string, boolean>>({});
+  const [employeePreviews, setEmployeePreviews] = useState<Record<string, EmployeeNovedadPreview>>({});
+  const [loadingPreviews, setLoadingPreviews] = useState(false);
   
   // Voucher preview modal state
   const [showVoucherPreview, setShowVoucherPreview] = useState(false);
@@ -80,6 +82,45 @@ export const ExpandedEmployeesTable = ({
   
   // Get company details for voucher
   const { companyDetails } = useCompanyDetails();
+
+  // Load employee previews when employees or pending novedades change
+  useEffect(() => {
+    const loadPreviews = async () => {
+      if (!calculateEmployeePreview) return;
+      
+      setLoadingPreviews(true);
+      const previews: Record<string, EmployeeNovedadPreview> = {};
+      
+      // Calculate previews for all employees
+      await Promise.all(
+        employees.map(async (employee) => {
+          try {
+            previews[employee.id] = await calculateEmployeePreview(employee);
+          } catch (error) {
+            console.error(`Error calculating preview for employee ${employee.id}:`, error);
+            // Fallback to default preview
+            previews[employee.id] = {
+              hasPending: false,
+              pendingCount: 0,
+              originalDevengado: employee.total_devengado,
+              newDevengado: employee.total_devengado,
+              originalDeducciones: employee.total_deducciones,
+              newDeducciones: employee.total_deducciones,
+              originalNeto: employee.neto_pagado,
+              newNeto: employee.neto_pagado,
+              originalIBC: employee.ibc || 0,
+              newIBC: employee.ibc || 0
+            };
+          }
+        })
+      );
+      
+      setEmployeePreviews(previews);
+      setLoadingPreviews(false);
+    };
+
+    loadPreviews();
+  }, [employees, pendingNovedades, calculateEmployeePreview]);
 
   const getNovedadesCount = (employeeId: string): number => {
     return novedades[employeeId]?.length || 0;
@@ -90,12 +131,8 @@ export const ExpandedEmployeesTable = ({
   };
 
   const getEmployeePreview = (employee: ExpandedEmployee): EmployeeNovedadPreview => {
-    if (calculateEmployeePreview) {
-      return calculateEmployeePreview(employee);
-    }
-    
-    // Default preview with no changes
-    return {
+    // Return cached preview or default values
+    return employeePreviews[employee.id] || {
       hasPending: false,
       pendingCount: 0,
       originalDevengado: employee.total_devengado,
@@ -104,8 +141,8 @@ export const ExpandedEmployeesTable = ({
       newDeducciones: employee.total_deducciones,
       originalNeto: employee.neto_pagado,
       newNeto: employee.neto_pagado,
-      originalIBC: employee.ibc,
-      newIBC: employee.ibc
+      originalIBC: employee.ibc || 0,
+      newIBC: employee.ibc || 0
     };
   };
 

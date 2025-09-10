@@ -3,9 +3,8 @@ import { PendingNovedad, EmployeeNovedadPreview } from '@/types/pending-adjustme
 import { CreateNovedadData } from '@/types/novedades-enhanced';
 import { PendingNovedadesService, PendingAdjustmentData } from '@/services/PendingNovedadesService';
 import { useToast } from '@/hooks/use-toast';
-import { DeductionCalculationService } from '@/services/DeductionCalculationService';
+import { PayrollCalculationBackendService, PayrollCalculationInput } from '@/services/PayrollCalculationBackendService';
 import { convertNovedadesToIBC } from '@/utils/payrollCalculationsBackend';
-import { ConfigurationService } from '@/services/ConfigurationService';
 
 interface UsePendingAdjustmentsProps {
   periodId?: string;
@@ -89,11 +88,11 @@ export const usePendingAdjustments = ({ periodId, companyId }: UsePendingAdjustm
     return pendingNovedades.filter(n => n.employee_id === employeeId);
   }, [pendingNovedades]);
 
-  // Calculate preview for an employee
-  const calculateEmployeePreview = useCallback((
+  // Calculate preview for an employee using backend calculation service
+  const calculateEmployeePreview = useCallback(async (
     employee: any,
     employeePendingNovedades?: PendingNovedad[]
-  ): EmployeeNovedadPreview => {
+  ): Promise<EmployeeNovedadPreview> => {
     const pending = employeePendingNovedades || getPendingForEmployee(employee.id);
     
     if (pending.length === 0) {
@@ -111,90 +110,76 @@ export const usePendingAdjustments = ({ periodId, companyId }: UsePendingAdjustm
       };
     }
 
-    // Calculate adjustments from pending novedades using liquidation module logic
-    let devengoAdjustment = 0;
-    let explicitDeductions = 0;
+    try {
+      // Convert pending novedades to backend format
+      const pendingNovedadesForBackend = convertNovedadesToIBC(pending.map(p => ({
+        tipo_novedad: p.tipo_novedad,
+        valor: p.valor,
+        constitutivo_salario: p.novedadData?.constitutivo_salario,
+        dias: p.novedadData?.dias,
+        subtipo: p.novedadData?.subtipo
+      })));
 
-    // Convert pending novedades to proper format for IBC calculation
-    const novedadesForIBC = convertNovedadesToIBC(pending.map(p => ({
-      tipo_novedad: p.tipo_novedad,
-      valor: p.valor,
-      constitutivo_salario: p.novedadData?.constitutivo_salario,
-      dias: p.novedadData?.dias,
-      subtipo: p.novedadData?.subtipo
-    })));
+      // Prepare base calculation input
+      const baseInput: PayrollCalculationInput = {
+        baseSalary: employee.salario_base || 0,
+        workedDays: employee.dias_trabajados || 30,
+        extraHours: 0,
+        disabilities: 0,
+        bonuses: 0,
+        absences: 0,
+        periodType: employee.periodo_type === 'quincenal' ? 'quincenal' : 'mensual',
+        year: '2025'
+      };
 
-    // Process each pending novedad
-    pending.forEach(p => {
-      const valor = p.valor || 0;
+      // Calculate original values (without pending novedades, only existing ones)
+      const existingNovedades = employee.novedades || [];
+      const originalInput = {
+        ...baseInput,
+        novedades: existingNovedades
+      };
+
+      // Calculate new values (with all novedades: existing + pending)
+      const newInput = {
+        ...baseInput,
+        novedades: [...existingNovedades, ...pendingNovedadesForBackend]
+      };
+
+      // Call backend for both calculations
+      const [originalResult, newResult] = await Promise.all([
+        PayrollCalculationBackendService.calculatePayroll(originalInput),
+        PayrollCalculationBackendService.calculatePayroll(newInput)
+      ]);
+
+      return {
+        originalDevengado: originalResult.grossPay,
+        newDevengado: newResult.grossPay,
+        originalDeducciones: originalResult.totalDeductions,
+        newDeducciones: newResult.totalDeductions,
+        originalNeto: originalResult.netPay,
+        newNeto: newResult.netPay,
+        originalIBC: Math.round(originalResult.ibc),
+        newIBC: Math.round(newResult.ibc),
+        pendingCount: pending.length,
+        hasPending: true
+      };
+    } catch (error) {
+      console.error('Error calculating employee preview with backend:', error);
       
-      // Classify novedad types for devengado/deduction adjustments
-      const isDeduction = [
-        'descuento_voluntario', 'multa', 'libranza', 'retencion_fuente'
-      ].includes(p.tipo_novedad);
-      
-      if (isDeduction) {
-        explicitDeductions += Math.abs(valor);
-      } else {
-        devengoAdjustment += valor;
-      }
-    });
-
-    // Calculate IBC adjustment from constitutive novedades only
-    let constitutiveIBCAdjustment = 0;
-    novedadesForIBC.forEach(novedad => {
-      if (novedad.constitutivo_salario && novedad.valor > 0) {
-        constitutiveIBCAdjustment += novedad.valor;
-      }
-    });
-
-    // Get original values and calculate the CORRECT original IBC
-    const originalDevengado = employee.total_devengado || 0;
-    const originalStoredDeducciones = employee.total_deducciones || 0;
-    const originalNeto = employee.neto_pagado || 0;
-    
-    // Calculate the legally correct original IBC (proportional to days worked)
-    const diasTrabajados = employee.dias_trabajados || 30;
-    const salarioBase = employee.salario_base || 0;
-    const correctOriginalIBC = (salarioBase * diasTrabajados) / 30;
-    
-    // Use the correct original IBC as baseline, not the potentially incorrect stored IBC
-    const baseIBC = correctOriginalIBC > 0 ? correctOriginalIBC : (employee.ibc || salarioBase);
-
-    // Calculate new devengado early
-    const newDevengado = originalDevengado + devengoAdjustment;
-
-    // Calculate new IBC using corrected baseline + constitutive adjustments
-    let newIBC = baseIBC + constitutiveIBCAdjustment;
-    
-    // Get correct SMMLV for the year
-    const config = ConfigurationService.getConfigurationSync('2025');
-    const SMMLV = config.salarioMinimo;
-    
-    // Apply IBC constraints (remove 1 SMMLV floor; keep 25 SMMLV cap)
-    newIBC = Math.min(newIBC, SMMLV * 25);
-
-    // Calculate legal deductions based on both original and new IBC
-    const originalDeductionResult = DeductionCalculationService.calculateDeductions(correctOriginalIBC);
-    const newDeductionResult = DeductionCalculationService.calculateDeductions(newIBC);
-    
-    // Calculate correct original and new deductions
-    const correctOriginalDeducciones = originalDeductionResult.totalDeducciones;
-    const newDeducciones = newDeductionResult.totalDeducciones + explicitDeductions;
-    const newNeto = newDevengado - newDeducciones;
-
-    return {
-      originalDevengado,
-      newDevengado,
-      originalDeducciones: correctOriginalDeducciones, // Use legally correct original deductions
-      newDeducciones,
-      originalNeto: originalDevengado - correctOriginalDeducciones, // Recalculate based on correct deductions  
-      newNeto,
-      originalIBC: Math.round(correctOriginalIBC), // Use legally correct original IBC
-      newIBC: Math.round(newIBC),
-      pendingCount: pending.length,
-      hasPending: true
-    };
+      // Fallback to current stored values if backend fails
+      return {
+        originalDevengado: employee.total_devengado || 0,
+        newDevengado: employee.total_devengado || 0,
+        originalDeducciones: employee.total_deducciones || 0,
+        newDeducciones: employee.total_deducciones || 0,
+        originalNeto: employee.neto_pagado || 0,
+        newNeto: employee.neto_pagado || 0,
+        originalIBC: employee.ibc || 0,
+        newIBC: employee.ibc || 0,
+        pendingCount: pending.length,
+        hasPending: true
+      };
+    }
   }, [getPendingForEmployee]);
 
   // Apply all pending adjustments with full re-liquidation
