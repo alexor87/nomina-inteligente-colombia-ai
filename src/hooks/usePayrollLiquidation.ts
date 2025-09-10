@@ -97,8 +97,8 @@ export const usePayrollLiquidation = () => {
         additional_deductions: employee.deducciones_novedades,
         eps: '',
         afp: '',
-        // ✅ VALORES YA CALCULADOS CORRECTAMENTE POR EL SERVICIO
-        total_devengado: employee.devengos + (employee.salario_base / 30) * employee.dias_trabajados + employee.auxilio_transporte,
+        // ✅ USAR VALORES DIRECTOS DEL BACKEND
+        total_devengado: employee.total_devengado,
         total_deducciones: employee.deducciones,
         neto_pagado: employee.total_pagar,
         payrollId: null, // Se asignará al crear el registro
@@ -159,7 +159,7 @@ export const usePayrollLiquidation = () => {
         additional_deductions: employee.deducciones_novedades,
         eps: '',
         afp: '',
-        total_devengado: employee.devengos + (employee.salario_base / 30) * employee.dias_trabajados + employee.auxilio_transporte,
+        total_devengado: employee.total_devengado,
         total_deducciones: employee.deducciones,
         neto_pagado: employee.total_pagar,
         payrollId: null,
