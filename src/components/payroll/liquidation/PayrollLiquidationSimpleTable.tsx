@@ -206,27 +206,17 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
              backendTransport: calculation.transportAllowance
            });
 
-           // KISS FIX: Defensive detection of transport allowance inclusion in backend grossPay
-           // If backend transport allowance matches our calculation, it's likely already excluded from grossPay
-           // If they differ significantly, backend grossPay likely includes its own transport calculation
-           const transportIncludedInGrossPay = Math.abs(calculation.transportAllowance - proratedTransport) > 1000;
-           
-           const adjustedGrossPay = transportIncludedInGrossPay 
-             ? calculation.grossPay - calculation.transportAllowance + proratedTransport
-             : calculation.grossPay + proratedTransport;
-             
-           const adjustedNetPay = transportIncludedInGrossPay
-             ? calculation.netPay - calculation.transportAllowance + proratedTransport  
-             : calculation.netPay + proratedTransport;
+           // KISS FIX: Cálculo simple y predecible - siempre sumar auxilio de transporte al Total Devengado
+           const adjustedGrossPay = calculation.grossPay + proratedTransport;
+           const adjustedNetPay = calculation.netPay; // Mantener netPay original sin ajustes
 
-           console.log('🔧 AJUSTE DEFENSIVO DEVENGADO:', {
+           console.log('✅ CÁLCULO PROFESIONAL SIMPLE:', {
              employee: employee.name,
              backendGrossPay: calculation.grossPay,
-             backendTransport: calculation.transportAllowance,
-             proratedTransport,
-             transportIncludedInGrossPay,
-             adjustedGrossPay,
-             adjustedNetPay
+             auxilioTransporte: proratedTransport,
+             totalDevengado: adjustedGrossPay,
+             netoPagado: adjustedNetPay,
+             diferencia: 'Total Devengado = Backend GrossPay + Auxilio Transporte'
            });
 
           newCalculations[employee.id] = {
