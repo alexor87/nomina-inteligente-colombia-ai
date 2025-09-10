@@ -1,4 +1,5 @@
 import { PendingNovedad, EmployeeNovedadPreview } from '@/types/pending-adjustments';
+import { DeductionCalculationService } from '@/services/DeductionCalculationService';
 
 /**
  * Calculate preview impact of pending novedades on employee payroll
@@ -24,7 +25,7 @@ export const calculateEmployeePreviewImpact = (
 
   // Calculate adjustments from pending novedades
   let devengoAdjustment = 0;
-  let deduccionAdjustment = 0;
+  let explicitDeductions = 0;
 
   pendingNovedades.forEach(pending => {
     const valor = pending.valor || 0;
@@ -34,13 +35,13 @@ export const calculateEmployeePreviewImpact = (
     const isEarning = isEarningType(pending.tipo_novedad);
     
     if (isDeduction) {
-      deduccionAdjustment += Math.abs(valor); // Ensure positive for deductions
+      explicitDeductions += Math.abs(valor); // Ensure positive for deductions
     } else if (isEarning) {
       devengoAdjustment += Math.abs(valor); // Ensure positive for earnings
     } else {
       // Handle neutral or mixed types
       if (valor < 0) {
-        deduccionAdjustment += Math.abs(valor);
+        explicitDeductions += Math.abs(valor);
       } else {
         devengoAdjustment += valor;
       }
@@ -52,8 +53,6 @@ export const calculateEmployeePreviewImpact = (
   const originalNeto = employee.neto_pagado || 0;
 
   const newDevengado = originalDevengado + devengoAdjustment;
-  const newDeducciones = originalDeducciones + deduccionAdjustment;
-  const newNeto = newDevengado - newDeducciones;
 
   // Calculate IBC impact from pending novedades
   let constitutiveIBCAdjustment = 0;
@@ -98,6 +97,13 @@ export const calculateEmployeePreviewImpact = (
   // Apply maximum cap (25 SMMLV)
   const SMMLV_2025 = 1300000;
   newIBC = Math.min(newIBC, SMMLV_2025 * 25);
+
+  // Calculate legal deductions based on new IBC
+  const deductionResult = DeductionCalculationService.calculateDeductions(newIBC);
+  
+  // Add explicit deduction novelties to legal deductions
+  const newDeducciones = deductionResult.totalDeducciones + explicitDeductions;
+  const newNeto = newDevengado - newDeducciones;
 
   return {
     originalDevengado,
