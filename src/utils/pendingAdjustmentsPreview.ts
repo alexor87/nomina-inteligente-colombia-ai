@@ -86,8 +86,7 @@ export const calculateEmployeePreviewImpact = (
   const config = ConfigurationService.getConfigurationSync('2025');
   const SMMLV = config.salarioMinimo;
   
-  // Apply IBC constraints
-  newIBC = Math.max(newIBC, SMMLV);
+  // Apply IBC constraints (remove 1 SMMLV floor; keep 25 SMMLV cap)
   newIBC = Math.min(newIBC, SMMLV * 25);
 
   // Calculate legal deductions based on new IBC
