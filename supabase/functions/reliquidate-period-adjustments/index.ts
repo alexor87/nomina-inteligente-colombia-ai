@@ -192,13 +192,27 @@ Deno.serve(async (req) => {
           ibc: currentPayroll.ibc || 0
         };
 
+        // Integrity check: enforce net = devengado - deducciones
+        const expectedNet = Math.round(newCalculation.totalDevengado - newCalculation.totalDeducciones);
+        let finalNet = Math.round(newCalculation.netoPagado);
+        const netMismatch = Math.abs(finalNet - expectedNet) > 0;
+        if (netMismatch) {
+          console.warn(`⚠️ Net mismatch detected for employee ${employeeId}. Forcing consistency`, {
+            calculatedNet: finalNet,
+            expectedNet,
+            totalDevengado: newCalculation.totalDevengado,
+            totalDeducciones: newCalculation.totalDeducciones
+          });
+          finalNet = expectedNet;
+        }
+
         // Update payroll record
         const { error: updateError } = await supabase
           .from('payrolls')
           .update({
             total_devengado: newCalculation.totalDevengado,
             total_deducciones: newCalculation.totalDeducciones,
-            neto_pagado: newCalculation.netoPagado,
+            neto_pagado: finalNet,
             ibc: newCalculation.ibc,
             salud_empleado: newCalculation.healthDeduction,
             pension_empleado: newCalculation.pensionDeduction,
@@ -214,14 +228,14 @@ Deno.serve(async (req) => {
         }
 
         // Record corrections for audit
-        const netDifference = newCalculation.netoPagado - previousValues.neto_pagado;
+        const netDifference = finalNet - previousValues.neto_pagado;
         if (Math.abs(netDifference) > 0.01) { // Only record if there's a meaningful difference
           corrections.push({
             company_id: period.company_id,
             period_id: periodId,
             employee_id: employeeId,
             previous_value: previousValues.neto_pagado,
-            new_value: newCalculation.netoPagado,
+            new_value: finalNet,
             value_difference: netDifference,
             correction_type: 'novedad_adjustment',
             concept: 'Re-liquidation due to novedad changes',
@@ -230,8 +244,24 @@ Deno.serve(async (req) => {
           });
         }
 
+        // Additional audit when we had to force net consistency
+        if (netMismatch) {
+          corrections.push({
+            company_id: period.company_id,
+            period_id: periodId,
+            employee_id: employeeId,
+            previous_value: newCalculation.netoPagado,
+            new_value: expectedNet,
+            value_difference: expectedNet - Math.round(newCalculation.netoPagado),
+            correction_type: 'net_consistency_fix',
+            concept: 'Adjusted net pay to equal gross minus deductions',
+            justification: justification,
+            created_by: user.id
+          });
+        }
+
         employeesAffected++;
-        console.log(`✅ Re-liquidated employee ${employeeId}: ${previousValues.neto_pagado} → ${newCalculation.netoPagado}`);
+        console.log(`✅ Re-liquidated employee ${employeeId}: ${previousValues.neto_pagado} → ${finalNet}`);
 
       } catch (employeeError) {
         console.error(`Error processing employee ${employeeId}:`, employeeError);
