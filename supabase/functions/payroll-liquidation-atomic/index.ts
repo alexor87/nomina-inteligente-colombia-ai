@@ -121,15 +121,34 @@ serve(async (req) => {
           let ibc = ibcBase + novedadesConstitutivas
           
           // Apply maximum cap only (25 SMMLV) - no minimum to preserve exact calculation
-          const SMMLV_2025 = 1300000
+          const SMMLV_2025 = 1423500
           ibc = Math.min(ibc, SMMLV_2025 * 25)
           
           console.log(`🧮 IBC calculation for employee ${payroll.employee_id}: base=${ibcBase}, novedades=${novedadesConstitutivas}, final=${ibc}`)
 
-          // Calculate other fields
-          const transportAllowance = salarioBase <= (SMMLV_2025 * 2) ? (200000 / 30) * diasTrabajados : 0
-          const healthDeduction = ibc * 0.04
-          const pensionDeduction = ibc * 0.04
+          // Transport allowance prorated by worked days if base ≤ 2 SMMLV
+          const transportAllowance = salarioBase <= (SMMLV_2025 * 2) ? Math.round((200000 / 30) * diasTrabajados) : 0
+
+          // Deductions
+          const healthDeduction = Math.round(ibc * 0.04)
+          const pensionDeduction = Math.round(ibc * 0.04)
+
+          // Solidarity fund
+          let solidarityFund = 0
+          if (ibc > SMMLV_2025 * 4) {
+            solidarityFund = ibc <= SMMLV_2025 * 16 ? Math.round(ibc * 0.01) : Math.round(ibc * 0.012)
+          }
+
+          // Sum of all novedades (positive add to devengado, negative to deducciones)
+          const totalNovedades = (novedades || []).reduce((sum, n) => sum + (Number(n.valor) || 0), 0)
+
+          // Totals
+          const salarioProporcionado = (salarioBase / 30) * diasTrabajados
+          const totalDevengado = Math.round(salarioProporcionado + Math.max(0, totalNovedades) + transportAllowance)
+          const totalDeducciones = Math.round(healthDeduction + pensionDeduction + solidarityFund + Math.abs(Math.min(0, totalNovedades)))
+          const netoPagado = Math.round(totalDevengado - totalDeducciones)
+
+          console.log('✅ Atomic liquidation calc:', { payrollId: payroll.id, totalDevengado, totalDeducciones, netoPagado, transportAllowance, healthDeduction, pensionDeduction, solidarityFund })
 
           // Update payroll with calculated values
           await supabaseClient
@@ -137,9 +156,12 @@ serve(async (req) => {
             .update({ 
               estado: 'procesada',
               ibc: Math.round(ibc),
-              auxilio_transporte: Math.round(transportAllowance),
-              salud_empleado: Math.round(healthDeduction),
-              pension_empleado: Math.round(pensionDeduction),
+              auxilio_transporte: transportAllowance,
+              salud_empleado: healthDeduction,
+              pension_empleado: pensionDeduction,
+              total_devengado: totalDevengado,
+              total_deducciones: totalDeducciones,
+              neto_pagado: netoPagado,
               updated_at: new Date().toISOString() 
             })
             .eq('id', payroll.id)
