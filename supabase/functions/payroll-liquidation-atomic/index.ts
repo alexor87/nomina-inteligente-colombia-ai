@@ -121,58 +121,15 @@ serve(async (req) => {
           let ibc = ibcBase + novedadesConstitutivas
           
           // Apply maximum cap only (25 SMMLV) - no minimum to preserve exact calculation
-          const SMMLV_2025 = 1423500
+          const SMMLV_2025 = 1300000
           ibc = Math.min(ibc, SMMLV_2025 * 25)
           
           console.log(`🧮 IBC calculation for employee ${payroll.employee_id}: base=${ibcBase}, novedades=${novedadesConstitutivas}, final=${ibc}`)
 
-          // Transport allowance prorated by worked days if base ≤ 2 SMMLV
-          const transportAllowance = salarioBase <= (SMMLV_2025 * 2) ? Math.round((200000 / 30) * diasTrabajados) : 0
-
-          // Deductions
-          const healthDeduction = Math.round(ibc * 0.04)
-          const pensionDeduction = Math.round(ibc * 0.04)
-
-          // Solidarity fund
-          let solidarityFund = 0
-          if (ibc > SMMLV_2025 * 4) {
-            solidarityFund = ibc <= SMMLV_2025 * 16 ? Math.round(ibc * 0.01) : Math.round(ibc * 0.012)
-          }
-
-          // Sum of all novedades (positive add to devengado, negative to deducciones)
-          const totalNovedades = (novedades || []).reduce((sum, n) => sum + (Number(n.valor) || 0), 0)
-
-          // Totals
-          const salarioProporcionado = (salarioBase / 30) * diasTrabajados
-          const totalDevengado = Math.round(salarioProporcionado + Math.max(0, totalNovedades) + transportAllowance)
-          const totalDeducciones = Math.round(healthDeduction + pensionDeduction + solidarityFund + Math.abs(Math.min(0, totalNovedades)))
-          let netoPagado = Math.round(totalDevengado - totalDeducciones)
-
-          // Integrity check: enforce net = devengado - deducciones
-          const expectedNet = Math.round(totalDevengado - totalDeducciones)
-          if (Math.abs(netoPagado - expectedNet) > 0) {
-            console.warn('⚠️ Net inconsistency detected, forcing consistency', { payrollId: payroll.id, netoPagado, expectedNet, totalDevengado, totalDeducciones })
-            // Log to security audit log (RLS allows insert true)
-            await supabaseClient.from('security_audit_log').insert({
-              table_name: 'payrolls',
-              action: 'NET_FIX',
-              violation_type: 'net_inconsistency_fixed',
-              additional_data: {
-                payroll_id: payroll.id,
-                employee_id: payroll.employee_id,
-                previous_neto: netoPagado,
-                expected_neto: expectedNet,
-                total_devengado: totalDevengado,
-                total_deducciones: totalDeducciones,
-                period_id: data.period_id
-              },
-              user_id: null,
-              company_id: data.company_id
-            })
-            netoPagado = expectedNet
-          }
-
-          console.log('✅ Atomic liquidation calc:', { payrollId: payroll.id, totalDevengado, totalDeducciones, netoPagado, transportAllowance, healthDeduction, pensionDeduction, solidarityFund })
+          // Calculate other fields
+          const transportAllowance = salarioBase <= (SMMLV_2025 * 2) ? (200000 / 30) * diasTrabajados : 0
+          const healthDeduction = ibc * 0.04
+          const pensionDeduction = ibc * 0.04
 
           // Update payroll with calculated values
           await supabaseClient
@@ -180,12 +137,9 @@ serve(async (req) => {
             .update({ 
               estado: 'procesada',
               ibc: Math.round(ibc),
-              auxilio_transporte: transportAllowance,
-              salud_empleado: healthDeduction,
-              pension_empleado: pensionDeduction,
-              total_devengado: totalDevengado,
-              total_deducciones: totalDeducciones,
-              neto_pagado: netoPagado,
+              auxilio_transporte: Math.round(transportAllowance),
+              salud_empleado: Math.round(healthDeduction),
+              pension_empleado: Math.round(pensionDeduction),
               updated_at: new Date().toISOString() 
             })
             .eq('id', payroll.id)
@@ -204,38 +158,6 @@ serve(async (req) => {
 
       if (countError) {
         console.warn('⚠️ Error contando registros procesados:', countError)
-      }
-
-      // ✅ Update period totals from payrolls to ensure header consistency
-      try {
-        const { data: totalsRows, error: totalsErr } = await supabaseClient
-          .from('payrolls')
-          .select('total_devengado,total_deducciones,neto_pagado')
-          .eq('period_id', data.period_id)
-          .eq('company_id', data.company_id)
-        if (totalsErr) {
-          console.warn('⚠️ No se pudieron leer los totales para el período:', totalsErr)
-        } else if (totalsRows) {
-          const totals = (totalsRows as any[]).reduce((acc, r) => ({
-            dev: acc.dev + (Number(r.total_devengado) || 0),
-            ded: acc.ded + (Number(r.total_deducciones) || 0),
-            net: acc.net + (Number(r.neto_pagado) || 0),
-          }), { dev: 0, ded: 0, net: 0 })
-
-          await supabaseClient
-            .from('payroll_periods_real')
-            .update({
-              total_devengado: totals.dev,
-              total_deducciones: totals.ded,
-              total_neto: totals.net,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', data.period_id)
-
-          console.log('📈 Totales de período actualizados:', totals)
-        }
-      } catch (totalsError) {
-        console.error('❌ Error actualizando totales del período:', totalsError)
       }
 
       const liquidationResult = {

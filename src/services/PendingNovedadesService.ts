@@ -95,7 +95,7 @@ export class PendingNovedadesService {
             affectedEmployeeIds,
             justification: data.justification,
             options: {
-              reliquidateScope: 'all',
+              reliquidateScope: 'affected',
               regenerateVouchers: false, // Don't auto-regenerate, just mark as needing regeneration
               sendEmails: false
             }

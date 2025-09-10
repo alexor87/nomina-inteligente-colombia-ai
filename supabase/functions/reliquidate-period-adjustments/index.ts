@@ -115,10 +115,11 @@ Deno.serve(async (req) => {
       wasReopened = true;
     }
 
+    // 3. Get configuration for calculations
     const config: PayrollCalculationConfig = {
-      salarioMinimo: 1423500, // 2025 SMMLV oficial
-      auxilioTransporte: 200000, // 2025 oficial
-      uvt: 49799, // 2025 oficial
+      salarioMinimo: 1300000, // 2025 SMMLV
+      auxilioTransporte: 162000, // 2025
+      uvt: 47065, // 2025
       year: '2025'
     };
 
@@ -192,27 +193,13 @@ Deno.serve(async (req) => {
           ibc: currentPayroll.ibc || 0
         };
 
-        // Integrity check: enforce net = devengado - deducciones
-        const expectedNet = Math.round(newCalculation.totalDevengado - newCalculation.totalDeducciones);
-        let finalNet = Math.round(newCalculation.netoPagado);
-        const netMismatch = Math.abs(finalNet - expectedNet) > 0;
-        if (netMismatch) {
-          console.warn(`⚠️ Net mismatch detected for employee ${employeeId}. Forcing consistency`, {
-            calculatedNet: finalNet,
-            expectedNet,
-            totalDevengado: newCalculation.totalDevengado,
-            totalDeducciones: newCalculation.totalDeducciones
-          });
-          finalNet = expectedNet;
-        }
-
         // Update payroll record
         const { error: updateError } = await supabase
           .from('payrolls')
           .update({
             total_devengado: newCalculation.totalDevengado,
             total_deducciones: newCalculation.totalDeducciones,
-            neto_pagado: finalNet,
+            neto_pagado: newCalculation.netoPagado,
             ibc: newCalculation.ibc,
             salud_empleado: newCalculation.healthDeduction,
             pension_empleado: newCalculation.pensionDeduction,
@@ -228,14 +215,14 @@ Deno.serve(async (req) => {
         }
 
         // Record corrections for audit
-        const netDifference = finalNet - previousValues.neto_pagado;
+        const netDifference = newCalculation.netoPagado - previousValues.neto_pagado;
         if (Math.abs(netDifference) > 0.01) { // Only record if there's a meaningful difference
           corrections.push({
             company_id: period.company_id,
             period_id: periodId,
             employee_id: employeeId,
             previous_value: previousValues.neto_pagado,
-            new_value: finalNet,
+            new_value: newCalculation.netoPagado,
             value_difference: netDifference,
             correction_type: 'novedad_adjustment',
             concept: 'Re-liquidation due to novedad changes',
@@ -244,24 +231,8 @@ Deno.serve(async (req) => {
           });
         }
 
-        // Additional audit when we had to force net consistency
-        if (netMismatch) {
-          corrections.push({
-            company_id: period.company_id,
-            period_id: periodId,
-            employee_id: employeeId,
-            previous_value: newCalculation.netoPagado,
-            new_value: expectedNet,
-            value_difference: expectedNet - Math.round(newCalculation.netoPagado),
-            correction_type: 'net_consistency_fix',
-            concept: 'Adjusted net pay to equal gross minus deductions',
-            justification: justification,
-            created_by: user.id
-          });
-        }
-
         employeesAffected++;
-        console.log(`✅ Re-liquidated employee ${employeeId}: ${previousValues.neto_pagado} → ${finalNet}`);
+        console.log(`✅ Re-liquidated employee ${employeeId}: ${previousValues.neto_pagado} → ${newCalculation.netoPagado}`);
 
       } catch (employeeError) {
         console.error(`Error processing employee ${employeeId}:`, employeeError);
@@ -405,85 +376,51 @@ function calculateEmployeePayroll(
   diasTrabajados: number,
   config: PayrollCalculationConfig
 ) {
-  const workedDaysCapped = Math.max(0, Math.min(Number(diasTrabajados) || 0, 30));
-  const salarioProporcionado = (salarioBase / 30) * workedDaysCapped;
-
-  // Totals for novedades
-  const novedadesConstitutivas = (novedades || [])
+  // Calculate proportional base salary
+  const salarioProporcionado = (salarioBase / 30) * diasTrabajados;
+  
+  // Sum constitutive novedades for IBC calculation
+  const novedadesConstitutivas = novedades
     .filter(n => isNovedadConstitutive(n.tipo_novedad))
-    .reduce((sum, n) => sum + (Number(n.valor) || 0), 0);
-
-  const totalIncapacityDays = (novedades || [])
-    .filter(n => n.tipo_novedad === 'incapacidad')
-    .reduce((sum, n) => sum + (Number(n.dias) || 0), 0);
-
-  const totalIncapacityValue = (novedades || [])
-    .filter(n => n.tipo_novedad === 'incapacidad')
-    .reduce((sum, n) => sum + (Number(n.valor) || 0), 0);
-
-  const effectiveWorkedDays = Math.max(0, workedDaysCapped - totalIncapacityDays);
-
-  // Transport allowance: eligible if base ≤ 2 SMMLV, prorated by worked days
-  const eligibleForTransport = salarioBase <= (config.salarioMinimo * 2);
-  const transportAllowance = eligibleForTransport ? Math.round((config.auxilioTransporte / 30) * workedDaysCapped) : 0;
-
-  console.log('🚍 Auxilio Transporte (reliquidate):', {
-    salarioBase,
-    transportLimit: config.salarioMinimo * 2,
-    eligibleForTransport,
-    workedDays: workedDaysCapped,
-    monthlyAmount: config.auxilioTransporte,
-    proratedTransport: transportAllowance
-  });
-
-  // IBC unified: if incapacities present, use incapacity value; else proportional base + constitutive novelties
-  let ibc: number;
-  if (totalIncapacityDays > 0 && totalIncapacityValue > 0) {
-    ibc = Math.round(totalIncapacityValue);
-    console.log('🧮 IBC automático (incapacidad) [reliquidate]:', { totalIncapacityDays, totalIncapacityValue });
-  } else {
-    ibc = Math.round((salarioBase / 30) * effectiveWorkedDays + novedadesConstitutivas);
-    console.log('🧮 IBC automático (proporcional) [reliquidate]:', { ibc, effectiveWorkedDays, novedadesConstitutivas });
-  }
-  // Apply only maximum cap (25 SMMLV)
+    .reduce((sum, n) => sum + (n.valor || 0), 0);
+  
+  // Calculate IBC (base + constitutive novedades, capped at 25 SMMLV)
+  let ibc = salarioProporcionado + novedadesConstitutivas;
   const maxIbc = config.salarioMinimo * 25;
-  ibc = Math.min(ibc, maxIbc);
-
-  // Deductions
-  const healthDeduction = Math.round(ibc * 0.04);
-  const pensionDeduction = Math.round(ibc * 0.04);
-
-  // Solidarity fund
+  const minIbc = config.salarioMinimo;
+  
+  ibc = Math.max(minIbc, Math.min(ibc, maxIbc));
+  
+  // Calculate deductions
+  const healthDeduction = ibc * 0.04; // 4% health
+  const pensionDeduction = ibc * 0.04; // 4% pension
+  
+  // Solidarity fund (if IBC > 4 SMMLV)
   let solidarityFund = 0;
   if (ibc > config.salarioMinimo * 4) {
-    solidarityFund = ibc <= config.salarioMinimo * 16 ? Math.round(ibc * 0.01) : Math.round(ibc * 0.012);
+    if (ibc <= config.salarioMinimo * 16) {
+      solidarityFund = ibc * 0.01; // 1%
+    } else {
+      solidarityFund = ibc * 0.012; // 1.2%
+    }
   }
-
-  // Sum all novedades (positive devengados and negative values as deductions)
-  const totalNovedades = (novedades || []).reduce((sum, n) => sum + (Number(n.valor) || 0), 0);
-
-  const totalDevengado = Math.round(salarioProporcionado + Math.max(0, totalNovedades) + transportAllowance);
-  const totalDeducciones = Math.round(healthDeduction + pensionDeduction + solidarityFund + Math.abs(Math.min(0, totalNovedades)));
-  const netoPagado = Math.round(totalDevengado - totalDeducciones);
-
-  console.log('✅ Reliquidation calc result:', {
-    workedDaysCapped,
-    salarioProporcionado: Math.round(salarioProporcionado),
-    novedadesConstitutivas,
-    totalIncapacityDays,
-    totalIncapacityValue,
-    ibc,
-    healthDeduction,
-    pensionDeduction,
-    solidarityFund,
-    transportAllowance,
-    totalDevengado,
-    totalDeducciones,
-    netoPagado
-  });
-
-  const employerContributions = Math.round(ibc * 0.205);
-
+  
+  // Transport allowance (if base salary <= 2 SMMLV)
+  const transportAllowance = salarioBase <= (config.salarioMinimo * 2) 
+    ? (config.auxilioTransporte / 30) * diasTrabajados 
+    : 0;
+  
+  // Sum all novedades (devengados and deducciones)
+  const totalNovedades = novedades.reduce((sum, n) => sum + (n.valor || 0), 0);
+  
+  // Calculate totals
+  const totalDevengado = salarioProporcionado + Math.max(0, totalNovedades) + transportAllowance;
+  const totalDeducciones = healthDeduction + pensionDeduction + solidarityFund + Math.abs(Math.min(0, totalNovedades));
+  const netoPagado = totalDevengado - totalDeducciones;
+  
+  // Employer contributions (approximate)
+  const employerContributions = ibc * 0.205; // ~20.5% employer contributions
+  
   return {
     totalDevengado,
     totalDeducciones,
