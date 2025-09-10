@@ -12,7 +12,6 @@ interface Employee {
   apellido: string;
   salario_base: number;
   devengos: number;
-  total_devengado: number;
   deducciones: number;
   total_pagar: number;
   dias_trabajados: number;
@@ -143,8 +142,7 @@ export class PayrollLiquidationService extends SecureBaseService {
           nombre: employee.nombre,
           apellido: employee.apellido,
           salario_base: employee.salario_base,
-          devengos: salarioProporcional,
-          total_devengado: totalDevengado,
+          devengos: 0,
           deducciones: deductionResult.totalDeducciones,
           total_pagar: totalDevengado - deductionResult.totalDeducciones,
           dias_trabajados: diasTrabajados,
@@ -210,8 +208,7 @@ export class PayrollLiquidationService extends SecureBaseService {
           nombre: employee.nombre,
           apellido: employee.apellido,
           salario_base: employee.salario_base,
-          devengos: salarioProporcional,
-          total_devengado: totalDevengado,
+          devengos: 0,
           deducciones: deductionResult.totalDeducciones,
           total_pagar: totalDevengado - deductionResult.totalDeducciones,
           dias_trabajados: diasTrabajados,

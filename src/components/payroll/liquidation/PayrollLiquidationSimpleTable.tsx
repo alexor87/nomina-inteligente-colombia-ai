@@ -192,29 +192,58 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
             year: year
           });
 
-          console.log('💰 DATOS DEL BACKEND:', {
-            employee: employee.name,
-            grossPay: calculation.grossPay,
-            netPay: calculation.netPay,
-            transportAllowance: calculation.transportAllowance,
-            totalDeductions: calculation.totalDeductions
-          });
+          const eligible = employee.baseSalary <= (config.salarioMinimo * 2);
+          const proratedTransport = eligible ? Math.round((config.auxilioTransporte / 30) * currentWorkedDays) : 0;
+          
+           console.log('🚌 CORRECCIÓN AUXILIO DE TRANSPORTE:', {
+             employee: employee.name,
+             salarioBase: employee.baseSalary,
+             limite2SMMLV: config.salarioMinimo * 2,
+             eligible,
+             auxilioMensual: config.auxilioTransporte,
+             diasTrabajados: currentWorkedDays,
+             proratedTransport,
+             backendTransport: calculation.transportAllowance
+           });
+
+           // KISS FIX: Defensive detection of transport allowance inclusion in backend grossPay
+           // If backend transport allowance matches our calculation, it's likely already excluded from grossPay
+           // If they differ significantly, backend grossPay likely includes its own transport calculation
+           const transportIncludedInGrossPay = Math.abs(calculation.transportAllowance - proratedTransport) > 1000;
+           
+           const adjustedGrossPay = transportIncludedInGrossPay 
+             ? calculation.grossPay - calculation.transportAllowance + proratedTransport
+             : calculation.grossPay + proratedTransport;
+             
+           const adjustedNetPay = transportIncludedInGrossPay
+             ? calculation.netPay - calculation.transportAllowance + proratedTransport  
+             : calculation.netPay + proratedTransport;
+
+           console.log('🔧 AJUSTE DEFENSIVO DEVENGADO:', {
+             employee: employee.name,
+             backendGrossPay: calculation.grossPay,
+             backendTransport: calculation.transportAllowance,
+             proratedTransport,
+             transportIncludedInGrossPay,
+             adjustedGrossPay,
+             adjustedNetPay
+           });
 
           newCalculations[employee.id] = {
-            totalToPay: calculation.netPay,
+            totalToPay: adjustedNetPay,
             ibc: calculation.ibc,
-            grossPay: calculation.grossPay,
+            grossPay: adjustedGrossPay,
             deductions: calculation.totalDeductions,
             healthDeduction: calculation.healthDeduction,
             pensionDeduction: calculation.pensionDeduction,
-            transportAllowance: calculation.transportAllowance
+            transportAllowance: proratedTransport
           };
 
-          console.log('✅ Empleado calculado:', employee.name, {
+          console.log('✅ Empleado calculado con auxilio corregido:', employee.name, {
             ibc: calculation.ibc,
-            netPay: calculation.netPay,
-            grossPay: calculation.grossPay,
-            transportAllowance: calculation.transportAllowance,
+            netPay: adjustedNetPay,
+            grossPay: adjustedGrossPay,
+            transportAllowance: proratedTransport,
             healthDeduction: calculation.healthDeduction,
             pensionDeduction: calculation.pensionDeduction
           });
