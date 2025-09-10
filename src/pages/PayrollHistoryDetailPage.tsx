@@ -11,6 +11,7 @@ import { usePayrollNovedadesUnified } from '@/hooks/usePayrollNovedadesUnified';
 import { PayrollNovedad as PayrollNovedadEnhanced, CreateNovedadData } from '@/types/novedades-enhanced';
 import { PayrollNovedad } from '@/types/novedades';
 import { PayrollHistoryService, PayrollPeriodData, PayrollEmployeeData } from '@/services/PayrollHistoryService';
+import { useEmployeeNovedadesCacheStore } from '@/stores/employeeNovedadesCacheStore';
 import { PeriodSummaryCards } from '@/components/payroll-history/PeriodSummaryCards';
 import { ExpandedEmployeesTable } from '@/components/payroll-history/ExpandedEmployeesTable';
 import { formatCurrency } from '@/lib/utils';
@@ -96,6 +97,18 @@ export default function PayrollHistoryDetailPage() {
     periodId: periodId || '', 
     enabled: !!periodData?.company_id && !!periodId 
   });
+
+  // Get lastRefreshTime from global store to trigger UI updates
+  const { lastRefreshTime } = useEmployeeNovedadesCacheStore();
+
+  // Auto-refresh when global store updates (e.g., after deleting a novedad)
+  useEffect(() => {
+    if (lastRefreshTime && periodData?.company_id && periodId) {
+      console.log('🔄 Global store updated, refreshing novedades...');
+      refetchNovedades();
+      loadEmployees(); // Also refresh employee data to update badge counts
+    }
+  }, [lastRefreshTime, refetchNovedades, periodData?.company_id, periodId]);
 
   // Load period data
   useEffect(() => {
@@ -407,6 +420,13 @@ export default function PayrollHistoryDetailPage() {
 
   const { title, dateRange } = formatPeriodHeader();
 
+  // Handle changes in employee novedades (e.g., deletion from modal)
+  const handleEmployeeNovedadesChange = async (employeeId: string) => {
+    console.log('🔄 Employee novedades changed for:', employeeId, 'refreshing UI...');
+    refetchNovedades();
+    loadEmployees();
+  };
+
   if (!periodId) {
     return (
       <div className="container py-10">
@@ -565,6 +585,7 @@ export default function PayrollHistoryDetailPage() {
         periodId={periodId}
         onSubmit={handleNovedadSubmit}
         onClose={() => setShowAdjustmentModal(false)}
+        onEmployeeNovedadesChange={handleEmployeeNovedadesChange}
         selectedNovedadType={null}
         mode={periodData?.estado === 'cerrado' ? 'ajustes' : 'liquidacion'}
         startDate={periodData?.fecha_inicio}
