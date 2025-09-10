@@ -5,7 +5,7 @@ import { PendingNovedad, EmployeeNovedadPreview } from '@/types/pending-adjustme
 import { formatPreviewCurrency } from '@/utils/pendingAdjustmentsPreview';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, FileText, Mail } from 'lucide-react';
+import { Plus, FileText, Mail, RefreshCw } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { PayrollNovedad } from '@/types/novedades';
 import { VoucherPreviewModal } from '@/components/payroll/modals/VoucherPreviewModal';
@@ -52,6 +52,7 @@ interface ExpandedEmployeesTableProps {
   pendingNovedades?: PendingNovedad[];
   getPendingCount?: (employeeId: string) => number;
   calculateEmployeePreview?: (employee: any) => Promise<EmployeeNovedadPreview>;
+  isRecalculatingBackend?: boolean; // New prop to show backend loading state
   // New props for voucher preview functionality
   periodData?: {
     fecha_inicio: string;
@@ -69,36 +70,22 @@ export const ExpandedEmployeesTable = ({
   pendingNovedades = [],
   getPendingCount,
   calculateEmployeePreview,
+  isRecalculatingBackend = false,
   periodData
 }: ExpandedEmployeesTableProps) => {
   const [sendingEmails, setSendingEmails] = useState<Record<string, boolean>>({});
   const [employeePreviews, setEmployeePreviews] = useState<Record<string, EmployeeNovedadPreview>>({});
   const [loadingPreviews, setLoadingPreviews] = useState(false);
 
-  // Helper function to calculate correct deductions from individual fields
-  const calculateCorrectDeductions = (employee: ExpandedEmployee): number => {
-    const calculated = (employee.salud_empleado || 0) + 
-                      (employee.pension_empleado || 0) + 
-                      (employee.retencion_fuente || 0) + 
-                      (employee.descuentos_varios || 0);
-    
-    // Log discrepancy if database field doesn't match calculation
-    if (employee.total_deducciones !== calculated) {
-      console.warn(`⚠️ Deduction discrepancy for ${employee.nombre} ${employee.apellido}:`, {
-        employeeId: employee.id,
-        dbField: employee.total_deducciones,
-        calculated: calculated,
-        difference: employee.total_deducciones - calculated
-      });
-    }
-    
-    return calculated;
-  };
-
-  // Helper function to calculate correct net pay
-  const calculateCorrectNetPay = (employee: ExpandedEmployee): number => {
-    const correctDeductions = calculateCorrectDeductions(employee);
-    return employee.total_devengado - correctDeductions;
+  // Log backend calculated values to confirm source of truth
+  const logBackendValues = (employee: ExpandedEmployee) => {
+    console.log(`✅ Using backend values for ${employee.nombre} ${employee.apellido}:`, {
+      employeeId: employee.id,
+      total_devengado: employee.total_devengado,
+      total_deducciones: employee.total_deducciones,
+      neto_pagado: employee.neto_pagado,
+      source: 'backend_calculation'
+    });
   };
   
   // Voucher preview modal state
@@ -124,19 +111,18 @@ export const ExpandedEmployeesTable = ({
             previews[employee.id] = await calculateEmployeePreview(employee);
           } catch (error) {
             console.error(`Error calculating preview for employee ${employee.id}:`, error);
-            // Fallback to default preview using calculated values
-            const correctDeductions = calculateCorrectDeductions(employee);
-            const correctNetPay = calculateCorrectNetPay(employee);
+            // Fallback to default preview using backend values only
+            logBackendValues(employee);
             
             previews[employee.id] = {
               hasPending: false,
               pendingCount: 0,
               originalDevengado: employee.total_devengado,
               newDevengado: employee.total_devengado,
-              originalDeducciones: correctDeductions,
-              newDeducciones: correctDeductions,
-              originalNeto: correctNetPay,
-              newNeto: correctNetPay,
+              originalDeducciones: employee.total_deducciones,
+              newDeducciones: employee.total_deducciones,
+              originalNeto: employee.neto_pagado,
+              newNeto: employee.neto_pagado,
               originalIBC: employee.ibc || 0,
               newIBC: employee.ibc || 0
             };
@@ -160,23 +146,23 @@ export const ExpandedEmployeesTable = ({
   };
 
   const getEmployeePreview = (employee: ExpandedEmployee): EmployeeNovedadPreview => {
-    // Return cached preview or default values using calculated deductions
+    // Return cached preview or default values using backend values only
     if (employeePreviews[employee.id]) {
       return employeePreviews[employee.id];
     }
     
-    const correctDeductions = calculateCorrectDeductions(employee);
-    const correctNetPay = calculateCorrectNetPay(employee);
+    // Log that we're using backend values
+    logBackendValues(employee);
     
     return {
       hasPending: false,
       pendingCount: 0,
       originalDevengado: employee.total_devengado,
       newDevengado: employee.total_devengado,
-      originalDeducciones: correctDeductions,
-      newDeducciones: correctDeductions,
-      originalNeto: correctNetPay,
-      newNeto: correctNetPay,
+      originalDeducciones: employee.total_deducciones,
+      newDeducciones: employee.total_deducciones,
+      originalNeto: employee.neto_pagado,
+      newNeto: employee.neto_pagado,
       originalIBC: employee.ibc || 0,
       newIBC: employee.ibc || 0
     };
@@ -206,17 +192,16 @@ export const ExpandedEmployeesTable = ({
     }
 
     try {
-      // Transform ExpandedEmployee to PayrollHistoryData format using calculated values
-      const correctDeductions = calculateCorrectDeductions(employee);
-      const correctNetPay = calculateCorrectNetPay(employee);
+      // Transform ExpandedEmployee to PayrollHistoryData format using backend values only
+      logBackendValues(employee);
       
       const historyData: PayrollHistoryData = {
         employee_id: employee.id,
         employee_name: employee.nombre,
         employee_lastname: employee.apellido,
         total_devengado: employee.total_devengado,
-        total_deducciones: correctDeductions,
-        neto_pagado: correctNetPay,
+        total_deducciones: employee.total_deducciones,
+        neto_pagado: employee.neto_pagado,
         salario_base: employee.salario_base,
         dias_trabajados: employee.dias_trabajados,
         ibc: employee.ibc,
@@ -394,7 +379,7 @@ export const ExpandedEmployeesTable = ({
                         </div>
                       ) : (
                         <span className="font-semibold text-red-600">
-                          {formatCurrency(calculateCorrectDeductions(employee))}
+                          {formatCurrency(employee.total_deducciones)}
                         </span>
                       )}
                     </TableCell>
@@ -439,7 +424,7 @@ export const ExpandedEmployeesTable = ({
                         </div>
                       ) : (
                         <span className="font-semibold text-blue-600">
-                          {formatCurrency(calculateCorrectNetPay(employee))}
+                          {formatCurrency(employee.neto_pagado)}
                         </span>
                       )}
                     </TableCell>

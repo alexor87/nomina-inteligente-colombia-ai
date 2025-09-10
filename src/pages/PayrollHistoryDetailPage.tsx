@@ -291,12 +291,11 @@ export default function PayrollHistoryDetailPage() {
       console.log('✅ Loaded employees from payrolls table:', expandedEmployees.length);
       console.log('Sample employee:', expandedEmployees[0]);
       
-      // Auto-recalculate all employees after loading
-      setTimeout(() => {
-        if (expandedEmployees.length > 0) {
-          recalculateAllEmployees();
-        }
-      }, 1000);
+      // Auto-recalculate all employees immediately after loading
+      if (expandedEmployees.length > 0) {
+        console.log('🔄 Starting immediate backend recalculation...');
+        recalculateAllEmployees();
+      }
       
     } catch (error) {
       console.error('Error loading employees:', error);
@@ -748,6 +747,7 @@ export default function PayrollHistoryDetailPage() {
           pendingNovedades={pendingNovedades}
           getPendingCount={getPendingCount}
           calculateEmployeePreview={calculateEmployeePreview}
+          isRecalculatingBackend={isRecalculatingAll}
           periodData={periodData}
         />
             )}
