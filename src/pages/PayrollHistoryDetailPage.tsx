@@ -74,7 +74,8 @@ export default function PayrollHistoryDetailPage() {
     clearAllPending,
     applyPendingAdjustments: applyAdjustments,
     getPendingCount,
-    calculateEmployeePreview
+    calculateEmployeePreview,
+    removePendingNovedadesForEmployee
   } = usePendingAdjustments({ 
     periodId: periodId || '', 
     companyId: periodData?.company_id || '' 
@@ -422,6 +423,8 @@ export default function PayrollHistoryDetailPage() {
   // Handle changes in employee novedades (e.g., deletion from modal)
   const handleEmployeeNovedadesChange = async (employeeId: string) => {
     console.log('🔄 Employee novedades changed for:', employeeId, 'refreshing UI...');
+    // Clear any pending novelties for this employee to sync badges
+    removePendingNovedadesForEmployee(employeeId);
     refetchNovedades();
   };
 
