@@ -59,8 +59,14 @@ export const calculateEmployeePreviewImpact = (
   // Calculate IBC impact from pending novedades
   let nonRemuneratedDays = 0;
 
-  // Calculate new IBC using proper liquidation module logic  
-  const baseIBC = employee.ibc || employee.salario_base || 0;
+  // Calculate the CORRECT original IBC (proportional to days worked)
+  // Many periods have IBC=0 in database which is incorrect
+  const diasTrabajados = employee.dias_trabajados || 30;
+  const salarioBase = employee.salario_base || 0;
+  const correctOriginalIBC = (salarioBase * diasTrabajados) / 30;
+  
+  // Use the correct original IBC as baseline, not the potentially incorrect stored IBC
+  const baseIBC = correctOriginalIBC > 0 ? correctOriginalIBC : (employee.ibc || salarioBase);
   
   // Convert pending novedades to proper format for IBC calculation
   const novedadesForIBC = convertNovedadesToIBC(pendingNovedades.map(pending => ({
@@ -79,7 +85,7 @@ export const calculateEmployeePreviewImpact = (
     }
   });
 
-  // Calculate new IBC using baseline + constitutive adjustments
+  // Calculate new IBC using corrected baseline + constitutive adjustments
   let newIBC = baseIBC + constitutiveIBCAdjustment;
   
   // Get correct SMMLV for the year
@@ -89,21 +95,24 @@ export const calculateEmployeePreviewImpact = (
   // Apply IBC constraints (remove 1 SMMLV floor; keep 25 SMMLV cap)
   newIBC = Math.min(newIBC, SMMLV * 25);
 
-  // Calculate legal deductions based on new IBC
-  const deductionResult = DeductionCalculationService.calculateDeductions(newIBC);
+  // Calculate legal deductions based on both original and new IBC
+  const originalIBCForDeductions = correctOriginalIBC > 0 ? correctOriginalIBC : (employee.ibc || 0);
+  const originalDeductionResult = DeductionCalculationService.calculateDeductions(originalIBCForDeductions);
+  const newDeductionResult = DeductionCalculationService.calculateDeductions(newIBC);
   
-  // Add explicit deduction novelties to legal deductions
-  const newDeducciones = deductionResult.totalDeducciones + explicitDeductions;
+  // Calculate correct original and new deductions
+  const correctOriginalDeducciones = originalDeductionResult.totalDeducciones;
+  const newDeducciones = newDeductionResult.totalDeducciones + explicitDeductions;
   const newNeto = newDevengado - newDeducciones;
 
   return {
     originalDevengado,
     newDevengado,
-    originalDeducciones,
+    originalDeducciones: correctOriginalDeducciones, // Use legally correct original deductions
     newDeducciones,
-    originalNeto,
+    originalNeto: originalDevengado - correctOriginalDeducciones, // Recalculate based on correct deductions
     newNeto,
-    originalIBC: employee.ibc || 0,
+    originalIBC: Math.round(correctOriginalIBC), // Use legally correct original IBC
     newIBC: Math.round(newIBC),
     pendingCount: pendingNovedades.length,
     hasPending: true
