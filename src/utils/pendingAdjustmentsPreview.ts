@@ -1,5 +1,7 @@
 import { PendingNovedad, EmployeeNovedadPreview } from '@/types/pending-adjustments';
 import { DeductionCalculationService } from '@/services/DeductionCalculationService';
+import { convertNovedadesToIBC } from '@/utils/payrollCalculationsBackend';
+import { ConfigurationService } from '@/services/ConfigurationService';
 
 /**
  * Calculate preview impact of pending novedades on employee payroll
@@ -55,48 +57,38 @@ export const calculateEmployeePreviewImpact = (
   const newDevengado = originalDevengado + devengoAdjustment;
 
   // Calculate IBC impact from pending novedades
-  let constitutiveIBCAdjustment = 0;
   let nonRemuneratedDays = 0;
 
-  pendingNovedades.forEach(pending => {
-    const valor = pending.valor || 0;
-    const dias = pending.novedadData?.dias || 0;
-    
-    // Core constitutive types (always constitutive by nature)
-    const alwaysConstitutiveTypes = [
-      'horas_extra', 'recargo_nocturno', 'recargo_dominical', 'comision', 
-      'bonificacion', 'vacaciones', 'licencia_remunerada'
-    ];
-    
-    const isNonRemunerated = [
-      'ausencia', 'licencia_no_remunerada', 'incapacidad'
-    ].includes(pending.tipo_novedad);
-    
-    // Unified IBC constitutive logic: always constitutive OR explicitly marked
-    const isConstitutiveForIBC = alwaysConstitutiveTypes.includes(pending.tipo_novedad) || 
-                                 pending.novedadData?.constitutivo_salario === true;
-    
-    if (isConstitutiveForIBC) {
-      constitutiveIBCAdjustment += valor;
-    }
-    
-    if (isNonRemunerated) {
-      nonRemuneratedDays += dias;
+  // Calculate new IBC using proper liquidation module logic  
+  const baseIBC = employee.ibc || employee.salario_base || 0;
+  
+  // Convert pending novedades to proper format for IBC calculation
+  const novedadesForIBC = convertNovedadesToIBC(pendingNovedades.map(pending => ({
+    tipo_novedad: pending.tipo_novedad,
+    valor: pending.valor,
+    constitutivo_salario: pending.novedadData?.constitutivo_salario,
+    dias: pending.novedadData?.dias,
+    subtipo: pending.novedadData?.subtipo
+  })));
+
+  // Calculate IBC adjustment from constitutive novedades only
+  let constitutiveIBCAdjustment = 0;
+  novedadesForIBC.forEach(novedad => {
+    if (novedad.constitutivo_salario && novedad.valor > 0) {
+      constitutiveIBCAdjustment += novedad.valor;
     }
   });
 
-  // Calculate new IBC with adjustments
-  const salarioBase = employee.salario_base || 0;
-  const diasTrabajados = employee.dias_trabajados || 30;
-  const effectiveDays = Math.max(0, diasTrabajados - nonRemuneratedDays);
+  // Calculate new IBC using baseline + constitutive adjustments
+  let newIBC = baseIBC + constitutiveIBCAdjustment;
   
-  // Recalculate IBC: (salario_base / 30 * effective_days) + constitutive_adjustments
-  const ibcBase = (salarioBase / 30) * effectiveDays;
-  let newIBC = ibcBase + constitutiveIBCAdjustment;
+  // Get correct SMMLV for the year
+  const config = ConfigurationService.getConfigurationSync('2025');
+  const SMMLV = config.salarioMinimo;
   
-  // Apply maximum cap (25 SMMLV)
-  const SMMLV_2025 = 1300000;
-  newIBC = Math.min(newIBC, SMMLV_2025 * 25);
+  // Apply IBC constraints
+  newIBC = Math.max(newIBC, SMMLV);
+  newIBC = Math.min(newIBC, SMMLV * 25);
 
   // Calculate legal deductions based on new IBC
   const deductionResult = DeductionCalculationService.calculateDeductions(newIBC);
