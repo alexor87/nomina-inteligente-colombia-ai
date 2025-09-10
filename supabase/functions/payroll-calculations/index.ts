@@ -269,7 +269,12 @@ async function calculatePayroll(supabase: any, data: any) {
     extraPay += novedad.valor || 0;
   }
 
-  const grossPay = regularPay + extraPay;
+  // ✅ AUXILIO DE TRANSPORTE CORREGIDO: Solo si salario ≤ 2 SMMLV
+  const transportLimit = getTransportAssistanceLimit(year);
+  const transportAllowance = baseSalary <= transportLimit ? config.auxilioTransporte : 0;
+
+  // ✅ BACKEND AUTHORITATIVE FIX: Include transport allowance in grossPay
+  const grossPay = regularPay + extraPay + transportAllowance;
 
   // ✅ IBC AUTOMÁTICO: Incapacidad vs Proporcional
   let ibcSalud: number;
@@ -292,11 +297,8 @@ async function calculatePayroll(supabase: any, data: any) {
   const pensionDeduction = Math.round(ibcSalud * 0.04);
   const totalDeductions = healthDeduction + pensionDeduction;
 
-  // ✅ AUXILIO DE TRANSPORTE CORREGIDO: Solo si salario ≤ 2 SMMLV
-  const transportLimit = getTransportAssistanceLimit(year);
-  const transportAllowance = baseSalary <= transportLimit ? config.auxilioTransporte : 0;
-
-  const netPay = grossPay - totalDeductions + transportAllowance;
+  // ✅ netPay now correctly calculated: grossPay (with transport) - deductions
+  const netPay = grossPay - totalDeductions;
 
   // Employer contributions (not affected by IBC mode)
   const employerHealth = Math.round(ibcSalud * 0.085);

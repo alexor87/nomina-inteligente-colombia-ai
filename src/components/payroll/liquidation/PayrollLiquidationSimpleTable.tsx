@@ -206,17 +206,20 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
              backendTransport: calculation.transportAllowance
            });
 
-           // KISS FIX: Cálculo simple y predecible - siempre sumar auxilio de transporte al Total Devengado
-           const adjustedGrossPay = calculation.grossPay + proratedTransport;
-           const adjustedNetPay = calculation.netPay; // Mantener netPay original sin ajustes
+           // ✅ BACKEND AUTHORITATIVE: Use backend values directly - no frontend adjustments
+           // Backend now includes transport allowance in grossPay and calculates netPay correctly
+           const adjustedGrossPay = calculation.grossPay; // Backend includes transport allowance
+           const adjustedNetPay = calculation.netPay; // Backend calculated: grossPay - deductions
 
-           console.log('✅ CÁLCULO PROFESIONAL SIMPLE:', {
+           console.log('✅ BACKEND AUTHORITATIVE CALCULATION:', {
              employee: employee.name,
              backendGrossPay: calculation.grossPay,
-             auxilioTransporte: proratedTransport,
+             backendNetPay: calculation.netPay,
+             backendTransport: calculation.transportAllowance,
+             proratedTransport,
              totalDevengado: adjustedGrossPay,
              netoPagado: adjustedNetPay,
-             diferencia: 'Total Devengado = Backend GrossPay + Auxilio Transporte'
+             mathematicalCheck: `${adjustedGrossPay} - ${calculation.healthDeduction + calculation.pensionDeduction} = ${adjustedNetPay}`
            });
 
           newCalculations[employee.id] = {
