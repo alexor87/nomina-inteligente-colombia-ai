@@ -269,11 +269,23 @@ async function calculatePayroll(supabase: any, data: any) {
     extraPay += novedad.valor || 0;
   }
 
-  // ✅ AUXILIO DE TRANSPORTE CORREGIDO: Solo si salario ≤ 2 SMMLV
+  // ✅ AUXILIO DE TRANSPORTE PRORRATEADO: Solo si salario ≤ 2 SMMLV y según días trabajados
   const transportLimit = getTransportAssistanceLimit(year);
-  const transportAllowance = baseSalary <= transportLimit ? config.auxilioTransporte : 0;
+  const eligibleForTransport = baseSalary <= transportLimit;
+  const workedDaysCapped = Math.max(0, Math.min(Number(workedDays) || 0, 30));
+  const transportAllowance = eligibleForTransport ? Math.round((config.auxilioTransporte / 30) * workedDaysCapped) : 0;
 
-  // ✅ BACKEND AUTHORITATIVE FIX: Include transport allowance in grossPay
+  console.log('🚍 Auxilio Transporte:', {
+    baseSalary,
+    transportLimit,
+    eligibleForTransport,
+    periodType,
+    workedDays,
+    monthlyAmount: config.auxilioTransporte,
+    proratedTransport: transportAllowance
+  });
+
+  // ✅ BACKEND AUTHORITATIVE FIX: Include prorated transport allowance in grossPay
   const grossPay = regularPay + extraPay + transportAllowance;
 
   // ✅ IBC AUTOMÁTICO: Incapacidad vs Proporcional
@@ -339,7 +351,11 @@ async function calculatePayroll(supabase: any, data: any) {
     ibcMode,
     ibcSalud,
     healthDeduction,
-    pensionDeduction
+    pensionDeduction,
+    transportAllowance,
+    grossPay: Math.round(grossPay),
+    totalDeductions,
+    netPay: Math.round(netPay)
   });
 
   return result;
