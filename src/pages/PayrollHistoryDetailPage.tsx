@@ -106,7 +106,6 @@ export default function PayrollHistoryDetailPage() {
     if (lastRefreshTime && periodData?.company_id && periodId) {
       console.log('🔄 Global store updated, refreshing novedades...');
       refetchNovedades();
-      loadEmployees(); // Also refresh employee data to update badge counts
     }
   }, [lastRefreshTime, refetchNovedades, periodData?.company_id, periodId]);
 
@@ -424,7 +423,6 @@ export default function PayrollHistoryDetailPage() {
   const handleEmployeeNovedadesChange = async (employeeId: string) => {
     console.log('🔄 Employee novedades changed for:', employeeId, 'refreshing UI...');
     refetchNovedades();
-    loadEmployees();
   };
 
   if (!periodId) {
