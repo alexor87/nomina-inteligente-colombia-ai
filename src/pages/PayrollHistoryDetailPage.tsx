@@ -24,6 +24,9 @@ import { NovedadesEnhancedService } from '@/services/NovedadesEnhancedService';
 import { PendingAdjustmentsService } from '@/services/PendingAdjustmentsService';
 import { usePendingAdjustments } from '@/hooks/usePendingAdjustments';
 import { PeriodAuditSummaryComponent } from '@/components/payroll/audit/PeriodAuditSummary';
+import { PayrollCalculationBackendService, PayrollCalculationInput } from '@/services/PayrollCalculationBackendService';
+import { PayrollCalculationService } from '@/services/PayrollCalculationService';
+import { convertNovedadesToIBC } from '@/utils/payrollCalculationsBackend';
 
 // Use PayrollPeriodData from service instead of local interface
 
@@ -92,7 +95,8 @@ export default function PayrollHistoryDetailPage() {
     novedades,
     isLoading: isLoadingNovedades,
     refetch: refetchNovedades,
-    createNovedad
+    createNovedad,
+    getEmployeeNovedadesList
   } = usePayrollNovedadesUnified({ 
     companyId: periodData?.company_id, 
     periodId: periodId || '', 
@@ -238,6 +242,77 @@ export default function PayrollHistoryDetailPage() {
     console.log('Edit novedad:', novedad);
   };
 
+  // Recalculate employee values using backend service
+  const recalculateEmployeeValues = async (employeeId: string) => {
+    if (!periodData) return;
+    
+    try {
+      console.log('🔄 Recalculando valores para empleado:', employeeId);
+      
+      const employee = employees.find(emp => emp.id === employeeId);
+      if (!employee) {
+        console.warn('⚠️ Employee not found for recalculation:', employeeId);
+        return;
+      }
+
+      // Get all novedades for this employee (including the newly created one)
+      const employeeNovedades = await getEmployeeNovedadesList(employeeId);
+      
+      // Convert novedades to IBC format
+      const novedadesForIBC = convertNovedadesToIBC(employeeNovedades);
+      
+      // Get period info for days calculation
+      const daysInfo = PayrollCalculationService.getDaysInfo({
+        tipo_periodo: periodData.tipo_periodo as 'quincenal' | 'mensual' | 'semanal',
+        fecha_inicio: periodData.fecha_inicio,
+        fecha_fin: periodData.fecha_fin
+      });
+
+      // Calculate using backend service
+      const calculationInput: PayrollCalculationInput = {
+        baseSalary: employee.salario_base,
+        workedDays: daysInfo.legalDays,
+        extraHours: 0,
+        disabilities: 0,
+        bonuses: 0,
+        absences: 0,
+        periodType: daysInfo.periodType === 'quincenal' ? 'quincenal' : 'mensual',
+        novedades: novedadesForIBC,
+        year: '2025'
+      };
+
+      const result = await PayrollCalculationBackendService.calculatePayroll(calculationInput);
+
+      // Update employee in local state
+      setEmployees(prevEmployees => 
+        prevEmployees.map(emp => 
+          emp.id === employeeId 
+            ? {
+                ...emp,
+                total_devengado: result.grossPay,
+                total_deducciones: result.totalDeductions, 
+                neto_pagado: result.netPay,
+                ibc: result.ibc,
+                auxilio_transporte: result.transportAllowance,
+                salud_empleado: result.healthDeduction,
+                pension_empleado: result.pensionDeduction
+              }
+            : emp
+        )
+      );
+
+      console.log('✅ Valores actualizados para empleado:', employeeId, {
+        devengado: result.grossPay,
+        deducciones: result.totalDeductions,
+        neto: result.netPay,
+        ibc: result.ibc
+      });
+
+    } catch (error) {
+      console.error('❌ Error recalculando valores del empleado:', error);
+    }
+  };
+
   const handleNovedadSubmit = async (novedadData: CreateNovedadData): Promise<{ isPending?: boolean } | void> => {
     if (!periodData) return;
 
@@ -266,6 +341,9 @@ export default function PayrollHistoryDetailPage() {
         
         // Refresh novedades
         await refetchNovedades();
+        
+        // Recalculate affected employee values
+        await recalculateEmployeeValues(novedadData.empleado_id);
         
         return { isPending: false };
       }
