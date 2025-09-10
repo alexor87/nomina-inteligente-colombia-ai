@@ -195,19 +195,39 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
           const eligible = employee.baseSalary <= (config.salarioMinimo * 2);
           const proratedTransport = eligible ? Math.round((config.auxilioTransporte / 30) * currentWorkedDays) : 0;
           
-          console.log('🚌 CORRECCIÓN AUXILIO DE TRANSPORTE:', {
-            employee: employee.name,
-            salarioBase: employee.baseSalary,
-            limite2SMMLV: config.salarioMinimo * 2,
-            eligible,
-            auxilioMensual: config.auxilioTransporte,
-            diasTrabajados: currentWorkedDays,
-            proratedTransport,
-            backendTransport: calculation.transportAllowance
-          });
+           console.log('🚌 CORRECCIÓN AUXILIO DE TRANSPORTE:', {
+             employee: employee.name,
+             salarioBase: employee.baseSalary,
+             limite2SMMLV: config.salarioMinimo * 2,
+             eligible,
+             auxilioMensual: config.auxilioTransporte,
+             diasTrabajados: currentWorkedDays,
+             proratedTransport,
+             backendTransport: calculation.transportAllowance
+           });
 
-          const adjustedGrossPay = calculation.grossPay - calculation.transportAllowance + proratedTransport;
-          const adjustedNetPay = calculation.netPay - calculation.transportAllowance + proratedTransport;
+           // KISS FIX: Defensive detection of transport allowance inclusion in backend grossPay
+           // If backend transport allowance matches our calculation, it's likely already excluded from grossPay
+           // If they differ significantly, backend grossPay likely includes its own transport calculation
+           const transportIncludedInGrossPay = Math.abs(calculation.transportAllowance - proratedTransport) > 1000;
+           
+           const adjustedGrossPay = transportIncludedInGrossPay 
+             ? calculation.grossPay - calculation.transportAllowance + proratedTransport
+             : calculation.grossPay + proratedTransport;
+             
+           const adjustedNetPay = transportIncludedInGrossPay
+             ? calculation.netPay - calculation.transportAllowance + proratedTransport  
+             : calculation.netPay + proratedTransport;
+
+           console.log('🔧 AJUSTE DEFENSIVO DEVENGADO:', {
+             employee: employee.name,
+             backendGrossPay: calculation.grossPay,
+             backendTransport: calculation.transportAllowance,
+             proratedTransport,
+             transportIncludedInGrossPay,
+             adjustedGrossPay,
+             adjustedNetPay
+           });
 
           newCalculations[employee.id] = {
             totalToPay: adjustedNetPay,
