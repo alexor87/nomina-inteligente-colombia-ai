@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { XCircle, ArrowLeft, Users, History } from "lucide-react"
+import { XCircle, ArrowLeft, Users, History, RefreshCw } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { toast } from "@/hooks/use-toast"
@@ -66,6 +66,7 @@ export default function PayrollHistoryDetailPage() {
   const [employees, setEmployees] = useState<ExpandedEmployee[]>([]);
   const [periodData, setPeriodData] = useState<PayrollPeriodData | null>(null);
   const [isLoadingEmployees, setIsLoadingEmployees] = useState(false);
+  const [isRecalculatingAll, setIsRecalculatingAll] = useState(false);
   const [isLoadingPeriod, setIsLoadingPeriod] = useState(false);
   
   // States for pending adjustments logic - replaced with hook
@@ -166,6 +167,86 @@ export default function PayrollHistoryDetailPage() {
     }
   }, [periodData]);
 
+  // Recalculate all employees using backend service
+  const recalculateAllEmployees = async () => {
+    if (!periodData || employees.length === 0) return;
+    
+    console.log('🔄 Recalculando todos los empleados...');
+    setIsRecalculatingAll(true);
+    
+    try {
+      const updatedEmployees = [...employees];
+      
+      for (const employee of employees) {
+        try {
+          // Get all novedades for this employee
+          const employeeNovedades = await getEmployeeNovedadesList(employee.id);
+          
+          // Convert novedades to IBC format
+          const novedadesForIBC = convertNovedadesToIBC(employeeNovedades);
+          
+          // Get period info for days calculation
+          const daysInfo = PayrollCalculationService.getDaysInfo({
+            tipo_periodo: periodData.tipo_periodo as 'quincenal' | 'mensual' | 'semanal',
+            fecha_inicio: periodData.fecha_inicio,
+            fecha_fin: periodData.fecha_fin
+          });
+
+          // Calculate using backend service
+          const calculationInput: PayrollCalculationInput = {
+            baseSalary: employee.salario_base,
+            workedDays: daysInfo.legalDays,
+            extraHours: 0,
+            disabilities: 0,
+            bonuses: 0,
+            absences: 0,
+            periodType: daysInfo.periodType === 'quincenal' ? 'quincenal' : 'mensual',
+            novedades: novedadesForIBC,
+            year: '2025'
+          };
+
+          const result = await PayrollCalculationBackendService.calculatePayroll(calculationInput);
+
+          // Update employee in the array
+          const employeeIndex = updatedEmployees.findIndex(emp => emp.id === employee.id);
+          if (employeeIndex >= 0) {
+            updatedEmployees[employeeIndex] = {
+              ...updatedEmployees[employeeIndex],
+              total_devengado: result.grossPay,
+              total_deducciones: result.totalDeductions,
+              neto_pagado: result.netPay,
+              ibc: result.ibc,
+              auxilio_transporte: result.transportAllowance,
+              salud_empleado: result.healthDeduction,
+              pension_empleado: result.pensionDeduction
+            };
+          }
+        } catch (error) {
+          console.error(`❌ Error recalculando empleado ${employee.nombre}:`, error);
+        }
+      }
+      
+      // Update all employees at once
+      setEmployees(updatedEmployees);
+      
+      toast({
+        title: "Recálculo completado",
+        description: `Valores actualizados para ${employees.length} empleados`,
+      });
+      
+      console.log('✅ Recálculo masivo completado');
+    } catch (error) {
+      console.error('❌ Error en recálculo masivo:', error);
+      toast({
+        title: "Error en recálculo",
+        description: "No se pudieron recalcular todos los valores",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRecalculatingAll(false);
+    }
+  };
+
   // Load employees for the period
   const loadEmployees = async () => {
     if (!periodId) return;
@@ -209,6 +290,14 @@ export default function PayrollHistoryDetailPage() {
       
       console.log('✅ Loaded employees from payrolls table:', expandedEmployees.length);
       console.log('Sample employee:', expandedEmployees[0]);
+      
+      // Auto-recalculate all employees after loading
+      setTimeout(() => {
+        if (expandedEmployees.length > 0) {
+          recalculateAllEmployees();
+        }
+      }, 1000);
+      
     } catch (error) {
       console.error('Error loading employees:', error);
       toast({
@@ -567,28 +656,46 @@ export default function PayrollHistoryDetailPage() {
             </div>
           </div>
           
-          {/* Botón de novedades pendientes (solo si hay) */}
-          {totalPendingCount > 0 && (
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="animate-pulse">
-                {totalPendingCount} novedades pendientes
-              </Badge>
-              <Button 
-                variant="destructive"
-                onClick={() => setShowDiscardModal(true)}
-                disabled={isApplying}
-              >
-                Descartar cambios
-              </Button>
-              <Button 
-                className="bg-warning hover:bg-warning/90 text-warning-foreground"
-                onClick={() => setShowConfirmModal(true)}
-                disabled={isApplying}
-              >
-                {isApplying ? "Aplicando..." : "Aplicar Ajustes"}
-              </Button>
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            {/* Recalcular Todo Button */}
+            <Button 
+              variant="outline"
+              size="sm"
+              onClick={recalculateAllEmployees}
+              disabled={isRecalculatingAll || isLoadingEmployees}
+              className="flex items-center gap-2"
+            >
+              {isRecalculatingAll ? (
+                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary" />
+              ) : (
+                <RefreshCw className="h-3 w-3" />
+              )}
+              {isRecalculatingAll ? "Recalculando..." : "Recalcular Todo"}
+            </Button>
+            
+            {/* Botón de novedades pendientes (solo si hay) */}
+            {totalPendingCount > 0 && (
+              <>
+                <Badge variant="secondary" className="animate-pulse">
+                  {totalPendingCount} novedades pendientes
+                </Badge>
+                <Button 
+                  variant="destructive"
+                  onClick={() => setShowDiscardModal(true)}
+                  disabled={isApplying}
+                >
+                  Descartar cambios
+                </Button>
+                <Button 
+                  className="bg-warning hover:bg-warning/90 text-warning-foreground"
+                  onClick={() => setShowConfirmModal(true)}
+                  disabled={isApplying}
+                >
+                  {isApplying ? "Aplicando..." : "Aplicar Ajustes"}
+                </Button>
+              </>
+            )}
+          </div>
         </div>
         
         {/* Summary Cards */}
