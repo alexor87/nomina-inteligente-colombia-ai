@@ -131,56 +131,121 @@ serve(async (req) => {
       console.log('✅ Payroll data fetched successfully');
       console.log('🔍 Deduction values from DB - Salud:', data.salud_empleado, 'Pensión:', data.pension_empleado);
     } else if (requestBody.employee && requestBody.period) {
-      // Modo simple: construir estructura mínima compatible
-      console.log('ℹ️ Using simple payload (employee + period) to build PDF');
+      // Modo mejorado: intentar resolver SIEMPRE desde la BD usando employee.id + periodo
+      console.log('ℹ️ Using employee + period payload; attempting DB resolution');
       const emp = requestBody.employee;
       const per = requestBody.period;
-      const companyName = requestBody.companyName || 'Mi Empresa';
-      const companyNit = requestBody.companyNit || 'N/A';
 
-      const totalDevengado = Number(emp.grossPay ?? emp.baseSalary ?? 0);
-      const totalDeducciones = Number(emp.deductions ?? 0);
-      const netoPagado = Number(emp.netPay ?? (totalDevengado - totalDeducciones));
+      let resolvedFromDB: any = null;
+      try {
+        if (emp?.id && per?.startDate && per?.endDate) {
+          console.log('🔎 Resolving payroll by employee_id and period dates:', emp.id, per.startDate, per.endDate);
+          const { data: candidates, error: fetchError } = await supabase
+            .from('payrolls')
+            .select(`
+              *,
+              employees!inner(
+                id,
+                nombre,
+                apellido,
+                cedula,
+                cargo,
+                eps,
+                afp,
+                salario_base,
+                estado
+              ),
+              payroll_periods_real!inner(
+                id,
+                periodo,
+                fecha_inicio,
+                fecha_fin,
+                tipo_periodo
+              ),
+              companies!inner(
+                id,
+                razon_social,
+                nit,
+                direccion,
+                ciudad,
+                telefono,
+                email,
+                logo_url
+              )
+            `)
+            .eq('employee_id', emp.id)
+            .order('updated_at', { ascending: false })
+            .limit(20);
 
-      payrollData = {
-        employees: {
-          id: emp.id,
-          nombre: emp.name || 'Empleado',
-          apellido: '',
-          cedula: emp.id || 'N/A',
-          cargo: emp.position || '',
-          eps: emp.eps || '',
-          afp: emp.afp || '',
-          salario_base: Number(emp.baseSalary ?? 0),
-          estado: 'activo',
-        },
-        payroll_periods_real: {
-          id: 'temp',
-          periodo: per.periodo || `${per.startDate} - ${per.endDate}`,
-          fecha_inicio: per.startDate,
-          fecha_fin: per.endDate,
-          tipo_periodo: per.type || 'quincenal',
-        },
-        companies: {
-          id: 'temp',
-          razon_social: companyName,
-          nit: companyNit,
-          direccion: '',
-          ciudad: '',
-          telefono: '',
-          email: '',
-          logo_url: null,
-        },
-        dias_trabajados: Number(emp.workedDays ?? 15),
-        horas_extra: Number(emp.extraHours ?? 0),
-        total_devengado: totalDevengado,
-        total_deducciones: totalDeducciones,
-        neto_pagado: netoPagado,
-        // Usar deducciones específicas del empleado si están disponibles
-        salud_empleado: Number(emp.healthDeduction ?? (totalDeducciones * 0.5)),
-        pension_empleado: Number(emp.pensionDeduction ?? (totalDeducciones * 0.5)),
-      };
-      fileNameBase = `comprobante-${(emp.name || 'empleado').replace(/\s+/g, '-')}`;
+          if (fetchError) {
+            console.warn('⚠️ Error fetching candidate payrolls:', fetchError);
+          }
+
+          if (candidates && candidates.length > 0) {
+            resolvedFromDB = candidates.find((row: any) => {
+              const fi = row?.payroll_periods_real?.fecha_inicio;
+              const ff = row?.payroll_periods_real?.fecha_fin;
+              return String(fi) === String(per.startDate) && String(ff) === String(per.endDate);
+            }) || null;
+          }
+        }
+      } catch (e) {
+        console.warn('⚠️ Exception while resolving payroll from DB, will fallback to simple mode:', e);
+      }
+
+      if (resolvedFromDB) {
+        console.log('✅ Resolved payroll from DB for employee + period');
+        payrollData = resolvedFromDB;
+        fileNameBase = `comprobante-${(resolvedFromDB.employees.nombre || 'empleado').replace(/\s+/g, '-')}`;
+      } else {
+        console.log('ℹ️ Falling back to simple payload (no DB record found)');
+        const companyName = requestBody.companyName || 'Mi Empresa';
+        const companyNit = requestBody.companyNit || 'N/A';
+
+        const totalDevengado = Number(emp.grossPay ?? emp.baseSalary ?? 0);
+        const totalDeducciones = Number(emp.deductions ?? 0);
+        const netoPagado = Number(emp.netPay ?? (totalDevengado - totalDeducciones));
+
+        payrollData = {
+          employees: {
+            id: emp.id,
+            nombre: emp.name || 'Empleado',
+            apellido: '',
+            cedula: emp.id || 'N/A',
+            cargo: emp.position || '',
+            eps: emp.eps || '',
+            afp: emp.afp || '',
+            salario_base: Number(emp.baseSalary ?? 0),
+            estado: 'activo',
+          },
+          payroll_periods_real: {
+            id: 'temp',
+            periodo: per.periodo || `${per.startDate} - ${per.endDate}`,
+            fecha_inicio: per.startDate,
+            fecha_fin: per.endDate,
+            tipo_periodo: per.type || 'quincenal',
+          },
+          companies: {
+            id: 'temp',
+            razon_social: companyName,
+            nit: companyNit,
+            direccion: '',
+            ciudad: '',
+            telefono: '',
+            email: '',
+            logo_url: null,
+          },
+          dias_trabajados: Number(emp.workedDays ?? 15),
+          horas_extra: Number(emp.extraHours ?? 0),
+          total_devengado: totalDevengado,
+          total_deducciones: totalDeducciones,
+          neto_pagado: netoPagado,
+          // Usar deducciones específicas del empleado si están disponibles
+          salud_empleado: Number(emp.healthDeduction ?? (totalDeducciones * 0.5)),
+          pension_empleado: Number(emp.pensionDeduction ?? (totalDeducciones * 0.5)),
+        };
+        fileNameBase = `comprobante-${(emp.name || 'empleado').replace(/\s+/g, '-')}`;
+      }
     } else {
       throw new Error('Provide payrollId or { employee, period }');
     }
