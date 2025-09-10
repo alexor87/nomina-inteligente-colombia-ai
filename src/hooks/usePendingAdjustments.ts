@@ -148,6 +148,15 @@ export const usePendingAdjustments = ({ periodId, companyId }: UsePendingAdjustm
       }
     });
 
+    // Get original values first
+    const originalDevengado = employee.total_devengado || 0;
+    const originalDeducciones = employee.total_deducciones || 0;
+    const originalNeto = employee.neto_pagado || 0;
+    const originalIBC = employee.ibc || 0;
+
+    // Calculate new devengado early
+    const newDevengado = originalDevengado + devengoAdjustment;
+
     // Calculate new IBC using baseline + constitutive adjustments
     const baseIBC = employee.ibc || employee.salario_base || 0;
     let newIBC = baseIBC + constitutiveIBCAdjustment;
@@ -159,13 +168,6 @@ export const usePendingAdjustments = ({ periodId, companyId }: UsePendingAdjustm
     // Apply IBC constraints
     newIBC = Math.max(newIBC, SMMLV);
     newIBC = Math.min(newIBC, SMMLV * 25);
-
-    const originalDevengado = employee.total_devengado || 0;
-    const originalDeducciones = employee.total_deducciones || 0;
-    const originalNeto = employee.neto_pagado || 0;
-    const originalIBC = employee.ibc || 0;
-
-    const newDevengado = originalDevengado + devengoAdjustment;
 
     // Calculate legal deductions based on new IBC
     const deductionResult = DeductionCalculationService.calculateDeductions(newIBC);
