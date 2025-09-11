@@ -19,6 +19,7 @@ import { PendingNovedad, PeriodState } from '@/types/pending-adjustments';
 import { PendingNovedadesService, PendingAdjustmentData } from '@/services/PendingNovedadesService';
 import { ConfirmAdjustmentModal } from '@/components/payroll/corrections/ConfirmAdjustmentModal';
 import { NovedadUnifiedModal } from '@/components/payroll/novedades/NovedadUnifiedModal';
+import { NovedadExistingList } from '@/components/payroll/novedades/NovedadExistingList';
 import { PayrollRecalculationService } from '@/services/PayrollRecalculationService';
 import { NovedadesEnhancedService } from '@/services/NovedadesEnhancedService';
 import { PendingAdjustmentsService } from '@/services/PendingAdjustmentsService';

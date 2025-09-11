@@ -25,8 +25,20 @@ interface NovedadExistingListProps {
   refreshTrigger?: number;
   onEmployeeNovedadesChange?: (employeeId: string) => Promise<void>;
   periodState?: PeriodState;
+  // Legacy props for compatibility (liquidación mode)
   onPendingAdjustmentChange?: () => void;
   addPendingDeletion?: (employeeId: string, employeeName: string, originalNovedad: any) => void;
+  // New props for edit period integration
+  editState?: 'closed' | 'editing' | 'saving' | 'discarding';
+  pendingChanges?: {
+    novedades: {
+      added: any[];
+      modified: any[];
+      deleted: string[];
+    };
+  };
+  onAddNovedad?: (novedadData: any) => void;
+  onRemoveNovedad?: (novedadId: string) => void;
 }
 
 export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
@@ -39,7 +51,12 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
   onEmployeeNovedadesChange,
   periodState = 'borrador',
   onPendingAdjustmentChange,
-  addPendingDeletion
+  addPendingDeletion,
+  // New edit period props
+  editState,
+  pendingChanges,
+  onAddNovedad,
+  onRemoveNovedad
 }) => {
   const [integratedData, setIntegratedData] = useState<DisplayNovedad[]>([]);
   const [pendingAdjustments, setPendingAdjustments] = useState<PendingAdjustmentRecord[]>([]);
@@ -98,21 +115,31 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
     
     setLoading(true);
     try {
-      // Load novedades and pending adjustments in parallel
-      const [data, pendingData] = await Promise.all([
-        loadIntegratedNovedades(employeeId),
-        PendingAdjustmentsService.getPendingAdjustmentsForEmployee(employeeId, periodId)
-      ]);
-      
+      // Always load integrated novedades
+      const data = await loadIntegratedNovedades(employeeId);
       setIntegratedData(data);
-      setPendingAdjustments(pendingData);
       
-      console.log('📊 NovedadExistingList: Datos cargados:', { 
-        novedades: data.length, 
-        pending: pendingData.length,
-        employeeId, 
-        periodId 
-      });
+      // Only load legacy pending adjustments if not in edit mode
+      if (editState !== 'editing') {
+        const pendingData = await PendingAdjustmentsService.getPendingAdjustmentsForEmployee(employeeId, periodId);
+        setPendingAdjustments(pendingData);
+        
+        console.log('📊 NovedadExistingList: Datos cargados (modo legacy):', { 
+          novedades: data.length, 
+          pending: pendingData.length,
+          employeeId, 
+          periodId 
+        });
+      } else {
+        // In edit mode, pending changes come from the hook
+        setPendingAdjustments([]);
+        console.log('📊 NovedadExistingList: Datos cargados (modo edición):', { 
+          novedades: data.length, 
+          pendingFromHook: pendingChanges?.novedades?.added?.length || 0,
+          employeeId, 
+          periodId 
+        });
+      }
     } catch (error) {
       console.error('❌ NovedadExistingList: Error cargando datos:', error);
       toast({
@@ -123,7 +150,7 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [employeeId, periodId, loadIntegratedNovedades, toast]);
+  }, [employeeId, periodId, loadIntegratedNovedades, toast, editState, pendingChanges]);
 
   useEffect(() => {
     fetchIntegratedData();
@@ -221,22 +248,45 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
     }
   };
 
-  // Create the delete handler
-  const handleConfirmDelete = createDeleteHandler(
-    deleteNovedad,
-    addPendingDeletion || (() => console.error('addPendingDeletion not available')),
-    onEmployeeNovedadesChange,
-    onPendingAdjustmentChange,
-    setIntegratedData,
-    toast,
-    employeeId,
-    employeeName
-  );
-    
-  // Ensure delete handler is available
-  if (!addPendingDeletion) {
-    console.error('❌ addPendingDeletion prop not provided to NovedadExistingList');
-  }
+  // Create the delete handler - choose based on edit mode
+  const handleConfirmDelete = React.useMemo(() => {
+    if (editState === 'editing' && onRemoveNovedad) {
+      // Edit mode: use the hook's remove function
+      return async (createPendingAdjustment: boolean, novedad: DisplayNovedad) => {
+        try {
+          console.log('🗑️ Edit mode deletion:', novedad.id);
+          onRemoveNovedad(novedad.id);
+          
+          // Also remove from local state for immediate UI update
+          setIntegratedData(prev => prev.filter(n => n.id !== novedad.id));
+          
+          toast({
+            title: "Novedad marcada para eliminación",
+            description: "La eliminación se aplicará al guardar los cambios",
+          });
+        } catch (error) {
+          console.error('❌ Error in edit mode deletion:', error);
+          toast({
+            title: "Error",
+            description: "No se pudo marcar la novedad para eliminación",
+            variant: "destructive",
+          });
+        }
+      };
+    } else {
+      // Legacy mode: use existing delete handler
+      return createDeleteHandler(
+        deleteNovedad,
+        addPendingDeletion || (() => console.error('addPendingDeletion not available')),
+        onEmployeeNovedadesChange,
+        onPendingAdjustmentChange,
+        setIntegratedData,
+        toast,
+        employeeId,
+        employeeName
+      );
+    }
+  }, [editState, onRemoveNovedad, deleteNovedad, addPendingDeletion, onEmployeeNovedadesChange, onPendingAdjustmentChange, toast, employeeId, employeeName]);
 
   const onDeleteConfirm = (createPendingAdjustment: boolean) => {
     if (deleteConfirmModal.novedad) {
@@ -354,7 +404,7 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
       badgeColor: 'bg-orange-100 text-orange-800',
       badgeIcon: '⏳',
       statusColor: 'border-orange-200 text-orange-700',
-      status: 'pendiente',
+          status: 'pendiente' as const,
       canEdit: false,
       canDelete: true,
       created_at: p.created_at,
@@ -365,7 +415,35 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
   const getSeparatedTotals = (): SeparatedTotals & { pending: { devengos: number; deducciones: number; neto: number; count: number } } => {
     const confirmed = integratedData.filter(n => n.isConfirmed);
     const estimated = integratedData.filter(n => !n.isConfirmed);
-    const pending = convertPendingToDisplay(pendingAdjustments);
+    
+    // Get pending data from appropriate source
+    const pendingData = editState === 'editing' 
+      ? (pendingChanges?.novedades?.added?.filter(n => n.empleado_id === employeeId) || [])
+      : pendingAdjustments;
+    
+    const pending = editState === 'editing' 
+      ? pendingData.map((n: any) => ({
+          id: n.id || `temp-${Date.now()}`,
+          origen: 'edit_pending' as any,
+          tipo_novedad: n.tipo_novedad,
+          subtipo: n.subtipo,
+          valor: n.valor,
+          dias: n.dias || 0,
+          fecha_inicio: n.fecha_inicio,
+          fecha_fin: n.fecha_fin,
+          observacion: n.observacion,
+          isConfirmed: false,
+          badgeLabel: formatTipoNovedad(n.tipo_novedad, n.subtipo),
+          badgeColor: 'bg-blue-100 text-blue-800',
+          badgeIcon: '⏳',
+          statusColor: 'border-blue-200 text-blue-700',
+          status: 'pendiente' as const,
+          canEdit: false,
+          canDelete: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }))
+      : convertPendingToDisplay(pendingAdjustments);
 
     // Calculate totals for each category
     const calculateTotals = (items: DisplayNovedad[]) => {
@@ -511,10 +589,10 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
             <Badge variant="outline" className="text-sm">
               {integratedData.length} registros
             </Badge>
-            {pendingAdjustments.length > 0 && (
-              <Badge variant="secondary" className="bg-orange-100 text-orange-800">
+            {getSeparatedTotals().pending.count > 0 && (
+              <Badge variant="secondary" className={editState === 'editing' ? "bg-blue-100 text-blue-800" : "bg-orange-100 text-orange-800"}>
                 <Clock className="h-3 w-3 mr-1" />
-                {pendingAdjustments.length} pendientes
+                {getSeparatedTotals().pending.count} {editState === 'editing' ? 'por aplicar' : 'pendientes'}
               </Badge>
             )}
           </div>
@@ -531,7 +609,7 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
           </div>
         ) : (
           <>
-            {integratedData.length === 0 && pendingAdjustments.length === 0 ? (
+            {integratedData.length === 0 && getSeparatedTotals().pending.count === 0 ? (
               <Card>
                 <CardContent className="py-8">
                   <div className="text-center">
@@ -545,7 +623,34 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
               </Card>
             ) : (
               <div className="space-y-4">
-                {[...convertPendingToDisplay(pendingAdjustments), ...integratedData].map((item, index) => (
+                {(() => {
+                  const { pending } = getSeparatedTotals();
+                  const pendingItems = editState === 'editing' 
+                    ? (pendingChanges?.novedades?.added?.filter(n => n.empleado_id === employeeId) || []).map((n: any) => ({
+                        id: n.id || `temp-${Date.now()}`,
+                        origen: 'edit_pending' as any,
+                        tipo_novedad: n.tipo_novedad,
+                        subtipo: n.subtipo,
+                        valor: n.valor,
+                        dias: n.dias || 0,
+                        fecha_inicio: n.fecha_inicio,
+                        fecha_fin: n.fecha_fin,
+                        observacion: n.observacion,
+                        isConfirmed: false,
+                        badgeLabel: formatTipoNovedad(n.tipo_novedad, n.subtipo),
+                        badgeColor: 'bg-blue-100 text-blue-800',
+                        badgeIcon: '⏳',
+                        statusColor: 'border-blue-200 text-blue-700',
+                        status: 'pendiente' as const,
+                        canEdit: false,
+                        canDelete: true,
+                        created_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString()
+                      }))
+                    : convertPendingToDisplay(pendingAdjustments);
+                  
+                  return [...pendingItems, ...integratedData];
+                })().map((item, index) => (
                   <Card key={`${item.origen}-${item.id}-${index}`} className={`transition-all duration-200 ${item.statusColor || 'hover:shadow-md'}`}>
                     <CardContent className="p-4">
                       <div className="grid grid-cols-12 gap-4 items-center">
