@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Trash2, Edit, Plus, Eye, ExternalLink, Clock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useNovedades } from '@/hooks/useNovedades';
+import { usePayrollNovedadesUnified } from '@/hooks/usePayrollNovedadesUnified';
 import { DisplayNovedad, SeparatedTotals } from '@/types/vacation-integration';
 import { useToast } from '@/hooks/use-toast';
 import { VacationAbsenceDetailModal } from '@/components/vacations/VacationAbsenceDetailModal';
@@ -71,8 +71,20 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
     novedad: DisplayNovedad | null;
   }>({ isOpen: false, novedad: null });
   
-  const { loadIntegratedNovedades, deleteNovedad } = useNovedades(periodId);
   const { companyId } = useUserCompany();
+  
+  const { 
+    novedades: unifiedNovedades,
+    isLoading: isLoadingUnified,
+    deleteNovedad,
+    refetch: refetchNovedades
+  } = usePayrollNovedadesUnified({
+    companyId,
+    periodId,
+    employeeId,
+    enabled: !!(companyId && periodId && employeeId)
+  });
+  
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -115,9 +127,34 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
     
     setLoading(true);
     try {
-      // Always load integrated novedades
-      const data = await loadIntegratedNovedades(employeeId);
-      setIntegratedData(data);
+      // Use unified novedades data directly
+      const displayNovedades = unifiedNovedades.map(novedad => ({
+        id: novedad.id,
+        empleado_id: novedad.empleado_id,
+        periodo_id: novedad.periodo_id,
+        tipo_novedad: novedad.tipo_novedad,
+        subtipo: novedad.subtipo,
+        valor: novedad.valor,
+        dias: novedad.dias,
+        horas: novedad.horas,
+        observacion: novedad.observacion,
+        fecha_inicio: novedad.fecha_inicio,
+        fecha_fin: novedad.fecha_fin,
+        origen: 'novedades' as const,
+        status: 'registrada' as const,
+        processed_in_period_id: novedad.periodo_id,
+        isConfirmed: true,
+        canEdit: true,
+        canDelete: true,
+        badgeColor: 'bg-blue-100 text-blue-800',
+        badgeIcon: '📋',
+        badgeLabel: 'Novedad',
+        statusColor: 'bg-blue-100 text-blue-800',
+        created_at: novedad.created_at,
+        updated_at: novedad.updated_at,
+      }));
+      
+      setIntegratedData(displayNovedades);
       
       // Only load legacy pending adjustments if not in edit mode
       if (editState !== 'editing') {
@@ -125,7 +162,7 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
         setPendingAdjustments(pendingData);
         
         console.log('📊 NovedadExistingList: Datos cargados (modo legacy):', { 
-          novedades: data.length, 
+          novedades: displayNovedades.length, 
           pending: pendingData.length,
           employeeId, 
           periodId 
@@ -134,7 +171,7 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
         // In edit mode, pending changes come from the hook
         setPendingAdjustments([]);
         console.log('📊 NovedadExistingList: Datos cargados (modo edición):', { 
-          novedades: data.length, 
+          novedades: displayNovedades.length, 
           pendingFromHook: pendingChanges?.novedades?.added?.length || 0,
           employeeId, 
           periodId 
@@ -150,7 +187,7 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [employeeId, periodId, loadIntegratedNovedades, toast, editState, pendingChanges]);
+  }, [employeeId, periodId, refetchNovedades, toast, editState, pendingChanges, unifiedNovedades]);
 
   useEffect(() => {
     fetchIntegratedData();
@@ -248,6 +285,16 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
     }
   };
 
+  // Wrapper for deleteNovedad to match expected return type
+  const deleteNovedadWrapper = async (id: string): Promise<{ success: boolean; error?: any }> => {
+    try {
+      await deleteNovedad(id);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error };
+    }
+  };
+
   // Create the delete handler - choose based on edit mode
   const handleConfirmDelete = React.useMemo(() => {
     if (editState === 'editing' && onRemoveNovedad) {
@@ -276,7 +323,7 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
     } else {
       // Legacy mode: use existing delete handler
       return createDeleteHandler(
-        deleteNovedad,
+        deleteNovedadWrapper,
         addPendingDeletion || (() => console.error('addPendingDeletion not available')),
         onEmployeeNovedadesChange,
         onPendingAdjustmentChange,

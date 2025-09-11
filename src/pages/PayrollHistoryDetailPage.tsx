@@ -25,6 +25,7 @@ import { PeriodAuditSummaryComponent } from '@/components/payroll/audit/PeriodAu
 import { PayrollCalculationBackendService, PayrollCalculationInput } from '@/services/PayrollCalculationBackendService';
 import { PayrollCalculationService } from '@/services/PayrollCalculationService';
 import { convertNovedadesToIBC } from '@/utils/payrollCalculationsBackend';
+import { supabase } from '@/integrations/supabase/client';
 
 // Use PayrollPeriodData from service instead of local interface
 
@@ -208,11 +209,26 @@ export default function PayrollHistoryDetailPage() {
 
           const result = await PayrollCalculationBackendService.calculatePayroll(calculationInput);
 
-          // Update employee in the array
-          const employeeIndex = updatedEmployees.findIndex(emp => emp.id === employee.id);
-          if (employeeIndex >= 0) {
-            updatedEmployees[employeeIndex] = {
-              ...updatedEmployees[employeeIndex],
+      // Update employee in the array AND persist to database
+      const employeeIndex = updatedEmployees.findIndex(emp => emp.id === employee.id);
+      if (employeeIndex >= 0) {
+        const updatedEmployee = {
+          ...updatedEmployees[employeeIndex],
+          total_devengado: result.grossPay,
+          total_deducciones: result.totalDeductions,
+          neto_pagado: result.netPay,
+          ibc: result.ibc,
+          auxilio_transporte: result.transportAllowance,
+          salud_empleado: result.healthDeduction,
+          pension_empleado: result.pensionDeduction
+        };
+        updatedEmployees[employeeIndex] = updatedEmployee;
+        
+        // Persist to database
+        if (updatedEmployee.payroll_id) {
+          await supabase
+            .from('payrolls')
+            .update({
               total_devengado: result.grossPay,
               total_deducciones: result.totalDeductions,
               neto_pagado: result.netPay,
@@ -220,8 +236,10 @@ export default function PayrollHistoryDetailPage() {
               auxilio_transporte: result.transportAllowance,
               salud_empleado: result.healthDeduction,
               pension_empleado: result.pensionDeduction
-            };
-          }
+            })
+            .eq('id', updatedEmployee.payroll_id);
+        }
+      }
         } catch (error) {
           console.error(`❌ Error recalculando empleado ${employee.nombre}:`, error);
         }
@@ -392,6 +410,23 @@ export default function PayrollHistoryDetailPage() {
             : emp
         )
       );
+
+      // Persist individual employee recalculation to database
+      const employeeRecord = employees.find(emp => emp.id === employeeId);
+      if (employeeRecord?.payroll_id) {
+        await supabase
+          .from('payrolls')
+          .update({
+            total_devengado: result.grossPay,
+            total_deducciones: result.totalDeductions,
+            neto_pagado: result.netPay,
+            ibc: result.ibc,
+            auxilio_transporte: result.transportAllowance,
+            salud_empleado: result.healthDeduction,
+            pension_empleado: result.pensionDeduction
+          })
+          .eq('id', employeeRecord.payroll_id);
+      }
 
       console.log('✅ Valores actualizados para empleado:', employeeId, {
         devengado: result.grossPay,
