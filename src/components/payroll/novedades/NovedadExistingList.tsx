@@ -348,6 +348,11 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
         await PendingAdjustmentsService.deletePendingAdjustment(adjustmentId);
         setPendingAdjustments(prev => prev.filter(p => p.id !== adjustmentId));
         
+        // Trigger recalculation and UI update
+        if (onEmployeeNovedadesChange) {
+          await onEmployeeNovedadesChange(employeeId);
+        }
+        
         toast({
           title: "Ajuste eliminado",
           description: "El ajuste pendiente se ha eliminado correctamente",

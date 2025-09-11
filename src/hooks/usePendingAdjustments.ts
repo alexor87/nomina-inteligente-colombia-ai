@@ -33,45 +33,49 @@ export const usePendingAdjustments = ({ periodId, companyId }: UsePendingAdjustm
     }
   }, [periodId]);
 
-  // Load from both session storage and database on mount
+  // Enhanced loading from both session storage and database
   useEffect(() => {
     if (!periodId) return;
     
     const loadInitialData = async () => {
       try {
-        // Load from session storage (temporary/local adjustments)
+        console.log('🔄 Loading pending adjustments from database and session storage');
+        
+        // Load from database first (source of truth)
+        const dbData = await loadPendingFromDatabase();
+        
+        // Load from session storage as fallback/cache
         const sessionData: PendingNovedad[] = [];
         const saved = sessionStorage.getItem(storageKey);
         if (saved) {
-          const parsed = JSON.parse(saved);
-          sessionData.push(...parsed);
+          try {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed)) {
+              sessionData.push(...parsed);
+            }
+          } catch (error) {
+            console.warn('⚠️ Invalid session storage data, ignoring');
+          }
         }
         
-        // Load from database (persisted adjustments)
-        const dbData = await loadPendingFromDatabase();
+        // Prioritize database data but include session-only items that haven't been saved yet
+        const dbKeys = new Set(dbData.map(adj => `${adj.employee_id}_${adj.tipo_novedad}_${adj.valor}`));
+        const sessionOnlyData = sessionData.filter(adj => !dbKeys.has(`${adj.employee_id}_${adj.tipo_novedad}_${adj.valor}`));
         
-        // Combine and prioritize database data over session storage
-        // Remove duplicates, prioritizing database entries
-        const combined = [...dbData];
-        sessionData.forEach(sessionItem => {
-          const existsInDb = dbData.find(dbItem => 
-            dbItem.employee_id === sessionItem.employee_id &&
-            dbItem.tipo_novedad === sessionItem.tipo_novedad &&
-            Math.abs(dbItem.valor - sessionItem.valor) < 0.01
-          );
-          if (!existsInDb) {
-            combined.push(sessionItem);
-          }
-        });
+        const combined = [...dbData, ...sessionOnlyData];
+        
+        console.log(`✅ Loaded ${dbData.length} from DB, ${sessionOnlyData.length} session-only, ${combined.length} total`);
         
         setPendingNovedades(combined);
-        console.log('🔄 Loaded pending adjustments:', { 
-          fromSession: sessionData.length, 
-          fromDatabase: dbData.length, 
-          combined: combined.length 
-        });
+        
+        // Update session storage with combined data
+        if (combined.length > 0) {
+          sessionStorage.setItem(storageKey, JSON.stringify(combined));
+        } else {
+          sessionStorage.removeItem(storageKey);
+        }
       } catch (error) {
-        console.error('Error loading pending adjustments:', error);
+        console.error('❌ Error loading pending adjustments:', error);
       }
     };
     

@@ -224,7 +224,7 @@ Deno.serve(async (req) => {
             previous_value: previousValues.neto_pagado,
             new_value: newCalculation.netoPagado,
             value_difference: netDifference,
-            correction_type: 'novedad_adjustment',
+            correction_type: 'correctivo',
             concept: 'Re-liquidation due to novedad changes',
             justification: justification,
             created_by: user.id

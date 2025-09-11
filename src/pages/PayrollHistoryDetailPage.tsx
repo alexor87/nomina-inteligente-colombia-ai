@@ -289,8 +289,8 @@ export default function PayrollHistoryDetailPage() {
       
       setEmployees(expandedEmployees);
       
-      // Load pending adjustments from database and recalculate affected employees
-      console.log('🔄 Loading pending adjustments for persistence...');
+      // Load pending adjustments from database and sync with session storage
+      console.log('🔄 Loading and syncing pending adjustments...');
       const dbPendingAdjustments = await loadPendingFromDatabase();
       
       if (dbPendingAdjustments.length > 0) {
