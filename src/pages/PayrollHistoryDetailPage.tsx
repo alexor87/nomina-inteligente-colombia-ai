@@ -79,7 +79,8 @@ export default function PayrollHistoryDetailPage() {
     applyPendingAdjustments: applyAdjustments,
     getPendingCount,
     calculateEmployeePreview,
-    removePendingNovedadesForEmployee
+    removePendingNovedadesForEmployee,
+    loadPendingFromDatabase
   } = usePendingAdjustments({ 
     periodId: periodId || '', 
     companyId: periodData?.company_id || '' 
@@ -287,6 +288,30 @@ export default function PayrollHistoryDetailPage() {
       }));
       
       setEmployees(expandedEmployees);
+      
+      // Load pending adjustments from database and recalculate affected employees
+      console.log('🔄 Loading pending adjustments for persistence...');
+      const dbPendingAdjustments = await loadPendingFromDatabase();
+      
+      if (dbPendingAdjustments.length > 0) {
+        console.log(`📊 Found ${dbPendingAdjustments.length} pending adjustments, recalculating affected employees...`);
+        
+        // Get unique employee IDs with pending adjustments
+        const affectedEmployeeIds = Array.from(
+          new Set(dbPendingAdjustments.map(adj => adj.employee_id))
+        ).filter((id): id is string => typeof id === 'string');
+        
+        // Recalculate each affected employee
+        for (const employeeId of affectedEmployeeIds) {
+          try {
+            await recalculateEmployeeValues(employeeId);
+          } catch (error) {
+            console.error(`Error recalculating employee ${employeeId}:`, error);
+          }
+        }
+        
+        console.log('✅ Persistence adjustments applied to UI');
+      }
       
       console.log('✅ Loaded employees from payrolls table:', expandedEmployees.length);
       console.log('Sample employee:', expandedEmployees[0]);

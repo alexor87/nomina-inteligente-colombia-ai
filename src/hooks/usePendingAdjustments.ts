@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { PendingNovedad, EmployeeNovedadPreview } from '@/types/pending-adjustments';
 import { CreateNovedadData } from '@/types/novedades-enhanced';
 import { PendingNovedadesService, PendingAdjustmentData } from '@/services/PendingNovedadesService';
+import { PendingAdjustmentsService } from '@/services/PendingAdjustmentsService';
 import { useToast } from '@/hooks/use-toast';
 import { PayrollCalculationBackendService, PayrollCalculationInput } from '@/services/PayrollCalculationBackendService';
 import { convertNovedadesToIBC } from '@/utils/payrollCalculationsBackend';
@@ -19,20 +20,63 @@ export const usePendingAdjustments = ({ periodId, companyId }: UsePendingAdjustm
   // Session storage key for persistence
   const storageKey = `pending-adjustments-${periodId}`;
 
-  // Load from session storage on mount
+  // Load pending adjustments from database
+  const loadPendingFromDatabase = useCallback(async () => {
+    if (!periodId) return [];
+    
+    try {
+      const dbAdjustments = await PendingAdjustmentsService.getPendingAdjustmentsForPeriod(periodId);
+      return dbAdjustments.map(adj => PendingAdjustmentsService.toPendingNovedad(adj));
+    } catch (error) {
+      console.error('Error loading pending adjustments from database:', error);
+      return [];
+    }
+  }, [periodId]);
+
+  // Load from both session storage and database on mount
   useEffect(() => {
     if (!periodId) return;
     
-    try {
-      const saved = sessionStorage.getItem(storageKey);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        setPendingNovedades(parsed);
+    const loadInitialData = async () => {
+      try {
+        // Load from session storage (temporary/local adjustments)
+        const sessionData: PendingNovedad[] = [];
+        const saved = sessionStorage.getItem(storageKey);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          sessionData.push(...parsed);
+        }
+        
+        // Load from database (persisted adjustments)
+        const dbData = await loadPendingFromDatabase();
+        
+        // Combine and prioritize database data over session storage
+        // Remove duplicates, prioritizing database entries
+        const combined = [...dbData];
+        sessionData.forEach(sessionItem => {
+          const existsInDb = dbData.find(dbItem => 
+            dbItem.employee_id === sessionItem.employee_id &&
+            dbItem.tipo_novedad === sessionItem.tipo_novedad &&
+            Math.abs(dbItem.valor - sessionItem.valor) < 0.01
+          );
+          if (!existsInDb) {
+            combined.push(sessionItem);
+          }
+        });
+        
+        setPendingNovedades(combined);
+        console.log('🔄 Loaded pending adjustments:', { 
+          fromSession: sessionData.length, 
+          fromDatabase: dbData.length, 
+          combined: combined.length 
+        });
+      } catch (error) {
+        console.error('Error loading pending adjustments:', error);
       }
-    } catch (error) {
-      console.error('Error loading pending adjustments from storage:', error);
-    }
-  }, [periodId, storageKey]);
+    };
+    
+    loadInitialData();
+  }, [periodId, storageKey, loadPendingFromDatabase]);
 
   // Save to session storage whenever state changes
   useEffect(() => {
@@ -289,6 +333,7 @@ export const usePendingAdjustments = ({ periodId, companyId }: UsePendingAdjustm
     // Utilities
     getPendingCount,
     getPendingForEmployee,
-    calculateEmployeePreview
+    calculateEmployeePreview,
+    loadPendingFromDatabase
   };
 };
