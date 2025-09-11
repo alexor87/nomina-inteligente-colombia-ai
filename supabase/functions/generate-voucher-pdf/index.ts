@@ -442,9 +442,16 @@ async function generateProfessionalVoucherPDF(payrollData: any): Promise<Uint8Ar
   const netoPagado = Number(payrollData.neto_pagado) || 0;
   const horasExtra = Number(payrollData.horas_extra) || 0;
 
+  // Alineación con la vista previa: conceptos adicionales
+  const transportAllowance = Number(payrollData.auxilio_transporte ?? payrollData.transport_allowance ?? payrollData.transportAllowance ?? 0);
+  const bonuses = Number(payrollData.bonificaciones ?? payrollData.bonuses ?? 0);
+  const ibc = Number((payrollData.ibc ?? payrollData.ibc_salud ?? payrollData.ibcSalud ?? employee.salario_base) || 0);
+
   // USAR VALORES REALES DE DEDUCCIONES DESDE LA BD
   const saludEmpleado = Number(payrollData.salud_empleado) || 0;
   const pensionEmpleado = Number(payrollData.pension_empleado) || 0;
+  const saludPorcentaje = ibc > 0 && saludEmpleado > 0 ? (Math.round((saludEmpleado / ibc) * 1000) / 10).toFixed(1) : '4.0';
+  const pensionPorcentaje = ibc > 0 && pensionEmpleado > 0 ? (Math.round((pensionEmpleado / ibc) * 1000) / 10).toFixed(1) : '4.0';
   
   console.log('💰 Using real deduction values from DB - Salud:', saludEmpleado, 'Pensión:', pensionEmpleado);
   console.log('💰 PDF will use - Total deducciones:', totalDeducciones, 'Neto pagado:', netoPagado);
@@ -534,6 +541,23 @@ async function generateProfessionalVoucherPDF(payrollData: any): Promise<Uint8Ar
   doc.text(formatCurrency(salarioProporcional), margin + 50, leftY);
   leftY += lineHeight;
 
+  // Alineado con vista previa: subsidio de transporte y bonificaciones
+  if (transportAllowance > 0) {
+    doc.setFont('helvetica', 'bold');
+    doc.text(normalizeText('Subsidio de Transporte:'), margin, leftY);
+    doc.setFont('helvetica', 'normal');
+    doc.text(formatCurrency(transportAllowance), margin + 50, leftY);
+    leftY += lineHeight;
+  }
+
+  if (bonuses > 0) {
+    doc.setFont('helvetica', 'bold');
+    doc.text(normalizeText('Bonificaciones:'), margin, leftY);
+    doc.setFont('helvetica', 'normal');
+    doc.text(formatCurrency(bonuses), margin + 50, leftY);
+    leftY += lineHeight;
+  }
+
   if (totalHorasExtra > 0) {
     doc.setFont('helvetica', 'bold');
     doc.text(normalizeText(`Horas Extra (${horasExtra}):`), margin, leftY);
@@ -579,7 +603,7 @@ async function generateProfessionalVoucherPDF(payrollData: any): Promise<Uint8Ar
     // Mostrar deducciones reales de la base de datos
     if (saludEmpleado > 0) {
       doc.setFont('helvetica', 'bold');
-      doc.text(normalizeText('Salud (4%):'), margin, yPos);
+      doc.text(normalizeText(`Salud (${saludPorcentaje}%):`), margin, yPos);
       doc.setFont('helvetica', 'normal');
       doc.text(formatCurrency(saludEmpleado), margin + 40, yPos);
       yPos += lineHeight;
@@ -587,7 +611,7 @@ async function generateProfessionalVoucherPDF(payrollData: any): Promise<Uint8Ar
 
     if (pensionEmpleado > 0) {
       doc.setFont('helvetica', 'bold');
-      doc.text(normalizeText('Pension (4%):'), margin, yPos);
+      doc.text(normalizeText(`Pensión (${pensionPorcentaje}%):`), margin, yPos);
       doc.setFont('helvetica', 'normal');
       doc.text(formatCurrency(pensionEmpleado), margin + 40, yPos);
       yPos += lineHeight;
