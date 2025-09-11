@@ -15,14 +15,10 @@ import { useEmployeeNovedadesCacheStore } from '@/stores/employeeNovedadesCacheS
 import { PeriodSummaryCards } from '@/components/payroll-history/PeriodSummaryCards';
 import { ExpandedEmployeesTable } from '@/components/payroll-history/ExpandedEmployeesTable';
 import { formatCurrency } from '@/lib/utils';
-import { PendingNovedad, PeriodState } from '@/types/pending-adjustments';
-import { PendingNovedadesService, PendingAdjustmentData } from '@/services/PendingNovedadesService';
-import { ConfirmAdjustmentModal } from '@/components/payroll/corrections/ConfirmAdjustmentModal';
 import { NovedadUnifiedModal } from '@/components/payroll/novedades/NovedadUnifiedModal';
 import { NovedadExistingList } from '@/components/payroll/novedades/NovedadExistingList';
 import { PayrollRecalculationService } from '@/services/PayrollRecalculationService';
 import { NovedadesEnhancedService } from '@/services/NovedadesEnhancedService';
-import { PendingAdjustmentsService } from '@/services/PendingAdjustmentsService';
 import { useEditPeriod } from '@/hooks/useEditPeriod';
 import { EditPeriodMode } from '@/components/payroll-history/EditPeriodMode';
 import { PeriodAuditSummaryComponent } from '@/components/payroll/audit/PeriodAuditSummary';
@@ -414,21 +410,27 @@ export default function PayrollHistoryDetailPage() {
 
     try {
       if (periodData.estado === 'cerrado' && editState !== 'editing') {
-        // For closed periods not in edit mode, create pending adjustment
-        const pendingNovedad: PendingNovedad = {
-          employee_id: novedadData.empleado_id,
-          employee_name: `${employees.find(emp => emp.id === novedadData.empleado_id)?.nombre || ''} ${employees.find(emp => emp.id === novedadData.empleado_id)?.apellido || ''}`.trim(),
+        // For closed periods, user must activate edit mode first
+        toast({
+          title: "Período Cerrado",
+          description: "Active el modo de edición para realizar cambios en este período",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      if (editState === 'editing') {
+        // Use new editing system for periods in edit mode
+        addNovedad({
           tipo_novedad: novedadData.tipo_novedad,
+          subtipo: novedadData.subtipo,
           valor: novedadData.valor,
+          dias: novedadData.dias,
+          fecha_inicio: novedadData.fecha_inicio,
+          fecha_fin: novedadData.fecha_fin,
           observacion: novedadData.observacion,
-          novedadData: novedadData
-        };
-
-        // Save to database
-        await PendingAdjustmentsService.savePendingAdjustment(pendingNovedad);
-        
-        // Recalculate employee values to show immediate visual impact
-        await recalculateEmployeeValues(novedadData.empleado_id);
+          constitutivo_salario: novedadData.constitutivo_salario
+        });
         
         return { isPending: true };
       } else {
@@ -707,7 +709,7 @@ export default function PayrollHistoryDetailPage() {
         startDate={periodData?.fecha_inicio}
         endDate={periodData?.fecha_fin}
         companyId={periodData?.company_id || ''}
-        periodState={periodData?.estado as PeriodState}
+        periodState={periodData?.estado as any}
         currentLiquidatedValues={employees.find(e => e.id === selectedEmployeeId) ? {
           salario_base: employees.find(e => e.id === selectedEmployeeId)!.salario_base,
           ibc: employees.find(e => e.id === selectedEmployeeId)!.ibc,
