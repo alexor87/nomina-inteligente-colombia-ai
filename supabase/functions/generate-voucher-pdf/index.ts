@@ -131,17 +131,82 @@ serve(async (req) => {
       fileNameBase = `comprobante-${(data.employees.nombre || 'empleado').replace(/\s+/g, '-')}`;
       console.log('✅ Payroll data fetched successfully');
       console.log('🔍 Deduction values from DB - Salud:', data.salud_empleado, 'Pensión:', data.pension_empleado);
+
+      // 🔎 Si el registro está marcado como "is_stale", forzar re-liquidación puntual antes de generar el PDF
+      if (data.is_stale === true) {
+        console.log('♻️ Payroll está is_stale=true. Forzando re-liquidación puntual para PDF...');
+        try {
+          const invocation = await supabase.functions.invoke('reliquidate-period-adjustments', {
+            body: {
+              periodId: data.period_id,
+              affectedEmployeeIds: [data.employee_id],
+              justification: 'Auto-reliquidación al generar comprobante',
+              options: {
+                reliquidateScope: 'affected',
+                regenerateVouchers: false,
+                sendEmails: false
+              }
+            },
+            headers: { Authorization: authHeader }
+          });
+          if ((invocation as any).error) {
+            console.warn('⚠️ Error invocando re-liquidación puntual:', (invocation as any).error);
+          } else {
+            console.log('✅ Re-liquidación puntual realizada. Releyendo nómina fresca para PDF...');
+            const { data: fresh, error: refetchErr } = await supabase
+              .from('payrolls')
+              .select(`
+                *,
+                employees!inner(
+                  id,
+                  nombre,
+                  apellido,
+                  cedula,
+                  cargo,
+                  eps,
+                  afp,
+                  salario_base,
+                  estado
+                ),
+                payroll_periods_real!inner(
+                  id,
+                  periodo,
+                  fecha_inicio,
+                  fecha_fin,
+                  tipo_periodo
+                ),
+                companies!inner(
+                  id,
+                  razon_social,
+                  nit,
+                  direccion,
+                  ciudad,
+                  telefono,
+                  email,
+                  logo_url
+                )
+              `)
+              .eq('id', requestBody.payrollId)
+              .single();
+            if (!refetchErr && fresh) {
+              payrollData = fresh;
+            }
+          }
+        } catch (staleErr) {
+          console.warn('⚠️ Falló re-liquidación puntual para PDF (continuando con BD actual):', staleErr);
+        }
+      }
       
       // ✅ Confiar en valores de BD para el PDF
-      const dbTotalDeducciones = Number(data.total_deducciones);
-      const dbNeto = Number(data.neto_pagado);
+      const dbTotalDeducciones = Number(payrollData.total_deducciones);
+      const dbNeto = Number(payrollData.neto_pagado);
       if (Number.isFinite(dbTotalDeducciones)) {
         payrollData.total_deducciones = dbTotalDeducciones;
       }
       if (Number.isFinite(dbNeto)) {
         payrollData.neto_pagado = dbNeto;
       } else {
-        payrollData.neto_pagado = (Number(data.total_devengado) || 0) - (Number(payrollData.total_deducciones) || 0);
+        payrollData.neto_pagado = (Number(payrollData.total_devengado) || 0) - (Number(payrollData.total_deducciones) || 0);
       }
       console.log('💰 Usando valores de BD para PDF - Total deducciones:', payrollData.total_deducciones, 'Neto pagado:', payrollData.neto_pagado);
     } else if (requestBody.periodId && requestBody.employeeId) {
@@ -192,17 +257,83 @@ serve(async (req) => {
       payrollData = data;
       fileNameBase = `comprobante-${(data.employees.nombre || 'empleado').replace(/\s+/g, '-')}`;
       console.log('✅ Payroll data fetched by period/employee successfully');
-      
+
+      // 🔎 Si el registro está is_stale, forzar re-liquidación puntual del empleado para el período
+      if (data.is_stale === true) {
+        console.log('♻️ Payroll is_stale=true (period+employee). Forzando re-liquidación puntual para PDF...');
+        try {
+          const invocation = await supabase.functions.invoke('reliquidate-period-adjustments', {
+            body: {
+              periodId: data.period_id,
+              affectedEmployeeIds: [data.employee_id],
+              justification: 'Auto-reliquidación al generar comprobante (period+employee)',
+              options: {
+                reliquidateScope: 'affected',
+                regenerateVouchers: false,
+                sendEmails: false
+              }
+            },
+            headers: { Authorization: authHeader }
+          });
+          if ((invocation as any).error) {
+            console.warn('⚠️ Error invocando re-liquidación puntual:', (invocation as any).error);
+          } else {
+            console.log('✅ Re-liquidación puntual realizada. Releyendo nómina fresca...');
+            const { data: fresh, error: refetchErr } = await supabase
+              .from('payrolls')
+              .select(`
+                *,
+                employees!inner(
+                  id,
+                  nombre,
+                  apellido,
+                  cedula,
+                  cargo,
+                  eps,
+                  afp,
+                  salario_base,
+                  estado
+                ),
+                payroll_periods_real!inner(
+                  id,
+                  periodo,
+                  fecha_inicio,
+                  fecha_fin,
+                  tipo_periodo
+                ),
+                companies!inner(
+                  id,
+                  razon_social,
+                  nit,
+                  direccion,
+                  ciudad,
+                  telefono,
+                  email,
+                  logo_url
+                )
+              `)
+              .eq('period_id', requestBody.periodId)
+              .eq('employee_id', requestBody.employeeId)
+              .single();
+            if (!refetchErr && fresh) {
+              payrollData = fresh;
+            }
+          }
+        } catch (staleErr) {
+          console.warn('⚠️ Falló re-liquidación puntual para PDF (continuando con BD actual):', staleErr);
+        }
+      }
+
       // ✅ Confiar en valores de BD para el PDF
-      const dbTotalDeducciones = Number(data.total_deducciones);
-      const dbNeto = Number(data.neto_pagado);
+      const dbTotalDeducciones = Number(payrollData.total_deducciones);
+      const dbNeto = Number(payrollData.neto_pagado);
       if (Number.isFinite(dbTotalDeducciones)) {
         payrollData.total_deducciones = dbTotalDeducciones;
       }
       if (Number.isFinite(dbNeto)) {
         payrollData.neto_pagado = dbNeto;
       } else {
-        payrollData.neto_pagado = (Number(data.total_devengado) || 0) - (Number(payrollData.total_deducciones) || 0);
+        payrollData.neto_pagado = (Number(payrollData.total_devengado) || 0) - (Number(payrollData.total_deducciones) || 0);
       }
       console.log('💰 Usando valores de BD para PDF - Total deducciones:', payrollData.total_deducciones, 'Neto pagado:', payrollData.neto_pagado);
     } else if (requestBody.employee && requestBody.period) {
