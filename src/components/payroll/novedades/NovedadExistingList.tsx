@@ -237,7 +237,7 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
   // Create the delete handler
   const handleConfirmDelete = createDeleteHandler(
     deleteNovedad,
-    addPendingDeletion,
+    addPendingDeletion || (() => console.error('addPendingDeletion not available')),
     onEmployeeNovedadesChange,
     onPendingAdjustmentChange,
     setIntegratedData,
@@ -245,6 +245,11 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
     employeeId,
     employeeName
   );
+    
+  // Ensure delete handler is available
+  if (!addPendingDeletion) {
+    console.error('❌ addPendingDeletion prop not provided to NovedadExistingList');
+  }
 
   const onDeleteConfirm = (createPendingAdjustment: boolean) => {
     if (deleteConfirmModal.novedad) {

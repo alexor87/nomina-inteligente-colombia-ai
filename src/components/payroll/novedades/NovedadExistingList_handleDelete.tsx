@@ -30,13 +30,13 @@ export const createDeleteHandler = (
           constitutivo_salario: false // Default for most novedades
         });
 
-        // Trigger pending adjustment change callback
+        // Trigger pending adjustment change callback immediately
         if (onPendingAdjustmentChange) {
           onPendingAdjustmentChange();
         }
 
         toast({
-          title: "Ajuste pendiente creado",
+          title: "Ajuste de eliminación pendiente",
           description: `Se creó un ajuste para eliminar ${novedad.badgeLabel} en la próxima re-liquidación`,
           className: "border-orange-200 bg-orange-50"
         });

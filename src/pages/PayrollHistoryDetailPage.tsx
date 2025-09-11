@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -86,6 +86,20 @@ export default function PayrollHistoryDetailPage() {
     periodId: periodId || '', 
     companyId: periodData?.company_id || '' 
   });
+
+  // Force state refresh counter to trigger re-render when pending count changes
+  const [pendingUpdateTrigger, setPendingUpdateTrigger] = useState(0);
+  
+  // Enhanced addPendingDeletion that forces immediate re-render
+  const handleAddPendingDeletion = useCallback((
+    employeeId: string, 
+    employeeName: string, 
+    originalNovedad: any
+  ) => {
+    addPendingDeletion(employeeId, employeeName, originalNovedad);
+    // Force immediate re-render to update totalPendingCount
+    setPendingUpdateTrigger(prev => prev + 1);
+  }, [addPendingDeletion]);
   
   const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -806,7 +820,7 @@ export default function PayrollHistoryDetailPage() {
         onSubmit={handleNovedadSubmit}
         onClose={() => setShowAdjustmentModal(false)}
         onEmployeeNovedadesChange={handleEmployeeNovedadesChange}
-        addPendingDeletion={addPendingDeletion}
+        addPendingDeletion={handleAddPendingDeletion}
         selectedNovedadType={null}
         mode={periodData?.estado === 'cerrado' ? 'ajustes' : 'liquidacion'}
         startDate={periodData?.fecha_inicio}
