@@ -261,6 +261,42 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
     const { setLastRefreshTime } = useEmployeeNovedadesCacheStore.getState();
     
     try {
+      // Check if period is closed and we should create a pending adjustment
+      if (periodState === 'cerrado' && addPendingDeletion) {
+        console.log('🔄 Period is closed, creating pending deletion adjustment for vacation:', vacationId);
+        
+        // Find the vacation in the current data to get its details
+        const vacationNovedad = integratedData.find(n => n.id === vacationId);
+        if (vacationNovedad) {
+          // Create pending deletion adjustment
+          addPendingDeletion(employeeId, employeeName, {
+            id: vacationNovedad.id,
+            tipo_novedad: vacationNovedad.tipo_novedad,
+            subtipo: vacationNovedad.subtipo,
+            valor: vacationNovedad.valor,
+            dias: vacationNovedad.dias,
+            fecha_inicio: vacationNovedad.fecha_inicio,
+            fecha_fin: vacationNovedad.fecha_fin,
+            constitutivo_salario: false // Default for most novedades
+          });
+
+          // Trigger pending adjustment change callback immediately
+          if (onPendingAdjustmentChange) {
+            onPendingAdjustmentChange();
+          }
+
+          setVacationDetailModal({ isOpen: false, vacation: null });
+
+          toast({
+            title: "Ajuste de eliminación pendiente",
+            description: `Se creó un ajuste para eliminar ${vacationNovedad.badgeLabel} en la próxima re-liquidación`,
+            className: "border-orange-200 bg-orange-50"
+          });
+        }
+        return;
+      }
+      
+      // Period is open - delete directly
       console.log('🗑️ NovedadExistingList: Eliminando ausencia desde modal y actualizando cache global:', vacationId);
       
       const { error } = await supabase

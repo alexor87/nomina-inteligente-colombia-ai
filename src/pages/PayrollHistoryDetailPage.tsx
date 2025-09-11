@@ -826,6 +826,7 @@ export default function PayrollHistoryDetailPage() {
         startDate={periodData?.fecha_inicio}
         endDate={periodData?.fecha_fin}
         companyId={periodData?.company_id || ''}
+        periodState={periodData?.estado as PeriodState}
         currentLiquidatedValues={employees.find(e => e.id === selectedEmployeeId) ? {
           salario_base: employees.find(e => e.id === selectedEmployeeId)!.salario_base,
           ibc: employees.find(e => e.id === selectedEmployeeId)!.ibc,

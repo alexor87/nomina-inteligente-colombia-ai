@@ -12,6 +12,7 @@ import { NovedadDeduccionesConsolidatedForm } from './forms/NovedadDeduccionesCo
 import { NovedadRetefuenteForm } from './forms/NovedadRetefuenteForm';
 import { NovedadTypeSelector, NovedadCategory } from './NovedadTypeSelector';
 import { NovedadType, CreateNovedadData } from '@/types/novedades-enhanced';
+import { PeriodState } from '@/types/pending-adjustments';
 import { useToast } from '@/hooks/use-toast';
 import { NovedadRecargoConsolidatedForm } from './forms/NovedadRecargoConsolidatedForm';
 import { NovedadVacacionesConsolidatedForm } from './forms/NovedadVacacionesConsolidatedForm';
@@ -49,6 +50,7 @@ interface NovedadUnifiedModalProps {
   companyId?: string | null;
   currentLiquidatedValues?: EmployeeLiquidatedValues;
   addPendingDeletion?: (employeeId: string, employeeName: string, originalNovedad: any) => void;
+  periodState?: PeriodState;
 }
 
 const categoryToNovedadType: Record<NovedadCategory, NovedadType> = {
@@ -88,7 +90,8 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   mode = 'liquidacion',
   companyId,
   currentLiquidatedValues,
-  addPendingDeletion
+  addPendingDeletion,
+  periodState
 }) => {
   const [currentStep, setCurrentStep] = useState<'list' | 'selector' | 'form' | 'absence'>('list');
   const [selectedType, setSelectedType] = useState<NovedadType | null>(selectedNovedadType);
@@ -547,6 +550,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
             refreshTrigger={refreshTrigger}
             onEmployeeNovedadesChange={onEmployeeNovedadesChange}
             addPendingDeletion={addPendingDeletion}
+            periodState={periodState}
           />
         </div>
       );
