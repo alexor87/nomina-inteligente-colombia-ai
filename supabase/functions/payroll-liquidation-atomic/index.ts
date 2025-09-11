@@ -8,7 +8,7 @@ const corsHeaders = {
 }
 
 interface LiquidationRequest {
-  action: 'validate_pre_liquidation' | 'execute_atomic_liquidation'
+  action: 'validate_pre_liquidation' | 'execute_atomic_liquidation' | 'recalculate_payroll_values'
   data: {
     period_id: string
     company_id: string
@@ -62,6 +62,169 @@ serve(async (req) => {
       }
 
       return new Response(JSON.stringify({ success: true, validation }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    if (action === 'recalculate_payroll_values') {
+      console.log('🔄 Recalculando valores sin cerrar período:', data.period_id)
+
+      const authHeader = req.headers.get('Authorization') || ''
+      let initiatedBy: string | null = null
+      try {
+        const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
+        const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+        if (authHeader && supabaseUrl && supabaseAnonKey) {
+          const userSb = createClient(supabaseUrl, supabaseAnonKey, { global: { headers: { Authorization: authHeader } } })
+          const { data: userData } = await userSb.auth.getUser()
+          initiatedBy = userData?.user?.id ?? null
+        }
+      } catch (uErr) {
+        console.warn('⚠️ No se pudo identificar el usuario que inició el recálculo:', uErr)
+      }
+
+      const startTime = Date.now()
+      let runId: string | null = null
+      try {
+        const { data: run, error: runErr } = await supabaseClient
+          .from('payroll_calculation_runs')
+          .insert({ company_id: data.company_id, period_id: data.period_id, initiated_by: initiatedBy })
+          .select('id')
+          .maybeSingle()
+        runId = run?.id ?? null
+      } catch (insErr) {
+        console.warn('⚠️ No se pudo registrar cálculo en payroll_calculation_runs:', insErr)
+      }
+
+      // Obtener payrolls del período con salario_base del empleado
+      const { data: payrollsData, error: payrollsDataError } = await supabaseClient
+        .from('payrolls')
+        .select(`*, employees!inner(salario_base)`) 
+        .eq('period_id', data.period_id)
+        .eq('company_id', data.company_id)
+
+      if (payrollsDataError) {
+        throw new Error(`Error cargando payrolls del período: ${payrollsDataError.message}`)
+      }
+
+      const SMMLV_2025 = 1300000
+      const AUXILIO_TRANSPORTE_2025 = 200000
+
+      let successCount = 0
+      let failCount = 0
+
+      for (const payroll of payrollsData || []) {
+        try {
+          const salarioBase = Number(payroll.employees?.salario_base) || 0
+          const diasTrabajados = Number(payroll.dias_trabajados) || 30
+
+          // Novedades del período para este empleado
+          const { data: novedades } = await supabaseClient
+            .from('payroll_novedades')
+            .select('tipo_novedad, valor')
+            .eq('periodo_id', data.period_id)
+            .eq('empleado_id', payroll.employee_id)
+
+          const constitutiveTypes = ['horas_extra', 'recargo_nocturno', 'recargo_dominical', 'comision', 'bonificacion', 'vacaciones', 'licencia_remunerada', 'auxilio_conectividad']
+          const novedadesConstitutivas = (novedades || [])
+            .filter(n => constitutiveTypes.includes(n.tipo_novedad as string))
+            .reduce((sum: number, n: any) => sum + (Number(n.valor) || 0), 0)
+
+          const ibcBase = (salarioBase / 30) * diasTrabajados
+          let ibc = ibcBase + novedadesConstitutivas
+          ibc = Math.min(ibc, SMMLV_2025 * 25) // Tope máximo legal
+
+          const transportAllowance = salarioBase <= (SMMLV_2025 * 2) ? (AUXILIO_TRANSPORTE_2025 / 30) * diasTrabajados : 0
+          const healthDeduction = ibc * 0.04
+          const pensionDeduction = ibc * 0.04
+
+          const grossPay = ibcBase + transportAllowance + novedadesConstitutivas
+          const totalDeductions = Math.round(healthDeduction + pensionDeduction)
+          const netPay = Math.round(grossPay - totalDeductions)
+
+          const { error: updErr } = await supabaseClient
+            .from('payrolls')
+            .update({
+              ibc: Math.round(ibc),
+              auxilio_transporte: Math.round(transportAllowance),
+              salud_empleado: Math.round(healthDeduction),
+              pension_empleado: Math.round(pensionDeduction),
+              total_devengado: Math.round(grossPay),
+              total_deducciones: totalDeductions,
+              neto_pagado: netPay,
+              is_stale: false,
+              calculated_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', payroll.id)
+
+          if (updErr) {
+            failCount++
+            console.error(`❌ Error actualizando payroll ${payroll.id}:`, updErr)
+          } else {
+            successCount++
+          }
+        } catch (employeeError) {
+          failCount++
+          console.error(`❌ Error recalculando payroll ${payroll.id}:`, employeeError)
+        }
+      }
+
+      // Recalcular totales del período desde la BD
+      const { data: totalsRows, error: totalsErr } = await supabaseClient
+        .from('payrolls')
+        .select('total_devengado, total_deducciones, neto_pagado')
+        .eq('period_id', data.period_id)
+        .eq('company_id', data.company_id)
+
+      if (totalsErr) {
+        console.warn('⚠️ No se pudieron obtener totales para el período:', totalsErr)
+      }
+
+      const sums = (totalsRows || []).reduce((acc: any, r: any) => {
+        acc.devengado += Number(r.total_devengado) || 0
+        acc.deducciones += Number(r.total_deducciones) || 0
+        acc.neto += Number(r.neto_pagado) || 0
+        return acc
+      }, { devengado: 0, deducciones: 0, neto: 0 })
+
+      const { error: periodTotalsErr } = await supabaseClient
+        .from('payroll_periods_real')
+        .update({
+          total_devengado: sums.devengado,
+          total_deducciones: sums.deducciones,
+          total_neto: sums.neto,
+          calculated_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', data.period_id)
+
+      if (periodTotalsErr) {
+        console.warn('⚠️ Error actualizando totales del período:', periodTotalsErr)
+      }
+
+      // Finalizar run
+      if (runId) {
+        await supabaseClient
+          .from('payroll_calculation_runs')
+          .update({
+            total_employees: (payrollsData || []).length,
+            successful_calculations: successCount,
+            failed_calculations: failCount,
+            execution_time_ms: Date.now() - startTime,
+            completed_at: new Date().toISOString()
+          })
+          .eq('id', runId)
+      }
+
+      const response = {
+        success: true,
+        employees_processed: successCount,
+        period_id: data.period_id
+      }
+
+      console.log('✅ Recalculo y persistencia completados:', response)
+      return new Response(JSON.stringify(response), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }

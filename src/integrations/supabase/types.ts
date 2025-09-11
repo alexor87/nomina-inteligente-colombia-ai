@@ -1112,6 +1112,48 @@ export type Database = {
         }
         Relationships: []
       }
+      payroll_calculation_runs: {
+        Row: {
+          company_id: string
+          completed_at: string | null
+          created_at: string
+          error_message: string | null
+          execution_time_ms: number | null
+          failed_calculations: number
+          id: string
+          initiated_by: string | null
+          period_id: string
+          successful_calculations: number
+          total_employees: number
+        }
+        Insert: {
+          company_id: string
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          execution_time_ms?: number | null
+          failed_calculations?: number
+          id?: string
+          initiated_by?: string | null
+          period_id: string
+          successful_calculations?: number
+          total_employees?: number
+        }
+        Update: {
+          company_id?: string
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          execution_time_ms?: number | null
+          failed_calculations?: number
+          id?: string
+          initiated_by?: string | null
+          period_id?: string
+          successful_calculations?: number
+          total_employees?: number
+        }
+        Relationships: []
+      }
       payroll_novedades: {
         Row: {
           adjunto_url: string | null
@@ -1337,6 +1379,7 @@ export type Database = {
       }
       payroll_periods_real: {
         Row: {
+          calculated_at: string | null
           company_id: string
           created_at: string
           empleados_count: number | null
@@ -1355,6 +1398,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          calculated_at?: string | null
           company_id: string
           created_at?: string
           empleados_count?: number | null
@@ -1373,6 +1417,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          calculated_at?: string | null
           company_id?: string
           created_at?: string
           empleados_count?: number | null
@@ -1581,6 +1626,8 @@ export type Database = {
           auxilio_transporte: number | null
           bonificaciones: number | null
           bonificaciones_adicionales: number | null
+          calculated_at: string | null
+          calculation_hash: string | null
           cesantias: number | null
           comisiones: number | null
           company_id: string
@@ -1600,6 +1647,7 @@ export type Database = {
           id: string
           incapacidades: number | null
           intereses_cesantias: number | null
+          is_stale: boolean | null
           licencias_remuneradas: number | null
           neto_pagado: number | null
           otras_deducciones: number | null
@@ -1626,6 +1674,8 @@ export type Database = {
           auxilio_transporte?: number | null
           bonificaciones?: number | null
           bonificaciones_adicionales?: number | null
+          calculated_at?: string | null
+          calculation_hash?: string | null
           cesantias?: number | null
           comisiones?: number | null
           company_id: string
@@ -1645,6 +1695,7 @@ export type Database = {
           id?: string
           incapacidades?: number | null
           intereses_cesantias?: number | null
+          is_stale?: boolean | null
           licencias_remuneradas?: number | null
           neto_pagado?: number | null
           otras_deducciones?: number | null
@@ -1671,6 +1722,8 @@ export type Database = {
           auxilio_transporte?: number | null
           bonificaciones?: number | null
           bonificaciones_adicionales?: number | null
+          calculated_at?: string | null
+          calculation_hash?: string | null
           cesantias?: number | null
           comisiones?: number | null
           company_id?: string
@@ -1690,6 +1743,7 @@ export type Database = {
           id?: string
           incapacidades?: number | null
           intereses_cesantias?: number | null
+          is_stale?: boolean | null
           licencias_remuneradas?: number | null
           neto_pagado?: number | null
           otras_deducciones?: number | null

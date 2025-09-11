@@ -167,80 +167,44 @@ export default function PayrollHistoryDetailPage() {
     }
   }, [periodData]);
 
-  // Recalculate all employees using backend service
+  // Recalculate all employees using backend service (persisted in DB)
   const recalculateAllEmployees = async () => {
-    if (!periodData || employees.length === 0) return;
+    if (!periodData) return;
     
-    console.log('🔄 Recalculando todos los empleados...');
+    console.log('🔄 Recalculando y guardando todos los empleados en BD...');
     setIsRecalculatingAll(true);
     
     try {
-      const updatedEmployees = [...employees];
-      
-      for (const employee of employees) {
+      const result = await PayrollRecalculationService.recalculatePayrollValues(periodData.id, periodData.company_id);
+      if (result?.success) {
+        // Reload employees and period totals from DB to reflect persisted values
+        await loadEmployees();
         try {
-          // Get all novedades for this employee
-          const employeeNovedades = await getEmployeeNovedadesList(employee.id);
-          
-          // Convert novedades to IBC format
-          const novedadesForIBC = convertNovedadesToIBC(employeeNovedades);
-          
-          // Get period info for days calculation
-          const daysInfo = PayrollCalculationService.getDaysInfo({
-            tipo_periodo: periodData.tipo_periodo as 'quincenal' | 'mensual' | 'semanal',
-            fecha_inicio: periodData.fecha_inicio,
-            fecha_fin: periodData.fecha_fin
-          });
-
-          // Calculate using backend service
-          const calculationInput: PayrollCalculationInput = {
-            baseSalary: employee.salario_base,
-            workedDays: daysInfo.legalDays,
-            extraHours: 0,
-            disabilities: 0,
-            bonuses: 0,
-            absences: 0,
-            periodType: daysInfo.periodType === 'quincenal' ? 'quincenal' : 'mensual',
-            novedades: novedadesForIBC,
-            year: '2025'
-          };
-
-          const result = await PayrollCalculationBackendService.calculatePayroll(calculationInput);
-
-          // Update employee in the array
-          const employeeIndex = updatedEmployees.findIndex(emp => emp.id === employee.id);
-          if (employeeIndex >= 0) {
-            updatedEmployees[employeeIndex] = {
-              ...updatedEmployees[employeeIndex],
-              total_devengado: result.grossPay,
-              total_deducciones: result.totalDeductions,
-              neto_pagado: result.netPay,
-              ibc: result.ibc,
-              auxilio_transporte: result.transportAllowance,
-              salud_empleado: result.healthDeduction,
-              pension_empleado: result.pensionDeduction
-            };
-          }
-        } catch (error) {
-          console.error(`❌ Error recalculando empleado ${employee.nombre}:`, error);
+          const data = await PayrollHistoryService.getPeriodData(periodData.id);
+          setPeriodData(data);
+        } catch (pdErr) {
+          console.warn('⚠️ No se pudo refrescar datos del período:', pdErr);
         }
+
+        toast({
+          title: 'Recálculo guardado',
+          description: `Se actualizaron ${result.employees_processed} empleados`,
+        });
+      } else {
+        toast({
+          title: 'Recálculo incompleto',
+          description: 'No se pudieron actualizar todos los empleados',
+          variant: 'destructive',
+        });
       }
       
-      // Update all employees at once
-      setEmployees(updatedEmployees);
-      
-      toast({
-        title: "Recálculo completado",
-        description: `Valores actualizados para ${employees.length} empleados`,
-      });
-      
-      console.log('✅ Recálculo masivo completado');
+      console.log('✅ Recálculo persistente completado');
     } catch (error) {
-      console.error('❌ Error en recálculo masivo:', error);
+      console.error('❌ Error en recálculo persistente:', error);
       toast({
-        title: "Error en recálculo",
-        description: "No se pudieron recalcular todos los valores",
-        variant: "destructive",
+        title: 'Error en recálculo',
+        description: 'No se pudieron recalcular y guardar los valores',
+        variant: 'destructive',
       });
     } finally {
       setIsRecalculatingAll(false);
