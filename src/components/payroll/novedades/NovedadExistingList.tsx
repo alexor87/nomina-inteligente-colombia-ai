@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +14,7 @@ import { PendingAdjustmentsService, PendingAdjustmentRecord } from '@/services/P
 import { DeleteNovedadConfirmModal } from '@/components/payroll/corrections/DeleteNovedadConfirmModal';
 import { PeriodState } from '@/types/pending-adjustments';
 import { createDeleteHandler } from './NovedadExistingList_handleDelete';
+import { useUserCompany } from '@/hooks/useUserCompany';
 
 interface NovedadExistingListProps {
   employeeId: string;
@@ -54,10 +55,7 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
   }>({ isOpen: false, novedad: null });
   
   const { loadIntegratedNovedades, deleteNovedad } = useNovedades(periodId);
-  
-  // Get company ID for pending adjustments
-  const [companyId, setCompanyId] = useState<string | null>(null);
-  
+  const { companyId } = useUserCompany();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -95,27 +93,18 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
     return mappings[tipo] || tipo.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
   };
 
-  const fetchIntegratedData = async () => {
+  const fetchIntegratedData = useCallback(async () => {
+    if (!employeeId || !periodId) return;
+    
     setLoading(true);
     try {
-      // Load company ID if not set
-      if (!companyId) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('company_id')
-          .eq('user_id', (await supabase.auth.getUser()).data.user?.id)
-          .single();
-        
-        if (profile?.company_id) {
-          setCompanyId(profile.company_id);
-        }
-      }
-
-      const data = await loadIntegratedNovedades(employeeId);
-      setIntegratedData(data);
+      // Load novedades and pending adjustments in parallel
+      const [data, pendingData] = await Promise.all([
+        loadIntegratedNovedades(employeeId),
+        PendingAdjustmentsService.getPendingAdjustmentsForEmployee(employeeId, periodId)
+      ]);
       
-      // Load pending adjustments
-      const pendingData = await PendingAdjustmentsService.getPendingAdjustmentsForEmployee(employeeId, periodId);
+      setIntegratedData(data);
       setPendingAdjustments(pendingData);
       
       console.log('📊 NovedadExistingList: Datos cargados:', { 
@@ -134,19 +123,17 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [employeeId, periodId, loadIntegratedNovedades, toast]);
 
   useEffect(() => {
-    if (employeeId && periodId) {
-      fetchIntegratedData();
-    }
-  }, [employeeId, periodId]);
+    fetchIntegratedData();
+  }, [fetchIntegratedData]);
 
   useEffect(() => {
-    if (refreshTrigger && employeeId && periodId) {
+    if (refreshTrigger) {
       fetchIntegratedData();
     }
-  }, [refreshTrigger]);
+  }, [refreshTrigger, fetchIntegratedData]);
 
   const handleEditNovedad = (item: DisplayNovedad) => {
     toast({

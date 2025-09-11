@@ -21,7 +21,7 @@ export class PayrollIntegratedDataService {
         return [];
       }
 
-      // ✅ Obtener novedades y breakdown del backend
+      // ✅ Obtener novedades y breakdown del backend en paralelo (optimizado)
       const [novedadesData, breakdown] = await Promise.all([
         NovedadesEnhancedService.getNovedadesByEmployee(employeeId, periodId),
         NovedadesCalculationService.getEmployeeNovedadesBreakdown(employeeId, periodId)

@@ -11,29 +11,19 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from './use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useEmployeeNovedadesCacheStore } from '@/stores/employeeNovedadesCacheStore';
+import { useUserCompany } from './useUserCompany';
 
 export const useNovedades = (periodId: string) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { companyId } = useUserCompany();
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['novedades', periodId],
+    queryKey: ['novedades', periodId, companyId],
     queryFn: async () => {
-      if (!periodId) return [];
+      if (!periodId || !companyId) return [];
       try {
-        // Get company ID from user profile
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return [];
-
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('company_id')
-          .eq('user_id', user.id)
-          .single();
-        
-        if (!profile?.company_id) return [];
-
-        const novedades = await NovedadesEnhancedService.getNovedades(profile.company_id, periodId);
+        const novedades = await NovedadesEnhancedService.getNovedades(companyId, periodId);
         return novedades;
       } catch (error) {
         console.error("Error fetching novedades:", error);
@@ -45,24 +35,13 @@ export const useNovedades = (periodId: string) => {
         return [];
       }
     },
-    enabled: !!periodId,
+    enabled: !!periodId && !!companyId,
   });
 
   const createNovedad = useCallback(async (data: CreateNovedadData) => {
-    // Ensure company_id is present
-    if (!data.company_id) {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('company_id')
-          .eq('user_id', user.id)
-          .single();
-        
-        if (profile?.company_id) {
-          data.company_id = profile.company_id;
-        }
-      }
+    // Use cached company_id
+    if (!data.company_id && companyId) {
+      data.company_id = companyId;
     }
 
     if (!data.company_id) {
@@ -89,15 +68,14 @@ export const useNovedades = (periodId: string) => {
       console.error('Error creating novedad:', error);
       return { success: false, error: error.message };
     }
-  }, [refetch]);
+  }, [refetch, companyId]);
 
   const updateNovedad = useCallback(async (id: string, data: CreateNovedadData) => {
     try {
       const result = await NovedadesEnhancedService.updateNovedad(id, data);
       if (result) {
-        // Invalidate all novedades-related queries so other modules (e.g., liquidation) refresh automatically
-        queryClient.invalidateQueries({ queryKey: ['novedades'], exact: false });
-        queryClient.invalidateQueries({ queryKey: ['payroll-novedades-unified'], exact: false });
+        // Use specific invalidation to avoid excessive re-renders
+        queryClient.invalidateQueries({ queryKey: ['novedades', periodId, companyId] });
         await refetch();
         return { success: true, data: result };
       }
@@ -106,7 +84,7 @@ export const useNovedades = (periodId: string) => {
       console.error('Error updating novedad:', error);
       return { success: false, error: error.message };
     }
-  }, [refetch, queryClient]);
+  }, [refetch, queryClient, periodId, companyId]);
 
   const deleteNovedad = useCallback(async (id: string) => {
     const { removeNovedadFromCache, setLastRefreshTime } = useEmployeeNovedadesCacheStore.getState();
@@ -119,9 +97,8 @@ export const useNovedades = (periodId: string) => {
       removeNovedadFromCache(id);
       setLastRefreshTime(Date.now());
       
-      // Invalidate all novedades-related queries so other modules (e.g., liquidation) refresh automatically
-      queryClient.invalidateQueries({ queryKey: ['novedades'], exact: false });
-      queryClient.invalidateQueries({ queryKey: ['payroll-novedades-unified'], exact: false });
+      // Use specific invalidation to avoid excessive re-renders
+      queryClient.invalidateQueries({ queryKey: ['novedades', periodId, companyId] });
       await refetch();
       
       console.log('✅ useNovedades: Novedad eliminada y cache actualizado');
@@ -130,7 +107,7 @@ export const useNovedades = (periodId: string) => {
       console.error('❌ useNovedades: Error deleting novedad:', error);
       return { success: false, error: error.message };
     }
-  }, [refetch, queryClient]);
+  }, [refetch, queryClient, periodId, companyId]);
 
   // SOLUCIÓN KISS: Usar servicio simplificado que ya no duplica datos
   const loadIntegratedNovedades = useCallback(async (employeeId: string): Promise<DisplayNovedad[]> => {
