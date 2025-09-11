@@ -255,12 +255,6 @@ export default function PayrollHistoryDetailPage() {
       console.log('✅ Loaded employees from payrolls table:', expandedEmployees.length);
       console.log('Sample employee:', expandedEmployees[0]);
       
-      // Auto-recalculate all employees immediately after loading
-      if (expandedEmployees.length > 0) {
-        console.log('🔄 Starting immediate backend recalculation...');
-        recalculateAllEmployees();
-      }
-      
     } catch (error) {
       console.error('Error loading employees:', error);
       toast({
