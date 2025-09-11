@@ -422,6 +422,9 @@ export default function PayrollHistoryDetailPage() {
         // Also add to local state for immediate display
         addPendingNovedad(pendingNovedad);
         
+        // Recalculate employee values to show immediate visual impact
+        await recalculateEmployeeValues(novedadData.empleado_id);
+        
         return { isPending: true };
       } else {
         // Apply immediately for open periods
@@ -591,7 +594,9 @@ export default function PayrollHistoryDetailPage() {
     console.log('🔄 Employee novedades changed for:', employeeId, 'refreshing UI...');
     // Clear any pending novelties for this employee to sync badges
     removePendingNovedadesForEmployee(employeeId);
-    refetchNovedades();
+    await refetchNovedades();
+    // Recalculate employee values to show updated calculations immediately
+    await recalculateEmployeeValues(employeeId);
   };
 
   if (!periodId) {
