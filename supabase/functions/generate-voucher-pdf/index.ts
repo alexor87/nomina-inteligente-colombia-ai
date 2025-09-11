@@ -132,31 +132,18 @@ serve(async (req) => {
       console.log('✅ Payroll data fetched successfully');
       console.log('🔍 Deduction values from DB - Salud:', data.salud_empleado, 'Pensión:', data.pension_empleado);
       
-      // 🚨 RECALCULAR DEDUCCIONES Y VERIFICAR INTEGRIDAD
-      const calculatedSalud = Number(data.salud_empleado) || 0;
-      const calculatedPension = Number(data.pension_empleado) || 0;
-      const calculatedTotalDeducciones = calculatedSalud + calculatedPension;
-      const dbTotalDeducciones = Number(data.total_deducciones) || 0;
-      
-      console.log('🔍 Verificando integridad de deducciones:');
-      console.log('   - Salud calculada:', calculatedSalud);
-      console.log('   - Pensión calculada:', calculatedPension);
-      console.log('   - Total calculado:', calculatedTotalDeducciones);
-      console.log('   - Total en BD:', dbTotalDeducciones);
-      
-      if (Math.abs(calculatedTotalDeducciones - dbTotalDeducciones) > 1) {
-        console.warn('⚠️ DISCREPANCIA EN DEDUCCIONES DETECTADA:');
-        console.warn('   - BD dice:', dbTotalDeducciones);
-        console.warn('   - Calculado:', calculatedTotalDeducciones);
-        console.warn('   - Diferencia:', Math.abs(calculatedTotalDeducciones - dbTotalDeducciones));
-        
-        // Usar valores calculados (correctos) en lugar de BD corrupta
-        payrollData.total_deducciones = calculatedTotalDeducciones;
-        payrollData.neto_pagado = (Number(data.total_devengado) || 0) - calculatedTotalDeducciones;
-        
-        console.log('✅ Usando valores recalculados - Total deducciones:', payrollData.total_deducciones);
-        console.log('✅ Usando valores recalculados - Neto pagado:', payrollData.neto_pagado);
+      // ✅ Confiar en valores de BD para el PDF
+      const dbTotalDeducciones = Number(data.total_deducciones);
+      const dbNeto = Number(data.neto_pagado);
+      if (Number.isFinite(dbTotalDeducciones)) {
+        payrollData.total_deducciones = dbTotalDeducciones;
       }
+      if (Number.isFinite(dbNeto)) {
+        payrollData.neto_pagado = dbNeto;
+      } else {
+        payrollData.neto_pagado = (Number(data.total_devengado) || 0) - (Number(payrollData.total_deducciones) || 0);
+      }
+      console.log('💰 Usando valores de BD para PDF - Total deducciones:', payrollData.total_deducciones, 'Neto pagado:', payrollData.neto_pagado);
     } else if (requestBody.periodId && requestBody.employeeId) {
       console.log('✅ PeriodId and EmployeeId found in request:', requestBody.periodId, requestBody.employeeId);
       console.log('🔍 Fetching payroll by period and employee from database');
@@ -206,31 +193,18 @@ serve(async (req) => {
       fileNameBase = `comprobante-${(data.employees.nombre || 'empleado').replace(/\s+/g, '-')}`;
       console.log('✅ Payroll data fetched by period/employee successfully');
       
-      // 🚨 RECALCULAR DEDUCCIONES Y VERIFICAR INTEGRIDAD
-      const calculatedSalud = Number(data.salud_empleado) || 0;
-      const calculatedPension = Number(data.pension_empleado) || 0;
-      const calculatedTotalDeducciones = calculatedSalud + calculatedPension;
-      const dbTotalDeducciones = Number(data.total_deducciones) || 0;
-      
-      console.log('🔍 Verificando integridad de deducciones:');
-      console.log('   - Salud calculada:', calculatedSalud);
-      console.log('   - Pensión calculada:', calculatedPension);
-      console.log('   - Total calculado:', calculatedTotalDeducciones);
-      console.log('   - Total en BD:', dbTotalDeducciones);
-      
-      if (Math.abs(calculatedTotalDeducciones - dbTotalDeducciones) > 1) {
-        console.warn('⚠️ DISCREPANCIA EN DEDUCCIONES DETECTADA:');
-        console.warn('   - BD dice:', dbTotalDeducciones);
-        console.warn('   - Calculado:', calculatedTotalDeducciones);
-        console.warn('   - Diferencia:', Math.abs(calculatedTotalDeducciones - dbTotalDeducciones));
-        
-        // Usar valores calculados (correctos) en lugar de BD corrupta
-        payrollData.total_deducciones = calculatedTotalDeducciones;
-        payrollData.neto_pagado = (Number(data.total_devengado) || 0) - calculatedTotalDeducciones;
-        
-        console.log('✅ Usando valores recalculados - Total deducciones:', payrollData.total_deducciones);
-        console.log('✅ Usando valores recalculados - Neto pagado:', payrollData.neto_pagado);
+      // ✅ Confiar en valores de BD para el PDF
+      const dbTotalDeducciones = Number(data.total_deducciones);
+      const dbNeto = Number(data.neto_pagado);
+      if (Number.isFinite(dbTotalDeducciones)) {
+        payrollData.total_deducciones = dbTotalDeducciones;
       }
+      if (Number.isFinite(dbNeto)) {
+        payrollData.neto_pagado = dbNeto;
+      } else {
+        payrollData.neto_pagado = (Number(data.total_devengado) || 0) - (Number(payrollData.total_deducciones) || 0);
+      }
+      console.log('💰 Usando valores de BD para PDF - Total deducciones:', payrollData.total_deducciones, 'Neto pagado:', payrollData.neto_pagado);
     } else if (requestBody.employee && requestBody.period) {
       // Modo mejorado: intentar resolver SIEMPRE desde la BD usando employee.id + periodo
       console.log('ℹ️ Using employee + period payload; attempting DB resolution');
@@ -351,34 +325,8 @@ serve(async (req) => {
         throw new Error('Provide payrollId, (periodId + employeeId), or (employee + period)');
       }
 
-    // Recalcular total devengado con backend para asegurar neto correcto
-    try {
-      const periodInfo = payrollData?.payroll_periods_real;
-      const employeeInfo = payrollData?.employees || {};
-      const baseSalary = Number(employeeInfo.salario_base ?? payrollData.salario_base ?? 0);
-      const workedDays = Number(payrollData.dias_trabajados ?? 0) || 0;
-      const periodType = periodInfo?.tipo_periodo || 'mensual';
-      const startDate = periodInfo?.fecha_inicio ? new Date(periodInfo.fecha_inicio) : null;
-      const year = startDate ? String(startDate.getUTCFullYear()) : String(new Date().getUTCFullYear());
-      const invokeBody = { action: 'calculate', data: { baseSalary, workedDays, extraHours: 0, disabilities: 0, bonuses: 0, absences: 0, periodType, year } };
-      console.log('📊 Recalculating gross via payroll-calculations:', JSON.stringify(invokeBody));
-      const { data: calcData, error: calcError } = await supabase.functions.invoke('payroll-calculations', { body: invokeBody });
-      if (!calcError && calcData) {
-        const backendGross = Number((calcData as any).grossPay ?? 0);
-        const priorGross = Number(payrollData.total_devengado ?? 0);
-        console.log('💡 Gross comparison - DB:', priorGross, 'Backend:', backendGross);
-        if (backendGross > 0 && Math.abs(backendGross - priorGross) > 1) {
-          const finalDeducciones = Number(payrollData.total_deducciones ?? 0);
-          payrollData.total_devengado = backendGross;
-          payrollData.neto_pagado = backendGross - finalDeducciones;
-          console.log('✅ Overriding totals for PDF - Total devengado:', backendGross, 'Neto:', payrollData.neto_pagado);
-        }
-      } else {
-        console.warn('⚠️ payroll-calculations invoke failed:', calcError);
-      }
-    } catch (e) {
-      console.warn('⚠️ Exception recalculating gross:', e);
-    }
+    // ⛔ Sin recálculos: el PDF refleja exactamente los valores almacenados en BD
+    //    (solo se usa cálculo cuando no existe registro en BD y se usa el payload simple)
 
     // === Generación de PDF ===
     const pdfBytes = await generateProfessionalVoucherPDF(payrollData);
