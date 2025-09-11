@@ -25,8 +25,6 @@ import { PeriodAuditSummaryComponent } from '@/components/payroll/audit/PeriodAu
 import { PayrollCalculationBackendService, PayrollCalculationInput } from '@/services/PayrollCalculationBackendService';
 import { PayrollCalculationService } from '@/services/PayrollCalculationService';
 import { convertNovedadesToIBC } from '@/utils/payrollCalculationsBackend';
-import { PeriodEditingTestSuite } from '@/components/testing/PeriodEditingTestSuite';
-import { PeriodEditingUIValidator } from '@/components/testing/PeriodEditingUIValidator';
 
 // Use PayrollPeriodData from service instead of local interface
 
@@ -729,25 +727,6 @@ export default function PayrollHistoryDetailPage() {
           }
         }}
       />
-
-      {/* Testing Suite - Solo para desarrollo */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="mt-8 space-y-6">
-          <PeriodEditingUIValidator
-            editState={editState}
-            hasChanges={hasChanges}
-            totalChangesCount={totalChangesCount}
-            isValid={isValid}
-            validationErrors={validationErrors}
-            editingSession={editingSession}
-          />
-          
-          <PeriodEditingTestSuite 
-            periodId={periodId || ''} 
-            companyId={periodData?.company_id}
-          />
-        </div>
-      )}
 
       {/* Keep minimal modals for compatibility */}
     </div>
