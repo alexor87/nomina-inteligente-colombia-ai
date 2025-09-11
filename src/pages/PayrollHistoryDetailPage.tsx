@@ -113,7 +113,7 @@ export default function PayrollHistoryDetailPage() {
       console.log('🔄 Global store updated, refreshing novedades...');
       refetchNovedades();
     }
-  }, [lastRefreshTime, refetchNovedades, periodData?.company_id, periodId]);
+  }, [lastRefreshTime, periodData?.company_id, periodId]);
 
   // Load period data
   useEffect(() => {
