@@ -113,7 +113,7 @@ export default function PayrollHistoryDetailPage() {
       console.log('🔄 Global store updated, refreshing novedades...');
       refetchNovedades();
     }
-  }, [lastRefreshTime, periodData?.company_id, periodId]);
+  }, [lastRefreshTime, refetchNovedades, periodData?.company_id, periodId]);
 
   // Load period data
   useEffect(() => {
@@ -167,44 +167,80 @@ export default function PayrollHistoryDetailPage() {
     }
   }, [periodData]);
 
-  // Recalculate all employees using backend service (persisted in DB)
+  // Recalculate all employees using backend service
   const recalculateAllEmployees = async () => {
-    if (!periodData) return;
+    if (!periodData || employees.length === 0) return;
     
-    console.log('🔄 Recalculando y guardando todos los empleados en BD...');
+    console.log('🔄 Recalculando todos los empleados...');
     setIsRecalculatingAll(true);
     
     try {
-      const result = await PayrollRecalculationService.recalculatePayrollValues(periodData.id, periodData.company_id);
-      if (result?.success) {
-        // Reload employees and period totals from DB to reflect persisted values
-        await loadEmployees();
+      const updatedEmployees = [...employees];
+      
+      for (const employee of employees) {
         try {
-          const data = await PayrollHistoryService.getPeriodData(periodData.id);
-          setPeriodData(data);
-        } catch (pdErr) {
-          console.warn('⚠️ No se pudo refrescar datos del período:', pdErr);
-        }
+          // Get all novedades for this employee
+          const employeeNovedades = await getEmployeeNovedadesList(employee.id);
+          
+          // Convert novedades to IBC format
+          const novedadesForIBC = convertNovedadesToIBC(employeeNovedades);
+          
+          // Get period info for days calculation
+          const daysInfo = PayrollCalculationService.getDaysInfo({
+            tipo_periodo: periodData.tipo_periodo as 'quincenal' | 'mensual' | 'semanal',
+            fecha_inicio: periodData.fecha_inicio,
+            fecha_fin: periodData.fecha_fin
+          });
 
-        toast({
-          title: 'Recálculo guardado',
-          description: `Se actualizaron ${result.employees_processed} empleados`,
-        });
-      } else {
-        toast({
-          title: 'Recálculo incompleto',
-          description: 'No se pudieron actualizar todos los empleados',
-          variant: 'destructive',
-        });
+          // Calculate using backend service
+          const calculationInput: PayrollCalculationInput = {
+            baseSalary: employee.salario_base,
+            workedDays: daysInfo.legalDays,
+            extraHours: 0,
+            disabilities: 0,
+            bonuses: 0,
+            absences: 0,
+            periodType: daysInfo.periodType === 'quincenal' ? 'quincenal' : 'mensual',
+            novedades: novedadesForIBC,
+            year: '2025'
+          };
+
+          const result = await PayrollCalculationBackendService.calculatePayroll(calculationInput);
+
+          // Update employee in the array
+          const employeeIndex = updatedEmployees.findIndex(emp => emp.id === employee.id);
+          if (employeeIndex >= 0) {
+            updatedEmployees[employeeIndex] = {
+              ...updatedEmployees[employeeIndex],
+              total_devengado: result.grossPay,
+              total_deducciones: result.totalDeductions,
+              neto_pagado: result.netPay,
+              ibc: result.ibc,
+              auxilio_transporte: result.transportAllowance,
+              salud_empleado: result.healthDeduction,
+              pension_empleado: result.pensionDeduction
+            };
+          }
+        } catch (error) {
+          console.error(`❌ Error recalculando empleado ${employee.nombre}:`, error);
+        }
       }
       
-      console.log('✅ Recálculo persistente completado');
-    } catch (error) {
-      console.error('❌ Error en recálculo persistente:', error);
+      // Update all employees at once
+      setEmployees(updatedEmployees);
+      
       toast({
-        title: 'Error en recálculo',
-        description: 'No se pudieron recalcular y guardar los valores',
-        variant: 'destructive',
+        title: "Recálculo completado",
+        description: `Valores actualizados para ${employees.length} empleados`,
+      });
+      
+      console.log('✅ Recálculo masivo completado');
+    } catch (error) {
+      console.error('❌ Error en recálculo masivo:', error);
+      toast({
+        title: "Error en recálculo",
+        description: "No se pudieron recalcular todos los valores",
+        variant: "destructive",
       });
     } finally {
       setIsRecalculatingAll(false);
@@ -254,6 +290,12 @@ export default function PayrollHistoryDetailPage() {
       
       console.log('✅ Loaded employees from payrolls table:', expandedEmployees.length);
       console.log('Sample employee:', expandedEmployees[0]);
+      
+      // Auto-recalculate all employees immediately after loading
+      if (expandedEmployees.length > 0) {
+        console.log('🔄 Starting immediate backend recalculation...');
+        recalculateAllEmployees();
+      }
       
     } catch (error) {
       console.error('Error loading employees:', error);
