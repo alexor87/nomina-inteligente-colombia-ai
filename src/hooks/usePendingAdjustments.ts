@@ -137,11 +137,10 @@ export const usePendingAdjustments = ({ periodId, companyId }: UsePendingAdjustm
         empleado_id: employeeId,
         periodo_id: periodId,
         company_id: companyId
-      }
-      }
-    };
+       }
+     };
 
-    setPendingNovedades(prev => [...prev, deletionAdjustment]);
+     setPendingNovedades(prev => [...prev, deletionAdjustment]);
     
     toast({
       title: "Eliminación agregada a ajustes pendientes",
