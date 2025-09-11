@@ -748,7 +748,10 @@ export default function PayrollHistoryDetailPage() {
           getPendingCount={getPendingCount}
           calculateEmployeePreview={calculateEmployeePreview}
           isRecalculatingBackend={isRecalculatingAll}
-          periodData={periodData}
+          periodData={periodData ? {
+            ...periodData,
+            id: periodId // Add period ID for PDF generation lookup
+          } : undefined}
         />
             )}
           </TabsContent>

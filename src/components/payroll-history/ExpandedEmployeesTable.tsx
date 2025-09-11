@@ -55,6 +55,7 @@ interface ExpandedEmployeesTableProps {
   isRecalculatingBackend?: boolean; // New prop to show backend loading state
   // New props for voucher preview functionality
   periodData?: {
+    id?: string; // Add period ID
     fecha_inicio: string;
     fecha_fin: string;
     tipo_periodo: string;
@@ -482,6 +483,7 @@ export const ExpandedEmployeesTable = ({
           type: periodData.tipo_periodo
         } : null}
         payrollId={selectedPayrollId}
+        periodId={periodData?.id} // Pass period ID for backend lookup
         companyInfo={companyDetails ? {
           razon_social: companyDetails.razon_social,
           nit: companyDetails.nit,

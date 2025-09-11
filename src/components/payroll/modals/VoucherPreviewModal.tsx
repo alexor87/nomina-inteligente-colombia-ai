@@ -27,6 +27,7 @@ interface VoucherPreviewModalProps {
     logo_url?: string;
   } | null;
   payrollId?: string; // Optional payroll ID for historical data
+  periodId?: string; // Optional period ID for backend calculation lookup
 }
 
 export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
@@ -35,7 +36,8 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
   employee,
   period,
   companyInfo,
-  payrollId
+  payrollId,
+  periodId
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
@@ -58,12 +60,25 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
       console.log('🚀 INICIANDO DESCARGA PDF NATIVO para:', employee.name);
       console.log('🔍 Employee object received in modal:', employee);
       console.log('🔍 PayrollId prop:', payrollId);
+      console.log('🔍 PeriodId prop:', periodId);
       console.log('🔍 Employee.id (fallback):', employee.id);
       
-      // Use payrollId if provided (for historical data), otherwise use employee data
-      const requestBody = payrollId 
-        ? { payrollId: payrollId }
-        : { employee, period, returnBase64: false };
+      // Prioridad: payrollId > periodId+employeeId > employee data fallback
+      let requestBody: any;
+      
+      if (payrollId) {
+        console.log('📋 Usando payrollId para datos históricos exactos');
+        requestBody = { payrollId: payrollId };
+      } else if (periodId && employee.id) {
+        console.log('📋 Usando periodId + employeeId para búsqueda directa en BD');
+        requestBody = { 
+          periodId: periodId, 
+          employeeId: employee.id 
+        };
+      } else {
+        console.log('📋 Fallback a datos del empleado + período');
+        requestBody = { employee, period, returnBase64: false };
+      }
 
       console.log('📤 Enviando request al generador nativo:', JSON.stringify(requestBody, null, 2));
 

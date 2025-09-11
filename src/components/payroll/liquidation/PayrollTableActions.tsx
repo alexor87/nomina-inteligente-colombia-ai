@@ -122,6 +122,7 @@ export const PayrollTableActions: React.FC<PayrollTableActionsProps> = ({
         onClose={() => setShowVoucherPreview(false)}
         employee={employee}
         period={period}
+        periodId={periodId}
       />
 
       {/* Dialog de Envío del Comprobante */}
