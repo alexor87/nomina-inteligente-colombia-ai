@@ -713,6 +713,14 @@ export default function PayrollHistoryDetailPage() {
           total_deducciones: employees.find(e => e.id === selectedEmployeeId)!.total_deducciones,
           neto_pagado: employees.find(e => e.id === selectedEmployeeId)!.neto_pagado
         } : undefined}
+        editMode={editState === 'editing'}
+        onNovedadChange={(action, novedadData) => {
+          if (action === 'add') {
+            addNovedad(novedadData);
+          } else if (action === 'remove') {
+            removeNovedad(novedadData.empleado_id); // This would need the ID, but for now this handles add
+          }
+        }}
       />
 
       {/* Keep minimal modals for compatibility */}
