@@ -75,13 +75,14 @@ export default function PayrollHistoryDetailPage() {
     totalPendingCount,
     isApplying,
     addPendingNovedad,
+    addPendingDeletion,
     clearAllPending,
     applyPendingAdjustments: applyAdjustments,
     getPendingCount,
     calculateEmployeePreview,
     removePendingNovedadesForEmployee,
     loadPendingFromDatabase
-  } = usePendingAdjustments({ 
+  } = usePendingAdjustments({
     periodId: periodId || '', 
     companyId: periodData?.company_id || '' 
   });
@@ -805,6 +806,7 @@ export default function PayrollHistoryDetailPage() {
         onSubmit={handleNovedadSubmit}
         onClose={() => setShowAdjustmentModal(false)}
         onEmployeeNovedadesChange={handleEmployeeNovedadesChange}
+        addPendingDeletion={addPendingDeletion}
         selectedNovedadType={null}
         mode={periodData?.estado === 'cerrado' ? 'ajustes' : 'liquidacion'}
         startDate={periodData?.fecha_inicio}

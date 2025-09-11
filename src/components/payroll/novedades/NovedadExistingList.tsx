@@ -13,7 +13,6 @@ import { useEmployeeNovedadesCacheStore } from '@/stores/employeeNovedadesCacheS
 import { PendingAdjustmentsService, PendingAdjustmentRecord } from '@/services/PendingAdjustmentsService';
 import { DeleteNovedadConfirmModal } from '@/components/payroll/corrections/DeleteNovedadConfirmModal';
 import { PeriodState } from '@/types/pending-adjustments';
-import { usePendingAdjustments } from '@/hooks/usePendingAdjustments';
 import { createDeleteHandler } from './NovedadExistingList_handleDelete';
 
 interface NovedadExistingListProps {
@@ -26,6 +25,7 @@ interface NovedadExistingListProps {
   onEmployeeNovedadesChange?: (employeeId: string) => Promise<void>;
   periodState?: PeriodState;
   onPendingAdjustmentChange?: () => void;
+  addPendingDeletion?: (employeeId: string, employeeName: string, originalNovedad: any) => void;
 }
 
 export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
@@ -37,7 +37,8 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
   refreshTrigger,
   onEmployeeNovedadesChange,
   periodState = 'borrador',
-  onPendingAdjustmentChange
+  onPendingAdjustmentChange,
+  addPendingDeletion
 }) => {
   const [integratedData, setIntegratedData] = useState<DisplayNovedad[]>([]);
   const [pendingAdjustments, setPendingAdjustments] = useState<PendingAdjustmentRecord[]>([]);
@@ -56,12 +57,6 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
   
   // Get company ID for pending adjustments
   const [companyId, setCompanyId] = useState<string | null>(null);
-  
-  // Initialize pending adjustments hook
-  const { addPendingDeletion } = usePendingAdjustments({ 
-    periodId, 
-    companyId: companyId || '' 
-  });
   
   const { toast } = useToast();
   const navigate = useNavigate();
