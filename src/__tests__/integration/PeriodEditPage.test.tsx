@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render } from '@testing-library/react';
+import { screen, fireEvent, waitFor } from '@testing-library/dom';
 import '@testing-library/jest-dom';
 import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -93,14 +94,14 @@ describe('PeriodEditPage Integration Tests', () => {
   it('should load period and employee data correctly', async () => {
     // Arrange
     const mockSupabase = await import('@/integrations/supabase/client');
-    mockSupabase.supabase.from = vi.fn(() => ({
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      single: vi.fn().mockResolvedValue({
-        data: mockPayrollPeriod,
-        error: null,
-      }),
-    }));
+(mockSupabase as any).supabase.from = vi.fn(() => ({
+  select: vi.fn().mockReturnThis(),
+  eq: vi.fn().mockReturnThis(),
+  single: vi.fn().mockResolvedValue({
+    data: mockPayrollPeriod,
+    error: null,
+  }),
+})) as any;
 
     // Act
     render(
@@ -126,18 +127,17 @@ describe('PeriodEditPage Integration Tests', () => {
     // Assert
     expect(screen.getByText('Cargando...')).toBeInTheDocument();
   });
-
   it('should handle period not found', async () => {
     // Arrange
     const mockSupabase = await import('@/integrations/supabase/client');
-    mockSupabase.supabase.from = vi.fn(() => ({
+    (mockSupabase as any).supabase.from = vi.fn(() => ({
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
       single: vi.fn().mockResolvedValue({
         data: null,
         error: { message: 'Period not found' },
       }),
-    }));
+    })) as any;
 
     // Act
     render(
