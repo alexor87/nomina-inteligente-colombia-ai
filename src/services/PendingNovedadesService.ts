@@ -110,6 +110,25 @@ export class PendingNovedadesService {
 
       console.log('✅ Re-liquidation completed:', reliquidationResult);
 
+      // 🧹 Clean up applied pending adjustments from the database so they don't reappear on reload
+      try {
+        if (affectedEmployeeIds.length > 0) {
+          const { error: deleteError } = await supabase
+            .from('pending_payroll_adjustments')
+            .delete()
+            .eq('period_id', data.periodId)
+            .in('employee_id', affectedEmployeeIds);
+
+          if (deleteError) {
+            console.warn('⚠️ Applied successfully but failed to clean pending records:', deleteError);
+          } else {
+            console.log(`🧹 Cleaned pending adjustments for ${affectedEmployeeIds.length} employee(s) in period ${data.periodo}`);
+          }
+        }
+      } catch (cleanupError) {
+        console.warn('⚠️ Cleanup of pending adjustments failed:', cleanupError);
+      }
+
       return {
         success: true,
         message: `Successfully applied ${adjustmentsApplied} adjustments and re-liquidated ${reliquidationResult.employeesAffected} employees`,
