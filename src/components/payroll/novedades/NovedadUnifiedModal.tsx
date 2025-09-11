@@ -53,6 +53,15 @@ interface NovedadUnifiedModalProps {
   periodState?: PeriodState;
   // New props for edit mode integration
   editMode?: boolean;
+  editState?: 'closed' | 'editing' | 'saving' | 'discarding';
+  pendingChanges?: {
+    novedades: {
+      added: any[];
+      modified: any[];
+      deleted: string[];
+    };
+  };
+  onRemoveNovedad?: (novedadId: string) => void;
   onNovedadChange?: (action: 'add' | 'remove', novedadData: CreateNovedadData) => void;
 }
 
@@ -96,6 +105,9 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   addPendingDeletion,
   periodState,
   editMode = false,
+  editState,
+  pendingChanges,
+  onRemoveNovedad,
   onNovedadChange
 }) => {
   const [currentStep, setCurrentStep] = useState<'list' | 'selector' | 'form' | 'absence'>('list');
@@ -610,6 +622,10 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
             onEmployeeNovedadesChange={onEmployeeNovedadesChange}
             addPendingDeletion={addPendingDeletion}
             periodState={periodState}
+            editState={editState}
+            pendingChanges={pendingChanges}
+            onAddNovedad={onNovedadChange ? (novedadData) => onNovedadChange('add', novedadData) : undefined}
+            onRemoveNovedad={onRemoveNovedad}
           />
         </div>
       );

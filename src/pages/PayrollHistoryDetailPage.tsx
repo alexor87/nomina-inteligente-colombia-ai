@@ -639,59 +639,70 @@ export default function PayrollHistoryDetailPage() {
 
       {/* Content Section */}
       <div className="px-6 space-y-6">
-        <Tabs defaultValue="employees" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="employees" className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              Empleados
-            </TabsTrigger>
-            <TabsTrigger value="audit" className="flex items-center gap-2">
-              <History className="h-4 w-4" />
-              Auditoría
-            </TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="employees">
-            {isLoadingEmployees ? (
-              <div className="flex items-center justify-center min-h-[200px]">
-                <div className="text-center">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto mb-2"></div>
-                  <p className="text-sm text-muted-foreground">Cargando empleados...</p>
-                </div>
-              </div>
-            ) : employees.length === 0 ? (
-              <div className="text-center py-12">
-                <Users className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium mb-2">Sin empleados liquidados</h3>
-                <p className="text-sm text-muted-foreground">
-                  No hay empleados liquidados en este período.
-                </p>
-              </div>
-            ) : (
-        <ExpandedEmployeesTable
-          employees={employees}
-          novedades={novedadesByEmployee}
-          onAddNovedad={handleAddNovedad}
-          onEditNovedad={handleEditNovedad}
-          canEdit={editState === 'editing' || periodData?.estado !== 'cerrado'}
+        <EditPeriodMode
           editState={editState}
-          pendingChanges={pendingChanges}
-          isRecalculatingBackend={isRecalculatingAll}
-         periodData={periodData ? {
-           ...periodData,
-           id: periodId || ''
-         } : undefined}
-        />
-            )}
-          </TabsContent>
-          
-          <TabsContent value="audit">
-            <PeriodAuditSummaryComponent 
-              periodId={periodId || ''} 
-              periodName={periodData?.periodo || ''} 
-            />
-          </TabsContent>
-        </Tabs>
+          hasChanges={hasChanges}
+          totalChangesCount={totalChangesCount}
+          isValid={isValid}
+          validationErrors={validationErrors}
+          onStartEditing={startEditing}
+          onApplyChanges={applyChanges}
+          onDiscardChanges={discardChanges}
+        >
+          <Tabs defaultValue="employees" className="space-y-4">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="employees" className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Empleados
+              </TabsTrigger>
+              <TabsTrigger value="audit" className="flex items-center gap-2">
+                <History className="h-4 w-4" />
+                Auditoría
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="employees">
+              {isLoadingEmployees ? (
+                <div className="flex items-center justify-center min-h-[200px]">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto mb-2"></div>
+                    <p className="text-sm text-muted-foreground">Cargando empleados...</p>
+                  </div>
+                </div>
+              ) : employees.length === 0 ? (
+                <div className="text-center py-12">
+                  <Users className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-medium mb-2">Sin empleados liquidados</h3>
+                  <p className="text-sm text-muted-foreground">
+                    No hay empleados liquidados en este período.
+                  </p>
+                </div>
+              ) : (
+          <ExpandedEmployeesTable
+            employees={employees}
+            novedades={novedadesByEmployee}
+            onAddNovedad={handleAddNovedad}
+            onEditNovedad={handleEditNovedad}
+            canEdit={editState === 'editing' || periodData?.estado !== 'cerrado'}
+            editState={editState}
+            pendingChanges={pendingChanges}
+            isRecalculatingBackend={isRecalculatingAll}
+           periodData={periodData ? {
+             ...periodData,
+             id: periodId || ''
+           } : undefined}
+          />
+              )}
+            </TabsContent>
+            
+            <TabsContent value="audit">
+              <PeriodAuditSummaryComponent 
+                periodId={periodId || ''} 
+                periodName={periodData?.periodo || ''} 
+              />
+            </TabsContent>
+          </Tabs>
+        </EditPeriodMode>
       </div>
 
       {/* Novedad Modal */}
@@ -719,6 +730,9 @@ export default function PayrollHistoryDetailPage() {
           neto_pagado: employees.find(e => e.id === selectedEmployeeId)!.neto_pagado
         } : undefined}
         editMode={editState === 'editing'}
+        editState={editState}
+        pendingChanges={pendingChanges}
+        onRemoveNovedad={removeNovedad}
         onNovedadChange={(action, novedadData) => {
           if (action === 'add') {
             addNovedad(novedadData);
