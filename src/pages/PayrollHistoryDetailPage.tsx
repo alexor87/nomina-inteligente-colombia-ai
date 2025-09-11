@@ -671,6 +671,8 @@ export default function PayrollHistoryDetailPage() {
           onAddNovedad={handleAddNovedad}
           onEditNovedad={handleEditNovedad}
           canEdit={editState === 'editing' || periodData?.estado !== 'cerrado'}
+          editState={editState}
+          pendingChanges={pendingChanges}
           isRecalculatingBackend={isRecalculatingAll}
          periodData={periodData ? {
            ...periodData,
