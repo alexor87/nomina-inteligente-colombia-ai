@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +11,10 @@ import { VacationAbsenceDetailModal } from '@/components/vacations/VacationAbsen
 import { supabase } from '@/integrations/supabase/client';
 import { useEmployeeNovedadesCacheStore } from '@/stores/employeeNovedadesCacheStore';
 import { PendingAdjustmentsService, PendingAdjustmentRecord } from '@/services/PendingAdjustmentsService';
+import { DeleteNovedadConfirmModal } from '@/components/payroll/corrections/DeleteNovedadConfirmModal';
+import { PeriodState } from '@/types/pending-adjustments';
+import { usePendingAdjustments } from '@/hooks/usePendingAdjustments';
+import { createDeleteHandler } from './NovedadExistingList_handleDelete';
 
 interface NovedadExistingListProps {
   employeeId: string;
@@ -21,6 +24,8 @@ interface NovedadExistingListProps {
   onClose: () => void;
   refreshTrigger?: number;
   onEmployeeNovedadesChange?: (employeeId: string) => Promise<void>;
+  periodState?: PeriodState;
+  onPendingAdjustmentChange?: () => void;
 }
 
 export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
@@ -30,7 +35,9 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
   onAddNew,
   onClose,
   refreshTrigger,
-  onEmployeeNovedadesChange
+  onEmployeeNovedadesChange,
+  periodState = 'borrador',
+  onPendingAdjustmentChange
 }) => {
   const [integratedData, setIntegratedData] = useState<DisplayNovedad[]>([]);
   const [pendingAdjustments, setPendingAdjustments] = useState<PendingAdjustmentRecord[]>([]);
@@ -40,7 +47,22 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
     vacation: any | null;
   }>({ isOpen: false, vacation: null });
   
+  const [deleteConfirmModal, setDeleteConfirmModal] = useState<{
+    isOpen: boolean;
+    novedad: DisplayNovedad | null;
+  }>({ isOpen: false, novedad: null });
+  
   const { loadIntegratedNovedades, deleteNovedad } = useNovedades(periodId);
+  
+  // Get company ID for pending adjustments
+  const [companyId, setCompanyId] = useState<string | null>(null);
+  
+  // Initialize pending adjustments hook
+  const { addPendingDeletion } = usePendingAdjustments({ 
+    periodId, 
+    companyId: companyId || '' 
+  });
+  
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -48,52 +70,72 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
     if (tipo === 'recargo_nocturno') {
       switch (subtipo) {
         case 'nocturno':
-          return 'Recargo nocturno';
-        case 'dominical':
-          return 'Recargo dominical';
-        case 'nocturno_dominical':
-          return 'Recargo nocturno dominical';
+          return 'Recargo Nocturno';
+        case 'dominical_festivo':
+          return 'Dominical y Festivo';
+        case 'nocturno_dominical_festivo':
+          return 'Nocturno Dominical';
         default:
-          return 'Recargo nocturno';
+          return 'Recargo';
       }
     }
-
-    const tipos: Record<string, string> = {
-      'horas_extra': 'Horas Extra',
+    
+    const mappings: Record<string, string> = {
+      'hora_extra': 'Horas Extra',
+      'auxilio_transporte': 'Auxilio Transporte',
       'bonificacion': 'Bonificación',
-      'incapacidad': 'Incapacidad',
+      'comision': 'Comisión',
       'vacaciones': 'Vacaciones',
-      'licencia_remunerada': 'Licencia',
-      'otros_ingresos': 'Otros Ingresos',
-      'descuento_voluntario': 'Descuento',
-      'libranza': 'Libranza'
+      'incapacidad': 'Incapacidad',
+      'licencia_remunerada': 'Licencia Remunerada',
+      'licencia_no_remunerada': 'Licencia No Remunerada',
+      'ausencia': 'Ausencia',
+      'prestamo': 'Préstamo',
+      'descuento': 'Descuento',
+      'anticipo': 'Anticipo',
+      'deduccion_salud': 'Deducción Salud',
+      'deduccion_pension': 'Deducción Pensión'
     };
-
-    const base = tipos[tipo] || tipo;
-    return subtipo && tipo !== 'recargo_nocturno' ? `${base} (${subtipo})` : base;
+    
+    return mappings[tipo] || tipo.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
   };
 
   const fetchIntegratedData = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
+      // Load company ID if not set
+      if (!companyId) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('company_id')
+          .eq('user_id', (await supabase.auth.getUser()).data.user?.id)
+          .single();
+        
+        if (profile?.company_id) {
+          setCompanyId(profile.company_id);
+        }
+      }
+
+      const data = await loadIntegratedNovedades(employeeId);
+      setIntegratedData(data);
       
-      // Load regular integrated data
-      const result = await loadIntegratedNovedades(employeeId);
-      setIntegratedData(result);
+      // Load pending adjustments
+      const pendingData = await PendingAdjustmentsService.getPendingAdjustmentsForEmployee(employeeId, periodId);
+      setPendingAdjustments(pendingData);
       
-      // Load pending adjustments for this employee
-      const pending = await PendingAdjustmentsService.getPendingAdjustmentsForEmployee(employeeId, periodId);
-      setPendingAdjustments(pending);
-      
+      console.log('📊 NovedadExistingList: Datos cargados:', { 
+        novedades: data.length, 
+        pending: pendingData.length,
+        employeeId, 
+        periodId 
+      });
     } catch (error) {
-      console.error('Error cargando datos integrados:', error);
+      console.error('❌ NovedadExistingList: Error cargando datos:', error);
       toast({
         title: "Error",
-        description: "No se pudieron cargar los datos integrados",
+        description: "No se pudieron cargar las novedades",
         variant: "destructive",
       });
-      setIntegratedData([]);
-      setPendingAdjustments([]);
     } finally {
       setLoading(false);
     }
@@ -148,86 +190,72 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
   const handleGoToVacationModule = (employeeId: string) => {
     navigate('/app/vacations-absences', {
       state: { 
-        filterByEmployee: employeeId,
+        prefilterEmployeeId: employeeId,
         employeeName: employeeName
       }
     });
-    
     onClose();
   };
 
   const handleDeleteByOrigin = async (item: DisplayNovedad) => {
-    const { setLastRefreshTime } = useEmployeeNovedadesCacheStore.getState();
-    
     if (item.origen === 'vacaciones') {
-      if (item.status !== 'pendiente') {
-        toast({
-          title: "Acción no disponible",
-          description: "Solo se pueden eliminar ausencias en estado pendiente",
-          variant: "default",
-        });
-        return;
-      }
-
-      if (window.confirm('¿Estás seguro de que deseas eliminar esta ausencia?')) {
-        try {
-          console.log('🗑️ NovedadExistingList: Eliminando ausencia y actualizando cache global:', item.id);
+      try {
+        console.log('🗑️ NovedadExistingList: Eliminando ausencia desde lista y actualizando cache global:', item.id);
+        
+        const { error } = await supabase
+          .from('employee_vacation_periods')
+          .delete()
+          .eq('id', item.id);
           
-          const { error } = await supabase
-            .from('employee_vacation_periods')
-            .delete()
-            .eq('id', item.id);
-
-          if (error) throw error;
-
-          setIntegratedData(prev => prev.filter(n => n.id !== item.id));
-          
-          // Update global cache store to trigger liquidation recalculation
-          setLastRefreshTime(Date.now());
-          console.log('✅ NovedadExistingList: Ausencia eliminada y cache actualizado');
-          
-          if (onEmployeeNovedadesChange) {
-            await onEmployeeNovedadesChange(employeeId);
-          }
-          
-          toast({
-            title: "Ausencia eliminada",
-            description: "La ausencia se ha eliminado correctamente",
-          });
-        } catch (error) {
-          console.error('❌ NovedadExistingList: Error eliminando ausencia:', error);
-          toast({
-            title: "Error",
-            description: "No se pudo eliminar la ausencia",
-            variant: "destructive",
-          });
+        if (error) throw error;
+        
+        const { setLastRefreshTime } = useEmployeeNovedadesCacheStore.getState();
+        setLastRefreshTime(Date.now());
+        
+        setIntegratedData(prev => prev.filter(n => n.id !== item.id));
+        
+        if (onEmployeeNovedadesChange) {
+          await onEmployeeNovedadesChange(employeeId);
         }
+        
+        toast({
+          title: "Ausencia eliminada",
+          description: "La ausencia se ha eliminado correctamente",
+        });
+      } catch (error) {
+        console.error('❌ NovedadExistingList: Error eliminando ausencia:', error);
+        toast({
+          title: "Error",
+          description: "No se pudo eliminar la ausencia",
+          variant: "destructive",
+        });
       }
     } else {
-      if (window.confirm('¿Estás seguro de que deseas eliminar esta novedad?')) {
-        try {
-          console.log('🗑️ NovedadExistingList: Eliminando novedad (useNovedades se encarga del cache):', item.id);
-          await deleteNovedad(item.id);
-          setIntegratedData(prev => prev.filter(n => n.id !== item.id));
-          
-          if (onEmployeeNovedadesChange) {
-            await onEmployeeNovedadesChange(employeeId);
-          }
-          
-          toast({
-            title: "Novedad eliminada",
-            description: "La novedad se ha eliminado correctamente",
-          });
-        } catch (error) {
-          console.error('❌ NovedadExistingList: Error eliminando novedad:', error);
-          toast({
-            title: "Error",
-            description: "No se pudo eliminar la novedad",
-            variant: "destructive",
-          });
-        }
-      }
+      // Open confirmation modal for regular novedades
+      setDeleteConfirmModal({
+        isOpen: true,
+        novedad: item
+      });
     }
+  };
+
+  // Create the delete handler
+  const handleConfirmDelete = createDeleteHandler(
+    deleteNovedad,
+    addPendingDeletion,
+    onEmployeeNovedadesChange,
+    onPendingAdjustmentChange,
+    setIntegratedData,
+    toast,
+    employeeId,
+    employeeName
+  );
+
+  const onDeleteConfirm = (createPendingAdjustment: boolean) => {
+    if (deleteConfirmModal.novedad) {
+      handleConfirmDelete(createPendingAdjustment, deleteConfirmModal.novedad);
+    }
+    setDeleteConfirmModal({ isOpen: false, novedad: null });
   };
 
   const handleEditVacation = (vacation: any) => {
@@ -252,27 +280,24 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
         .from('employee_vacation_periods')
         .delete()
         .eq('id', vacationId);
-
+        
       if (error) throw error;
-
-      setIntegratedData(prev => prev.filter(n => n.id !== vacationId));
       
-      // Update global cache store to trigger liquidation recalculation
       setLastRefreshTime(Date.now());
-      console.log('✅ NovedadExistingList: Ausencia eliminada desde modal y cache actualizado');
+      setIntegratedData(prev => prev.filter(n => n.id !== vacationId));
       
       if (onEmployeeNovedadesChange) {
         await onEmployeeNovedadesChange(employeeId);
       }
       
+      setVacationDetailModal({ isOpen: false, vacation: null });
+      
       toast({
         title: "Ausencia eliminada",
-        description: "La ausencia se ha eliminado correctamente",
+        description: "La ausencia se ha eliminado correctamente desde el detalle",
       });
-      
-      setVacationDetailModal({ isOpen: false, vacation: null });
     } catch (error) {
-      console.error('❌ NovedadExistingList: Error eliminando ausencia desde modal:', error);
+      console.error('❌ NovedadExistingList: Error eliminando ausencia:', error);
       toast({
         title: "Error",
         description: "No se pudo eliminar la ausencia",
@@ -319,394 +344,260 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
     const estimated = integratedData.filter(n => !n.isConfirmed);
     const pending = convertPendingToDisplay(pendingAdjustments);
 
+    // Calculate totals for each category
+    const calculateTotals = (items: DisplayNovedad[]) => {
+      let devengos = 0;
+      let deducciones = 0;
+      
+      items.forEach(item => {
+        if (item.valor > 0) {
+          devengos += item.valor;
+        } else {
+          deducciones += Math.abs(item.valor);
+        }
+      });
+      
+      return { devengos, deducciones, neto: devengos - deducciones };
+    };
+
+    const confirmedTotals = calculateTotals(confirmed);
+    const estimatedTotals = calculateTotals(estimated);
+    const pendingTotals = calculateTotals(pending);
+
     return {
       confirmed: {
-        devengos: confirmed.filter(n => n.valor > 0).reduce((sum, n) => sum + n.valor, 0),
-        deducciones: Math.abs(confirmed.filter(n => n.valor < 0).reduce((sum, n) => sum + n.valor, 0)),
-        neto: confirmed.reduce((sum, n) => sum + n.valor, 0),
+        ...confirmedTotals,
         count: confirmed.length
       },
       estimated: {
-        devengos: estimated.filter(n => n.valor > 0).reduce((sum, n) => sum + n.valor, 0),
-        deducciones: Math.abs(estimated.filter(n => n.valor < 0).reduce((sum, n) => sum + n.valor, 0)),
-        neto: estimated.reduce((sum, n) => sum + n.valor, 0),
+        ...estimatedTotals, 
         count: estimated.length
       },
       pending: {
-        devengos: pending.filter(n => n.valor > 0).reduce((sum, n) => sum + n.valor, 0),
-        deducciones: Math.abs(pending.filter(n => n.valor < 0).reduce((sum, n) => sum + n.valor, 0)),
-        neto: pending.reduce((sum, n) => sum + n.valor, 0),
+        ...pendingTotals,
         count: pending.length
       }
     };
   };
 
-  // Handle deletion of pending adjustments
   const handleDeletePendingAdjustment = async (adjustmentId: string) => {
-    if (window.confirm('¿Estás seguro de que deseas eliminar este ajuste pendiente?')) {
-      try {
-        await PendingAdjustmentsService.deletePendingAdjustment(adjustmentId);
-        setPendingAdjustments(prev => prev.filter(p => p.id !== adjustmentId));
-        
-        // Trigger recalculation and UI update
-        if (onEmployeeNovedadesChange) {
-          await onEmployeeNovedadesChange(employeeId);
-        }
-        
-        toast({
-          title: "Ajuste eliminado",
-          description: "El ajuste pendiente se ha eliminado correctamente",
-        });
-      } catch (error) {
-        console.error('❌ Error eliminando ajuste pendiente:', error);
-        toast({
-          title: "Error",
-          description: "No se pudo eliminar el ajuste pendiente",
-          variant: "destructive",
-        });
-      }
+    try {
+      await PendingAdjustmentsService.deletePendingAdjustment(adjustmentId);
+      setPendingAdjustments(prev => prev.filter(p => p.id !== adjustmentId));
+      
+      toast({
+        title: "Ajuste eliminado",
+        description: "El ajuste pendiente se ha eliminado",
+      });
+    } catch (error) {
+      console.error('Error eliminando ajuste pendiente:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el ajuste pendiente",
+        variant: "destructive",
+      });
     }
   };
 
   const getActionButtons = (item: DisplayNovedad) => {
+    const buttons = [];
+    
     if (item.origen === 'pending_adjustment' as any) {
-      return (
-        <div className="flex gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-red-600 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
-            onClick={() => handleDeletePendingAdjustment(item.id)}
-            title="Eliminar ajuste pendiente"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
-      );
-    } else if (item.origen === 'vacaciones') {
-      return (
-        <div className="flex gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 h-8 w-8 p-0"
-            onClick={() => handleViewVacationDetail(item)}
-            title="Ver detalles"
-          >
-            <Eye className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-green-600 hover:text-green-700 hover:bg-green-50 h-8 w-8 p-0"
-            onClick={() => handleGoToVacationModule(employeeId)}
-            title="Ir al módulo de vacaciones"
-          >
-            <ExternalLink className="h-4 w-4" />
-          </Button>
-          {item.status === 'pendiente' && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-red-600 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
-              onClick={() => handleDeleteByOrigin(item)}
-              title="Eliminar ausencia"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
+      // For pending adjustments, only show delete button
+      buttons.push(
+        <Button
+          key="delete"
+          variant="outline"
+          size="sm"
+          onClick={() => handleDeletePendingAdjustment(item.id)}
+          className="text-red-600 hover:text-red-700"
+        >
+          <Trash2 className="h-3 w-3" />
+        </Button>
       );
     } else {
-      return (
-        <div className="flex gap-1">
+      // For regular novedades, show standard actions
+      
+      if (item.canEdit) {
+        buttons.push(
           <Button
-            variant="ghost"
+            key="edit"
+            variant="outline"
             size="sm"
-            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 h-8 w-8 p-0"
             onClick={() => handleEditNovedad(item)}
-            title="Editar novedad"
           >
-            <Edit className="h-4 w-4" />
+            <Edit className="h-3 w-3" />
           </Button>
+        );
+      }
+
+      if (item.origen === 'vacaciones') {
+        buttons.push(
           <Button
-            variant="ghost"
+            key="view"
+            variant="outline"
+            size="sm"
+            onClick={() => handleViewVacationDetail(item)}
+          >
+            <Eye className="h-3 w-3" />
+          </Button>
+        );
+        
+        buttons.push(
+          <Button
+            key="goto"
+            variant="outline"
+            size="sm"
+            onClick={() => handleGoToVacationModule(employeeId)}
+          >
+            <ExternalLink className="h-3 w-3" />
+          </Button>
+        );
+      }
+
+      if (item.canDelete) {
+        buttons.push(
+          <Button
+            key="delete"
+            variant="outline"
             size="sm"
             onClick={() => handleDeleteByOrigin(item)}
-            className="text-red-600 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
-            title="Eliminar novedad"
+            className="text-red-600 hover:text-red-700"
           >
-            <Trash2 className="h-4 w-4" />
+            <Trash2 className="h-3 w-3" />
           </Button>
-        </div>
-      );
+        );
+      }
     }
-  };
 
-  if (loading) {
     return (
-      <div className="p-6 text-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-        <p className="text-gray-600">Cargando datos integrados...</p>
+      <div className="flex gap-1 justify-end">
+        {buttons}
       </div>
     );
-  }
-
-  const separatedTotals = getSeparatedTotals();
+  };
 
   return (
     <>
-      <div className="p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900">Novedades y Ausencias de {employeeName}</h2>
-            <p className="text-sm text-gray-600 mt-1">
-              Vista integrada • {integratedData.length} novedad{integratedData.length !== 1 ? 'es' : ''} 
-              {pendingAdjustments.length > 0 && (
-                <> • {pendingAdjustments.length} ajuste{pendingAdjustments.length !== 1 ? 's' : ''} pendiente{pendingAdjustments.length !== 1 ? 's' : ''}</>
-              )}
-            </p>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <h2 className="text-xl font-semibold text-gray-900">
+              Novedades - {employeeName}
+            </h2>
+            <Badge variant="outline" className="text-sm">
+              {integratedData.length} registros
+            </Badge>
+            {pendingAdjustments.length > 0 && (
+              <Badge variant="secondary" className="bg-orange-100 text-orange-800">
+                <Clock className="h-3 w-3 mr-1" />
+                {pendingAdjustments.length} pendientes
+              </Badge>
+            )}
           </div>
-          <Button onClick={onAddNew} className="bg-blue-600 hover:bg-blue-700">
-            <Plus className="h-4 w-4 mr-2" />
-            Agregar Novedad
+          
+          <Button onClick={onAddNew} className="flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            Agregar Nueva
           </Button>
         </div>
 
-        {integratedData.length === 0 && pendingAdjustments.length === 0 ? (
-          <Card className="border-dashed">
-            <CardContent className="pt-6 pb-6 text-center">
-              <div className="text-gray-400 mb-4">
-                <Plus className="h-12 w-12 mx-auto" />
-              </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Sin registros encontrados
-              </h3>
-              <p className="text-gray-600 mb-4">
-                Este empleado no tiene novedades ni ausencias registradas
-              </p>
-              <Button onClick={onAddNew} variant="outline">
-                Agregar Primera Novedad
-              </Button>
-            </CardContent>
-          </Card>
+        {loading ? (
+          <div className="text-center py-8">
+            <p className="text-muted-foreground">Cargando novedades...</p>
+          </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              <Card className="border-green-200 bg-green-50">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium text-green-800 flex items-center gap-2">
-                    ✅ Valores Confirmados
-                    <Badge variant="outline" className="text-xs">
-                      {separatedTotals.confirmed.count}
-                    </Badge>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-green-700">Devengos:</span>
-                    <span className="font-semibold text-green-800">
-                      {formatCurrency(separatedTotals.confirmed.devengos)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-green-700">Deducciones:</span>
-                    <span className="font-semibold text-red-600">
-                      {formatCurrency(separatedTotals.confirmed.deducciones)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center pt-2 border-t border-green-200">
-                    <span className="text-sm font-medium text-green-800">Neto:</span>
-                    <span className="font-bold text-green-900">
-                      {formatCurrency(separatedTotals.confirmed.neto)}
-                    </span>
+            {integratedData.length === 0 && pendingAdjustments.length === 0 ? (
+              <Card>
+                <CardContent className="py-8">
+                  <div className="text-center">
+                    <p className="text-muted-foreground mb-4">No hay novedades registradas para este empleado</p>
+                    <Button onClick={onAddNew} className="flex items-center gap-2">
+                      <Plus className="h-4 w-4" />
+                      Agregar Primera Novedad
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
-
-              <Card className="border-yellow-200 bg-yellow-50">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium text-yellow-800 flex items-center gap-2">
-                    ⏳ Valores Estimados
-                    <Badge variant="outline" className="text-xs">
-                      {separatedTotals.estimated.count}
-                    </Badge>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-yellow-700">Devengos:</span>
-                    <span className="font-semibold text-yellow-800">
-                      {formatCurrency(separatedTotals.estimated.devengos)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-yellow-700">Deducciones:</span>
-                    <span className="font-semibold text-red-600">
-                      {formatCurrency(separatedTotals.estimated.deducciones)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center pt-2 border-t border-yellow-200">
-                    <span className="text-sm font-medium text-yellow-800">Neto:</span>
-                    <span className="font-bold text-yellow-900">
-                      {formatCurrency(separatedTotals.estimated.neto)}
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="space-y-3">
-              {/* Regular novedades */}
-              {integratedData.map((item) => (
-                <Card key={`${item.origen}-${item.id}`} className={`hover:shadow-md transition-shadow ${!item.isConfirmed ? 'border-yellow-200 bg-yellow-50' : ''}`}>
-                  <CardContent className="pt-4">
-                    <div className="grid grid-cols-12 gap-4 items-center">
-                      <div className="col-span-12 sm:col-span-4 lg:col-span-3">
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2">
+            ) : (
+              <div className="space-y-4">
+                {[...convertPendingToDisplay(pendingAdjustments), ...integratedData].map((item, index) => (
+                  <Card key={`${item.origen}-${item.id}-${index}`} className={`transition-all duration-200 ${item.statusColor || 'hover:shadow-md'}`}>
+                    <CardContent className="p-4">
+                      <div className="grid grid-cols-12 gap-4 items-center">
+                        <div className="col-span-12 sm:col-span-6 lg:col-span-6">
+                          <div className="flex items-center gap-3">
                             <Badge className={item.badgeColor}>
-                              {item.badgeIcon} {item.badgeLabel}
-                            </Badge>
-                            <Badge variant="outline" className={item.statusColor}>
-                              {item.status === 'procesada' ? 'Procesada' : 
-                               item.status === 'pendiente' ? 'Pendiente' :
-                               item.status === 'registrada' ? 'Registrada' : 
-                               item.status}
-                            </Badge>
-                            {!item.isConfirmed && (
-                              <Badge variant="outline" className="text-xs bg-yellow-100 text-yellow-800">
-                                Estimado
-                              </Badge>
-                            )}
-                          </div>
-                          <div className="text-sm font-medium text-gray-900">
-                            {formatTipoNovedad(item.tipo_novedad, item.subtipo)}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="col-span-6 sm:col-span-3 lg:col-span-2">
-                        <div className="text-right sm:text-left">
-                          <div className={`text-lg font-bold ${item.valor >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {formatCurrency(Math.abs(item.valor))}
-                          </div>
-                          {item.valor < 0 && (
-                            <div className="text-xs text-red-500">Deducción</div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="col-span-6 sm:col-span-2 lg:col-span-2">
-                        <div className="text-sm text-gray-600 space-y-1">
-                          {item.horas && (
-                            <div className="flex items-center">
-                              <span className="font-medium">{item.horas}</span>
-                              <span className="ml-1">hrs</span>
-                            </div>
-                          )}
-                          {item.dias && (
-                            <div className="flex items-center">
-                              <span className="font-medium">{item.dias}</span>
-                              <span className="ml-1">días</span>
-                            </div>
-                          )}
-                          {item.fecha_inicio && item.fecha_fin && (
-                            <div className="text-xs text-gray-500">
-                              {item.fecha_inicio} / {item.fecha_fin}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="col-span-12 sm:col-span-8 lg:col-span-4">
-                        {item.observacion && (
-                          <div className="text-sm text-gray-600 bg-gray-50 p-2 rounded text-left">
-                            <div className="line-clamp-2">
-                              {item.observacion}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="col-span-12 sm:col-span-4 lg:col-span-1">
-                        <div className="flex justify-end sm:justify-center">
-                          {getActionButtons(item)}
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-              
-              {/* Pending adjustments */}
-              {convertPendingToDisplay(pendingAdjustments).map((item) => (
-                <Card key={`pending-${item.id}`} className="border-orange-200 bg-orange-50 hover:shadow-md transition-shadow">
-                  <CardContent className="pt-4">
-                    <div className="grid grid-cols-12 gap-4 items-center">
-                      <div className="col-span-12 sm:col-span-4 lg:col-span-3">
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2">
-                            <Badge className="bg-orange-100 text-orange-800 border-orange-200">
-                              <Clock className="h-3 w-3 mr-1" />
+                              <span className="mr-1">{item.badgeIcon}</span>
                               {item.badgeLabel}
                             </Badge>
-                            <Badge variant="outline" className="border-orange-200 text-orange-700">
-                              Pendiente
-                            </Badge>
+                            <div className="text-sm text-muted-foreground">
+                              {item.fecha_inicio && item.fecha_fin && (
+                                <span>
+                                  {new Date(item.fecha_inicio).toLocaleDateString()} - {new Date(item.fecha_fin).toLocaleDateString()}
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          {item.fecha_inicio && item.fecha_fin && (
-                            <p className="text-xs text-orange-600">
-                              {new Date(item.fecha_inicio).toLocaleDateString('es-CO')} - {new Date(item.fecha_fin).toLocaleDateString('es-CO')}
+                          
+                          <div className="mt-2">
+                            <p className="font-medium text-lg">
+                              {item.valor >= 0 ? '+' : ''}{formatCurrency(item.valor)}
                             </p>
-                          )}
-                        </div>
-                      </div>
-                      
-                      <div className="col-span-12 sm:col-span-2 lg:col-span-2 text-center">
-                        <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800">
-                          {item.dias} día{item.dias !== 1 ? 's' : ''}
-                        </Badge>
-                      </div>
-                      
-                      <div className="col-span-12 sm:col-span-3 lg:col-span-4">
-                        <div className="text-right">
-                          <div className={`text-lg font-bold ${item.valor >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {formatCurrency(item.valor)}
+                            {item.dias > 0 && (
+                              <p className="text-sm text-muted-foreground">
+                                {item.dias} {item.dias === 1 ? 'día' : 'días'}
+                              </p>
+                            )}
                           </div>
+                          
                           {item.observacion && (
                             <p className="text-xs text-orange-600 mt-1 truncate" title={item.observacion}>
                               {item.observacion}
                             </p>
                           )}
                         </div>
+                        
+                        <div className="col-span-12 sm:col-span-3 lg:col-span-3 text-right">
+                          {getActionButtons(item)}
+                        </div>
                       </div>
-                      
-                      <div className="col-span-12 sm:col-span-3 lg:col-span-3 text-right">
-                        {getActionButtons(item)}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
           </>
         )}
 
-        <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
+        <VacationAbsenceDetailModal
+          isOpen={vacationDetailModal.isOpen}
+          onClose={() => setVacationDetailModal({ isOpen: false, vacation: null })}
+          vacation={vacationDetailModal.vacation}
+          onEdit={handleEditVacation}
+          onDelete={handleDeleteVacation}
+        />
+
+        <DeleteNovedadConfirmModal
+          isOpen={deleteConfirmModal.isOpen}
+          onClose={() => setDeleteConfirmModal({ isOpen: false, novedad: null })}
+          onConfirm={onDeleteConfirm}
+          novedad={deleteConfirmModal.novedad}
+          periodState={periodState}
+          employeeName={employeeName}
+        />
+
+        <div className="flex justify-between items-center pt-4 border-t">
           <Button variant="outline" onClick={onClose}>
             Cerrar
           </Button>
+          <Button onClick={onAddNew}>
+            <Plus className="h-4 w-4 mr-2" />
+            Agregar Nueva
+          </Button>
         </div>
       </div>
-
-      <VacationAbsenceDetailModal
-        isOpen={vacationDetailModal.isOpen}
-        onClose={() => setVacationDetailModal({ isOpen: false, vacation: null })}
-        vacation={vacationDetailModal.vacation}
-        onEdit={handleEditVacation}
-        onDelete={handleDeleteVacation}
-      />
     </>
   );
 };

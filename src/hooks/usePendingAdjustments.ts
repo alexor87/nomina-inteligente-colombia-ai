@@ -113,6 +113,43 @@ export const usePendingAdjustments = ({ periodId, companyId }: UsePendingAdjustm
     setPendingNovedades(prev => prev.filter((_, i) => i !== index));
   }, []);
 
+  // Create negative pending adjustment for deletion
+  const addPendingDeletion = useCallback((
+    employeeId: string, 
+    employeeName: string, 
+    originalNovedad: any
+  ) => {
+    const deletionAdjustment: PendingNovedad = {
+      employee_id: employeeId,
+      employee_name: employeeName,
+      tipo_novedad: originalNovedad.tipo_novedad,
+      valor: -originalNovedad.valor, // Negative value to reverse the original
+      observacion: `Eliminación de: ${originalNovedad.tipo_novedad} (Original: ${originalNovedad.valor})`,
+      novedadData: {
+        tipo_novedad: originalNovedad.tipo_novedad,
+        subtipo: originalNovedad.subtipo,
+        valor: -originalNovedad.valor,
+        dias: originalNovedad.dias,
+        fecha_inicio: originalNovedad.fecha_inicio,
+        fecha_fin: originalNovedad.fecha_fin,
+        observacion: `Eliminación de: ${originalNovedad.tipo_novedad} (ID: ${originalNovedad.id})`,
+        constitutivo_salario: originalNovedad.constitutivo_salario || false,
+        empleado_id: employeeId,
+        periodo_id: periodId,
+        company_id: companyId
+      }
+      }
+    };
+
+    setPendingNovedades(prev => [...prev, deletionAdjustment]);
+    
+    toast({
+      title: "Eliminación agregada a ajustes pendientes",
+      description: `Se creó ajuste para eliminar ${originalNovedad.tipo_novedad} de ${employeeName}`,
+      className: "border-red-200 bg-red-50"
+    });
+  }, [periodId, companyId, toast]);
+
   // Remove all pending novedades for an employee
   const removePendingNovedadesForEmployee = useCallback((employeeId: string) => {
     setPendingNovedades(prev => prev.filter(n => n.employee_id !== employeeId));
@@ -329,6 +366,7 @@ export const usePendingAdjustments = ({ periodId, companyId }: UsePendingAdjustm
     
     // Actions
     addPendingNovedad,
+    addPendingDeletion,
     removePendingNovedad,
     removePendingNovedadesForEmployee,
     clearAllPending,
