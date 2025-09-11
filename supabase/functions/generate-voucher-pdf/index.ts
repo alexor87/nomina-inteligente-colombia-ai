@@ -351,6 +351,35 @@ serve(async (req) => {
         throw new Error('Provide payrollId, (periodId + employeeId), or (employee + period)');
       }
 
+    // Recalcular total devengado con backend para asegurar neto correcto
+    try {
+      const periodInfo = payrollData?.payroll_periods_real;
+      const employeeInfo = payrollData?.employees || {};
+      const baseSalary = Number(employeeInfo.salario_base ?? payrollData.salario_base ?? 0);
+      const workedDays = Number(payrollData.dias_trabajados ?? 0) || 0;
+      const periodType = periodInfo?.tipo_periodo || 'mensual';
+      const startDate = periodInfo?.fecha_inicio ? new Date(periodInfo.fecha_inicio) : null;
+      const year = startDate ? String(startDate.getUTCFullYear()) : String(new Date().getUTCFullYear());
+      const invokeBody = { action: 'calculate', data: { baseSalary, workedDays, extraHours: 0, disabilities: 0, bonuses: 0, absences: 0, periodType, year } };
+      console.log('📊 Recalculating gross via payroll-calculations:', JSON.stringify(invokeBody));
+      const { data: calcData, error: calcError } = await supabase.functions.invoke('payroll-calculations', { body: invokeBody });
+      if (!calcError && calcData) {
+        const backendGross = Number((calcData as any).grossPay ?? 0);
+        const priorGross = Number(payrollData.total_devengado ?? 0);
+        console.log('💡 Gross comparison - DB:', priorGross, 'Backend:', backendGross);
+        if (backendGross > 0 && Math.abs(backendGross - priorGross) > 1) {
+          const finalDeducciones = Number(payrollData.total_deducciones ?? 0);
+          payrollData.total_devengado = backendGross;
+          payrollData.neto_pagado = backendGross - finalDeducciones;
+          console.log('✅ Overriding totals for PDF - Total devengado:', backendGross, 'Neto:', payrollData.neto_pagado);
+        }
+      } else {
+        console.warn('⚠️ payroll-calculations invoke failed:', calcError);
+      }
+    } catch (e) {
+      console.warn('⚠️ Exception recalculating gross:', e);
+    }
+
     // === Generación de PDF ===
     const pdfBytes = await generateProfessionalVoucherPDF(payrollData);
     console.log('✅ PDF generated successfully: ' + pdfBytes.length + ' bytes');
