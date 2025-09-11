@@ -58,7 +58,7 @@ export class PeriodEditingService {
       };
 
       // Guardar sesión en la base de datos
-      const { error: sessionError } = await supabase
+      const { error: sessionError } = await (supabase as any)
         .from('period_edit_sessions')
         .insert({
           id: sessionId,
@@ -108,7 +108,7 @@ export class PeriodEditingService {
       };
 
       // Guardar snapshot
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('period_edit_snapshots')
         .insert({
           period_id: periodId,
@@ -131,7 +131,7 @@ export class PeriodEditingService {
   static async applyChanges(sessionId: string): Promise<void> {
     try {
       // Obtener sesión
-      const { data: session, error: sessionError } = await supabase
+      const { data: session, error: sessionError } = await (supabase as any)
         .from('period_edit_sessions')
         .select('*')
         .eq('id', sessionId)
@@ -146,7 +146,7 @@ export class PeriodEditingService {
       }
 
       // Marcar sesión como guardando
-      await supabase
+      await (supabase as any)
         .from('period_edit_sessions')
         .update({ status: 'saving' })
         .eq('id', sessionId);
@@ -159,7 +159,7 @@ export class PeriodEditingService {
       if (error) throw error;
 
       // Marcar sesión como completada
-      await supabase
+      await (supabase as any)
         .from('period_edit_sessions')
         .update({ 
           status: 'completed',
@@ -172,7 +172,7 @@ export class PeriodEditingService {
 
     } catch (error) {
       // Marcar sesión como error
-      await supabase
+      await (supabase as any)
         .from('period_edit_sessions')
         .update({ 
           status: 'cancelled',
@@ -190,7 +190,7 @@ export class PeriodEditingService {
   static async discardChanges(sessionId: string): Promise<void> {
     try {
       // Obtener sesión
-      const { data: session, error: sessionError } = await supabase
+      const { data: session, error: sessionError } = await (supabase as any)
         .from('period_edit_sessions')
         .select('*')
         .eq('id', sessionId)
@@ -199,7 +199,7 @@ export class PeriodEditingService {
       if (sessionError) throw sessionError;
 
       // Marcar sesión como cancelada
-      await supabase
+      await (supabase as any)
         .from('period_edit_sessions')
         .update({ 
           status: 'cancelled',
@@ -221,7 +221,7 @@ export class PeriodEditingService {
    */
   static async validateEditingLock(periodId: string): Promise<boolean> {
     try {
-      const { data: activeSessions } = await supabase
+      const { data: activeSessions } = await (supabase as any)
         .from('period_edit_sessions')
         .select('*')
         .eq('period_id', periodId)
@@ -302,7 +302,7 @@ export class PeriodEditingService {
    */
   private static async cleanupSnapshot(periodId: string): Promise<void> {
     try {
-      await supabase
+      await (supabase as any)
         .from('period_edit_snapshots')
         .delete()
         .eq('period_id', periodId);
@@ -318,7 +318,7 @@ export class PeriodEditingService {
     try {
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
       
-      await supabase
+      await (supabase as any)
         .from('period_edit_sessions')
         .update({ status: 'expired' })
         .eq('status', 'active')
@@ -333,7 +333,7 @@ export class PeriodEditingService {
    */
   static async getActiveSession(periodId: string): Promise<EditingSession | null> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('period_edit_sessions')
         .select('*')
         .eq('period_id', periodId)
