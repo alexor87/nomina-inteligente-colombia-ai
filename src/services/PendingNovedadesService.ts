@@ -97,7 +97,8 @@ export class PendingNovedadesService {
             options: {
               reliquidateScope: 'affected',
               regenerateVouchers: false, // Don't auto-regenerate, just mark as needing regeneration
-              sendEmails: false
+              sendEmails: false,
+              source: 'payroll_history' // Identify this as coming from payroll history module
             }
           }
         }

@@ -9,6 +9,7 @@ interface ReliquidationRequest {
     reliquidateScope?: 'affected' | 'all';
     regenerateVouchers?: boolean;
     sendEmails?: boolean;
+    source?: string;
   };
 }
 
@@ -50,7 +51,8 @@ Deno.serve(async (req) => {
     const {
       reliquidateScope = 'affected',
       regenerateVouchers = false,
-      sendEmails = false
+      sendEmails = false,
+      source
     } = options;
 
     console.log(`🔄 Starting re-liquidation for period ${periodId}`, {
@@ -194,19 +196,26 @@ Deno.serve(async (req) => {
         };
 
         // Update payroll record
+        const updateData: any = {
+          total_devengado: newCalculation.totalDevengado,
+          total_deducciones: newCalculation.totalDeducciones,
+          neto_pagado: newCalculation.netoPagado,
+          ibc: newCalculation.ibc,
+          salud_empleado: newCalculation.healthDeduction,
+          pension_empleado: newCalculation.pensionDeduction,
+          auxilio_transporte: newCalculation.transportAllowance,
+          fondo_solidaridad: newCalculation.solidarityFund,
+          updated_at: new Date().toISOString()
+        };
+
+        // Only set is_stale: false for payroll history adjustments
+        if (source === 'payroll_history') {
+          updateData.is_stale = false;
+        }
+
         const { error: updateError } = await supabase
           .from('payrolls')
-          .update({
-            total_devengado: newCalculation.totalDevengado,
-            total_deducciones: newCalculation.totalDeducciones,
-            neto_pagado: newCalculation.netoPagado,
-            ibc: newCalculation.ibc,
-            salud_empleado: newCalculation.healthDeduction,
-            pension_empleado: newCalculation.pensionDeduction,
-            auxilio_transporte: newCalculation.transportAllowance,
-            fondo_solidaridad: newCalculation.solidarityFund,
-            updated_at: new Date().toISOString()
-          })
+          .update(updateData)
           .eq('id', currentPayroll.id);
 
         if (updateError) {
