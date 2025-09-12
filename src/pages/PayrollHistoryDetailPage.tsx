@@ -28,7 +28,7 @@ import { PayrollCalculationBackendService, PayrollCalculationInput } from '@/ser
 import { PayrollCalculationService } from '@/services/PayrollCalculationService';
 import { convertNovedadesToIBC } from '@/utils/payrollCalculationsBackend';
 import { PayrollEditProvider, usePayrollEdit } from '@/contexts/PayrollEditContext';
-import { EditModeHeader } from '@/components/payroll/edit/EditModeHeader';
+import { PayrollActionsPanel } from '@/components/payroll/actions/PayrollActionsPanel';
 import { AddEmployeeModal } from '@/components/payroll/edit/AddEmployeeModal';
 import { CompositionChangesModal } from '@/components/payroll/edit/CompositionChangesModal';
 import { Edit } from 'lucide-react';
@@ -810,36 +810,22 @@ function PayrollHistoryDetailPageContent() {
               {isRecalculatingAll ? "Recalculando..." : "Recalcular Todo"}
             </Button>
             
-            {/* Botón de novedades pendientes (solo si hay) */}
-            {totalPendingCount > 0 && (
-              <>
-                <Badge variant="secondary" className="animate-pulse">
-                  {totalPendingCount} novedades pendientes
-                </Badge>
-                <Button 
-                  variant="destructive"
-                  onClick={() => setShowDiscardModal(true)}
-                  disabled={isApplying}
-                >
-                  Descartar cambios
-                </Button>
-                <Button 
-                  className="bg-warning hover:bg-warning/90 text-warning-foreground"
-                  onClick={() => setShowConfirmModal(true)}
-                  disabled={isApplying}
-                >
-                  {isApplying ? "Aplicando..." : "Aplicar Ajustes"}
-                </Button>
-              </>
-            )}
         </div>
       </div>
 
-      {/* Edit Mode Header */}
-      <EditModeHeader 
-        onApplyChanges={handleApplyCompositionChanges}
-        onDiscardChanges={handleDiscardCompositionChanges}
-      />
+      {/* Unified Actions Panel */}
+      <div className="px-6">
+        <PayrollActionsPanel
+          totalPendingCount={totalPendingCount}
+          isApplying={isApplying}
+          onApplyPendingAdjustments={() => setShowConfirmModal(true)}
+          onDiscardPendingAdjustments={() => setShowDiscardModal(true)}
+          onApplyCompositionChanges={handleApplyCompositionChanges}
+          onDiscardCompositionChanges={handleDiscardCompositionChanges}
+          canEdit={periodData?.estado === 'cerrado'}
+          periodStatus={periodData?.estado || ''}
+        />
+      </div>
 
       {/* Summary Cards */}
         <PeriodSummaryCards
