@@ -151,9 +151,24 @@ export class PeriodEditingService {
         .update({ status: 'saving' })
         .eq('id', sessionId);
 
-      // Aplicar cambios usando función de base de datos
-      const { data, error } = await supabase.functions.invoke('apply-period-changes', {
-        body: { sessionId, changes: session.changes }
+      // Aplicar cambios usando función de re-liquidación
+      const affectedEmployeeIds = [
+        ...session.changes.employees.added,
+        ...session.changes.employees.removed,
+        ...Object.keys(session.changes.payrollData)
+      ];
+
+      const { data, error } = await supabase.functions.invoke('reliquidate-period-adjustments', {
+        body: {
+          periodId: session.period_id,
+          affectedEmployeeIds: affectedEmployeeIds.length > 0 ? affectedEmployeeIds : undefined,
+          justification: 'Aplicación de cambios de edición de período',
+          options: {
+            reliquidateScope: 'affected',
+            regenerateVouchers: false,
+            sendEmails: false
+          }
+        }
       });
 
       if (error) throw error;
