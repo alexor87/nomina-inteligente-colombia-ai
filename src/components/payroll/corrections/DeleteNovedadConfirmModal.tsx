@@ -17,7 +17,7 @@ import { PeriodState } from '@/types/pending-adjustments';
 interface DeleteNovedadConfirmModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (createPendingAdjustment: boolean) => void;
+  onConfirm: (createPendingAdjustment: boolean, novedad: DisplayNovedad) => void;
   novedad: DisplayNovedad | null;
   periodState: PeriodState;
   employeeName: string;
@@ -44,11 +44,7 @@ export const DeleteNovedadConfirmModal: React.FC<DeleteNovedadConfirmModalProps>
   if (!novedad) return null;
 
   const handleImmediateDelete = () => {
-    onConfirm(isPeriodClosed);
-  };
-
-  const handleScheduleDelete = () => {
-    onConfirm(true); // Always create pending adjustment for scheduled deletion
+    onConfirm(isPeriodClosed, novedad);
   };
 
   return (

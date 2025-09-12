@@ -335,10 +335,8 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
     }
   }, [editState, onRemoveNovedad, deleteNovedad, addPendingDeletion, onEmployeeNovedadesChange, onPendingAdjustmentChange, toast, employeeId, employeeName]);
 
-  const onDeleteConfirm = (createPendingAdjustment: boolean) => {
-    if (deleteConfirmModal.novedad) {
-      handleConfirmDelete(createPendingAdjustment, deleteConfirmModal.novedad);
-    }
+  const onDeleteConfirm = (createPendingAdjustment: boolean, novedad: DisplayNovedad) => {
+    handleConfirmDelete(createPendingAdjustment, novedad);
     setDeleteConfirmModal({ isOpen: false, novedad: null });
   };
 
