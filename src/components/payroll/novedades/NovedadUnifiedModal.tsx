@@ -544,6 +544,8 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
             onClose={handleClose}
             refreshTrigger={refreshTrigger}
             onEmployeeNovedadesChange={onEmployeeNovedadesChange}
+            mode={mode}
+            companyId={companyId}
           />
         </div>
       );

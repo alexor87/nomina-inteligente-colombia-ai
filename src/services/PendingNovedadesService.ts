@@ -28,8 +28,7 @@ interface AdjustmentResult {
 export class PendingNovedadesService {
   
   /**
-   * Apply all pending novelties to a closed period with full re-liquidation
-   * This triggers a complete atomic re-liquidation using the Edge Function
+   * Apply pending adjustments including deletions and creations
    */
   static async applyPendingAdjustments(data: PendingAdjustmentData): Promise<AdjustmentResult> {
     try {
@@ -45,39 +44,60 @@ export class PendingNovedadesService {
       }
 
       let adjustmentsApplied = 0;
+      let deletionsApplied = 0;
 
-      // First, create all the novedades
+      // First, process deletions and creations
       for (const group of data.employeeGroups) {
         try {
-          // Create novedades for each employee
+          // Process each adjustment for this employee
           for (const novedad of group.novedades) {
-            const { error: novedadError } = await supabase
-              .from('payroll_novedades')
-              .insert({
-                company_id: data.companyId,
-                empleado_id: novedad.employee_id,
-                periodo_id: data.periodId,
-                tipo_novedad: novedad.novedadData.tipo_novedad as any, // Cast to match DB enum
-                subtipo: novedad.novedadData.subtipo,
-                valor: novedad.novedadData.valor || novedad.valor,
-                observacion: `${novedad.novedadData.observacion || novedad.observacion || ''} - Ajuste aplicado: ${data.justification}`.trim(),
-                fecha_inicio: novedad.novedadData.fecha_inicio,
-                fecha_fin: novedad.novedadData.fecha_fin,
-                dias: novedad.novedadData.dias,
-                horas: novedad.novedadData.horas,
-                constitutivo_salario: novedad.novedadData.constitutivo_salario,
-                base_calculo: typeof novedad.novedadData.base_calculo === 'object' 
-                  ? JSON.stringify(novedad.novedadData.base_calculo) 
-                  : novedad.novedadData.base_calculo,
-                creado_por: (await supabase.auth.getUser()).data.user?.id
-              });
+            const novedadData = novedad.novedadData as any;
+            
+            if (novedadData.action === 'delete') {
+              // Handle deletion by removing the original novedad
+              if (novedadData.novedad_id) {
+                const { error: deleteError } = await supabase
+                  .from('payroll_novedades')
+                  .delete()
+                  .eq('id', novedadData.novedad_id)
+                  .eq('company_id', data.companyId);
 
-            if (novedadError) {
-              console.error('Error creating novedad:', novedadError);
-              continue;
+                if (deleteError) {
+                  console.error('Error deleting novedad:', deleteError);
+                  continue;
+                }
+                deletionsApplied++;
+              }
+            } else {
+              // Handle creation (existing logic)
+              const { error: novedadError } = await supabase
+                .from('payroll_novedades')
+                .insert({
+                  company_id: data.companyId,
+                  empleado_id: novedad.employee_id,
+                  periodo_id: data.periodId,
+                  tipo_novedad: novedad.novedadData.tipo_novedad as any,
+                  subtipo: novedad.novedadData.subtipo,
+                  valor: novedad.novedadData.valor || novedad.valor,
+                  observacion: `${novedad.novedadData.observacion || novedad.observacion || ''} - Ajuste aplicado: ${data.justification}`.trim(),
+                  fecha_inicio: novedad.novedadData.fecha_inicio,
+                  fecha_fin: novedad.novedadData.fecha_fin,
+                  dias: novedad.novedadData.dias,
+                  horas: novedad.novedadData.horas,
+                  constitutivo_salario: novedad.novedadData.constitutivo_salario,
+                  base_calculo: typeof novedad.novedadData.base_calculo === 'object' 
+                    ? JSON.stringify(novedad.novedadData.base_calculo) 
+                    : novedad.novedadData.base_calculo,
+                  creado_por: (await supabase.auth.getUser()).data.user?.id
+                });
+
+              if (novedadError) {
+                console.error('Error creating novedad:', novedadError);
+                continue;
+              }
+
+              adjustmentsApplied++;
             }
-
-            adjustmentsApplied++;
           }
         } catch (employeeError) {
           console.error(`Error processing employee ${group.employeeId}:`, employeeError);
@@ -132,9 +152,9 @@ export class PendingNovedadesService {
 
       return {
         success: true,
-        message: `Successfully applied ${adjustmentsApplied} adjustments and re-liquidated ${reliquidationResult.employeesAffected} employees`,
+        message: `Successfully applied ${adjustmentsApplied} adjustments and ${deletionsApplied} deletions, then re-liquidated ${reliquidationResult.employeesAffected} employees`,
         employeesAffected: reliquidationResult.employeesAffected,
-        adjustmentsApplied,
+        adjustmentsApplied: adjustmentsApplied + deletionsApplied,
         correctionsApplied: reliquidationResult.correctionsApplied,
         vouchersRegenerated: reliquidationResult.vouchersRegenerated,
         periodReopened: reliquidationResult.periodReopened

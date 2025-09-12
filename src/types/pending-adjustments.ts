@@ -7,7 +7,10 @@ export interface PendingNovedad {
   tipo_novedad: string;
   valor: number;
   observacion?: string;
-  novedadData: CreateNovedadData; // Complete novedad data for application
+  novedadData: CreateNovedadData & {
+    action?: 'create' | 'delete'; // Action type for pending adjustment
+    novedad_id?: string; // For delete actions, reference to original novedad
+  };
 }
 
 // Period state types

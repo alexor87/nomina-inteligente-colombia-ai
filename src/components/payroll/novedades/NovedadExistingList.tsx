@@ -12,6 +12,7 @@ import { VacationAbsenceDetailModal } from '@/components/vacations/VacationAbsen
 import { supabase } from '@/integrations/supabase/client';
 import { useEmployeeNovedadesCacheStore } from '@/stores/employeeNovedadesCacheStore';
 import { PendingAdjustmentsService, PendingAdjustmentRecord } from '@/services/PendingAdjustmentsService';
+import { PendingNovedad } from '@/types/pending-adjustments';
 
 interface NovedadExistingListProps {
   employeeId: string;
@@ -21,6 +22,8 @@ interface NovedadExistingListProps {
   onClose: () => void;
   refreshTrigger?: number;
   onEmployeeNovedadesChange?: (employeeId: string) => Promise<void>;
+  mode?: 'liquidacion' | 'ajustes';
+  companyId?: string | null;
 }
 
 export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
@@ -30,7 +33,9 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
   onAddNew,
   onClose,
   refreshTrigger,
-  onEmployeeNovedadesChange
+  onEmployeeNovedadesChange,
+  mode = 'liquidacion',
+  companyId
 }) => {
   const [integratedData, setIntegratedData] = useState<DisplayNovedad[]>([]);
   const [pendingAdjustments, setPendingAdjustments] = useState<PendingAdjustmentRecord[]>([]);
@@ -157,6 +162,76 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
   };
 
   const handleDeleteByOrigin = async (item: DisplayNovedad) => {
+    // For closed periods in adjustment mode, create pending deletion instead of immediate deletion
+    if (mode === 'ajustes' && companyId && !item.origen.includes('pending')) {
+      try {
+        const pendingDeletion: PendingNovedad = {
+          employee_id: employeeId,
+          employee_name: employeeName,
+          tipo_novedad: item.tipo_novedad,
+          valor: 0, // Delete operations have no value impact until applied
+          observacion: `Eliminar: ${item.tipo_novedad}${item.subtipo ? ` (${item.subtipo})` : ''}`,
+          novedadData: {
+            empleado_id: employeeId,
+            periodo_id: periodId,
+            company_id: companyId,
+            tipo_novedad: item.tipo_novedad as any,
+            subtipo: item.subtipo,
+            valor: item.valor,
+            observacion: `Eliminar: ${item.tipo_novedad}${item.subtipo ? ` (${item.subtipo})` : ''}`,
+            action: 'delete',
+            novedad_id: item.id,
+            fecha_inicio: item.fecha_inicio,
+            fecha_fin: item.fecha_fin,
+            dias: item.dias,
+            horas: item.horas
+          }
+        };
+
+        // Save as pending adjustment
+        await PendingAdjustmentsService.savePendingAdjustment(pendingDeletion);
+        
+        // Add to local pending adjustments state to show immediately
+        setPendingAdjustments(prev => [...prev, {
+          id: `temp-delete-${Date.now()}`,
+          company_id: companyId,
+          employee_id: employeeId,
+          employee_name: employeeName,
+          period_id: periodId,
+          tipo_novedad: item.tipo_novedad,
+          subtipo: item.subtipo,
+          valor: 0,
+          dias: item.dias,
+          horas: item.horas,
+          fecha_inicio: item.fecha_inicio,
+          fecha_fin: item.fecha_fin,
+          observacion: pendingDeletion.observacion,
+          novedad_data: pendingDeletion.novedadData,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }]);
+
+        toast({
+          title: "⏳ Eliminación Pendiente",
+          description: `La novedad será eliminada cuando apliques los ajustes. Se reliquidará el período automáticamente.`,
+          className: "border-yellow-200 bg-yellow-50"
+        });
+
+        // Trigger parent component update to show pending adjustments banner
+        await onEmployeeNovedadesChange?.(employeeId);
+        
+      } catch (error) {
+        console.error('Error creating pending deletion:', error);
+        toast({
+          title: "Error",
+          description: "No se pudo crear la eliminación pendiente",
+          variant: "destructive",
+        });
+      }
+      return;
+    }
+
+    // Original delete logic for draft periods and vacations
     const { setLastRefreshTime } = useEmployeeNovedadesCacheStore.getState();
     
     if (item.origen === 'vacaciones') {
@@ -291,27 +366,34 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
 
   // Convert pending adjustments to display format
   const convertPendingToDisplay = (pending: PendingAdjustmentRecord[]): DisplayNovedad[] => {
-    return pending.map(p => ({
-      id: p.id,
-      origen: 'pending_adjustment' as any,
-      tipo_novedad: p.tipo_novedad as any,
-      subtipo: p.subtipo,
-      valor: p.valor,
-      dias: p.dias || 0,
-      fecha_inicio: p.fecha_inicio,
-      fecha_fin: p.fecha_fin,
-      observacion: p.observacion,
-      isConfirmed: false, // Pending adjustments are never confirmed
-      badgeLabel: formatTipoNovedad(p.tipo_novedad, p.subtipo),
-      badgeColor: 'bg-orange-100 text-orange-800',
-      badgeIcon: '⏳',
-      statusColor: 'border-orange-200 text-orange-700',
-      status: 'pendiente',
-      canEdit: false,
-      canDelete: true,
-      created_at: p.created_at,
-      updated_at: p.updated_at
-    }));
+    return pending.map(p => {
+      const novedadData = p.novedad_data as any;
+      const isDeleteAction = novedadData?.action === 'delete';
+      
+      return {
+        id: p.id,
+        origen: isDeleteAction ? 'pending_delete' as any : 'pending_adjustment' as any,
+        tipo_novedad: p.tipo_novedad as any,
+        subtipo: p.subtipo,
+        valor: p.valor,
+        dias: p.dias || 0,
+        fecha_inicio: p.fecha_inicio,
+        fecha_fin: p.fecha_fin,
+        observacion: p.observacion,
+        isConfirmed: false, // Pending adjustments are never confirmed
+        badgeLabel: isDeleteAction 
+          ? `Eliminar: ${formatTipoNovedad(p.tipo_novedad, p.subtipo)}`
+          : formatTipoNovedad(p.tipo_novedad, p.subtipo),
+        badgeColor: isDeleteAction ? 'bg-red-100 text-red-800' : 'bg-orange-100 text-orange-800',
+        badgeIcon: isDeleteAction ? '🗑️' : '⏳',
+        statusColor: isDeleteAction ? 'border-red-200 text-red-700' : 'border-orange-200 text-orange-700',
+        status: 'pendiente',
+        canEdit: false,
+        canDelete: true,
+        created_at: p.created_at,
+        updated_at: p.updated_at
+      };
+    });
   };
 
   const getSeparatedTotals = (): SeparatedTotals & { pending: { devengos: number; deducciones: number; neto: number; count: number } } => {
