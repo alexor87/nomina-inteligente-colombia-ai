@@ -1526,6 +1526,45 @@ export type Database = {
         }
         Relationships: []
       }
+      payroll_version_history: {
+        Row: {
+          changes_summary: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          period_id: string
+          previous_version_id: string | null
+          snapshot_data: Json
+          version_number: number
+          version_type: string
+        }
+        Insert: {
+          changes_summary?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          period_id: string
+          previous_version_id?: string | null
+          snapshot_data?: Json
+          version_number?: number
+          version_type?: string
+        }
+        Update: {
+          changes_summary?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          period_id?: string
+          previous_version_id?: string | null
+          snapshot_data?: Json
+          version_number?: number
+          version_type?: string
+        }
+        Relationships: []
+      }
       payroll_vouchers: {
         Row: {
           company_id: string
