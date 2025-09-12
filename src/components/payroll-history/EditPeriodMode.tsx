@@ -99,46 +99,68 @@ export const EditPeriodMode = ({
               )}
               
               {/* Discard Changes Button */}
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button 
-                    variant="outline"
-                    size="sm"
-                    disabled={editState === 'saving' || editState === 'discarding' || !hasChanges}
-                    className="border-gray-300 text-gray-600 hover:bg-gray-50"
-                  >
-                    {editState === 'discarding' ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Descartando...
-                      </>
-                    ) : (
-                      <>
-                        <X className="mr-2 h-4 w-4" />
-                        Descartar
-                      </>
-                    )}
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>¿Descartar cambios?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Se perderán todos los cambios pendientes ({totalChangesCount} {totalChangesCount === 1 ? 'cambio' : 'cambios'}). 
-                      Esta acción no se puede deshacer.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction 
-                      onClick={onDiscardChanges}
-                      className="bg-red-600 hover:bg-red-700"
+              {hasChanges ? (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button 
+                      variant="outline"
+                      size="sm"
+                      disabled={editState === 'saving' || editState === 'discarding'}
+                      className="border-gray-300 text-gray-600 hover:bg-gray-50"
                     >
-                      Descartar Cambios
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+                      {editState === 'discarding' ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Descartando...
+                        </>
+                      ) : (
+                        <>
+                          <X className="mr-2 h-4 w-4" />
+                          Descartar Cambios
+                        </>
+                      )}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>¿Descartar cambios?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Se perderán todos los cambios pendientes ({totalChangesCount} {totalChangesCount === 1 ? 'cambio' : 'cambios'}). 
+                        Esta acción no se puede deshacer.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction 
+                        onClick={onDiscardChanges}
+                        className="bg-red-600 hover:bg-red-700"
+                      >
+                        Descartar Cambios
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              ) : (
+                <Button 
+                  variant="outline"
+                  size="sm"
+                  onClick={onDiscardChanges}
+                  disabled={editState === 'saving' || editState === 'discarding'}
+                  className="border-gray-300 text-gray-600 hover:bg-gray-50"
+                >
+                  {editState === 'discarding' ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saliendo...
+                    </>
+                  ) : (
+                    <>
+                      <X className="mr-2 h-4 w-4" />
+                      Salir del Modo Edición
+                    </>
+                  )}
+                </Button>
+              )}
 
               {/* Apply Changes Button */}
               <Button 
