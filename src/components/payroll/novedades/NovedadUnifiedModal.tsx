@@ -12,7 +12,6 @@ import { NovedadDeduccionesConsolidatedForm } from './forms/NovedadDeduccionesCo
 import { NovedadRetefuenteForm } from './forms/NovedadRetefuenteForm';
 import { NovedadTypeSelector, NovedadCategory } from './NovedadTypeSelector';
 import { NovedadType, CreateNovedadData } from '@/types/novedades-enhanced';
-import { PeriodState } from '@/types/pending-adjustments';
 import { useToast } from '@/hooks/use-toast';
 import { NovedadRecargoConsolidatedForm } from './forms/NovedadRecargoConsolidatedForm';
 import { NovedadVacacionesConsolidatedForm } from './forms/NovedadVacacionesConsolidatedForm';
@@ -49,20 +48,6 @@ interface NovedadUnifiedModalProps {
   mode?: 'liquidacion' | 'ajustes';
   companyId?: string | null;
   currentLiquidatedValues?: EmployeeLiquidatedValues;
-  addPendingDeletion?: (employeeId: string, employeeName: string, originalNovedad: any) => void;
-  periodState?: PeriodState;
-  // New props for edit mode integration
-  editMode?: boolean;
-  editState?: 'closed' | 'editing' | 'saving' | 'discarding';
-  pendingChanges?: {
-    novedades: {
-      added: any[];
-      modified: any[];
-      deleted: string[];
-    };
-  };
-  onRemoveNovedad?: (novedadId: string) => void;
-  onNovedadChange?: (action: 'add' | 'remove', novedadData: CreateNovedadData) => void;
 }
 
 const categoryToNovedadType: Record<NovedadCategory, NovedadType> = {
@@ -101,14 +86,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   endDate,
   mode = 'liquidacion',
   companyId,
-  currentLiquidatedValues,
-  addPendingDeletion,
-  periodState,
-  editMode = false,
-  editState,
-  pendingChanges,
-  onRemoveNovedad,
-  onNovedadChange
+  currentLiquidatedValues
 }) => {
   const [currentStep, setCurrentStep] = useState<'list' | 'selector' | 'form' | 'absence'>('list');
   const [selectedType, setSelectedType] = useState<NovedadType | null>(selectedNovedadType);
@@ -318,21 +296,6 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
         observacion: formData.observations
       };
       
-      // Use edit mode handler if in edit mode
-      if (editMode && onNovedadChange) {
-        onNovedadChange('add', novedadData);
-        handleClose();
-        
-        toast({
-          title: "📝 Novedad Agregada",
-          description: `${formData.type === 'incapacidad' && valorCalculado > 0 
-            ? `Incapacidad agregada a cambios pendientes ($${valorCalculado.toLocaleString()})` 
-            : 'Ausencia agregada a cambios pendientes'}. Se aplicará al confirmar los cambios.`,
-          className: "border-blue-200 bg-blue-50"
-        });
-        return;
-      }
-
       const result = await onSubmit(novedadData);
 
       await new Promise(resolve => setTimeout(resolve, 300));
@@ -389,45 +352,6 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     try {
       const isArrayData = Array.isArray(formData);
       const dataArray = isArrayData ? formData : [formData];
-      
-      // Handle edit mode - add to pending changes instead of submitting
-      if (editMode && onNovedadChange) {
-        for (const entry of dataArray) {
-          const submitData: CreateNovedadData = {
-            empleado_id: employeeId,
-            periodo_id: periodId,
-            company_id: companyId || '',
-            tipo_novedad: selectedType!,
-            valor: entry.valor || 0,
-            horas: entry.horas || undefined,
-            dias: entry.dias || undefined,
-            observacion: entry.observacion || undefined,
-            fecha_inicio: entry.fecha_inicio || undefined,
-            fecha_fin: entry.fecha_fin || undefined,
-            subtipo: entry.subtipo || entry.tipo || undefined,
-            base_calculo: entry.base_calculo || undefined
-          };
-
-          onNovedadChange('add', submitData);
-        }
-        
-        handleClose();
-        
-        const totalValue = isArrayData 
-          ? dataArray.reduce((sum, entry) => sum + (entry.valor || 0), 0)
-          : (formData.valor || 0);
-
-        toast({
-          title: "📝 Novedades Agregadas",
-          description: isArrayData 
-            ? `${dataArray.length} novedades agregadas a cambios pendientes (Total: $${totalValue.toLocaleString()}). Se aplicarán al confirmar los cambios.`
-            : `Novedad agregada a cambios pendientes ($${totalValue.toLocaleString()}). Se aplicará al confirmar los cambios.`,
-          className: "border-blue-200 bg-blue-50"
-        });
-        return;
-      }
-
-      // Normal submission for non-edit mode
       let hasPendingSubmissions = false;
       
       for (const entry of dataArray) {
@@ -620,12 +544,6 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
             onClose={handleClose}
             refreshTrigger={refreshTrigger}
             onEmployeeNovedadesChange={onEmployeeNovedadesChange}
-            addPendingDeletion={addPendingDeletion}
-            periodState={periodState}
-            editState={editState}
-            pendingChanges={pendingChanges}
-            onAddNovedad={onNovedadChange ? (novedadData) => onNovedadChange('add', novedadData) : undefined}
-            onRemoveNovedad={onRemoveNovedad}
           />
         </div>
       );
@@ -691,14 +609,12 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
           <>
             <DialogHeader>
               <DialogTitle>
-                {editMode ? '🔧 Agregar Novedad (Modo Edición)' : mode === 'ajustes' ? '📝 Agregar Ajuste' : '📋 Gestionar Novedades'}
+                {mode === 'ajustes' ? '📝 Agregar Ajuste' : '📋 Gestionar Novedades'}
               </DialogTitle>
               <DialogDescription>
-                {editMode 
-                  ? 'Esta novedad se agregará a los cambios pendientes del período.'
-                  : mode === 'ajustes' 
-                    ? 'Este ajuste será aplicado tras confirmación con justificación.'
-                    : 'Gestione las novedades de nómina para este empleado.'
+                {mode === 'ajustes' 
+                  ? 'Este ajuste será aplicado tras confirmación con justificación.'
+                  : 'Gestione las novedades de nómina para este empleado.'
                 }
               </DialogDescription>
               {employeeFullName && (

@@ -3,18 +3,15 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Save, X, Calculator, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Save, X, Calculator } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { formatCurrency } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { PayrollEmployeeCalculationService, EmployeeRecalculationInput } from '@/services/PayrollEmployeeCalculationService';
-import { usePayrollNovedadesUnified } from '@/hooks/usePayrollNovedadesUnified';
 
 /**
- * ✅ PÁGINA DE EDICIÓN DE PERÍODO - UNIFICADA CON MOTOR ROBUSTO
- * Usa PayrollEmployeeCalculationService para cálculos precisos
- * Integra novedades y validaciones del sistema de liquidación
+ * ✅ PÁGINA DE EDICIÓN DE PERÍODO - FASE 3 CRÍTICA
+ * Implementa funcionalidad real de edición
  */
 export const PeriodEditPage = () => {
   const { periodId } = useParams<{ periodId: string }>();
@@ -23,22 +20,9 @@ export const PeriodEditPage = () => {
   
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [isRecalculating, setIsRecalculating] = useState(false);
   const [period, setPeriod] = useState<any>(null);
   const [employees, setEmployees] = useState<any[]>([]);
   const [editedValues, setEditedValues] = useState<Record<string, any>>({});
-  const [calculatedValues, setCalculatedValues] = useState<Record<string, any>>({});
-
-  // ✅ INTEGRACIÓN: Hook de novedades unificado
-  const {
-    novedades,
-    isLoading: isLoadingNovedades,
-    getEmployeeNovedadesList
-  } = usePayrollNovedadesUnified({ 
-    companyId: period?.company_id, 
-    periodId: periodId || '', 
-    enabled: !!period?.company_id && !!periodId 
-  });
 
   useEffect(() => {
     if (periodId) {
@@ -96,125 +80,16 @@ export const PeriodEditPage = () => {
     }));
   };
 
-  // ✅ UNIFICADO: Usar motor robusto de cálculo en lugar de lógica manual
-  const getCalculatedTotals = (employee: any) => {
-    const employeeId = employee.id;
+  const calculateTotals = (employee: any) => {
+    const salarioBase = editedValues[`${employee.id}_salario_base`] ?? employee.salario_base;
+    const horasExtra = editedValues[`${employee.id}_horas_extra`] ?? employee.horas_extra ?? 0;
+    const bonificaciones = editedValues[`${employee.id}_bonificaciones`] ?? employee.bonificaciones ?? 0;
+    const deducciones = editedValues[`${employee.id}_total_deducciones`] ?? employee.total_deducciones ?? 0;
     
-    // Si hay valores calculados, usarlos. Si no, usar valores actuales del empleado
-    const calculated = calculatedValues[employeeId];
-    if (calculated) {
-      return {
-        totalDevengado: calculated.totalDevengado,
-        netoAPagar: calculated.netoPagado,
-        ibc: calculated.ibc,
-        auxilioTransporte: calculated.auxilioTransporte,
-        saludEmpleado: calculated.saludEmpleado,
-        pensionEmpleado: calculated.pensionEmpleado
-      };
-    }
+    const totalDevengado = Number(salarioBase) + Number(horasExtra) + Number(bonificaciones);
+    const netoAPagar = totalDevengado - Number(deducciones);
     
-    // Fallback a valores actuales del empleado
-    return {
-      totalDevengado: employee.total_devengado || 0,
-      netoAPagar: employee.neto_pagado || 0,
-      ibc: employee.ibc || 0,
-      auxilioTransporte: employee.auxilio_transporte || 0,
-      saludEmpleado: employee.salud_empleado || 0,
-      pensionEmpleado: employee.pension_empleado || 0
-    };
-  };
-
-  // ✅ NUEVO: Recalcular empleado individual usando motor robusto
-  const recalculateEmployee = async (employeeId: string) => {
-    if (!period) return;
-    
-    const employee = employees.find(emp => emp.id === employeeId);
-    if (!employee) return;
-    
-    try {
-      // Obtener novedades del empleado
-      const employeeNovedades = await getEmployeeNovedadesList(employeeId);
-      
-      // Usar salario editado o salario base actual
-      const currentSalary = editedValues[`${employeeId}_salario_base`] ?? employee.salario_base;
-      
-      const input: EmployeeRecalculationInput = {
-        employeeId,
-        baseSalary: currentSalary,
-        periodType: period.tipo_periodo,
-        fechaInicio: period.fecha_inicio,
-        fechaFin: period.fecha_fin,
-        novedades: employeeNovedades,
-        year: '2025'
-      };
-      
-      const result = await PayrollEmployeeCalculationService.recalculateEmployee(input);
-      
-      // Actualizar valores calculados
-      setCalculatedValues(prev => ({
-        ...prev,
-        [employeeId]: result
-      }));
-      
-      console.log('✅ Empleado recalculado:', employeeId, result);
-      
-    } catch (error) {
-      console.error('❌ Error recalculando empleado:', error);
-      toast({
-        title: "Error en recálculo",
-        description: `No se pudo recalcular el empleado ${employee.nombre}`,
-        variant: "destructive"
-      });
-    }
-  };
-
-  // ✅ NUEVO: Recalcular todos los empleados
-  const recalculateAllEmployees = async () => {
-    if (!period || employees.length === 0) return;
-    
-    setIsRecalculating(true);
-    try {
-      console.log('🔄 Recalculando todos los empleados con motor robusto...');
-      
-      const inputs: EmployeeRecalculationInput[] = [];
-      
-      for (const employee of employees) {
-        const employeeNovedades = await getEmployeeNovedadesList(employee.id);
-        const currentSalary = editedValues[`${employee.id}_salario_base`] ?? employee.salario_base;
-        
-        inputs.push({
-          employeeId: employee.id,
-          baseSalary: currentSalary,
-          periodType: period.tipo_periodo,
-          fechaInicio: period.fecha_inicio,
-          fechaFin: period.fecha_fin,
-          novedades: employeeNovedades,
-          year: '2025'
-        });
-      }
-      
-      const results = await PayrollEmployeeCalculationService.recalculateMultipleEmployees(inputs);
-      
-      setCalculatedValues(results);
-      
-      toast({
-        title: "✅ Recálculo completado",
-        description: `Se recalcularon ${employees.length} empleados con el motor robusto`,
-        className: "border-green-200 bg-green-50"
-      });
-      
-      console.log('✅ Recálculo masivo completado:', results);
-      
-    } catch (error) {
-      console.error('❌ Error en recálculo masivo:', error);
-      toast({
-        title: "Error",
-        description: "No se pudieron recalcular todos los empleados",
-        variant: "destructive"
-      });
-    } finally {
-      setIsRecalculating(false);
-    }
+    return { totalDevengado, netoAPagar };
   };
 
   const handleSave = async () => {
@@ -240,24 +115,18 @@ export const PeriodEditPage = () => {
         employeeUpdates[employeeId][field] = value;
       });
 
-      // ✅ UNIFICADO: Aplicar cambios usando valores calculados del motor robusto
+      // Aplicar cambios a cada empleado
       for (const [employeeId, updates] of Object.entries(employeeUpdates)) {
         const employee = employees.find(e => e.id === employeeId);
         if (employee) {
-          // Usar valores calculados del motor robusto si están disponibles
-          const calculatedTotals = getCalculatedTotals({ ...employee, ...updates });
+          const totals = calculateTotals({ ...employee, ...updates });
           
           const { error } = await supabase
             .from('payrolls')
             .update({
               ...updates,
-              total_devengado: calculatedTotals.totalDevengado,
-              neto_pagado: calculatedTotals.netoAPagar,
-              total_deducciones: calculatedTotals.totalDevengado - calculatedTotals.netoAPagar,
-              ibc: calculatedTotals.ibc,
-              auxilio_transporte: calculatedTotals.auxilioTransporte,
-              salud_empleado: calculatedTotals.saludEmpleado,
-              pension_empleado: calculatedTotals.pensionEmpleado,
+              total_devengado: totals.totalDevengado,
+              neto_pagado: totals.netoAPagar,
               updated_at: new Date().toISOString()
             })
             .eq('id', employee.id);
@@ -268,24 +137,21 @@ export const PeriodEditPage = () => {
         }
       }
 
-      // ✅ UNIFICADO: Actualizar totales del período usando motor robusto
+      // Actualizar totales del período
       const newTotalDevengado = employees.reduce((sum, emp) => {
-        const totals = getCalculatedTotals({ ...emp, ...employeeUpdates[emp.id] });
+        const totals = calculateTotals({ ...emp, ...employeeUpdates[emp.id] });
         return sum + totals.totalDevengado;
       }, 0);
 
       const newTotalNeto = employees.reduce((sum, emp) => {
-        const totals = getCalculatedTotals({ ...emp, ...employeeUpdates[emp.id] });
+        const totals = calculateTotals({ ...emp, ...employeeUpdates[emp.id] });
         return sum + totals.netoAPagar;
       }, 0);
-
-      const newTotalDeducciones = newTotalDevengado - newTotalNeto;
 
       const { error: periodError } = await supabase
         .from('payroll_periods_real')
         .update({
           total_devengado: newTotalDevengado,
-          total_deducciones: newTotalDeducciones,
           total_neto: newTotalNeto,
           updated_at: new Date().toISOString()
         })
@@ -302,7 +168,6 @@ export const PeriodEditPage = () => {
       });
 
       setEditedValues({});
-      setCalculatedValues({});
       await loadPeriodData();
       
     } catch (error) {
@@ -364,23 +229,11 @@ export const PeriodEditPage = () => {
         </div>
         
         <div className="flex items-center gap-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={recalculateAllEmployees}
-            disabled={isRecalculating || employees.length === 0}
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isRecalculating ? 'animate-spin' : ''}`} />
-            {isRecalculating ? 'Recalculando...' : 'Recalcular Todo'}
-          </Button>
           {hasChanges && (
             <Button 
               variant="outline" 
               size="sm" 
-              onClick={() => {
-                setEditedValues({});
-                setCalculatedValues({});
-              }}
+              onClick={() => setEditedValues({})}
             >
               <X className="h-4 w-4 mr-2" />
               Cancelar cambios
@@ -443,17 +296,16 @@ export const PeriodEditPage = () => {
                   <tr className="border-b">
                     <th className="text-left p-2">Empleado</th>
                     <th className="text-right p-2">Salario Base</th>
-                    <th className="text-right p-2">IBC</th>
-                    <th className="text-right p-2">Aux. Transporte</th>
+                    <th className="text-right p-2">Horas Extra</th>
+                    <th className="text-right p-2">Bonificaciones</th>
                     <th className="text-right p-2">Deducciones</th>
                     <th className="text-right p-2">Total Devengado</th>
                     <th className="text-right p-2">Neto a Pagar</th>
-                    <th className="text-right p-2">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
                   {employees.map((employee) => {
-                    const totals = getCalculatedTotals(employee);
+                    const totals = calculateTotals(employee);
                     
                     return (
                       <tr key={employee.id} className="border-b hover:bg-gray-50">
@@ -468,39 +320,40 @@ export const PeriodEditPage = () => {
                         <td className="p-2 text-right">
                           <input
                             type="number"
-                            className="w-24 text-right border rounded px-1 py-0.5 text-xs"
+                            className="w-20 text-right border rounded px-1 py-0.5 text-xs"
                             value={editedValues[`${employee.id}_salario_base`] ?? employee.salario_base}
-                            onChange={(e) => {
-                              handleValueChange(employee.id, 'salario_base', Number(e.target.value));
-                              // Trigger recalculation when salary changes
-                              setTimeout(() => recalculateEmployee(employee.id), 100);
-                            }}
+                            onChange={(e) => handleValueChange(employee.id, 'salario_base', Number(e.target.value))}
                           />
                         </td>
-                        <td className="p-2 text-right font-medium text-purple-600">
-                          {formatCurrency(totals.ibc)}
+                        <td className="p-2 text-right">
+                          <input
+                            type="number"
+                            className="w-20 text-right border rounded px-1 py-0.5 text-xs"
+                            value={editedValues[`${employee.id}_horas_extra`] ?? employee.horas_extra ?? 0}
+                            onChange={(e) => handleValueChange(employee.id, 'horas_extra', Number(e.target.value))}
+                          />
                         </td>
-                        <td className="p-2 text-right font-medium text-blue-600">
-                          {formatCurrency(totals.auxilioTransporte)}
+                        <td className="p-2 text-right">
+                          <input
+                            type="number"
+                            className="w-20 text-right border rounded px-1 py-0.5 text-xs"
+                            value={editedValues[`${employee.id}_bonificaciones`] ?? employee.bonificaciones ?? 0}
+                            onChange={(e) => handleValueChange(employee.id, 'bonificaciones', Number(e.target.value))}
+                          />
                         </td>
-                        <td className="p-2 text-right font-medium text-red-600">
-                          {formatCurrency(totals.totalDevengado - totals.netoAPagar)}
+                        <td className="p-2 text-right">
+                          <input
+                            type="number"
+                            className="w-20 text-right border rounded px-1 py-0.5 text-xs"
+                            value={editedValues[`${employee.id}_total_deducciones`] ?? employee.total_deducciones ?? 0}
+                            onChange={(e) => handleValueChange(employee.id, 'total_deducciones', Number(e.target.value))}
+                          />
                         </td>
                         <td className="p-2 text-right font-medium text-green-600">
                           {formatCurrency(totals.totalDevengado)}
                         </td>
                         <td className="p-2 text-right font-bold text-blue-600">
                           {formatCurrency(totals.netoAPagar)}
-                        </td>
-                        <td className="p-2 text-center">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => recalculateEmployee(employee.id)}
-                            className="text-xs"
-                          >
-                            <RefreshCw className="h-3 w-3" />
-                          </Button>
                         </td>
                       </tr>
                     );

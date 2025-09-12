@@ -1,19 +1,17 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+
+import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Trash2, Edit, Plus, Eye, ExternalLink, Clock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { usePayrollNovedadesUnified } from '@/hooks/usePayrollNovedadesUnified';
+import { useNovedades } from '@/hooks/useNovedades';
 import { DisplayNovedad, SeparatedTotals } from '@/types/vacation-integration';
 import { useToast } from '@/hooks/use-toast';
 import { VacationAbsenceDetailModal } from '@/components/vacations/VacationAbsenceDetailModal';
 import { supabase } from '@/integrations/supabase/client';
 import { useEmployeeNovedadesCacheStore } from '@/stores/employeeNovedadesCacheStore';
 import { PendingAdjustmentsService, PendingAdjustmentRecord } from '@/services/PendingAdjustmentsService';
-import { DeleteNovedadConfirmModal } from '@/components/payroll/corrections/DeleteNovedadConfirmModal';
-import { PeriodState } from '@/types/pending-adjustments';
-import { useUserCompany } from '@/hooks/useUserCompany';
 
 interface NovedadExistingListProps {
   employeeId: string;
@@ -23,21 +21,6 @@ interface NovedadExistingListProps {
   onClose: () => void;
   refreshTrigger?: number;
   onEmployeeNovedadesChange?: (employeeId: string) => Promise<void>;
-  periodState?: PeriodState;
-  // Legacy props for compatibility (liquidación mode)
-  onPendingAdjustmentChange?: () => void;
-  addPendingDeletion?: (employeeId: string, employeeName: string, originalNovedad: any) => void;
-  // New props for edit period integration
-  editState?: 'closed' | 'editing' | 'saving' | 'discarding';
-  pendingChanges?: {
-    novedades: {
-      added: any[];
-      modified: any[];
-      deleted: string[];
-    };
-  };
-  onAddNovedad?: (novedadData: any) => void;
-  onRemoveNovedad?: (novedadId: string) => void;
 }
 
 export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
@@ -47,18 +30,9 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
   onAddNew,
   onClose,
   refreshTrigger,
-  onEmployeeNovedadesChange,
-  periodState = 'borrador',
-  onPendingAdjustmentChange,
-  addPendingDeletion,
-  // New edit period props
-  editState,
-  pendingChanges,
-  onAddNovedad,
-  onRemoveNovedad
+  onEmployeeNovedadesChange
 }) => {
-  // KISS: Single source of truth - just track what we've deleted
-  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
+  const [integratedData, setIntegratedData] = useState<DisplayNovedad[]>([]);
   const [pendingAdjustments, setPendingAdjustments] = useState<PendingAdjustmentRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [vacationDetailModal, setVacationDetailModal] = useState<{
@@ -66,137 +40,76 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
     vacation: any | null;
   }>({ isOpen: false, vacation: null });
   
-  const [deleteConfirmModal, setDeleteConfirmModal] = useState<{
-    isOpen: boolean;
-    novedad: DisplayNovedad | null;
-  }>({ isOpen: false, novedad: null });
-  
-  const { companyId } = useUserCompany();
-  
-  const { 
-    novedades: unifiedNovedades,
-    isLoading: isLoadingUnified,
-    deleteNovedad,
-    refetch: refetchNovedades
-  } = usePayrollNovedadesUnified({
-    companyId,
-    periodId,
-    employeeId,
-    enabled: !!(companyId && periodId && employeeId)
-  });
-  
+  const { loadIntegratedNovedades, deleteNovedad } = useNovedades(periodId);
   const { toast } = useToast();
   const navigate = useNavigate();
-
-  // KISS: Single computed source of truth
-  const visibleNovedades = useMemo((): DisplayNovedad[] => {
-    // Filter out deleted IDs
-    let filtered = unifiedNovedades.filter(novedad => !deletedIds.has(novedad.id));
-    
-    // In editing mode, also filter out items marked for deletion in pending changes
-    if (editState === 'editing' && pendingChanges?.novedades?.deleted) {
-      filtered = filtered.filter(novedad => !pendingChanges.novedades.deleted.includes(novedad.id));
-    }
-    
-    // Convert to display format
-    return filtered.map(novedad => ({
-      id: novedad.id,
-      empleado_id: novedad.empleado_id,
-      periodo_id: novedad.periodo_id,
-      tipo_novedad: novedad.tipo_novedad,
-      subtipo: novedad.subtipo,
-      valor: novedad.valor,
-      dias: novedad.dias,
-      horas: novedad.horas,
-      observacion: novedad.observacion,
-      fecha_inicio: novedad.fecha_inicio,
-      fecha_fin: novedad.fecha_fin,
-      origen: 'novedades' as const,
-      status: 'registrada' as const,
-      processed_in_period_id: novedad.periodo_id,
-      isConfirmed: true,
-      canEdit: true,
-      canDelete: true,
-      badgeColor: 'bg-blue-100 text-blue-800',
-      badgeIcon: '📋',
-      badgeLabel: 'Novedad',
-      statusColor: 'bg-blue-100 text-blue-800',
-      created_at: novedad.created_at,
-      updated_at: novedad.updated_at,
-    }));
-  }, [unifiedNovedades, deletedIds, editState, pendingChanges]);
 
   const formatTipoNovedad = (tipo: string, subtipo?: string) => {
     if (tipo === 'recargo_nocturno') {
       switch (subtipo) {
         case 'nocturno':
-          return 'Recargo Nocturno';
-        case 'dominical_festivo':
-          return 'Dominical y Festivo';
-        case 'nocturno_dominical_festivo':
-          return 'Nocturno Dominical';
+          return 'Recargo nocturno';
+        case 'dominical':
+          return 'Recargo dominical';
+        case 'nocturno_dominical':
+          return 'Recargo nocturno dominical';
         default:
-          return 'Recargo';
+          return 'Recargo nocturno';
       }
     }
-    
-    const mappings: Record<string, string> = {
-      'hora_extra': 'Horas Extra',
-      'auxilio_transporte': 'Auxilio Transporte',
+
+    const tipos: Record<string, string> = {
+      'horas_extra': 'Horas Extra',
       'bonificacion': 'Bonificación',
-      'comision': 'Comisión',
-      'vacaciones': 'Vacaciones',
       'incapacidad': 'Incapacidad',
-      'licencia_remunerada': 'Licencia Remunerada',
-      'licencia_no_remunerada': 'Licencia No Remunerada',
-      'ausencia': 'Ausencia',
-      'prestamo': 'Préstamo',
-      'descuento': 'Descuento',
-      'anticipo': 'Anticipo',
-      'deduccion_salud': 'Deducción Salud',
-      'deduccion_pension': 'Deducción Pensión'
+      'vacaciones': 'Vacaciones',
+      'licencia_remunerada': 'Licencia',
+      'otros_ingresos': 'Otros Ingresos',
+      'descuento_voluntario': 'Descuento',
+      'libranza': 'Libranza'
     };
-    
-    return mappings[tipo] || tipo.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+
+    const base = tipos[tipo] || tipo;
+    return subtipo && tipo !== 'recargo_nocturno' ? `${base} (${subtipo})` : base;
   };
 
-  // KISS: Simple pending adjustments loading (no complex data transformation)
-  const loadPendingAdjustments = useCallback(async () => {
-    if (!employeeId || !periodId || editState === 'editing') return;
-    
-    setLoading(true);
+  const fetchIntegratedData = async () => {
     try {
-      const pendingData = await PendingAdjustmentsService.getPendingAdjustmentsForEmployee(employeeId, periodId);
-      setPendingAdjustments(pendingData);
+      setLoading(true);
       
-      console.log('📊 NovedadExistingList: Pending adjustments loaded:', { 
-        pending: pendingData.length,
-        employeeId, 
-        periodId 
-      });
+      // Load regular integrated data
+      const result = await loadIntegratedNovedades(employeeId);
+      setIntegratedData(result);
+      
+      // Load pending adjustments for this employee
+      const pending = await PendingAdjustmentsService.getPendingAdjustmentsForEmployee(employeeId, periodId);
+      setPendingAdjustments(pending);
+      
     } catch (error) {
-      console.error('❌ NovedadExistingList: Error loading pending adjustments:', error);
+      console.error('Error cargando datos integrados:', error);
       toast({
         title: "Error",
-        description: "No se pudieron cargar los ajustes pendientes",
+        description: "No se pudieron cargar los datos integrados",
         variant: "destructive",
       });
+      setIntegratedData([]);
+      setPendingAdjustments([]);
     } finally {
       setLoading(false);
     }
-  }, [employeeId, periodId, editState, toast]);
+  };
 
   useEffect(() => {
-    loadPendingAdjustments();
-  }, [loadPendingAdjustments]);
-
-  useEffect(() => {
-    if (refreshTrigger) {
-      // Reset deleted IDs on refresh
-      setDeletedIds(new Set());
-      loadPendingAdjustments();
+    if (employeeId && periodId) {
+      fetchIntegratedData();
     }
-  }, [refreshTrigger, loadPendingAdjustments]);
+  }, [employeeId, periodId]);
+
+  useEffect(() => {
+    if (refreshTrigger && employeeId && periodId) {
+      fetchIntegratedData();
+    }
+  }, [refreshTrigger]);
 
   const handleEditNovedad = (item: DisplayNovedad) => {
     toast({
@@ -235,112 +148,67 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
   const handleGoToVacationModule = (employeeId: string) => {
     navigate('/app/vacations-absences', {
       state: { 
-        prefilterEmployeeId: employeeId,
+        filterByEmployee: employeeId,
         employeeName: employeeName
       }
     });
+    
     onClose();
   };
 
   const handleDeleteByOrigin = async (item: DisplayNovedad) => {
+    const { setLastRefreshTime } = useEmployeeNovedadesCacheStore.getState();
+    
     if (item.origen === 'vacaciones') {
-      try {
-        console.log('🗑️ NovedadExistingList: Eliminando ausencia desde lista y actualizando cache global:', item.id);
-        
-        const { error } = await supabase
-          .from('employee_vacation_periods')
-          .delete()
-          .eq('id', item.id);
+      if (item.status !== 'pendiente') {
+        toast({
+          title: "Acción no disponible",
+          description: "Solo se pueden eliminar ausencias en estado pendiente",
+          variant: "default",
+        });
+        return;
+      }
+
+      if (window.confirm('¿Estás seguro de que deseas eliminar esta ausencia?')) {
+        try {
+          console.log('🗑️ NovedadExistingList: Eliminando ausencia y actualizando cache global:', item.id);
           
-        if (error) throw error;
-        
-        const { setLastRefreshTime } = useEmployeeNovedadesCacheStore.getState();
-        setLastRefreshTime(Date.now());
-        
-        // KISS: Simply mark as deleted
-        setDeletedIds(prev => new Set(prev).add(item.id));
-        
-        if (onEmployeeNovedadesChange) {
-          await onEmployeeNovedadesChange(employeeId);
+          const { error } = await supabase
+            .from('employee_vacation_periods')
+            .delete()
+            .eq('id', item.id);
+
+          if (error) throw error;
+
+          setIntegratedData(prev => prev.filter(n => n.id !== item.id));
+          
+          // Update global cache store to trigger liquidation recalculation
+          setLastRefreshTime(Date.now());
+          console.log('✅ NovedadExistingList: Ausencia eliminada y cache actualizado');
+          
+          if (onEmployeeNovedadesChange) {
+            await onEmployeeNovedadesChange(employeeId);
+          }
+          
+          toast({
+            title: "Ausencia eliminada",
+            description: "La ausencia se ha eliminado correctamente",
+          });
+        } catch (error) {
+          console.error('❌ NovedadExistingList: Error eliminando ausencia:', error);
+          toast({
+            title: "Error",
+            description: "No se pudo eliminar la ausencia",
+            variant: "destructive",
+          });
         }
-        
-        toast({
-          title: "Ausencia eliminada",
-          description: "La ausencia se ha eliminado correctamente",
-        });
-      } catch (error) {
-        console.error('❌ NovedadExistingList: Error eliminando ausencia:', error);
-        toast({
-          title: "Error",
-          description: "No se pudo eliminar la ausencia",
-          variant: "destructive",
-        });
       }
     } else {
-      // Open confirmation modal for regular novedades
-      setDeleteConfirmModal({
-        isOpen: true,
-        novedad: item
-      });
-    }
-  };
-
-  // Wrapper for deleteNovedad to match expected return type
-  const deleteNovedadWrapper = async (id: string): Promise<{ success: boolean; error?: any }> => {
-    try {
-      await deleteNovedad(id);
-      return { success: true };
-    } catch (error) {
-      return { success: false, error };
-    }
-  };
-
-  // KISS: Single delete handler for all cases
-  const handleConfirmDelete = useCallback(async (createPendingAdjustment: boolean, novedad: DisplayNovedad) => {
-    try {
-      if (editState === 'editing' && onRemoveNovedad) {
-        // Edit mode: use the hook's remove function
-        console.log('🗑️ Edit mode deletion:', novedad.id);
-        onRemoveNovedad(novedad.id);
-        
-        toast({
-          title: "Novedad marcada para eliminación",
-          description: "La eliminación se aplicará al guardar los cambios",
-        });
-      } else if (createPendingAdjustment && addPendingDeletion) {
-        // Period is closed - create pending adjustment for deletion
-        console.log('🔄 Creating pending deletion adjustment for closed period:', novedad.id);
-        
-        addPendingDeletion(employeeId, employeeName, {
-          id: novedad.id,
-          tipo_novedad: novedad.tipo_novedad,
-          subtipo: novedad.subtipo,
-          valor: novedad.valor,
-          dias: novedad.dias,
-          fecha_inicio: novedad.fecha_inicio,
-          fecha_fin: novedad.fecha_fin,
-          constitutivo_salario: false
-        });
-
-        if (onPendingAdjustmentChange) {
-          onPendingAdjustmentChange();
-        }
-
-        // Mark as deleted for immediate UI update
-        setDeletedIds(prev => new Set(prev).add(novedad.id));
-        
-        toast({
-          title: "Novedad eliminada",
-          description: "Se aplicará en la próxima liquidación",
-          className: "border-orange-200 bg-orange-50"
-        });
-      } else {
-        // Period is open - delete directly
-        console.log('🗑️ Deleting novedad directly (open period):', novedad.id);
-        
-        const result = await deleteNovedadWrapper(novedad.id);
-        if (result.success) {
-          setDeletedIds(prev => new Set(prev).add(novedad.id));
+      if (window.confirm('¿Estás seguro de que deseas eliminar esta novedad?')) {
+        try {
+          console.log('🗑️ NovedadExistingList: Eliminando novedad (useNovedades se encarga del cache):', item.id);
+          await deleteNovedad(item.id);
+          setIntegratedData(prev => prev.filter(n => n.id !== item.id));
           
           if (onEmployeeNovedadesChange) {
             await onEmployeeNovedadesChange(employeeId);
@@ -350,23 +218,16 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
             title: "Novedad eliminada",
             description: "La novedad se ha eliminado correctamente",
           });
-        } else {
-          throw result.error || new Error('Failed to delete novedad');
+        } catch (error) {
+          console.error('❌ NovedadExistingList: Error eliminando novedad:', error);
+          toast({
+            title: "Error",
+            description: "No se pudo eliminar la novedad",
+            variant: "destructive",
+          });
         }
       }
-    } catch (error) {
-      console.error('❌ Error in delete handler:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo procesar la eliminación",
-        variant: "destructive",
-      });
     }
-  }, [editState, onRemoveNovedad, addPendingDeletion, onEmployeeNovedadesChange, onPendingAdjustmentChange, deleteNovedadWrapper, toast, employeeId, employeeName]);
-
-  const onDeleteConfirm = (createPendingAdjustment: boolean, novedad: DisplayNovedad) => {
-    handleConfirmDelete(createPendingAdjustment, novedad);
-    setDeleteConfirmModal({ isOpen: false, novedad: null });
   };
 
   const handleEditVacation = (vacation: any) => {
@@ -385,66 +246,33 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
     const { setLastRefreshTime } = useEmployeeNovedadesCacheStore.getState();
     
     try {
-      // Check if period is closed and we should create a pending adjustment
-      if (periodState === 'cerrado' && addPendingDeletion) {
-        console.log('🔄 Period is closed, creating pending deletion adjustment for vacation:', vacationId);
-        
-        // Find the vacation in the current data to get its details
-        const vacationNovedad = visibleNovedades.find(n => n.id === vacationId);
-        if (vacationNovedad) {
-          // Create pending deletion adjustment
-          addPendingDeletion(employeeId, employeeName, {
-            id: vacationNovedad.id,
-            tipo_novedad: vacationNovedad.tipo_novedad,
-            subtipo: vacationNovedad.subtipo,
-            valor: vacationNovedad.valor,
-            dias: vacationNovedad.dias,
-            fecha_inicio: vacationNovedad.fecha_inicio,
-            fecha_fin: vacationNovedad.fecha_fin,
-            constitutivo_salario: false // Default for most novedades
-          });
-
-          // Trigger pending adjustment change callback immediately
-          if (onPendingAdjustmentChange) {
-            onPendingAdjustmentChange();
-          }
-
-          setVacationDetailModal({ isOpen: false, vacation: null });
-
-          toast({
-            title: "Ajuste de eliminación pendiente",
-            description: `Se creó un ajuste para eliminar ${vacationNovedad.badgeLabel} en la próxima re-liquidación`,
-            className: "border-orange-200 bg-orange-50"
-          });
-        }
-        return;
-      }
-      
-      // Period is open - delete directly
       console.log('🗑️ NovedadExistingList: Eliminando ausencia desde modal y actualizando cache global:', vacationId);
       
       const { error } = await supabase
         .from('employee_vacation_periods')
         .delete()
         .eq('id', vacationId);
-        
+
       if (error) throw error;
+
+      setIntegratedData(prev => prev.filter(n => n.id !== vacationId));
       
+      // Update global cache store to trigger liquidation recalculation
       setLastRefreshTime(Date.now());
-      setDeletedIds(prev => new Set(prev).add(vacationId));
+      console.log('✅ NovedadExistingList: Ausencia eliminada desde modal y cache actualizado');
       
       if (onEmployeeNovedadesChange) {
         await onEmployeeNovedadesChange(employeeId);
       }
       
-      setVacationDetailModal({ isOpen: false, vacation: null });
-      
       toast({
         title: "Ausencia eliminada",
-        description: "La ausencia se ha eliminado correctamente desde el detalle",
+        description: "La ausencia se ha eliminado correctamente",
       });
+      
+      setVacationDetailModal({ isOpen: false, vacation: null });
     } catch (error) {
-      console.error('❌ NovedadExistingList: Error eliminando ausencia:', error);
+      console.error('❌ NovedadExistingList: Error eliminando ausencia desde modal:', error);
       toast({
         title: "Error",
         description: "No se pudo eliminar la ausencia",
@@ -478,7 +306,7 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
       badgeColor: 'bg-orange-100 text-orange-800',
       badgeIcon: '⏳',
       statusColor: 'border-orange-200 text-orange-700',
-      status: 'pendiente' as const,
+      status: 'pendiente',
       canEdit: false,
       canDelete: true,
       created_at: p.created_at,
@@ -487,285 +315,385 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
   };
 
   const getSeparatedTotals = (): SeparatedTotals & { pending: { devengos: number; deducciones: number; neto: number; count: number } } => {
-    const confirmed = visibleNovedades.filter(n => n.isConfirmed);
-    const estimated = visibleNovedades.filter(n => !n.isConfirmed);
-    
-    // Get pending data from appropriate source
-    const pendingData = editState === 'editing' 
-      ? (pendingChanges?.novedades?.added?.filter(n => n.empleado_id === employeeId) || [])
-      : pendingAdjustments;
-    
-    const pending = editState === 'editing' 
-      ? pendingData.map((n: any) => ({
-          id: n.id || `temp-${Date.now()}`,
-          origen: 'edit_pending' as any,
-          tipo_novedad: n.tipo_novedad,
-          subtipo: n.subtipo,
-          valor: n.valor,
-          dias: n.dias || 0,
-          fecha_inicio: n.fecha_inicio,
-          fecha_fin: n.fecha_fin,
-          observacion: n.observacion,
-          isConfirmed: false,
-          badgeLabel: formatTipoNovedad(n.tipo_novedad, n.subtipo),
-          badgeColor: 'bg-blue-100 text-blue-800',
-          badgeIcon: '⏳',
-          statusColor: 'border-blue-200 text-blue-700',
-          status: 'pendiente' as const,
-          canEdit: false,
-          canDelete: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }))
-      : convertPendingToDisplay(pendingAdjustments);
-
-    // Calculate totals for each category
-    const calculateTotals = (items: DisplayNovedad[]) => {
-      let devengos = 0;
-      let deducciones = 0;
-      
-      items.forEach(item => {
-        if (item.valor > 0) {
-          devengos += item.valor;
-        } else {
-          deducciones += Math.abs(item.valor);
-        }
-      });
-      
-      return {
-        devengos,
-        deducciones,
-        neto: devengos - deducciones,
-        count: items.length
-      };
-    };
+    const confirmed = integratedData.filter(n => n.isConfirmed);
+    const estimated = integratedData.filter(n => !n.isConfirmed);
+    const pending = convertPendingToDisplay(pendingAdjustments);
 
     return {
-      confirmed: calculateTotals(confirmed),
-      estimated: calculateTotals(estimated),
-      pending: calculateTotals(pending)
+      confirmed: {
+        devengos: confirmed.filter(n => n.valor > 0).reduce((sum, n) => sum + n.valor, 0),
+        deducciones: Math.abs(confirmed.filter(n => n.valor < 0).reduce((sum, n) => sum + n.valor, 0)),
+        neto: confirmed.reduce((sum, n) => sum + n.valor, 0),
+        count: confirmed.length
+      },
+      estimated: {
+        devengos: estimated.filter(n => n.valor > 0).reduce((sum, n) => sum + n.valor, 0),
+        deducciones: Math.abs(estimated.filter(n => n.valor < 0).reduce((sum, n) => sum + n.valor, 0)),
+        neto: estimated.reduce((sum, n) => sum + n.valor, 0),
+        count: estimated.length
+      },
+      pending: {
+        devengos: pending.filter(n => n.valor > 0).reduce((sum, n) => sum + n.valor, 0),
+        deducciones: Math.abs(pending.filter(n => n.valor < 0).reduce((sum, n) => sum + n.valor, 0)),
+        neto: pending.reduce((sum, n) => sum + n.valor, 0),
+        count: pending.length
+      }
     };
   };
 
+  // Handle deletion of pending adjustments
   const handleDeletePendingAdjustment = async (adjustmentId: string) => {
-    try {
-      await PendingAdjustmentsService.deletePendingAdjustment(adjustmentId);
-      setPendingAdjustments(prev => prev.filter(p => p.id !== adjustmentId));
-      
-      toast({
-        title: "Ajuste eliminado",
-        description: "El ajuste pendiente se ha eliminado",
-      });
-    } catch (error) {
-      console.error('Error eliminando ajuste pendiente:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo eliminar el ajuste pendiente",
-        variant: "destructive",
-      });
+    if (window.confirm('¿Estás seguro de que deseas eliminar este ajuste pendiente?')) {
+      try {
+        await PendingAdjustmentsService.deletePendingAdjustment(adjustmentId);
+        setPendingAdjustments(prev => prev.filter(p => p.id !== adjustmentId));
+        
+        // Trigger recalculation and UI update
+        if (onEmployeeNovedadesChange) {
+          await onEmployeeNovedadesChange(employeeId);
+        }
+        
+        toast({
+          title: "Ajuste eliminado",
+          description: "El ajuste pendiente se ha eliminado correctamente",
+        });
+      } catch (error) {
+        console.error('❌ Error eliminando ajuste pendiente:', error);
+        toast({
+          title: "Error",
+          description: "No se pudo eliminar el ajuste pendiente",
+          variant: "destructive",
+        });
+      }
     }
   };
 
   const getActionButtons = (item: DisplayNovedad) => {
-    const buttons = [];
-    
     if (item.origen === 'pending_adjustment' as any) {
-      // For pending adjustments, only show delete button
-      buttons.push(
-        <Button
-          key="delete"
-          variant="outline"
-          size="sm"
-          onClick={() => handleDeletePendingAdjustment(item.id)}
-          className="text-red-600 hover:text-red-700"
-        >
-          <Trash2 className="h-3 w-3" />
-        </Button>
+      return (
+        <div className="flex gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-red-600 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
+            onClick={() => handleDeletePendingAdjustment(item.id)}
+            title="Eliminar ajuste pendiente"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      );
+    } else if (item.origen === 'vacaciones') {
+      return (
+        <div className="flex gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 h-8 w-8 p-0"
+            onClick={() => handleViewVacationDetail(item)}
+            title="Ver detalles"
+          >
+            <Eye className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-green-600 hover:text-green-700 hover:bg-green-50 h-8 w-8 p-0"
+            onClick={() => handleGoToVacationModule(employeeId)}
+            title="Ir al módulo de vacaciones"
+          >
+            <ExternalLink className="h-4 w-4" />
+          </Button>
+          {item.status === 'pendiente' && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-red-600 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
+              onClick={() => handleDeleteByOrigin(item)}
+              title="Eliminar ausencia"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
       );
     } else {
-      // For regular novedades, show standard actions
-      
-      if (item.canEdit) {
-        buttons.push(
+      return (
+        <div className="flex gap-1">
           <Button
-            key="edit"
-            variant="outline"
+            variant="ghost"
             size="sm"
+            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 h-8 w-8 p-0"
             onClick={() => handleEditNovedad(item)}
+            title="Editar novedad"
           >
-            <Edit className="h-3 w-3" />
+            <Edit className="h-4 w-4" />
           </Button>
-        );
-      }
-
-      if (item.origen === 'vacaciones') {
-        buttons.push(
           <Button
-            key="view"
-            variant="outline"
-            size="sm"
-            onClick={() => handleViewVacationDetail(item)}
-          >
-            <Eye className="h-3 w-3" />
-          </Button>
-        );
-        
-        buttons.push(
-          <Button
-            key="goto"
-            variant="outline"
-            size="sm"
-            onClick={() => handleGoToVacationModule(employeeId)}
-          >
-            <ExternalLink className="h-3 w-3" />
-          </Button>
-        );
-      }
-
-      if (item.canDelete) {
-        buttons.push(
-          <Button
-            key="delete"
-            variant="outline"
+            variant="ghost"
             size="sm"
             onClick={() => handleDeleteByOrigin(item)}
-            className="text-red-600 hover:text-red-700"
+            className="text-red-600 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
+            title="Eliminar novedad"
           >
-            <Trash2 className="h-3 w-3" />
+            <Trash2 className="h-4 w-4" />
           </Button>
-        );
-      }
+        </div>
+      );
     }
+  };
 
+  if (loading) {
     return (
-      <div className="flex gap-1 justify-end">
-        {buttons}
+      <div className="p-6 text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+        <p className="text-gray-600">Cargando datos integrados...</p>
       </div>
     );
-  };
+  }
+
+  const separatedTotals = getSeparatedTotals();
 
   return (
     <>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <h2 className="text-xl font-semibold text-gray-900">
-              Novedades - {employeeName}
-            </h2>
-            <Badge variant="outline" className="text-sm">
-              {visibleNovedades.length} registros
-            </Badge>
-            {getSeparatedTotals().pending.count > 0 && (
-              <Badge variant="secondary" className={editState === 'editing' ? "bg-blue-100 text-blue-800" : "bg-orange-100 text-orange-800"}>
-                <Clock className="h-3 w-3 mr-1" />
-                {getSeparatedTotals().pending.count} {editState === 'editing' ? 'por aplicar' : 'pendientes'}
-              </Badge>
-            )}
+      <div className="p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900">Novedades y Ausencias de {employeeName}</h2>
+            <p className="text-sm text-gray-600 mt-1">
+              Vista integrada • {integratedData.length} novedad{integratedData.length !== 1 ? 'es' : ''} 
+              {pendingAdjustments.length > 0 && (
+                <> • {pendingAdjustments.length} ajuste{pendingAdjustments.length !== 1 ? 's' : ''} pendiente{pendingAdjustments.length !== 1 ? 's' : ''}</>
+              )}
+            </p>
           </div>
-          
-          <Button onClick={onAddNew} className="flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            Agregar Nueva
+          <Button onClick={onAddNew} className="bg-blue-600 hover:bg-blue-700">
+            <Plus className="h-4 w-4 mr-2" />
+            Agregar Novedad
           </Button>
         </div>
 
-        {loading ? (
-          <div className="text-center py-8">
-            <p className="text-muted-foreground">Cargando novedades...</p>
-          </div>
+        {integratedData.length === 0 && pendingAdjustments.length === 0 ? (
+          <Card className="border-dashed">
+            <CardContent className="pt-6 pb-6 text-center">
+              <div className="text-gray-400 mb-4">
+                <Plus className="h-12 w-12 mx-auto" />
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                Sin registros encontrados
+              </h3>
+              <p className="text-gray-600 mb-4">
+                Este empleado no tiene novedades ni ausencias registradas
+              </p>
+              <Button onClick={onAddNew} variant="outline">
+                Agregar Primera Novedad
+              </Button>
+            </CardContent>
+          </Card>
         ) : (
           <>
-            {visibleNovedades.length === 0 && getSeparatedTotals().pending.count === 0 ? (
-              <Card>
-                <CardContent className="py-8">
-                  <div className="text-center">
-                    <p className="text-muted-foreground mb-4">No hay novedades registradas para este empleado</p>
-                    <Button onClick={onAddNew} className="flex items-center gap-2">
-                      <Plus className="h-4 w-4" />
-                      Agregar Primera Novedad
-                    </Button>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <Card className="border-green-200 bg-green-50">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-green-800 flex items-center gap-2">
+                    ✅ Valores Confirmados
+                    <Badge variant="outline" className="text-xs">
+                      {separatedTotals.confirmed.count}
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-green-700">Devengos:</span>
+                    <span className="font-semibold text-green-800">
+                      {formatCurrency(separatedTotals.confirmed.devengos)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-green-700">Deducciones:</span>
+                    <span className="font-semibold text-red-600">
+                      {formatCurrency(separatedTotals.confirmed.deducciones)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center pt-2 border-t border-green-200">
+                    <span className="text-sm font-medium text-green-800">Neto:</span>
+                    <span className="font-bold text-green-900">
+                      {formatCurrency(separatedTotals.confirmed.neto)}
+                    </span>
                   </div>
                 </CardContent>
               </Card>
-            ) : (
-              <div className="space-y-4">
-                {(() => {
-                  const { pending } = getSeparatedTotals();
-                  const pendingItems = editState === 'editing' 
-                    ? (pendingChanges?.novedades?.added?.filter(n => n.empleado_id === employeeId) || []).map((n: any) => ({
-                        id: n.id || `temp-${Date.now()}`,
-                        origen: 'edit_pending' as any,
-                        tipo_novedad: n.tipo_novedad,
-                        subtipo: n.subtipo,
-                        valor: n.valor,
-                        dias: n.dias || 0,
-                        fecha_inicio: n.fecha_inicio,
-                        fecha_fin: n.fecha_fin,
-                        observacion: n.observacion,
-                        isConfirmed: false,
-                        badgeLabel: formatTipoNovedad(n.tipo_novedad, n.subtipo),
-                        badgeColor: 'bg-blue-100 text-blue-800',
-                        badgeIcon: '⏳',
-                        statusColor: 'border-blue-200 text-blue-700',
-                        status: 'pendiente' as const,
-                        canEdit: false,
-                        canDelete: true,
-                        created_at: new Date().toISOString(),
-                        updated_at: new Date().toISOString()
-                      }))
-                    : convertPendingToDisplay(pendingAdjustments);
-                  
-                  return [...pendingItems, ...visibleNovedades];
-                })().map((item, index) => (
-                  <Card key={`${item.origen}-${item.id}-${index}`} className={`transition-all duration-200 ${item.statusColor || 'hover:shadow-md'}`}>
-                    <CardContent className="p-4">
-                      <div className="grid grid-cols-12 gap-4 items-center">
-                        <div className="col-span-12 sm:col-span-6 lg:col-span-6">
-                          <div className="flex items-center gap-3">
+
+              <Card className="border-yellow-200 bg-yellow-50">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-yellow-800 flex items-center gap-2">
+                    ⏳ Valores Estimados
+                    <Badge variant="outline" className="text-xs">
+                      {separatedTotals.estimated.count}
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-yellow-700">Devengos:</span>
+                    <span className="font-semibold text-yellow-800">
+                      {formatCurrency(separatedTotals.estimated.devengos)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-yellow-700">Deducciones:</span>
+                    <span className="font-semibold text-red-600">
+                      {formatCurrency(separatedTotals.estimated.deducciones)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center pt-2 border-t border-yellow-200">
+                    <span className="text-sm font-medium text-yellow-800">Neto:</span>
+                    <span className="font-bold text-yellow-900">
+                      {formatCurrency(separatedTotals.estimated.neto)}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="space-y-3">
+              {/* Regular novedades */}
+              {integratedData.map((item) => (
+                <Card key={`${item.origen}-${item.id}`} className={`hover:shadow-md transition-shadow ${!item.isConfirmed ? 'border-yellow-200 bg-yellow-50' : ''}`}>
+                  <CardContent className="pt-4">
+                    <div className="grid grid-cols-12 gap-4 items-center">
+                      <div className="col-span-12 sm:col-span-4 lg:col-span-3">
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
                             <Badge className={item.badgeColor}>
-                              <span className="mr-1">{item.badgeIcon}</span>
-                              {item.badgeLabel}
+                              {item.badgeIcon} {item.badgeLabel}
                             </Badge>
-                            <div className="text-sm text-muted-foreground">
-                              {item.fecha_inicio && item.fecha_fin && (
-                                <span>
-                                  {new Date(item.fecha_inicio).toLocaleDateString()} - {new Date(item.fecha_fin).toLocaleDateString()}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          
-                          <div className="mt-2">
-                            <p className="font-medium text-lg">
-                              {item.valor >= 0 ? '+' : ''}{formatCurrency(item.valor)}
-                            </p>
-                            {item.dias > 0 && (
-                              <p className="text-sm text-muted-foreground">
-                                {item.dias} {item.dias === 1 ? 'día' : 'días'}
-                              </p>
+                            <Badge variant="outline" className={item.statusColor}>
+                              {item.status === 'procesada' ? 'Procesada' : 
+                               item.status === 'pendiente' ? 'Pendiente' :
+                               item.status === 'registrada' ? 'Registrada' : 
+                               item.status}
+                            </Badge>
+                            {!item.isConfirmed && (
+                              <Badge variant="outline" className="text-xs bg-yellow-100 text-yellow-800">
+                                Estimado
+                              </Badge>
                             )}
                           </div>
-                          
-                          {item.observacion && (
-                            <p className="text-xs text-orange-600 mt-1 truncate" title={item.observacion}>
-                              💬 {item.observacion}
-                            </p>
+                          <div className="text-sm font-medium text-gray-900">
+                            {formatTipoNovedad(item.tipo_novedad, item.subtipo)}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="col-span-6 sm:col-span-3 lg:col-span-2">
+                        <div className="text-right sm:text-left">
+                          <div className={`text-lg font-bold ${item.valor >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {formatCurrency(Math.abs(item.valor))}
+                          </div>
+                          {item.valor < 0 && (
+                            <div className="text-xs text-red-500">Deducción</div>
                           )}
                         </div>
-                        
-                        <div className="col-span-12 sm:col-span-6 lg:col-span-6">
+                      </div>
+
+                      <div className="col-span-6 sm:col-span-2 lg:col-span-2">
+                        <div className="text-sm text-gray-600 space-y-1">
+                          {item.horas && (
+                            <div className="flex items-center">
+                              <span className="font-medium">{item.horas}</span>
+                              <span className="ml-1">hrs</span>
+                            </div>
+                          )}
+                          {item.dias && (
+                            <div className="flex items-center">
+                              <span className="font-medium">{item.dias}</span>
+                              <span className="ml-1">días</span>
+                            </div>
+                          )}
+                          {item.fecha_inicio && item.fecha_fin && (
+                            <div className="text-xs text-gray-500">
+                              {item.fecha_inicio} / {item.fecha_fin}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="col-span-12 sm:col-span-8 lg:col-span-4">
+                        {item.observacion && (
+                          <div className="text-sm text-gray-600 bg-gray-50 p-2 rounded text-left">
+                            <div className="line-clamp-2">
+                              {item.observacion}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="col-span-12 sm:col-span-4 lg:col-span-1">
+                        <div className="flex justify-end sm:justify-center">
                           {getActionButtons(item)}
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+              
+              {/* Pending adjustments */}
+              {convertPendingToDisplay(pendingAdjustments).map((item) => (
+                <Card key={`pending-${item.id}`} className="border-orange-200 bg-orange-50 hover:shadow-md transition-shadow">
+                  <CardContent className="pt-4">
+                    <div className="grid grid-cols-12 gap-4 items-center">
+                      <div className="col-span-12 sm:col-span-4 lg:col-span-3">
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Badge className="bg-orange-100 text-orange-800 border-orange-200">
+                              <Clock className="h-3 w-3 mr-1" />
+                              {item.badgeLabel}
+                            </Badge>
+                            <Badge variant="outline" className="border-orange-200 text-orange-700">
+                              Pendiente
+                            </Badge>
+                          </div>
+                          {item.fecha_inicio && item.fecha_fin && (
+                            <p className="text-xs text-orange-600">
+                              {new Date(item.fecha_inicio).toLocaleDateString('es-CO')} - {new Date(item.fecha_fin).toLocaleDateString('es-CO')}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="col-span-12 sm:col-span-2 lg:col-span-2 text-center">
+                        <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800">
+                          {item.dias} día{item.dias !== 1 ? 's' : ''}
+                        </Badge>
+                      </div>
+                      
+                      <div className="col-span-12 sm:col-span-3 lg:col-span-4">
+                        <div className="text-right">
+                          <div className={`text-lg font-bold ${item.valor >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {formatCurrency(item.valor)}
+                          </div>
+                          {item.observacion && (
+                            <p className="text-xs text-orange-600 mt-1 truncate" title={item.observacion}>
+                              {item.observacion}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="col-span-12 sm:col-span-3 lg:col-span-3 text-right">
+                        {getActionButtons(item)}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </>
         )}
 
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
           <Button variant="outline" onClick={onClose}>
             Cerrar
           </Button>
@@ -778,15 +706,6 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
         vacation={vacationDetailModal.vacation}
         onEdit={handleEditVacation}
         onDelete={handleDeleteVacation}
-      />
-
-      <DeleteNovedadConfirmModal
-        isOpen={deleteConfirmModal.isOpen}
-        onClose={() => setDeleteConfirmModal({ isOpen: false, novedad: null })}
-        onConfirm={onDeleteConfirm}
-        novedad={deleteConfirmModal.novedad}
-        periodState={periodState}
-        employeeName={employeeName}
       />
     </>
   );

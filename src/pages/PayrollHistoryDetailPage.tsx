@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -15,17 +15,18 @@ import { useEmployeeNovedadesCacheStore } from '@/stores/employeeNovedadesCacheS
 import { PeriodSummaryCards } from '@/components/payroll-history/PeriodSummaryCards';
 import { ExpandedEmployeesTable } from '@/components/payroll-history/ExpandedEmployeesTable';
 import { formatCurrency } from '@/lib/utils';
+import { PendingNovedad, PeriodState } from '@/types/pending-adjustments';
+import { PendingNovedadesService, PendingAdjustmentData } from '@/services/PendingNovedadesService';
+import { ConfirmAdjustmentModal } from '@/components/payroll/corrections/ConfirmAdjustmentModal';
 import { NovedadUnifiedModal } from '@/components/payroll/novedades/NovedadUnifiedModal';
-import { NovedadExistingList } from '@/components/payroll/novedades/NovedadExistingList';
 import { PayrollRecalculationService } from '@/services/PayrollRecalculationService';
 import { NovedadesEnhancedService } from '@/services/NovedadesEnhancedService';
-import { useEditPeriod } from '@/hooks/useEditPeriod';
-import { EditPeriodMode } from '@/components/payroll-history/EditPeriodMode';
+import { PendingAdjustmentsService } from '@/services/PendingAdjustmentsService';
+import { usePendingAdjustments } from '@/hooks/usePendingAdjustments';
 import { PeriodAuditSummaryComponent } from '@/components/payroll/audit/PeriodAuditSummary';
 import { PayrollCalculationBackendService, PayrollCalculationInput } from '@/services/PayrollCalculationBackendService';
 import { PayrollCalculationService } from '@/services/PayrollCalculationService';
 import { convertNovedadesToIBC } from '@/utils/payrollCalculationsBackend';
-import { supabase } from '@/integrations/supabase/client';
 
 // Use PayrollPeriodData from service instead of local interface
 
@@ -68,23 +69,21 @@ export default function PayrollHistoryDetailPage() {
   const [isRecalculatingAll, setIsRecalculatingAll] = useState(false);
   const [isLoadingPeriod, setIsLoadingPeriod] = useState(false);
   
-  // Edit period hook - replaces pending adjustments
+  // States for pending adjustments logic - replaced with hook
   const {
-    editState,
-    editingSession,
-    pendingChanges,
-    validationErrors,
-    hasChanges,
-    totalChangesCount,
-    isValid,
-    startEditing,
-    applyChanges,
-    discardChanges,
-    addNovedad,
-    removeNovedad
-  } = useEditPeriod({
-    periodId: periodId || '',
-    companyId: periodData?.company_id || ''
+    pendingNovedades,
+    totalPendingCount,
+    isApplying,
+    addPendingNovedad,
+    clearAllPending,
+    applyPendingAdjustments: applyAdjustments,
+    getPendingCount,
+    calculateEmployeePreview,
+    removePendingNovedadesForEmployee,
+    loadPendingFromDatabase
+  } = usePendingAdjustments({ 
+    periodId: periodId || '', 
+    companyId: periodData?.company_id || '' 
   });
   
   const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
@@ -209,26 +208,11 @@ export default function PayrollHistoryDetailPage() {
 
           const result = await PayrollCalculationBackendService.calculatePayroll(calculationInput);
 
-      // Update employee in the array AND persist to database
-      const employeeIndex = updatedEmployees.findIndex(emp => emp.id === employee.id);
-      if (employeeIndex >= 0) {
-        const updatedEmployee = {
-          ...updatedEmployees[employeeIndex],
-          total_devengado: result.grossPay,
-          total_deducciones: result.totalDeductions,
-          neto_pagado: result.netPay,
-          ibc: result.ibc,
-          auxilio_transporte: result.transportAllowance,
-          salud_empleado: result.healthDeduction,
-          pension_empleado: result.pensionDeduction
-        };
-        updatedEmployees[employeeIndex] = updatedEmployee;
-        
-        // Persist to database
-        if (updatedEmployee.payroll_id) {
-          await supabase
-            .from('payrolls')
-            .update({
+          // Update employee in the array
+          const employeeIndex = updatedEmployees.findIndex(emp => emp.id === employee.id);
+          if (employeeIndex >= 0) {
+            updatedEmployees[employeeIndex] = {
+              ...updatedEmployees[employeeIndex],
               total_devengado: result.grossPay,
               total_deducciones: result.totalDeductions,
               neto_pagado: result.netPay,
@@ -236,10 +220,8 @@ export default function PayrollHistoryDetailPage() {
               auxilio_transporte: result.transportAllowance,
               salud_empleado: result.healthDeduction,
               pension_empleado: result.pensionDeduction
-            })
-            .eq('id', updatedEmployee.payroll_id);
-        }
-      }
+            };
+          }
         } catch (error) {
           console.error(`❌ Error recalculando empleado ${employee.nombre}:`, error);
         }
@@ -307,8 +289,29 @@ export default function PayrollHistoryDetailPage() {
       
       setEmployees(expandedEmployees);
       
-      // Note: Edit period system handles changes differently
-      console.log('✅ Edit period system loaded');
+      // Load pending adjustments from database and sync with session storage
+      console.log('🔄 Loading and syncing pending adjustments...');
+      const dbPendingAdjustments = await loadPendingFromDatabase();
+      
+      if (dbPendingAdjustments.length > 0) {
+        console.log(`📊 Found ${dbPendingAdjustments.length} pending adjustments, recalculating affected employees...`);
+        
+        // Get unique employee IDs with pending adjustments
+        const affectedEmployeeIds = Array.from(
+          new Set(dbPendingAdjustments.map(adj => adj.employee_id))
+        ).filter((id): id is string => typeof id === 'string');
+        
+        // Recalculate each affected employee
+        for (const employeeId of affectedEmployeeIds) {
+          try {
+            await recalculateEmployeeValues(employeeId);
+          } catch (error) {
+            console.error(`Error recalculating employee ${employeeId}:`, error);
+          }
+        }
+        
+        console.log('✅ Persistence adjustments applied to UI');
+      }
       
       console.log('✅ Loaded employees from payrolls table:', expandedEmployees.length);
       console.log('Sample employee:', expandedEmployees[0]);
@@ -411,23 +414,6 @@ export default function PayrollHistoryDetailPage() {
         )
       );
 
-      // Persist individual employee recalculation to database
-      const employeeRecord = employees.find(emp => emp.id === employeeId);
-      if (employeeRecord?.payroll_id) {
-        await supabase
-          .from('payrolls')
-          .update({
-            total_devengado: result.grossPay,
-            total_deducciones: result.totalDeductions,
-            neto_pagado: result.netPay,
-            ibc: result.ibc,
-            auxilio_transporte: result.transportAllowance,
-            salud_empleado: result.healthDeduction,
-            pension_empleado: result.pensionDeduction
-          })
-          .eq('id', employeeRecord.payroll_id);
-      }
-
       console.log('✅ Valores actualizados para empleado:', employeeId, {
         devengado: result.grossPay,
         deducciones: result.totalDeductions,
@@ -444,28 +430,25 @@ export default function PayrollHistoryDetailPage() {
     if (!periodData) return;
 
     try {
-      if (periodData.estado === 'cerrado' && editState !== 'editing') {
-        // For closed periods, user must activate edit mode first
-        toast({
-          title: "Período Cerrado",
-          description: "Active el modo de edición para realizar cambios en este período",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      if (editState === 'editing') {
-        // Use new editing system for periods in edit mode
-        addNovedad({
+      if (periodData.estado === 'cerrado') {
+        // Save to database for closed periods
+        const pendingNovedad: PendingNovedad = {
+          employee_id: novedadData.empleado_id,
+          employee_name: `${employees.find(emp => emp.id === novedadData.empleado_id)?.nombre || ''} ${employees.find(emp => emp.id === novedadData.empleado_id)?.apellido || ''}`.trim(),
           tipo_novedad: novedadData.tipo_novedad,
-          subtipo: novedadData.subtipo,
           valor: novedadData.valor,
-          dias: novedadData.dias,
-          fecha_inicio: novedadData.fecha_inicio,
-          fecha_fin: novedadData.fecha_fin,
           observacion: novedadData.observacion,
-          constitutivo_salario: novedadData.constitutivo_salario
-        });
+          novedadData: novedadData
+        };
+
+        // Save to database
+        await PendingAdjustmentsService.savePendingAdjustment(pendingNovedad);
+        
+        // Also add to local state for immediate display
+        addPendingNovedad(pendingNovedad);
+        
+        // Recalculate employee values to show immediate visual impact
+        await recalculateEmployeeValues(novedadData.empleado_id);
         
         return { isPending: true };
       } else {
@@ -515,7 +498,71 @@ export default function PayrollHistoryDetailPage() {
     }
   };
 
-  // Legacy function for handling period detail loading (removed duplicate)
+  // Apply pending adjustments with justification
+  const handleApplyPendingAdjustments = async (justification: string) => {
+    if (!periodId || !periodData || pendingNovedades.length === 0) return;
+
+    try {
+      const result = await applyAdjustments(justification, periodData, periodData.company_id);
+      
+      if (result.success) {
+        setShowConfirmModal(false);
+        
+        // After successful adjustments, recalculate IBC to ensure consistency
+        try {
+          console.log('🔄 Triggering IBC recalculation after adjustments...');
+          await PayrollRecalculationService.recalculateIBC(periodId, periodData.company_id);
+          console.log('✅ IBC recalculation completed');
+        } catch (ibcError) {
+          console.error('⚠️ IBC recalculation failed:', ibcError);
+          // Don't fail the whole operation, just log the warning
+          toast({
+            title: "Ajustes aplicados",
+            description: "Los ajustes se aplicaron correctamente, pero hubo un problema al recalcular el IBC",
+            variant: "default",
+          });
+        }
+        
+        await loadPeriodDetail();
+        await loadEmployees(); // Refresh employee data to show updated IBC
+        refetchNovedades();
+        
+        toast({
+          title: "Ajustes aplicados correctamente",
+          description: `Los ajustes han sido aplicados y el período ha sido reliquidado`,
+        });
+      }
+    } catch (error) {
+      console.error('❌ Error applying adjustments:', error);
+    }
+  };
+
+  // Discard all pending changes
+  const handleDiscardChanges = async () => {
+    if (!periodId) return;
+
+    try {
+      // Clear from database
+      await PendingAdjustmentsService.clearPendingAdjustmentsForPeriod(periodId);
+      
+      // Clear from local state
+      clearAllPending();
+      
+      setShowDiscardModal(false);
+      
+      toast({
+        title: "Ajustes descartados",
+        description: "Todos los ajustes pendientes han sido eliminados",
+      });
+    } catch (error) {
+      console.error('Error discarding changes:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron descartar los ajustes",
+        variant: "destructive",
+      });
+    }
+  };
 
   // Group novedades by employee (convert to basic PayrollNovedad type)
   const novedadesByEmployee = React.useMemo(() => {
@@ -570,6 +617,8 @@ export default function PayrollHistoryDetailPage() {
   // Handle changes in employee novedades (e.g., deletion from modal)
   const handleEmployeeNovedadesChange = async (employeeId: string) => {
     console.log('🔄 Employee novedades changed for:', employeeId, 'refreshing UI...');
+    // Clear any pending novelties for this employee to sync badges
+    removePendingNovedadesForEmployee(employeeId);
     await refetchNovedades();
     // Recalculate employee values to show updated calculations immediately
     await recalculateEmployeeValues(employeeId);
@@ -653,11 +702,27 @@ export default function PayrollHistoryDetailPage() {
               {isRecalculatingAll ? "Recalculando..." : "Recalcular Todo"}
             </Button>
             
-            {/* Edit mode status */}
-            {editState === 'editing' && hasChanges && (
-              <Badge variant="secondary" className="animate-pulse bg-orange-200 text-orange-800">
-                {totalChangesCount} cambios pendientes
-              </Badge>
+            {/* Botón de novedades pendientes (solo si hay) */}
+            {totalPendingCount > 0 && (
+              <>
+                <Badge variant="secondary" className="animate-pulse">
+                  {totalPendingCount} novedades pendientes
+                </Badge>
+                <Button 
+                  variant="destructive"
+                  onClick={() => setShowDiscardModal(true)}
+                  disabled={isApplying}
+                >
+                  Descartar cambios
+                </Button>
+                <Button 
+                  className="bg-warning hover:bg-warning/90 text-warning-foreground"
+                  onClick={() => setShowConfirmModal(true)}
+                  disabled={isApplying}
+                >
+                  {isApplying ? "Aplicando..." : "Aplicar Ajustes"}
+                </Button>
+              </>
             )}
           </div>
         </div>
@@ -674,70 +739,60 @@ export default function PayrollHistoryDetailPage() {
 
       {/* Content Section */}
       <div className="px-6 space-y-6">
-        <EditPeriodMode
-          editState={editState}
-          hasChanges={hasChanges}
-          totalChangesCount={totalChangesCount}
-          isValid={isValid}
-          validationErrors={validationErrors}
-          onStartEditing={startEditing}
-          onApplyChanges={applyChanges}
-          onDiscardChanges={discardChanges}
-        >
-          <Tabs defaultValue="employees" className="space-y-4">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="employees" className="flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                Empleados
-              </TabsTrigger>
-              <TabsTrigger value="audit" className="flex items-center gap-2">
-                <History className="h-4 w-4" />
-                Auditoría
-              </TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="employees">
-              {isLoadingEmployees ? (
-                <div className="flex items-center justify-center min-h-[200px]">
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto mb-2"></div>
-                    <p className="text-sm text-muted-foreground">Cargando empleados...</p>
-                  </div>
+        <Tabs defaultValue="employees" className="space-y-4">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="employees" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Empleados
+            </TabsTrigger>
+            <TabsTrigger value="audit" className="flex items-center gap-2">
+              <History className="h-4 w-4" />
+              Auditoría
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="employees">
+            {isLoadingEmployees ? (
+              <div className="flex items-center justify-center min-h-[200px]">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto mb-2"></div>
+                  <p className="text-sm text-muted-foreground">Cargando empleados...</p>
                 </div>
-              ) : employees.length === 0 ? (
-                <div className="text-center py-12">
-                  <Users className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-medium mb-2">Sin empleados liquidados</h3>
-                  <p className="text-sm text-muted-foreground">
-                    No hay empleados liquidados en este período.
-                  </p>
-                </div>
-              ) : (
-          <ExpandedEmployeesTable
-            employees={employees}
-            novedades={novedadesByEmployee}
-            onAddNovedad={handleAddNovedad}
-            onEditNovedad={handleEditNovedad}
-            canEdit={editState === 'editing' || periodData?.estado !== 'cerrado'}
-            editState={editState}
-            pendingChanges={pendingChanges}
-            isRecalculatingBackend={isRecalculatingAll}
-           periodData={periodData ? {
-             ...periodData,
-             id: periodId || ''
-           } : undefined}
-          />
-              )}
-            </TabsContent>
-            
-            <TabsContent value="audit">
-              <PeriodAuditSummaryComponent 
-                periodId={periodId || ''} 
-                periodName={periodData?.periodo || ''} 
-              />
-            </TabsContent>
-          </Tabs>
-        </EditPeriodMode>
+              </div>
+            ) : employees.length === 0 ? (
+              <div className="text-center py-12">
+                <Users className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium mb-2">Sin empleados liquidados</h3>
+                <p className="text-sm text-muted-foreground">
+                  No hay empleados liquidados en este período.
+                </p>
+              </div>
+            ) : (
+        <ExpandedEmployeesTable
+          employees={employees}
+          novedades={novedadesByEmployee}
+          onAddNovedad={handleAddNovedad}
+          onEditNovedad={handleEditNovedad}
+          canEdit={true}
+          pendingNovedades={pendingNovedades}
+          getPendingCount={getPendingCount}
+          calculateEmployeePreview={calculateEmployeePreview}
+          isRecalculatingBackend={isRecalculatingAll}
+          periodData={periodData ? {
+            ...periodData,
+            id: periodId // Add period ID for PDF generation lookup
+          } : undefined}
+        />
+            )}
+          </TabsContent>
+          
+          <TabsContent value="audit">
+            <PeriodAuditSummaryComponent 
+              periodId={periodId || ''} 
+              periodName={periodData?.periodo || ''} 
+            />
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Novedad Modal */}
@@ -755,7 +810,6 @@ export default function PayrollHistoryDetailPage() {
         startDate={periodData?.fecha_inicio}
         endDate={periodData?.fecha_fin}
         companyId={periodData?.company_id || ''}
-        periodState={periodData?.estado as any}
         currentLiquidatedValues={employees.find(e => e.id === selectedEmployeeId) ? {
           salario_base: employees.find(e => e.id === selectedEmployeeId)!.salario_base,
           ibc: employees.find(e => e.id === selectedEmployeeId)!.ibc,
@@ -764,20 +818,39 @@ export default function PayrollHistoryDetailPage() {
           total_deducciones: employees.find(e => e.id === selectedEmployeeId)!.total_deducciones,
           neto_pagado: employees.find(e => e.id === selectedEmployeeId)!.neto_pagado
         } : undefined}
-        editMode={editState === 'editing'}
-        editState={editState}
-        pendingChanges={pendingChanges}
-        onRemoveNovedad={removeNovedad}
-        onNovedadChange={(action, novedadData) => {
-          if (action === 'add') {
-            addNovedad(novedadData);
-          } else if (action === 'remove') {
-            removeNovedad(novedadData.empleado_id); // This would need the ID, but for now this handles add
-          }
-        }}
       />
 
-      {/* Keep minimal modals for compatibility */}
+      {/* Confirmation Modal for Adjustments */}
+      <ConfirmAdjustmentModal
+        isOpen={showConfirmModal}
+        onClose={() => setShowConfirmModal(false)}
+        onConfirm={handleApplyPendingAdjustments}
+        pendingNovedades={pendingNovedades}
+        periodName={periodData?.periodo || ''}
+        isLoading={isApplying}
+      />
+
+      {/* Discard changes confirmation modal */}
+      <AlertDialog open={showDiscardModal} onOpenChange={setShowDiscardModal}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Descartar todos los ajustes?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción eliminará permanentemente todas las {totalPendingCount} novedades pendientes. 
+              La nómina volverá a su estado original. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDiscardChanges}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Descartar cambios
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { PendingNovedad, EmployeeNovedadPreview } from '@/types/pending-adjustments';
+import { formatPreviewCurrency } from '@/utils/pendingAdjustmentsPreview';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, FileText, Mail, RefreshCw } from 'lucide-react';
@@ -10,7 +12,6 @@ import { VoucherPreviewModal } from '@/components/payroll/modals/VoucherPreviewM
 import { transformPayrollHistoryToEmployee, PayrollHistoryData } from '@/utils/payrollDataTransformer';
 import { useCompanyDetails } from '@/hooks/useCompanyDetails';
 import { PayrollEmployee } from '@/types/payroll';
-import { PeriodEditState, EditingChanges } from '@/types/period-editing';
 
 interface ExpandedEmployee {
   id: string;
@@ -48,13 +49,13 @@ interface ExpandedEmployeesTableProps {
   onAddNovedad: (employeeId: string) => void;
   onEditNovedad: (novedad: PayrollNovedad) => void;
   canEdit: boolean;
-  // New edit period props
-  editState?: PeriodEditState;
-  pendingChanges?: EditingChanges;
-  isRecalculatingBackend?: boolean;
-  // Voucher preview functionality
+  pendingNovedades?: PendingNovedad[];
+  getPendingCount?: (employeeId: string) => number;
+  calculateEmployeePreview?: (employee: any) => Promise<EmployeeNovedadPreview>;
+  isRecalculatingBackend?: boolean; // New prop to show backend loading state
+  // New props for voucher preview functionality
   periodData?: {
-    id?: string;
+    id?: string; // Add period ID
     fecha_inicio: string;
     fecha_fin: string;
     tipo_periodo: string;
@@ -67,18 +68,25 @@ export const ExpandedEmployeesTable = ({
   onAddNovedad,
   onEditNovedad,
   canEdit,
-  editState,
-  pendingChanges,
+  pendingNovedades = [],
+  getPendingCount,
+  calculateEmployeePreview,
   isRecalculatingBackend = false,
   periodData
 }: ExpandedEmployeesTableProps) => {
   const [sendingEmails, setSendingEmails] = useState<Record<string, boolean>>({});
+  const [employeePreviews, setEmployeePreviews] = useState<Record<string, EmployeeNovedadPreview>>({});
+  const [loadingPreviews, setLoadingPreviews] = useState(false);
 
-  // Helper function to count pending novedades for an employee
-  const getPendingNovedadesCount = (employeeId: string): number => {
-    if (!pendingChanges) return 0;
-    // The pending changes structure groups by employeeId in payrollData
-    return Object.keys(pendingChanges.payrollData).includes(employeeId) ? 1 : 0;
+  // Log backend calculated values to confirm source of truth
+  const logBackendValues = (employee: ExpandedEmployee) => {
+    console.log(`✅ Using backend values for ${employee.nombre} ${employee.apellido}:`, {
+      employeeId: employee.id,
+      total_devengado: employee.total_devengado,
+      total_deducciones: employee.total_deducciones,
+      neto_pagado: employee.neto_pagado,
+      source: 'backend_calculation'
+    });
   };
   
   // Voucher preview modal state
@@ -89,8 +97,76 @@ export const ExpandedEmployeesTable = ({
   // Get company details for voucher
   const { companyDetails } = useCompanyDetails();
 
+  // Load employee previews when employees or pending novedades change
+  useEffect(() => {
+    const loadPreviews = async () => {
+      if (!calculateEmployeePreview) return;
+      
+      setLoadingPreviews(true);
+      const previews: Record<string, EmployeeNovedadPreview> = {};
+      
+      // Calculate previews for all employees
+      await Promise.all(
+        employees.map(async (employee) => {
+          try {
+            previews[employee.id] = await calculateEmployeePreview(employee);
+          } catch (error) {
+            console.error(`Error calculating preview for employee ${employee.id}:`, error);
+            // Fallback to default preview using backend values only
+            logBackendValues(employee);
+            
+            previews[employee.id] = {
+              hasPending: false,
+              pendingCount: 0,
+              originalDevengado: employee.total_devengado,
+              newDevengado: employee.total_devengado,
+              originalDeducciones: employee.total_deducciones,
+              newDeducciones: employee.total_deducciones,
+              originalNeto: employee.neto_pagado,
+              newNeto: employee.neto_pagado,
+              originalIBC: employee.ibc || 0,
+              newIBC: employee.ibc || 0
+            };
+          }
+        })
+      );
+      
+      setEmployeePreviews(previews);
+      setLoadingPreviews(false);
+    };
+
+    loadPreviews();
+  }, [employees, pendingNovedades, calculateEmployeePreview]);
+
   const getNovedadesCount = (employeeId: string): number => {
     return novedades[employeeId]?.length || 0;
+  };
+
+  const getPendingNovedadesCount = (employeeId: string): number => {
+    return getPendingCount ? getPendingCount(employeeId) : 0;
+  };
+
+  const getEmployeePreview = (employee: ExpandedEmployee): EmployeeNovedadPreview => {
+    // Return cached preview or default values using backend values only
+    if (employeePreviews[employee.id]) {
+      return employeePreviews[employee.id];
+    }
+    
+    // Log that we're using backend values
+    logBackendValues(employee);
+    
+    return {
+      hasPending: false,
+      pendingCount: 0,
+      originalDevengado: employee.total_devengado,
+      newDevengado: employee.total_devengado,
+      originalDeducciones: employee.total_deducciones,
+      newDeducciones: employee.total_deducciones,
+      originalNeto: employee.neto_pagado,
+      newNeto: employee.neto_pagado,
+      originalIBC: employee.ibc || 0,
+      newIBC: employee.ibc || 0
+    };
   };
 
   const handleSendEmail = async (employeeId: string, employeeName: string, hasEmail: boolean) => {
@@ -117,7 +193,9 @@ export const ExpandedEmployeesTable = ({
     }
 
     try {
-      // Transform ExpandedEmployee to PayrollHistoryData format
+      // Transform ExpandedEmployee to PayrollHistoryData format using backend values only
+      logBackendValues(employee);
+      
       const historyData: PayrollHistoryData = {
         employee_id: employee.id,
         employee_name: employee.nombre,
@@ -209,9 +287,9 @@ export const ExpandedEmployeesTable = ({
               </TableRow>
             </TableHeader>
             <TableBody>
-            {employees.map((employee) => {
+              {employees.map((employee) => {
                 const novedadesCount = getNovedadesCount(employee.id);
-                const pendingCount = getPendingNovedadesCount(employee.id);
+                const preview = getEmployeePreview(employee);
                 const hasEmail = true; // Mock email availability
                 const isSendingEmail = sendingEmails[employee.id] || false;
                 
@@ -228,9 +306,9 @@ export const ExpandedEmployeesTable = ({
                           </div>
                         </div>
                       </div>
-                      {editState === 'editing' && pendingCount > 0 && (
+                      {preview.hasPending && (
                         <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800 mt-1 animate-pulse">
-                          Cambios pendientes
+                          Ajustes pendientes
                         </Badge>
                       )}
                     </TableCell>
@@ -242,9 +320,23 @@ export const ExpandedEmployeesTable = ({
                     </TableCell>
                     
                     <TableCell className="text-right">
-                      <span className="font-medium text-foreground">
-                        {formatCurrency(employee.ibc)}
-                      </span>
+                      {preview.hasPending && preview.newIBC !== preview.originalIBC ? (
+                        <div className="space-y-1">
+                          <div className="text-muted-foreground line-through text-sm">
+                            {formatCurrency(preview.originalIBC)}
+                          </div>
+                          <div className="font-semibold text-purple-600">
+                            {formatCurrency(preview.newIBC)}
+                            <span className="text-xs ml-1">
+                              ({preview.newIBC > preview.originalIBC ? '+' : ''}{formatCurrency(preview.newIBC - preview.originalIBC)})
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="font-medium text-foreground">
+                          {formatCurrency(employee.ibc)}
+                        </span>
+                      )}
                     </TableCell>
                     
                     <TableCell className="text-center">
@@ -254,15 +346,43 @@ export const ExpandedEmployeesTable = ({
                     </TableCell>
                     
                     <TableCell className="bg-green-100 text-right">
-                      <span className="font-semibold text-green-600">
-                        {formatCurrency(employee.total_devengado)}
-                      </span>
+                      {preview.hasPending ? (
+                        <div className="space-y-1">
+                          <div className="text-muted-foreground line-through text-sm">
+                            {formatCurrency(preview.originalDevengado)}
+                          </div>
+                          <div className="font-semibold text-green-600">
+                            {formatCurrency(preview.newDevengado)}
+                            <span className="text-xs ml-1">
+                              (+{formatCurrency(preview.newDevengado - preview.originalDevengado)})
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="font-semibold text-green-600">
+                          {formatCurrency(employee.total_devengado)}
+                        </span>
+                      )}
                     </TableCell>
                     
                     <TableCell className="bg-red-100 text-right">
-                      <span className="font-semibold text-red-600">
-                        {formatCurrency(employee.total_deducciones)}
-                      </span>
+                      {preview.hasPending ? (
+                        <div className="space-y-1">
+                          <div className="text-muted-foreground line-through text-sm">
+                            {formatCurrency(preview.originalDeducciones)}
+                          </div>
+                          <div className="font-semibold text-red-600">
+                            {formatCurrency(preview.newDeducciones)}
+                            <span className="text-xs ml-1">
+                              (+{formatCurrency(preview.newDeducciones - preview.originalDeducciones)})
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="font-semibold text-red-600">
+                          {formatCurrency(employee.total_deducciones)}
+                        </span>
+                      )}
                     </TableCell>
                     
                      <TableCell className="text-center font-medium">
@@ -282,18 +402,32 @@ export const ExpandedEmployeesTable = ({
                              {novedadesCount}
                            </Badge>
                          )}
-                          {pendingCount > 0 && (
-                            <Badge variant="secondary" className="bg-orange-100 text-orange-800 animate-pulse text-xs">
-                              +{pendingCount}
-                            </Badge>
-                          )}
+                         {preview.pendingCount > 0 && (
+                           <Badge variant="secondary" className="bg-orange-100 text-orange-800 animate-pulse text-xs">
+                             +{preview.pendingCount}
+                           </Badge>
+                         )}
                        </div>
                      </TableCell>
                     
                     <TableCell className="bg-blue-100 text-right">
-                      <span className="font-semibold text-blue-600">
-                        {formatCurrency(employee.neto_pagado)}
-                      </span>
+                      {preview.hasPending ? (
+                        <div className="space-y-1">
+                          <div className="text-muted-foreground line-through text-sm">
+                            {formatCurrency(preview.originalNeto)}
+                          </div>
+                          <div className="font-semibold text-blue-600">
+                            {formatCurrency(preview.newNeto)}
+                            <span className="text-xs ml-1">
+                              ({preview.newNeto > preview.originalNeto ? '+' : ''}{formatCurrency(preview.newNeto - preview.originalNeto)})
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="font-semibold text-blue-600">
+                          {formatCurrency(employee.neto_pagado)}
+                        </span>
+                      )}
                     </TableCell>
                     
                     {canEdit && (
