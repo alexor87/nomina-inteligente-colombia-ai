@@ -27,6 +27,11 @@ import { PeriodAuditSummaryComponent } from '@/components/payroll/audit/PeriodAu
 import { PayrollCalculationBackendService, PayrollCalculationInput } from '@/services/PayrollCalculationBackendService';
 import { PayrollCalculationService } from '@/services/PayrollCalculationService';
 import { convertNovedadesToIBC } from '@/utils/payrollCalculationsBackend';
+import { PayrollEditProvider, usePayrollEdit } from '@/contexts/PayrollEditContext';
+import { EditModeHeader } from '@/components/payroll/edit/EditModeHeader';
+import { AddEmployeeModal } from '@/components/payroll/edit/AddEmployeeModal';
+import { CompositionChangesModal } from '@/components/payroll/edit/CompositionChangesModal';
+import { Edit } from 'lucide-react';
 
 // Use PayrollPeriodData from service instead of local interface
 
@@ -60,7 +65,8 @@ interface ExpandedEmployee {
   payroll_id: string;
 }
 
-export default function PayrollHistoryDetailPage() {
+function PayrollHistoryDetailPageContent() {
+  const { editMode, enterEditMode, applyChanges, discardChanges } = usePayrollEdit();
   const { periodId } = useParams<{ periodId: string }>();
   const navigate = useNavigate();
   const [employees, setEmployees] = useState<ExpandedEmployee[]>([]);
@@ -724,10 +730,16 @@ export default function PayrollHistoryDetailPage() {
                 </Button>
               </>
             )}
-          </div>
         </div>
-        
-        {/* Summary Cards */}
+      </div>
+
+      {/* Edit Mode Header */}
+      <EditModeHeader 
+        onApplyChanges={() => {}} 
+        onDiscardChanges={async () => await discardChanges()} 
+      />
+
+      {/* Summary Cards */}
         <PeriodSummaryCards
           periodType={periodData.tipo_periodo}
           employeesCount={periodData.empleados_count}
@@ -852,5 +864,13 @@ export default function PayrollHistoryDetailPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+export default function PayrollHistoryDetailPage() {
+  return (
+    <PayrollEditProvider>
+      <PayrollHistoryDetailPageContent />
+    </PayrollEditProvider>
   );
 }
