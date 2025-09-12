@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -13,7 +13,6 @@ import { useEmployeeNovedadesCacheStore } from '@/stores/employeeNovedadesCacheS
 import { PendingAdjustmentsService, PendingAdjustmentRecord } from '@/services/PendingAdjustmentsService';
 import { DeleteNovedadConfirmModal } from '@/components/payroll/corrections/DeleteNovedadConfirmModal';
 import { PeriodState } from '@/types/pending-adjustments';
-import { createDeleteHandler } from './NovedadExistingList_handleDelete';
 import { useUserCompany } from '@/hooks/useUserCompany';
 
 interface NovedadExistingListProps {
@@ -58,7 +57,8 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
   onAddNovedad,
   onRemoveNovedad
 }) => {
-  const [integratedData, setIntegratedData] = useState<DisplayNovedad[]>([]);
+  // KISS: Single source of truth - just track what we've deleted
+  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
   const [pendingAdjustments, setPendingAdjustments] = useState<PendingAdjustmentRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [vacationDetailModal, setVacationDetailModal] = useState<{
@@ -87,6 +87,44 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
   
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  // KISS: Single computed source of truth
+  const visibleNovedades = useMemo((): DisplayNovedad[] => {
+    // Filter out deleted IDs
+    let filtered = unifiedNovedades.filter(novedad => !deletedIds.has(novedad.id));
+    
+    // In editing mode, also filter out items marked for deletion in pending changes
+    if (editState === 'editing' && pendingChanges?.novedades?.deleted) {
+      filtered = filtered.filter(novedad => !pendingChanges.novedades.deleted.includes(novedad.id));
+    }
+    
+    // Convert to display format
+    return filtered.map(novedad => ({
+      id: novedad.id,
+      empleado_id: novedad.empleado_id,
+      periodo_id: novedad.periodo_id,
+      tipo_novedad: novedad.tipo_novedad,
+      subtipo: novedad.subtipo,
+      valor: novedad.valor,
+      dias: novedad.dias,
+      horas: novedad.horas,
+      observacion: novedad.observacion,
+      fecha_inicio: novedad.fecha_inicio,
+      fecha_fin: novedad.fecha_fin,
+      origen: 'novedades' as const,
+      status: 'registrada' as const,
+      processed_in_period_id: novedad.periodo_id,
+      isConfirmed: true,
+      canEdit: true,
+      canDelete: true,
+      badgeColor: 'bg-blue-100 text-blue-800',
+      badgeIcon: '📋',
+      badgeLabel: 'Novedad',
+      statusColor: 'bg-blue-100 text-blue-800',
+      created_at: novedad.created_at,
+      updated_at: novedad.updated_at,
+    }));
+  }, [unifiedNovedades, deletedIds, editState, pendingChanges]);
 
   const formatTipoNovedad = (tipo: string, subtipo?: string) => {
     if (tipo === 'recargo_nocturno') {
@@ -122,82 +160,43 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
     return mappings[tipo] || tipo.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
   };
 
-  const fetchIntegratedData = useCallback(async () => {
-    if (!employeeId || !periodId) return;
+  // KISS: Simple pending adjustments loading (no complex data transformation)
+  const loadPendingAdjustments = useCallback(async () => {
+    if (!employeeId || !periodId || editState === 'editing') return;
     
     setLoading(true);
     try {
-      // Use unified novedades data directly
-      const displayNovedades = unifiedNovedades.map(novedad => ({
-        id: novedad.id,
-        empleado_id: novedad.empleado_id,
-        periodo_id: novedad.periodo_id,
-        tipo_novedad: novedad.tipo_novedad,
-        subtipo: novedad.subtipo,
-        valor: novedad.valor,
-        dias: novedad.dias,
-        horas: novedad.horas,
-        observacion: novedad.observacion,
-        fecha_inicio: novedad.fecha_inicio,
-        fecha_fin: novedad.fecha_fin,
-        origen: 'novedades' as const,
-        status: 'registrada' as const,
-        processed_in_period_id: novedad.periodo_id,
-        isConfirmed: true,
-        canEdit: true,
-        canDelete: true,
-        badgeColor: 'bg-blue-100 text-blue-800',
-        badgeIcon: '📋',
-        badgeLabel: 'Novedad',
-        statusColor: 'bg-blue-100 text-blue-800',
-        created_at: novedad.created_at,
-        updated_at: novedad.updated_at,
-      }));
+      const pendingData = await PendingAdjustmentsService.getPendingAdjustmentsForEmployee(employeeId, periodId);
+      setPendingAdjustments(pendingData);
       
-      setIntegratedData(displayNovedades);
-      
-      // Only load legacy pending adjustments if not in edit mode
-      if (editState !== 'editing') {
-        const pendingData = await PendingAdjustmentsService.getPendingAdjustmentsForEmployee(employeeId, periodId);
-        setPendingAdjustments(pendingData);
-        
-        console.log('📊 NovedadExistingList: Datos cargados (modo legacy):', { 
-          novedades: displayNovedades.length, 
-          pending: pendingData.length,
-          employeeId, 
-          periodId 
-        });
-      } else {
-        // In edit mode, pending changes come from the hook
-        setPendingAdjustments([]);
-        console.log('📊 NovedadExistingList: Datos cargados (modo edición):', { 
-          novedades: displayNovedades.length, 
-          pendingFromHook: pendingChanges?.novedades?.added?.length || 0,
-          employeeId, 
-          periodId 
-        });
-      }
+      console.log('📊 NovedadExistingList: Pending adjustments loaded:', { 
+        pending: pendingData.length,
+        employeeId, 
+        periodId 
+      });
     } catch (error) {
-      console.error('❌ NovedadExistingList: Error cargando datos:', error);
+      console.error('❌ NovedadExistingList: Error loading pending adjustments:', error);
       toast({
         title: "Error",
-        description: "No se pudieron cargar las novedades",
+        description: "No se pudieron cargar los ajustes pendientes",
         variant: "destructive",
       });
     } finally {
       setLoading(false);
     }
-  }, [employeeId, periodId, refetchNovedades, toast, editState, pendingChanges, unifiedNovedades]);
+  }, [employeeId, periodId, editState, toast]);
 
   useEffect(() => {
-    fetchIntegratedData();
-  }, [fetchIntegratedData]);
+    loadPendingAdjustments();
+  }, [loadPendingAdjustments]);
 
   useEffect(() => {
     if (refreshTrigger) {
-      fetchIntegratedData();
+      // Reset deleted IDs on refresh
+      setDeletedIds(new Set());
+      loadPendingAdjustments();
     }
-  }, [refreshTrigger, fetchIntegratedData]);
+  }, [refreshTrigger, loadPendingAdjustments]);
 
   const handleEditNovedad = (item: DisplayNovedad) => {
     toast({
@@ -258,7 +257,8 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
         const { setLastRefreshTime } = useEmployeeNovedadesCacheStore.getState();
         setLastRefreshTime(Date.now());
         
-        setIntegratedData(prev => prev.filter(n => n.id !== item.id));
+        // KISS: Simply mark as deleted
+        setDeletedIds(prev => new Set(prev).add(item.id));
         
         if (onEmployeeNovedadesChange) {
           await onEmployeeNovedadesChange(employeeId);
@@ -295,45 +295,74 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
     }
   };
 
-  // Create the delete handler - choose based on edit mode
-  const handleConfirmDelete = React.useMemo(() => {
-    if (editState === 'editing' && onRemoveNovedad) {
-      // Edit mode: use the hook's remove function
-      return async (createPendingAdjustment: boolean, novedad: DisplayNovedad) => {
-        try {
-          console.log('🗑️ Edit mode deletion:', novedad.id);
-          onRemoveNovedad(novedad.id);
-          
-          // Also remove from local state for immediate UI update
-          setIntegratedData(prev => prev.filter(n => n.id !== novedad.id));
-          
-          toast({
-            title: "Novedad marcada para eliminación",
-            description: "La eliminación se aplicará al guardar los cambios",
-          });
-        } catch (error) {
-          console.error('❌ Error in edit mode deletion:', error);
-          toast({
-            title: "Error",
-            description: "No se pudo marcar la novedad para eliminación",
-            variant: "destructive",
-          });
+  // KISS: Single delete handler for all cases
+  const handleConfirmDelete = useCallback(async (createPendingAdjustment: boolean, novedad: DisplayNovedad) => {
+    try {
+      if (editState === 'editing' && onRemoveNovedad) {
+        // Edit mode: use the hook's remove function
+        console.log('🗑️ Edit mode deletion:', novedad.id);
+        onRemoveNovedad(novedad.id);
+        
+        toast({
+          title: "Novedad marcada para eliminación",
+          description: "La eliminación se aplicará al guardar los cambios",
+        });
+      } else if (createPendingAdjustment && addPendingDeletion) {
+        // Period is closed - create pending adjustment for deletion
+        console.log('🔄 Creating pending deletion adjustment for closed period:', novedad.id);
+        
+        addPendingDeletion(employeeId, employeeName, {
+          id: novedad.id,
+          tipo_novedad: novedad.tipo_novedad,
+          subtipo: novedad.subtipo,
+          valor: novedad.valor,
+          dias: novedad.dias,
+          fecha_inicio: novedad.fecha_inicio,
+          fecha_fin: novedad.fecha_fin,
+          constitutivo_salario: false
+        });
+
+        if (onPendingAdjustmentChange) {
+          onPendingAdjustmentChange();
         }
-      };
-    } else {
-      // Legacy mode: use existing delete handler
-      return createDeleteHandler(
-        deleteNovedadWrapper,
-        addPendingDeletion || (() => console.error('addPendingDeletion not available')),
-        onEmployeeNovedadesChange,
-        onPendingAdjustmentChange,
-        setIntegratedData,
-        toast,
-        employeeId,
-        employeeName
-      );
+
+        // Mark as deleted for immediate UI update
+        setDeletedIds(prev => new Set(prev).add(novedad.id));
+        
+        toast({
+          title: "Novedad eliminada",
+          description: "Se aplicará en la próxima liquidación",
+          className: "border-orange-200 bg-orange-50"
+        });
+      } else {
+        // Period is open - delete directly
+        console.log('🗑️ Deleting novedad directly (open period):', novedad.id);
+        
+        const result = await deleteNovedadWrapper(novedad.id);
+        if (result.success) {
+          setDeletedIds(prev => new Set(prev).add(novedad.id));
+          
+          if (onEmployeeNovedadesChange) {
+            await onEmployeeNovedadesChange(employeeId);
+          }
+          
+          toast({
+            title: "Novedad eliminada",
+            description: "La novedad se ha eliminado correctamente",
+          });
+        } else {
+          throw result.error || new Error('Failed to delete novedad');
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error in delete handler:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo procesar la eliminación",
+        variant: "destructive",
+      });
     }
-  }, [editState, onRemoveNovedad, deleteNovedad, addPendingDeletion, onEmployeeNovedadesChange, onPendingAdjustmentChange, toast, employeeId, employeeName]);
+  }, [editState, onRemoveNovedad, addPendingDeletion, onEmployeeNovedadesChange, onPendingAdjustmentChange, deleteNovedadWrapper, toast, employeeId, employeeName]);
 
   const onDeleteConfirm = (createPendingAdjustment: boolean, novedad: DisplayNovedad) => {
     handleConfirmDelete(createPendingAdjustment, novedad);
@@ -361,7 +390,7 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
         console.log('🔄 Period is closed, creating pending deletion adjustment for vacation:', vacationId);
         
         // Find the vacation in the current data to get its details
-        const vacationNovedad = integratedData.find(n => n.id === vacationId);
+        const vacationNovedad = visibleNovedades.find(n => n.id === vacationId);
         if (vacationNovedad) {
           // Create pending deletion adjustment
           addPendingDeletion(employeeId, employeeName, {
@@ -402,7 +431,7 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
       if (error) throw error;
       
       setLastRefreshTime(Date.now());
-      setIntegratedData(prev => prev.filter(n => n.id !== vacationId));
+      setDeletedIds(prev => new Set(prev).add(vacationId));
       
       if (onEmployeeNovedadesChange) {
         await onEmployeeNovedadesChange(employeeId);
@@ -449,7 +478,7 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
       badgeColor: 'bg-orange-100 text-orange-800',
       badgeIcon: '⏳',
       statusColor: 'border-orange-200 text-orange-700',
-          status: 'pendiente' as const,
+      status: 'pendiente' as const,
       canEdit: false,
       canDelete: true,
       created_at: p.created_at,
@@ -458,8 +487,8 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
   };
 
   const getSeparatedTotals = (): SeparatedTotals & { pending: { devengos: number; deducciones: number; neto: number; count: number } } => {
-    const confirmed = integratedData.filter(n => n.isConfirmed);
-    const estimated = integratedData.filter(n => !n.isConfirmed);
+    const confirmed = visibleNovedades.filter(n => n.isConfirmed);
+    const estimated = visibleNovedades.filter(n => !n.isConfirmed);
     
     // Get pending data from appropriate source
     const pendingData = editState === 'editing' 
@@ -503,26 +532,18 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
         }
       });
       
-      return { devengos, deducciones, neto: devengos - deducciones };
+      return {
+        devengos,
+        deducciones,
+        neto: devengos - deducciones,
+        count: items.length
+      };
     };
 
-    const confirmedTotals = calculateTotals(confirmed);
-    const estimatedTotals = calculateTotals(estimated);
-    const pendingTotals = calculateTotals(pending);
-
     return {
-      confirmed: {
-        ...confirmedTotals,
-        count: confirmed.length
-      },
-      estimated: {
-        ...estimatedTotals, 
-        count: estimated.length
-      },
-      pending: {
-        ...pendingTotals,
-        count: pending.length
-      }
+      confirmed: calculateTotals(confirmed),
+      estimated: calculateTotals(estimated),
+      pending: calculateTotals(pending)
     };
   };
 
@@ -632,7 +653,7 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
               Novedades - {employeeName}
             </h2>
             <Badge variant="outline" className="text-sm">
-              {integratedData.length} registros
+              {visibleNovedades.length} registros
             </Badge>
             {getSeparatedTotals().pending.count > 0 && (
               <Badge variant="secondary" className={editState === 'editing' ? "bg-blue-100 text-blue-800" : "bg-orange-100 text-orange-800"}>
@@ -654,7 +675,7 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
           </div>
         ) : (
           <>
-            {integratedData.length === 0 && getSeparatedTotals().pending.count === 0 ? (
+            {visibleNovedades.length === 0 && getSeparatedTotals().pending.count === 0 ? (
               <Card>
                 <CardContent className="py-8">
                   <div className="text-center">
@@ -694,7 +715,7 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
                       }))
                     : convertPendingToDisplay(pendingAdjustments);
                   
-                  return [...pendingItems, ...integratedData];
+                  return [...pendingItems, ...visibleNovedades];
                 })().map((item, index) => (
                   <Card key={`${item.origen}-${item.id}-${index}`} className={`transition-all duration-200 ${item.statusColor || 'hover:shadow-md'}`}>
                     <CardContent className="p-4">
@@ -727,12 +748,12 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
                           
                           {item.observacion && (
                             <p className="text-xs text-orange-600 mt-1 truncate" title={item.observacion}>
-                              {item.observacion}
+                              💬 {item.observacion}
                             </p>
                           )}
                         </div>
                         
-                        <div className="col-span-12 sm:col-span-3 lg:col-span-3 text-right">
+                        <div className="col-span-12 sm:col-span-6 lg:col-span-6">
                           {getActionButtons(item)}
                         </div>
                       </div>
@@ -744,33 +765,29 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
           </>
         )}
 
-        <VacationAbsenceDetailModal
-          isOpen={vacationDetailModal.isOpen}
-          onClose={() => setVacationDetailModal({ isOpen: false, vacation: null })}
-          vacation={vacationDetailModal.vacation}
-          onEdit={handleEditVacation}
-          onDelete={handleDeleteVacation}
-        />
-
-        <DeleteNovedadConfirmModal
-          isOpen={deleteConfirmModal.isOpen}
-          onClose={() => setDeleteConfirmModal({ isOpen: false, novedad: null })}
-          onConfirm={onDeleteConfirm}
-          novedad={deleteConfirmModal.novedad}
-          periodState={periodState}
-          employeeName={employeeName}
-        />
-
-        <div className="flex justify-between items-center pt-4 border-t">
+        <div className="flex justify-end">
           <Button variant="outline" onClick={onClose}>
             Cerrar
           </Button>
-          <Button onClick={onAddNew}>
-            <Plus className="h-4 w-4 mr-2" />
-            Agregar Nueva
-          </Button>
         </div>
       </div>
+
+      <VacationAbsenceDetailModal
+        isOpen={vacationDetailModal.isOpen}
+        onClose={() => setVacationDetailModal({ isOpen: false, vacation: null })}
+        vacation={vacationDetailModal.vacation}
+        onEdit={handleEditVacation}
+        onDelete={handleDeleteVacation}
+      />
+
+      <DeleteNovedadConfirmModal
+        isOpen={deleteConfirmModal.isOpen}
+        onClose={() => setDeleteConfirmModal({ isOpen: false, novedad: null })}
+        onConfirm={onDeleteConfirm}
+        novedad={deleteConfirmModal.novedad}
+        periodState={periodState}
+        employeeName={employeeName}
+      />
     </>
   );
 };
