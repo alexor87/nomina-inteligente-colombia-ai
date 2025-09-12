@@ -1927,9 +1927,12 @@ export type Database = {
           changes: Json
           company_id: string
           completed_at: string | null
+          composition_changes: Json | null
           created_at: string
           error_message: string | null
           id: string
+          is_composition_edit: boolean | null
+          original_snapshot: Json | null
           period_id: string
           status: string
           user_id: string
@@ -1938,9 +1941,12 @@ export type Database = {
           changes?: Json
           company_id: string
           completed_at?: string | null
+          composition_changes?: Json | null
           created_at?: string
           error_message?: string | null
           id?: string
+          is_composition_edit?: boolean | null
+          original_snapshot?: Json | null
           period_id: string
           status?: string
           user_id: string
@@ -1949,9 +1955,12 @@ export type Database = {
           changes?: Json
           company_id?: string
           completed_at?: string | null
+          composition_changes?: Json | null
           created_at?: string
           error_message?: string | null
           id?: string
+          is_composition_edit?: boolean | null
+          original_snapshot?: Json | null
           period_id?: string
           status?: string
           user_id?: string
