@@ -66,7 +66,7 @@ interface ExpandedEmployee {
 }
 
 function PayrollHistoryDetailPageContent() {
-  const { editMode, enterEditMode, applyChanges, discardChanges } = usePayrollEdit();
+  const { editMode, enterEditMode, applyChanges, discardChanges, addEmployeeToPeriod, removeEmployeeFromPeriod } = usePayrollEdit();
   const { periodId } = useParams<{ periodId: string }>();
   const navigate = useNavigate();
   const [employees, setEmployees] = useState<ExpandedEmployee[]>([]);
@@ -97,6 +97,8 @@ function PayrollHistoryDetailPageContent() {
   const [showDiscardModal, setShowDiscardModal] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
   const [selectedEmployeeName, setSelectedEmployeeName] = useState<string>('');
+  const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false);
+  const [showCompositionChangesModal, setShowCompositionChangesModal] = useState(false);
 
   // Load novedades for the period
   const {
@@ -570,6 +572,67 @@ function PayrollHistoryDetailPageContent() {
     }
   };
 
+  // Edit mode handlers
+  const handleEnterEditMode = async () => {
+    if (!periodData) return;
+    
+    try {
+      await enterEditMode(periodData.id, periodData.company_id);
+      toast({
+        title: "Modo de edición activado",
+        description: "Ahora puedes modificar la composición del período",
+      });
+    } catch (error) {
+      console.error('Error entering edit mode:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo activar el modo de edición",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleApplyCompositionChanges = () => {
+    setShowCompositionChangesModal(true);
+  };
+
+  const handleDiscardCompositionChanges = async () => {
+    try {
+      await discardChanges();
+      toast({
+        title: "Cambios descartados",
+        description: "Se han descartado los cambios de composición",
+      });
+    } catch (error) {
+      console.error('Error discarding changes:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron descartar los cambios",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleFinalApplyChanges = async (summary: string) => {
+    try {
+      await applyChanges(summary);
+      setShowCompositionChangesModal(false);
+      // Reload employees to reflect changes
+      await loadEmployees();
+      toast({
+        title: "Cambios aplicados",
+        description: "Los cambios de composición se han aplicado correctamente",
+      });
+    } catch (error) {
+      console.error('Error applying composition changes:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron aplicar los cambios",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Group novedades by employee (convert to basic PayrollNovedad type)
   const novedadesByEmployee = React.useMemo(() => {
     const grouped: Record<string, PayrollNovedad[]> = {};
@@ -692,6 +755,45 @@ function PayrollHistoryDetailPageContent() {
           </div>
           
           <div className="flex items-center gap-2">
+            {/* Edit Mode Actions */}
+            {editMode.isActive && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowAddEmployeeModal(true)}
+                  disabled={editMode.isLoading}
+                  className="flex items-center gap-2"
+                >
+                  <Users className="h-4 w-4" />
+                  Agregar Empleados
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowCompositionChangesModal(true)}
+                  disabled={editMode.isLoading || !editMode.hasUnsavedChanges}
+                  className="flex items-center gap-2"
+                >
+                  <History className="h-4 w-4" />
+                  Ver Cambios
+                </Button>
+              </>
+            )}
+            
+            {/* Edit Period Button - only for liquidated periods */}
+            {!editMode.isActive && periodData.estado === 'cerrado' && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleEnterEditMode}
+                className="flex items-center gap-2"
+              >
+                <Edit className="h-4 w-4" />
+                Editar Composición
+              </Button>
+            )}
+            
             {/* Recalcular Todo Button */}
             <Button 
               variant="outline"
@@ -735,8 +837,8 @@ function PayrollHistoryDetailPageContent() {
 
       {/* Edit Mode Header */}
       <EditModeHeader 
-        onApplyChanges={() => {}} 
-        onDiscardChanges={async () => await discardChanges()} 
+        onApplyChanges={handleApplyCompositionChanges}
+        onDiscardChanges={handleDiscardCompositionChanges}
       />
 
       {/* Summary Cards */}
@@ -863,6 +965,17 @@ function PayrollHistoryDetailPageContent() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Add Employee Modal */}
+      <AddEmployeeModal 
+        periodId={periodId || ''}
+        companyId={periodData?.company_id || ''}
+      />
+
+      {/* Composition Changes Modal */}
+      <CompositionChangesModal 
+        onApplyChanges={handleFinalApplyChanges}
+      />
     </div>
   );
 }
