@@ -108,7 +108,7 @@ export const DeleteNovedadConfirmModal: React.FC<DeleteNovedadConfirmModalProps>
                       <span className="font-medium text-amber-800">Período Cerrado</span>
                     </div>
                     <p className="text-sm text-amber-700">
-                      Este período ya está procesado. La eliminación requiere re-liquidación.
+                      La eliminación se procesará en la próxima liquidación.
                     </p>
                   </div>
                 </div>
@@ -131,21 +131,12 @@ export const DeleteNovedadConfirmModal: React.FC<DeleteNovedadConfirmModalProps>
             Cancelar
           </AlertDialogCancel>
           
-          {isPeriodClosed ? (
-            <AlertDialogAction
-              onClick={handleImmediateDelete}
-              className="bg-primary hover:bg-primary/90 sm:w-auto"
-            >
-              Programar y Re-liquidar
-            </AlertDialogAction>
-          ) : (
-            <AlertDialogAction
-              onClick={handleImmediateDelete}
-              className="bg-destructive hover:bg-destructive/90 sm:w-auto"
-            >
-              Eliminar Ahora
-            </AlertDialogAction>
-          )}
+          <AlertDialogAction
+            onClick={handleImmediateDelete}
+            className="bg-destructive hover:bg-destructive/90 sm:w-auto"
+          >
+            Eliminar
+          </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

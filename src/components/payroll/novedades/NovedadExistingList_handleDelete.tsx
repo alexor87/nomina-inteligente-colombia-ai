@@ -35,9 +35,12 @@ export const createDeleteHandler = (
           onPendingAdjustmentChange();
         }
 
+        // Always remove from UI immediately for better UX
+        setIntegratedData(prev => prev.filter(n => n.id !== novedad.id));
+        
         toast({
-          title: "Ajuste de eliminación pendiente",
-          description: `Se creó un ajuste para eliminar ${novedad.badgeLabel} en la próxima re-liquidación`,
+          title: "Novedad eliminada",
+          description: "Se aplicará en la próxima liquidación",
           className: "border-orange-200 bg-orange-50"
         });
       } else {
