@@ -686,8 +686,8 @@ function PayrollHistoryDetailPageContent() {
   // Handle changes in employee novedades (e.g., deletion from modal)
   const handleEmployeeNovedadesChange = async (employeeId: string) => {
     console.log('🔄 Employee novedades changed for:', employeeId, 'refreshing UI...');
-    // Clear any pending novelties for this employee to sync badges
-    removePendingNovedadesForEmployee(employeeId);
+    // Reload pending adjustments from database to sync state after changes
+    await loadPendingFromDatabase();
     await refetchNovedades();
     // Recalculate employee values to show updated calculations immediately
     await recalculateEmployeeValues(employeeId);

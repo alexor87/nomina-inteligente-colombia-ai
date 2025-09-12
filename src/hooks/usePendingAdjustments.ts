@@ -20,13 +20,15 @@ export const usePendingAdjustments = ({ periodId, companyId }: UsePendingAdjustm
   // Session storage key for persistence
   const storageKey = `pending-adjustments-${periodId}`;
 
-  // Load pending adjustments from database
+  // Load pending adjustments from database and update state
   const loadPendingFromDatabase = useCallback(async () => {
     if (!periodId) return [];
     
     try {
       const dbAdjustments = await PendingAdjustmentsService.getPendingAdjustmentsForPeriod(periodId);
-      return dbAdjustments.map(adj => PendingAdjustmentsService.toPendingNovedad(adj));
+      const pendingData = dbAdjustments.map(adj => PendingAdjustmentsService.toPendingNovedad(adj));
+      setPendingNovedades(pendingData); // Update state with database data
+      return pendingData;
     } catch (error) {
       console.error('Error loading pending adjustments from database:', error);
       return [];
