@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { AlertCircle, Users, FileEdit, Save, X, RefreshCw } from 'lucide-react';
+import { AlertCircle, Users, FileEdit, Save, X, RefreshCw, History } from 'lucide-react';
 import { usePayrollEdit } from '@/contexts/PayrollEditContext';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
@@ -18,6 +18,9 @@ interface PayrollActionsPanelProps {
   onApplyCompositionChanges: () => void;
   onDiscardCompositionChanges: () => void;
   
+  // Version Viewer Props
+  onViewInitialLiquidation?: () => void;
+  
   // General Props
   canEdit: boolean;
   periodStatus: string;
@@ -30,6 +33,7 @@ export const PayrollActionsPanel: React.FC<PayrollActionsPanelProps> = ({
   onDiscardPendingAdjustments,
   onApplyCompositionChanges,
   onDiscardCompositionChanges,
+  onViewInitialLiquidation,
   canEdit,
   periodStatus
 }) => {
@@ -39,8 +43,10 @@ export const PayrollActionsPanel: React.FC<PayrollActionsPanelProps> = ({
   const hasCompositionChanges = editMode.isActive && editMode.hasUnsavedChanges;
   const isInEditMode = editMode.isActive;
   
-  // Don't show if no actions are available
-  if (!hasPendingAdjustments && !isInEditMode) {
+  // Show if any actions are available or if period is closed (for version viewer)
+  const shouldShow = hasPendingAdjustments || isInEditMode || (periodStatus === 'cerrado' && onViewInitialLiquidation);
+  
+  if (!shouldShow) {
     return null;
   }
 
@@ -135,6 +141,28 @@ export const PayrollActionsPanel: React.FC<PayrollActionsPanelProps> = ({
                 )}
               </Button>
             </div>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Version Viewer Section - Show for closed periods */}
+      {periodStatus === 'cerrado' && onViewInitialLiquidation && (
+        <Alert className="border-blue-500/50 bg-blue-50/50">
+          <History className="h-4 w-4 text-blue-600" />
+          <AlertDescription className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-blue-900">Auditoría y Trazabilidad</span>
+              <span className="text-blue-700 text-sm">Ver liquidación inicial vs. estado actual</span>
+            </div>
+            <Button 
+              variant="outline"
+              size="sm"
+              onClick={onViewInitialLiquidation}
+              className="h-8 border-blue-200 text-blue-700 hover:bg-blue-50"
+            >
+              <History className="h-3 w-3 mr-1" />
+              Ver Liquidación Inicial
+            </Button>
           </AlertDescription>
         </Alert>
       )}

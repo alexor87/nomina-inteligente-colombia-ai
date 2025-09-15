@@ -31,6 +31,7 @@ import { PayrollEditProvider, usePayrollEdit } from '@/contexts/PayrollEditConte
 import { PayrollActionsPanel } from '@/components/payroll/actions/PayrollActionsPanel';
 import { AddEmployeeModal } from '@/components/payroll/edit/AddEmployeeModal';
 import { CompositionChangesModal } from '@/components/payroll/edit/CompositionChangesModal';
+import { PeriodVersionViewer } from '@/components/payroll/version/PeriodVersionViewer';
 import { Edit } from 'lucide-react';
 
 // Use PayrollPeriodData from service instead of local interface
@@ -95,6 +96,7 @@ function PayrollHistoryDetailPageContent() {
   const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showDiscardModal, setShowDiscardModal] = useState(false);
+  const [showVersionViewer, setShowVersionViewer] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
   const [selectedEmployeeName, setSelectedEmployeeName] = useState<string>('');
   const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false);
@@ -693,6 +695,11 @@ function PayrollHistoryDetailPageContent() {
     await recalculateEmployeeValues(employeeId);
   };
 
+  // Handle version viewer modal
+  const handleViewInitialLiquidation = () => {
+    setShowVersionViewer(true);
+  };
+
   if (!periodId) {
     return (
       <div className="container py-10">
@@ -822,6 +829,7 @@ function PayrollHistoryDetailPageContent() {
           onDiscardPendingAdjustments={() => setShowDiscardModal(true)}
           onApplyCompositionChanges={handleApplyCompositionChanges}
           onDiscardCompositionChanges={handleDiscardCompositionChanges}
+          onViewInitialLiquidation={handleViewInitialLiquidation}
           canEdit={periodData?.estado === 'cerrado'}
           periodStatus={periodData?.estado || ''}
         />
