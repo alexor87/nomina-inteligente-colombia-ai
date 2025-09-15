@@ -457,24 +457,25 @@ export class PeriodVersionComparisonService {
       
       console.log('🔍 Fetching employee names for IDs:', employeeIds);
       
+      const ids = Array.from(new Set(employeeIds.filter(Boolean)));
       const { data: employees, error } = await supabase
-        .from('employees')
-        .select('id, nombre, apellido, cedula, segundo_nombre')
-        .in('id', employeeIds);
+        .from('employees_limited')
+        .select('id, nombre, apellido')
+        .in('id', ids);
 
       if (error) {
-        console.error('❌ Error fetching employee names:', error);
+        console.error('❌ Error fetching employee limited names:', error);
         throw error;
       }
 
-      console.log('✅ Fetched employee data:', employees);
+      console.log('✅ Fetched employees_limited data:', employees);
 
       if (employees && employees.length > 0) {
         employees.forEach(emp => {
           employeeMap.set(emp.id, {
             nombre: emp.nombre || '',
             apellido: emp.apellido || '',
-            cedula: emp.cedula || 'N/A'
+            cedula: 'N/A',
           });
         });
       }
