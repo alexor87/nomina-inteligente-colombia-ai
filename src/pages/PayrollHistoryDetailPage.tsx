@@ -970,6 +970,14 @@ function PayrollHistoryDetailPageContent() {
       <CompositionChangesModal 
         onApplyChanges={handleFinalApplyChanges}
       />
+
+      {/* Period Version Viewer Modal */}
+      <PeriodVersionViewer
+        isOpen={showVersionViewer}
+        onClose={() => setShowVersionViewer(false)}
+        periodId={periodId || ''}
+        periodName={periodData?.periodo || ''}
+      />
     </div>
   );
 }
