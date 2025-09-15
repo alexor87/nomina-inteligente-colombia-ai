@@ -163,7 +163,7 @@ export const VersionDiffViewer: React.FC<VersionDiffViewerProps> = ({
             <TableRow>
               <TableHead className="w-12"></TableHead>
               <TableHead>Empleado</TableHead>
-              <TableHead>Cédula</TableHead>
+              <TableHead>Documento</TableHead>
               <TableHead>Tipo de Cambio</TableHead>
               <TableHead>Impacto Económico</TableHead>
               <TableHead>Detalles</TableHead>
@@ -195,7 +195,7 @@ export const VersionDiffViewer: React.FC<VersionDiffViewerProps> = ({
                         <span className="font-medium">{change.employeeName}</span>
                       </div>
                     </TableCell>
-                    <TableCell>{change.cedula}</TableCell>
+                    <TableCell>{change.documentType ? `${change.documentType} ${change.cedula || 'N/A'}` : (change.cedula || 'N/A')}</TableCell>
                     <TableCell>
                       <Badge className={PeriodVersionComparisonService.getChangeTypeColor(change.changeType)}>
                         {PeriodVersionComparisonService.getChangeTypeLabel(change.changeType)}

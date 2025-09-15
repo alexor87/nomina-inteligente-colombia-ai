@@ -60,6 +60,7 @@ export interface EmployeeVersionChange {
   employeeId: string;
   employeeName: string;
   cedula: string;
+  documentType?: string;
   changeType: 'no_change' | 'values_modified' | 'novedades_added' | 'novedades_removed' | 'employee_added' | 'employee_removed';
   initialData?: EmployeeSnapshotData;
   currentData?: EmployeeSnapshotData;
@@ -67,6 +68,7 @@ export interface EmployeeVersionChange {
   impactAmount: number;
   novedadesChanges: NovedadChange[];
 }
+
 
 export interface FieldChange {
   field: string;
@@ -225,7 +227,7 @@ export class PeriodVersionComparisonService {
         impactAmount = (currentEmp.neto_pagado || 0) - (initialEmp.neto_pagado || 0);
       }
 
-      // Get employee name and cedula with robust fallback and trimming
+      // Get employee name, document type and number with robust fallback and trimming
       const empInfo = employeeNames.get(employeeId);
       const nameParts = [
         currentEmp?.nombre ?? initialEmp?.nombre ?? empInfo?.nombre ?? '',
@@ -234,11 +236,13 @@ export class PeriodVersionComparisonService {
       const assembledName = nameParts.join(' ').trim();
       const employeeName = assembledName.length > 0 ? assembledName : `Empleado ${employeeId.slice(0, 8)}`;
       const cedula = currentEmp?.cedula ?? initialEmp?.cedula ?? empInfo?.cedula ?? 'N/A';
+      const documentType = (currentEmp as any)?.tipo_documento ?? (initialEmp as any)?.tipo_documento ?? empInfo?.tipo_documento ?? 'N/A';
 
       changes.push({
         employeeId,
         employeeName: employeeName || 'N/A',
         cedula: cedula || 'N/A',
+        documentType,
         changeType,
         initialData: initialEmp,
         currentData: currentEmp,
@@ -443,10 +447,10 @@ export class PeriodVersionComparisonService {
   }
 
   /**
-   * Get employee names from database for display
+   * Get employee identity from database for display
    */
-  private static async getEmployeeNames(employeeIds: string[]): Promise<Map<string, { nombre: string; apellido: string; cedula: string }>> {
-    const employeeMap = new Map();
+  private static async getEmployeeNames(employeeIds: string[]): Promise<Map<string, { nombre: string; apellido: string; cedula: string; tipo_documento: string }>> {
+    const employeeMap = new Map<string, { nombre: string; apellido: string; cedula: string; tipo_documento: string }>();
     
     if (employeeIds.length === 0) {
       return employeeMap;
@@ -455,27 +459,28 @@ export class PeriodVersionComparisonService {
     try {
       const { supabase } = await import('@/integrations/supabase/client');
       
-      console.log('🔍 Fetching employee names for IDs:', employeeIds);
+      console.log('🔍 Fetching employee identity for IDs:', employeeIds);
       
       const ids = Array.from(new Set(employeeIds.filter(Boolean)));
       const { data: employees, error } = await supabase
-        .from('employees_limited')
-        .select('id, nombre, apellido')
+        .from('employees')
+        .select('id, nombre, apellido, tipo_documento, cedula')
         .in('id', ids);
 
       if (error) {
-        console.error('❌ Error fetching employee limited names:', error);
+        console.error('❌ Error fetching employee identity:', error);
         throw error;
       }
 
-      console.log('✅ Fetched employees_limited data:', employees);
+      console.log('✅ Fetched employees data:', employees);
 
       if (employees && employees.length > 0) {
-        employees.forEach(emp => {
+        employees.forEach((emp: any) => {
           employeeMap.set(emp.id, {
             nombre: emp.nombre || '',
             apellido: emp.apellido || '',
-            cedula: 'N/A',
+            cedula: emp.cedula || 'N/A',
+            tipo_documento: emp.tipo_documento || 'N/A',
           });
         });
       }
@@ -486,20 +491,22 @@ export class PeriodVersionComparisonService {
           employeeMap.set(id, {
             nombre: `Empleado ${id.slice(0, 8)}`,
             apellido: '',
-            cedula: 'N/A'
+            cedula: 'N/A',
+            tipo_documento: 'N/A',
           });
         }
       });
       
     } catch (error) {
-      console.error('❌ Critical error fetching employee names:', error);
+      console.error('❌ Critical error fetching employee identity:', error);
       
       // Enhanced fallback with better naming
       employeeIds.forEach(id => {
         employeeMap.set(id, {
           nombre: `Empleado ${id.slice(0, 8)}`,
           apellido: '',
-          cedula: 'N/A'
+          cedula: 'N/A',
+          tipo_documento: 'N/A',
         });
       });
     }
