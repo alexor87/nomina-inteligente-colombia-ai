@@ -448,51 +448,60 @@ export class PeriodVersionComparisonService {
   private static async getEmployeeNames(employeeIds: string[]): Promise<Map<string, { nombre: string; apellido: string; cedula: string }>> {
     const employeeMap = new Map();
     
+    if (employeeIds.length === 0) {
+      return employeeMap;
+    }
+    
     try {
       const { supabase } = await import('@/integrations/supabase/client');
       
+      console.log('🔍 Fetching employee names for IDs:', employeeIds);
+      
       const { data: employees, error } = await supabase
         .from('employees')
-        .select('id, nombre, apellido, cedula')
+        .select('id, nombre, apellido, cedula, segundo_nombre')
         .in('id', employeeIds);
 
       if (error) {
-        console.error('Error fetching employee names:', error);
-        // Fallback to placeholder data
-        employeeIds.forEach(id => {
-          employeeMap.set(id, {
-            nombre: 'Empleado',
-            apellido: 'Desconocido',
-            cedula: 'N/A'
-          });
-        });
-      } else {
-        employees?.forEach(emp => {
+        console.error('❌ Error fetching employee names:', error);
+        throw error;
+      }
+
+      console.log('✅ Fetched employee data:', employees);
+
+      if (employees && employees.length > 0) {
+        employees.forEach(emp => {
+          const fullName = [emp.nombre, emp.segundo_nombre, emp.apellido]
+            .filter(Boolean)
+            .join(' ') || `Empleado ${emp.id.slice(0, 8)}`;
+            
           employeeMap.set(emp.id, {
-            nombre: emp.nombre || 'N/A',
-            apellido: emp.apellido || 'N/A',
+            nombre: fullName,
+            apellido: '', // We store full name in nombre field
             cedula: emp.cedula || 'N/A'
           });
         });
-        
-        // Add placeholders for any missing employees
-        employeeIds.forEach(id => {
-          if (!employeeMap.has(id)) {
-            employeeMap.set(id, {
-              nombre: 'Empleado',
-              apellido: 'Desconocido',
-              cedula: 'N/A'
-            });
-          }
-        });
       }
+      
+      // Add placeholders for any missing employees with more descriptive names
+      employeeIds.forEach(id => {
+        if (!employeeMap.has(id)) {
+          employeeMap.set(id, {
+            nombre: `Empleado ${id.slice(0, 8)}`,
+            apellido: '',
+            cedula: 'N/A'
+          });
+        }
+      });
+      
     } catch (error) {
-      console.error('Error fetching employee names:', error);
-      // Fallback to placeholder data
+      console.error('❌ Critical error fetching employee names:', error);
+      
+      // Enhanced fallback with better naming
       employeeIds.forEach(id => {
         employeeMap.set(id, {
-          nombre: 'Empleado',
-          apellido: 'Desconocido',
+          nombre: `Empleado ${id.slice(0, 8)}`,
+          apellido: '',
           cedula: 'N/A'
         });
       });

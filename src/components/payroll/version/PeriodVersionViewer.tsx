@@ -1,32 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { 
-  History, 
-  FileText, 
-  Download, 
-  Eye, 
-  Calendar, 
-  Users, 
-  DollarSign, 
-  TrendingUp, 
-  TrendingDown,
-  Shield,
-  Clock,
-  User
-} from 'lucide-react';
+import { History, Download } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import { VersionDiffViewer } from './VersionDiffViewer';
+import { EmployeeChangeCard } from './EmployeeChangeCard';
+import { BusinessImpactSummary } from './BusinessImpactSummary';
+import { ChangeTimelineComponent } from './ChangeTimelineComponent';
 import { 
   PeriodVersionComparisonService, 
-  VersionComparison, 
-  VersionSummaryMetrics 
+  VersionComparison 
 } from '@/services/PeriodVersionComparisonService';
 
 interface PeriodVersionViewerProps {
@@ -45,6 +29,7 @@ export const PeriodVersionViewer: React.FC<PeriodVersionViewerProps> = ({
   const [comparison, setComparison] = useState<VersionComparison | null>(null);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
+  const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (isOpen && periodId) {
@@ -124,185 +109,14 @@ export const PeriodVersionViewer: React.FC<PeriodVersionViewerProps> = ({
     }
   };
 
-  const formatDateTime = (dateString: string) => {
-    return new Date(dateString).toLocaleString('es-CO', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  const renderSummaryMetrics = (metrics: VersionSummaryMetrics) => (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-blue-600" />
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Empleados Afectados</p>
-              <p className="text-2xl font-bold text-blue-600">{metrics.employeesWithChanges}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex items-center gap-2">
-            {metrics.totalImpactAmount >= 0 ? (
-              <TrendingUp className="h-4 w-4 text-green-600" />
-            ) : (
-              <TrendingDown className="h-4 w-4 text-red-600" />
-            )}
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Impacto Total</p>
-              <p className={`text-2xl font-bold ${metrics.totalImpactAmount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {PeriodVersionComparisonService.formatCurrency(metrics.totalImpactAmount)}
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex items-center gap-2">
-            <DollarSign className="h-4 w-4 text-orange-600" />
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Novedades Agregadas</p>
-              <p className="text-2xl font-bold text-orange-600">{metrics.novedadesAdded}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex items-center gap-2">
-            <Shield className="h-4 w-4 text-purple-600" />
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Novedades Eliminadas</p>
-              <p className="text-2xl font-bold text-purple-600">{metrics.novedadesRemoved}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-
-  const renderVersionInfo = () => {
-    if (!comparison) return null;
-
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Initial Version */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <History className="h-5 w-5 text-blue-600" />
-              Liquidación Inicial
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {comparison.initialVersion ? (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                    Versión {comparison.initialVersion.version_number}
-                  </Badge>
-                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                    {comparison.initialVersion.version_type}
-                  </Badge>
-                </div>
-                
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                    <span>{formatDateTime(comparison.initialVersion.created_at)}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <User className="h-4 w-4 text-muted-foreground" />
-                    <span>{comparison.initialVersion.created_by}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                    <span>{comparison.initialVersion.changes_summary}</span>
-                  </div>
-                </div>
-                
-                <Alert className="bg-blue-50 border-blue-200">
-                  <Shield className="h-4 w-4 text-blue-600" />
-                  <AlertDescription className="text-blue-800">
-                    Esta es la liquidación <strong>original</strong> del período antes de cualquier modificación.
-                    Se utiliza como referencia para auditorías y comparaciones.
-                  </AlertDescription>
-                </Alert>
-              </div>
-            ) : (
-              <Alert className="bg-yellow-50 border-yellow-200">
-                <AlertDescription className="text-yellow-800">
-                  No se encontró liquidación inicial registrada para este período.
-                </AlertDescription>
-              </Alert>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Current Version */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5 text-green-600" />
-              Estado Actual
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {comparison.currentVersion ? (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                    Versión {comparison.currentVersion.version_number}
-                  </Badge>
-                  <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
-                    {comparison.currentVersion.version_type}
-                  </Badge>
-                </div>
-                
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                    <span>{formatDateTime(comparison.currentVersion.created_at)}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <User className="h-4 w-4 text-muted-foreground" />
-                    <span>{comparison.currentVersion.created_by}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                    <span>{comparison.currentVersion.changes_summary || 'Cambios aplicados'}</span>
-                  </div>
-                </div>
-                
-                <Alert className="bg-green-50 border-green-200">
-                  <Eye className="h-4 w-4 text-green-600" />
-                  <AlertDescription className="text-green-800">
-                    Este es el estado <strong>actual</strong> del período después de aplicar todas las modificaciones.
-                  </AlertDescription>
-                </Alert>
-              </div>
-            ) : (
-              <Alert className="bg-gray-50 border-gray-200">
-                <AlertDescription className="text-gray-800">
-                  No se encontraron versiones para este período.
-                </AlertDescription>
-              </Alert>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    );
+  const toggleEmployeeExpansion = (employeeId: string) => {
+    const newExpanded = new Set(expandedEmployees);
+    if (newExpanded.has(employeeId)) {
+      newExpanded.delete(employeeId);
+    } else {
+      newExpanded.add(employeeId);
+    }
+    setExpandedEmployees(newExpanded);
   };
 
   return (
@@ -324,64 +138,66 @@ export const PeriodVersionViewer: React.FC<PeriodVersionViewerProps> = ({
               </div>
             ) : (
               comparison && (
-                <>
-                  {/* Summary Metrics */}
-                  <div>
-                    <h3 className="text-lg font-semibold mb-4">Resumen de Cambios</h3>
-                    {renderSummaryMetrics(comparison.summaryMetrics)}
-                  </div>
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+                  <TabsList className="grid w-full grid-cols-4">
+                    <TabsTrigger value="overview">Resumen</TabsTrigger>
+                    <TabsTrigger value="employees">Empleados</TabsTrigger>
+                    <TabsTrigger value="timeline">Cronología</TabsTrigger>
+                    <TabsTrigger value="audit">Auditoría</TabsTrigger>
+                  </TabsList>
 
-                  <Separator />
+                  <TabsContent value="overview">
+                    <BusinessImpactSummary 
+                      metrics={comparison.summaryMetrics}
+                      employeeChanges={comparison.employeeChanges}
+                    />
+                  </TabsContent>
 
-                  {/* Tabs for detailed views */}
-                  <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-                    <TabsList className="grid w-full grid-cols-3">
-                      <TabsTrigger value="overview">Información General</TabsTrigger>
-                      <TabsTrigger value="comparison">Comparación Detallada</TabsTrigger>
-                      <TabsTrigger value="versions">Versiones</TabsTrigger>
-                    </TabsList>
+                  <TabsContent value="employees">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-semibold">
+                          Empleados Afectados ({comparison.employeeChanges.length})
+                        </h3>
+                      </div>
+                      
+                      {comparison.employeeChanges.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <p>No se encontraron cambios entre versiones.</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {comparison.employeeChanges.map((change) => (
+                            <EmployeeChangeCard
+                              key={change.employeeId}
+                              change={change}
+                              isExpanded={expandedEmployees.has(change.employeeId)}
+                              onToggleExpanded={() => toggleEmployeeExpansion(change.employeeId)}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </TabsContent>
 
-                    <TabsContent value="overview">
-                      {renderVersionInfo()}
-                    </TabsContent>
+                  <TabsContent value="timeline">
+                    <ChangeTimelineComponent
+                      initialVersion={comparison.initialVersion}
+                      currentVersion={comparison.currentVersion}
+                      metrics={comparison.summaryMetrics}
+                      periodName={periodName}
+                    />
+                  </TabsContent>
 
-                    <TabsContent value="comparison">
-                      <VersionDiffViewer 
-                        employeeChanges={comparison.employeeChanges}
-                        showOnlyChanges={true}
-                      />
-                    </TabsContent>
-
-                    <TabsContent value="versions">
-                      <Card>
-                        <CardHeader>
-                          <CardTitle>Certificación para Auditoría</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                          <Alert className="bg-blue-50 border-blue-200">
-                            <Shield className="h-4 w-4 text-blue-600" />
-                            <AlertDescription className="text-blue-800">
-                              <strong>Certificación de Inmutabilidad:</strong> La liquidación inicial se registró el {' '}
-                              {comparison.initialVersion && formatDateTime(comparison.initialVersion.created_at)} y no ha sido modificada.
-                              Todos los cambios posteriores están auditados y trazables.
-                            </AlertDescription>
-                          </Alert>
-                          
-                          <div className="space-y-2">
-                            <h4 className="font-medium">Información de Trazabilidad:</h4>
-                            <ul className="space-y-1 text-sm text-muted-foreground">
-                              <li>• ID del Período: {comparison.periodId}</li>
-                              <li>• Versión Inicial: {comparison.initialVersion?.id}</li>
-                              <li>• Versión Actual: {comparison.currentVersion?.id}</li>
-                              <li>• Fecha de Comparación: {formatDateTime(comparison.summaryMetrics.calculationDate)}</li>
-                              <li>• Total de Empleados con Cambios: {comparison.summaryMetrics.employeesWithChanges}</li>
-                            </ul>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </TabsContent>
-                  </Tabs>
-                </>
+                  <TabsContent value="audit">
+                    <ChangeTimelineComponent
+                      initialVersion={comparison.initialVersion}
+                      currentVersion={comparison.currentVersion}
+                      metrics={comparison.summaryMetrics}
+                      periodName={periodName}
+                    />
+                  </TabsContent>
+                </Tabs>
               )
             )}
           </div>
