@@ -551,8 +551,8 @@ function PayrollHistoryDetailPageContent() {
         console.log('✅ Pending adjustments state synchronized - ready for new adjustments');
         
         toast({
-          title: "Ajustes aplicados correctamente",
-          description: `Los ajustes han sido aplicados y el período ha sido reliquidado`,
+          title: "Cambios aplicados correctamente",
+          description: "Los ajustes pendientes han sido procesados y aplicados al período de nómina.",
         });
       }
     } catch (error) {

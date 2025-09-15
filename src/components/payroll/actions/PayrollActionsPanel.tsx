@@ -42,9 +42,33 @@ export const PayrollActionsPanel: React.FC<PayrollActionsPanelProps> = ({
   const hasPendingAdjustments = totalPendingCount > 0;
   const hasCompositionChanges = editMode.isActive && editMode.hasUnsavedChanges;
   const isInEditMode = editMode.isActive;
+  const hasAnyChanges = hasPendingAdjustments || hasCompositionChanges;
   
   // Show if any actions are available or if period is closed (for version viewer)
   const shouldShow = hasPendingAdjustments || isInEditMode || (periodStatus === 'cerrado' && onViewInitialLiquidation);
+  
+  // Unified apply changes handler
+  const handleApplyAllChanges = async () => {
+    // Apply pending adjustments first if they exist
+    if (hasPendingAdjustments) {
+      await onApplyPendingAdjustments();
+    }
+    
+    // Then apply composition changes if they exist
+    if (hasCompositionChanges) {
+      await onApplyCompositionChanges();
+    }
+  };
+  
+  // Unified discard handler
+  const handleDiscardAllChanges = () => {
+    if (hasPendingAdjustments) {
+      onDiscardPendingAdjustments();
+    }
+    if (isInEditMode) {
+      onDiscardCompositionChanges();
+    }
+  };
   
   if (!shouldShow) {
     return null;
@@ -52,86 +76,47 @@ export const PayrollActionsPanel: React.FC<PayrollActionsPanelProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Pending Adjustments Section */}
-      {hasPendingAdjustments && (
-        <Alert className="border-warning/50 bg-warning/5">
-          <AlertCircle className="h-4 w-4 text-warning" />
+      {/* Unified Changes Panel */}
+      {hasAnyChanges && (
+        <Alert className="border-primary/50 bg-primary/5">
+          <Save className="h-4 w-4 text-primary" />
           <AlertDescription className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <FileEdit className="h-4 w-4" />
-              <span className="font-medium">Ajustes Pendientes</span>
-              <Badge variant="secondary" className="animate-pulse">
-                {totalPendingCount} novedades
-              </Badge>
+              <span className="font-medium">Cambios Pendientes de Aplicar</span>
+              <div className="flex gap-2">
+                {hasPendingAdjustments && (
+                  <Badge variant="secondary" className="animate-pulse">
+                    {totalPendingCount} novedades
+                  </Badge>
+                )}
+                {hasCompositionChanges && (
+                  <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                    Composición modificada
+                  </Badge>
+                )}
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <Button 
                 variant="outline"
                 size="sm"
-                onClick={onDiscardPendingAdjustments}
-                disabled={isApplying}
+                onClick={handleDiscardAllChanges}
+                disabled={isApplying || editMode.isLoading}
                 className="h-8"
               >
                 <X className="h-3 w-3 mr-1" />
-                Descartar Ajustes
+                Descartar Cambios
               </Button>
               <Button 
                 size="sm"
-                onClick={onApplyPendingAdjustments}
-                disabled={isApplying}
-                className="h-8 bg-warning hover:bg-warning/90 text-warning-foreground"
+                onClick={handleApplyAllChanges}
+                disabled={isApplying || editMode.isLoading || !hasAnyChanges}
+                className="h-8 bg-primary hover:bg-primary/90 text-primary-foreground"
               >
-                {isApplying ? (
+                {(isApplying || editMode.isLoading) ? (
                   <>
                     <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
                     Aplicando...
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-3 w-3 mr-1" />
-                    Aplicar Ajustes
-                  </>
-                )}
-              </Button>
-            </div>
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Composition Edit Mode Section */}
-      {isInEditMode && (
-        <Alert className="border-blue-500/50 bg-blue-50/50">
-          <Users className="h-4 w-4 text-blue-600" />
-          <AlertDescription className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="font-medium text-blue-900">Modo de Edición: Composición de Empleados</span>
-              {hasCompositionChanges && (
-                <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                  {editMode.sessionId ? 'Cambios pendientes' : 'Sin cambios'}
-                </Badge>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-                <Button 
-                variant="outline"
-                size="sm"
-                onClick={onDiscardCompositionChanges}
-                disabled={editMode.isLoading}
-                className="h-8 border-blue-200 text-blue-700 hover:bg-blue-50"
-              >
-                <X className="h-3 w-3 mr-1" />
-                Salir del Modo Edición
-              </Button>
-              <Button 
-                size="sm"
-                onClick={onApplyCompositionChanges}
-                disabled={editMode.isLoading || !hasCompositionChanges}
-                className="h-8 bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                {editMode.isLoading ? (
-                  <>
-                    <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
-                    Procesando...
                   </>
                 ) : (
                   <>
@@ -141,6 +126,31 @@ export const PayrollActionsPanel: React.FC<PayrollActionsPanelProps> = ({
                 )}
               </Button>
             </div>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Edit Mode Info - Show when in edit mode but no specific changes */}
+      {isInEditMode && !hasAnyChanges && (
+        <Alert className="border-blue-500/50 bg-blue-50/50">
+          <Users className="h-4 w-4 text-blue-600" />
+          <AlertDescription className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-blue-900">Modo de Edición: Composición de Empleados</span>
+              <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                Sin cambios
+              </Badge>
+            </div>
+            <Button 
+              variant="outline"
+              size="sm"
+              onClick={onDiscardCompositionChanges}
+              disabled={editMode.isLoading}
+              className="h-8 border-blue-200 text-blue-700 hover:bg-blue-50"
+            >
+              <X className="h-3 w-3 mr-1" />
+              Salir del Modo Edición
+            </Button>
           </AlertDescription>
         </Alert>
       )}
@@ -163,17 +173,6 @@ export const PayrollActionsPanel: React.FC<PayrollActionsPanelProps> = ({
               <History className="h-3 w-3 mr-1" />
               Ver Liquidación Inicial
             </Button>
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Warning when both systems are active */}
-      {hasPendingAdjustments && isInEditMode && (
-        <Alert className="border-orange-500/50 bg-orange-50/50">
-          <AlertCircle className="h-4 w-4 text-orange-600" />
-          <AlertDescription className="text-orange-800">
-            <strong>Importante:</strong> Tienes tanto ajustes pendientes como cambios de composición. 
-            Te recomendamos aplicar primero los ajustes pendientes antes de finalizar los cambios de composición.
           </AlertDescription>
         </Alert>
       )}
