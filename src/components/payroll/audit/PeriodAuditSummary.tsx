@@ -209,7 +209,11 @@ export const PeriodAuditSummaryComponent: React.FC<PeriodAuditSummaryProps> = ({
                     <div className="flex items-center gap-4">
                       {getActionIcon(entry.action)}
                       <div className="space-y-1">
-                        <div className="font-medium">{entry.employee_name}</div>
+                         <div className="font-medium">
+                           {entry.employee_name.startsWith('Empleado ') 
+                             ? entry.employee_name 
+                             : entry.employee_name}
+                         </div>
                         <div className="text-sm text-gray-600 flex items-center gap-2">
                           <Badge className={getActionColor(entry.action)} variant="outline">
                             {PayrollAuditEnhancedService.getActionDescription(entry.action)}

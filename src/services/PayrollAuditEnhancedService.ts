@@ -36,7 +36,7 @@ export class PayrollAuditEnhancedService {
   }
 
   /**
-   * Get period audit summary with all changes
+   * Get period audit summary with all changes using the new RPC with embedded employee identity
    */
   static async getPeriodAuditSummary(periodId: string): Promise<PeriodAuditSummary[]> {
     try {

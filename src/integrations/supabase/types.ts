@@ -2585,6 +2585,7 @@ export type Database = {
         Returns: {
           action: string
           created_at: string
+          employee_document: string
           employee_name: string
           novedad_type: string
           user_email: string
