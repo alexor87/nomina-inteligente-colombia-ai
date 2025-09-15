@@ -23,8 +23,27 @@ interface NovedadSnapshotData {
 }
 
 interface PeriodSnapshot {
-  employees: EmployeeSnapshotData[];
-  novedades: NovedadSnapshotData[];
+  employees?: EmployeeSnapshotData[];
+  novedades?: NovedadSnapshotData[];
+  payrolls?: PayrollSnapshotData[];
+  timestamp?: string;
+  [key: string]: any;
+}
+
+interface PayrollSnapshotData {
+  id: string;
+  employee_id: string;
+  periodo: string;
+  estado: string;
+  salario_base: number;
+  dias_trabajados: number;
+  total_devengado: number;
+  total_deducciones: number;
+  neto_pagado: number;
+  ibc: number;
+  salud_empleado: number;
+  pension_empleado: number;
+  auxilio_transporte: number;
   [key: string]: any;
 }
 
@@ -106,13 +125,15 @@ export class PeriodVersionComparisonService {
       console.log('📊 Found versions:', { 
         total: versions.length, 
         initial: initialVersion?.id,
-        current: currentVersion?.id 
+        current: currentVersion?.id,
+        initialSnapshotKeys: initialVersion ? Object.keys(initialVersion.snapshot_data) : [],
+        currentSnapshotKeys: currentVersion ? Object.keys(currentVersion.snapshot_data) : []
       });
 
       // Generate employee-by-employee comparison
       const employeeChanges = await this.compareEmployeeData(
-        initialVersion?.snapshot_data as PeriodSnapshot || { employees: [], novedades: [] },
-        currentVersion?.snapshot_data as PeriodSnapshot || { employees: [], novedades: [] }
+        initialVersion?.snapshot_data as PeriodSnapshot || { employees: [], novedades: [], payrolls: [] },
+        currentVersion?.snapshot_data as PeriodSnapshot || { employees: [], novedades: [], payrolls: [] }
       );
 
       // Calculate summary metrics
@@ -142,10 +163,18 @@ export class PeriodVersionComparisonService {
   ): Promise<EmployeeVersionChange[]> {
     const changes: EmployeeVersionChange[] = [];
     
-    const initialEmployees = initialSnapshot.employees || [];
-    const currentEmployees = currentSnapshot.employees || [];
+    // Handle both old format (employees/novedades) and new format (payrolls)
+    const initialEmployees = this.extractEmployeesFromSnapshot(initialSnapshot);
+    const currentEmployees = this.extractEmployeesFromSnapshot(currentSnapshot);
     const initialNovedades = initialSnapshot.novedades || [];
     const currentNovedades = currentSnapshot.novedades || [];
+
+    console.log('🔍 Comparing snapshots:', {
+      initialEmployees: initialEmployees.length,
+      currentEmployees: currentEmployees.length,
+      hasInitialPayrolls: !!(initialSnapshot.payrolls && initialSnapshot.payrolls.length > 0),
+      hasCurrentPayrolls: !!(currentSnapshot.payrolls && currentSnapshot.payrolls.length > 0)
+    });
 
     // Create employee maps for easier comparison
     const initialEmpMap = new Map(initialEmployees.map((emp) => [emp.id, emp]));
@@ -160,6 +189,9 @@ export class PeriodVersionComparisonService {
       ...initialEmpMap.keys(),
       ...currentEmpMap.keys()
     ]);
+
+    // Get employee names from database
+    const employeeNames = await this.getEmployeeNames(Array.from(allEmployeeIds));
 
     for (const employeeId of allEmployeeIds) {
       const initialEmp = initialEmpMap.get(employeeId);
@@ -193,8 +225,15 @@ export class PeriodVersionComparisonService {
         impactAmount = (currentEmp.neto_pagado || 0) - (initialEmp.neto_pagado || 0);
       }
 
-      const employeeName = (currentEmp || initialEmp)?.nombre + ' ' + (currentEmp || initialEmp)?.apellido;
-      const cedula = (currentEmp || initialEmp)?.cedula;
+      // Get employee name and cedula, handling cases where they might be empty  
+      const empInfo = employeeNames.get(employeeId);
+      const currentName = currentEmp?.nombre || empInfo?.nombre || '';
+      const currentLastName = currentEmp?.apellido || empInfo?.apellido || '';
+      const initialName = initialEmp?.nombre || empInfo?.nombre || '';
+      const initialLastName = initialEmp?.apellido || empInfo?.apellido || '';
+      
+      const employeeName = (currentName || initialName) + ' ' + (currentLastName || initialLastName) || `Empleado ${employeeId.slice(0, 8)}`;
+      const cedula = (currentEmp || initialEmp)?.cedula || empInfo?.cedula || 'N/A';
 
       changes.push({
         employeeId,
@@ -209,7 +248,24 @@ export class PeriodVersionComparisonService {
       });
     }
 
-    return changes.filter(change => change.changeType !== 'no_change');
+    return changes.filter(change => {
+      const hasChanges = change.changeType !== 'no_change' || 
+                        change.fieldChanges.length > 0 || 
+                        change.novedadesChanges.length > 0 ||
+                        Math.abs(change.impactAmount) > 0.01;
+      
+      if (hasChanges) {
+        console.log('🔄 Change detected:', {
+          employee: change.employeeName,
+          type: change.changeType,
+          impact: change.impactAmount,
+          fieldChanges: change.fieldChanges.length,
+          novedadesChanges: change.novedadesChanges.length
+        });
+      }
+      
+      return hasChanges;
+    });
   }
 
   /**
@@ -349,6 +405,100 @@ export class PeriodVersionComparisonService {
       novedadesModified,
       calculationDate: new Date().toISOString()
     };
+  }
+
+  /**
+   * Extract employees from snapshot, handling both old and new formats
+   */
+  private static extractEmployeesFromSnapshot(snapshot: PeriodSnapshot): EmployeeSnapshotData[] {
+    // If the snapshot has the new payrolls format, convert it
+    if (snapshot.payrolls && snapshot.payrolls.length > 0) {
+      return this.convertPayrollsToEmployees(snapshot.payrolls);
+    }
+    
+    // Otherwise use the old employees format
+    return snapshot.employees || [];
+  }
+
+  /**
+   * Convert payroll records to employee snapshot format
+   */
+  private static convertPayrollsToEmployees(payrolls: PayrollSnapshotData[]): EmployeeSnapshotData[] {
+    return payrolls.map(payroll => ({
+      id: payroll.employee_id,
+      nombre: '', // Will be filled from employee data if needed
+      apellido: '',
+      cedula: '',
+      salario_base: payroll.salario_base,
+      dias_trabajados: payroll.dias_trabajados,
+      total_devengado: payroll.total_devengado,
+      total_deducciones: payroll.total_deducciones,
+      neto_pagado: payroll.neto_pagado,
+      ibc: payroll.ibc,
+      salud_empleado: payroll.salud_empleado,
+      pension_empleado: payroll.pension_empleado,
+      auxilio_transporte: payroll.auxilio_transporte,
+      ...payroll // Include any additional fields
+    }));
+  }
+
+  /**
+   * Get employee names from database for display
+   */
+  private static async getEmployeeNames(employeeIds: string[]): Promise<Map<string, { nombre: string; apellido: string; cedula: string }>> {
+    const employeeMap = new Map();
+    
+    try {
+      const { supabase } = await import('@/integrations/supabase/client');
+      
+      const { data: employees, error } = await supabase
+        .from('employees')
+        .select('id, nombre, apellido, cedula')
+        .in('id', employeeIds);
+
+      if (error) {
+        console.error('Error fetching employee names:', error);
+        // Fallback to placeholder data
+        employeeIds.forEach(id => {
+          employeeMap.set(id, {
+            nombre: 'Empleado',
+            apellido: 'Desconocido',
+            cedula: 'N/A'
+          });
+        });
+      } else {
+        employees?.forEach(emp => {
+          employeeMap.set(emp.id, {
+            nombre: emp.nombre || 'N/A',
+            apellido: emp.apellido || 'N/A',
+            cedula: emp.cedula || 'N/A'
+          });
+        });
+        
+        // Add placeholders for any missing employees
+        employeeIds.forEach(id => {
+          if (!employeeMap.has(id)) {
+            employeeMap.set(id, {
+              nombre: 'Empleado',
+              apellido: 'Desconocido',
+              cedula: 'N/A'
+            });
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching employee names:', error);
+      // Fallback to placeholder data
+      employeeIds.forEach(id => {
+        employeeMap.set(id, {
+          nombre: 'Empleado',
+          apellido: 'Desconocido',
+          cedula: 'N/A'
+        });
+      });
+    }
+
+    return employeeMap;
   }
 
   /**
