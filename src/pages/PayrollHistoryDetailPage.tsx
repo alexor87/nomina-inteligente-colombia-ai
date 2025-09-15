@@ -545,6 +545,11 @@ function PayrollHistoryDetailPageContent() {
         await loadEmployees(); // Refresh employee data to show updated IBC
         refetchNovedades();
         
+        // Force synchronization of pending adjustments state
+        console.log('🔄 Forcing pending adjustments state synchronization after successful application...');
+        await loadPendingFromDatabase();
+        console.log('✅ Pending adjustments state synchronized - ready for new adjustments');
+        
         toast({
           title: "Ajustes aplicados correctamente",
           description: `Los ajustes han sido aplicados y el período ha sido reliquidado`,

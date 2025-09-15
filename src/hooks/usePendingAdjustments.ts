@@ -40,6 +40,7 @@ export const usePendingAdjustments = ({ periodId, companyId }: UsePendingAdjustm
       });
       
       setPendingNovedades(pendingData); // Update state with database data
+      console.log('🔄 State synchronized with database - pending count:', pendingData.length);
       return pendingData;
     } catch (error) {
       console.error('❌ Error loading pending adjustments from database:', error);
@@ -145,10 +146,13 @@ export const usePendingAdjustments = ({ periodId, companyId }: UsePendingAdjustm
 
   // Clear all pending adjustments
   const clearAllPending = useCallback(() => {
+    console.log('🗑️ Clearing all pending adjustments from state and session storage');
     setPendingNovedades([]);
     if (periodId) {
       sessionStorage.removeItem(storageKey);
+      console.log('✅ Session storage cleared for period:', periodId);
     }
+    console.log('✅ All pending adjustments cleared - state reset to empty');
   }, [periodId, storageKey]);
 
   // Get pending novedades count for a specific employee
