@@ -311,18 +311,18 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       // Show different messages based on submission result
       if (result && 'isPending' in result && result.isPending) {
         toast({
-          title: "⏳ Ajuste Pendiente",
+          title: "✅ Novedad Guardada como Ajuste Pendiente",
           description: `${formData.type === 'incapacidad' && valorCalculado > 0 
-            ? `Incapacidad agregada como ajuste pendiente ($${valorCalculado.toLocaleString()})` 
-            : 'Ausencia agregada como ajuste pendiente'}. El período está cerrado, se aplicará cuando confirmes los ajustes.`,
-          className: "border-yellow-200 bg-yellow-50"
+            ? `Incapacidad por $${valorCalculado.toLocaleString()} agregada` 
+            : 'Ausencia agregada'}. Usa "Aplicar Ajustes" para confirmar y reliquidar el período.`,
+          className: "border-warning/50 bg-warning/5 text-warning-foreground"
         });
       } else {
         toast({
-          title: "✅ Éxito",
+          title: "✅ Novedad Aplicada Inmediatamente",
           description: `${formData.type === 'incapacidad' && valorCalculado > 0 
             ? `Incapacidad calculada correctamente ($${valorCalculado.toLocaleString()})` 
-            : 'Ausencia registrada correctamente'} en el módulo de novedades`,
+            : 'Ausencia registrada correctamente'} y aplicada al período`,
           className: "border-green-200 bg-green-50"
         });
       }
@@ -394,18 +394,18 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       // Show different messages based on submission results
       if (hasPendingSubmissions) {
         toast({
-          title: "⏳ Ajustes Pendientes",
+          title: "✅ Novedad Guardada como Ajuste Pendiente",
           description: isArrayData 
-            ? `${dataArray.length} ajustes agregados como pendientes (Total: $${totalValue.toLocaleString()}). El período está cerrado, se aplicarán cuando confirmes los ajustes.`
-            : "Novedad agregada como ajuste pendiente. El período está cerrado, se aplicará cuando confirmes los ajustes.",
-          className: "border-yellow-200 bg-yellow-50"
+            ? `${dataArray.length} novedades por $${totalValue.toLocaleString()} agregadas. Usa "Aplicar Ajustes" para confirmar y reliquidar el período.`
+            : `Novedad por $${totalValue.toLocaleString()} agregada. Usa "Aplicar Ajustes" para confirmar y reliquidar el período.`,
+          className: "border-warning/50 bg-warning/5 text-warning-foreground"
         });
       } else {
         toast({
-          title: "✅ Éxito",
+          title: "✅ Novedad Aplicada Inmediatamente",
           description: isArrayData 
-            ? `${dataArray.length} novedades registradas correctamente (Total: $${totalValue.toLocaleString()})`
-            : "Novedad registrada correctamente",
+            ? `${dataArray.length} novedades por $${totalValue.toLocaleString()} aplicadas al período`
+            : `Novedad por $${totalValue.toLocaleString()} aplicada al período`,
           className: "border-green-200 bg-green-50"
         });
       }
@@ -607,29 +607,25 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
           event.preventDefault();
         }}
       >
-        {(currentStep === 'form' || currentStep === 'absence') && (
-          <>
-            <DialogHeader>
-              <DialogTitle>
-                {mode === 'ajustes' ? '📝 Agregar Ajuste' : '📋 Gestionar Novedades'}
-              </DialogTitle>
-              <DialogDescription>
-                {mode === 'ajustes' 
-                  ? 'Este ajuste será aplicado tras confirmación con justificación.'
-                  : 'Gestione las novedades de nómina para este empleado.'
-                }
-              </DialogDescription>
-              {employeeFullName && (
-                <div className="text-sm text-muted-foreground mt-2 flex items-center gap-2">
-                  <span className="font-medium">Empleado:</span>
-                  <span className="bg-muted px-2 py-1 rounded text-foreground">
-                    {employeeFullName}
-                  </span>
-                </div>
-              )}
-            </DialogHeader>
-          </>
-        )}
+        <DialogHeader>
+          <DialogTitle>
+            {mode === 'ajustes' ? '📝 Agregar Ajuste' : '📋 Gestionar Novedades'}
+          </DialogTitle>
+          <DialogDescription>
+            {mode === 'ajustes' 
+              ? 'Este ajuste será aplicado tras confirmación con justificación.'
+              : 'Gestione las novedades de nómina para este empleado.'
+            }
+          </DialogDescription>
+          {employeeFullName && (
+            <div className="text-sm text-muted-foreground mt-2 flex items-center gap-2">
+              <span className="font-medium">Empleado:</span>
+              <span className="bg-muted px-2 py-1 rounded text-foreground">
+                {employeeFullName}
+              </span>
+            </div>
+          )}
+        </DialogHeader>
 
         {renderContent()}
 

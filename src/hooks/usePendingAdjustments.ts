@@ -21,16 +21,28 @@ export const usePendingAdjustments = ({ periodId, companyId }: UsePendingAdjustm
   const storageKey = `pending-adjustments-${periodId}`;
 
   // Load pending adjustments from database and update state
-  const loadPendingFromDatabase = useCallback(async () => {
+  const loadPendingFromDatabase = useCallback(async (): Promise<PendingNovedad[]> => {
     if (!periodId) return [];
+    
+    console.log('🔄 Loading pending adjustments from database...', { periodId });
     
     try {
       const dbAdjustments = await PendingAdjustmentsService.getPendingAdjustmentsForPeriod(periodId);
       const pendingData = dbAdjustments.map(adj => PendingAdjustmentsService.toPendingNovedad(adj));
+      
+      console.log('📊 Database pending adjustments loaded:', {
+        count: pendingData.length,
+        adjustments: pendingData.map(p => ({ 
+          employee: p.employee_name, 
+          tipo: p.tipo_novedad, 
+          valor: p.valor 
+        }))
+      });
+      
       setPendingNovedades(pendingData); // Update state with database data
       return pendingData;
     } catch (error) {
-      console.error('Error loading pending adjustments from database:', error);
+      console.error('❌ Error loading pending adjustments from database:', error);
       return [];
     }
   }, [periodId]);
@@ -94,6 +106,17 @@ export const usePendingAdjustments = ({ periodId, companyId }: UsePendingAdjustm
       } else {
         sessionStorage.removeItem(storageKey);
       }
+      
+      // Debug logging for state changes
+      console.log('📊 Pending adjustments state updated:', {
+        periodId,
+        count: pendingNovedades.length,
+        adjustments: pendingNovedades.map(p => ({ 
+          employee: p.employee_name, 
+          tipo: p.tipo_novedad, 
+          valor: p.valor 
+        }))
+      });
     } catch (error) {
       console.error('Error saving pending adjustments to storage:', error);
     }
@@ -248,7 +271,11 @@ export const usePendingAdjustments = ({ periodId, companyId }: UsePendingAdjustm
     }
 
     setIsApplying(true);
-    console.log('🔄 Applying pending adjustments with re-liquidation...');
+    console.log('🔄 Applying pending adjustments with re-liquidation...', {
+      adjustmentCount: pendingNovedades.length,
+      periodId: periodData.id,
+      companyId
+    });
     
     try {
       // Group pending adjustments by employee

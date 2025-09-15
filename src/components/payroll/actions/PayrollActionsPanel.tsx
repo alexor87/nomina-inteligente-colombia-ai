@@ -73,7 +73,7 @@ export const PayrollActionsPanel: React.FC<PayrollActionsPanelProps> = ({
                 className="h-8"
               >
                 <X className="h-3 w-3 mr-1" />
-                Descartar
+                Descartar Ajustes
               </Button>
               <Button 
                 size="sm"
@@ -112,7 +112,7 @@ export const PayrollActionsPanel: React.FC<PayrollActionsPanelProps> = ({
               )}
             </div>
             <div className="flex items-center gap-2">
-              <Button 
+                <Button 
                 variant="outline"
                 size="sm"
                 onClick={onDiscardCompositionChanges}
@@ -120,7 +120,7 @@ export const PayrollActionsPanel: React.FC<PayrollActionsPanelProps> = ({
                 className="h-8 border-blue-200 text-blue-700 hover:bg-blue-50"
               >
                 <X className="h-3 w-3 mr-1" />
-                Cancelar
+                Salir del Modo Edición
               </Button>
               <Button 
                 size="sm"

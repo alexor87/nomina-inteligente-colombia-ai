@@ -454,11 +454,19 @@ function PayrollHistoryDetailPageContent() {
         // Save to database
         await PendingAdjustmentsService.savePendingAdjustment(pendingNovedad);
         
-        // Also add to local state for immediate display
-        addPendingNovedad(pendingNovedad);
+        // CRITICAL: Force immediate synchronization to ensure UI consistency
+        console.log('🔄 Forcing pending adjustments sync after save...');
+        await loadPendingFromDatabase();
         
         // Recalculate employee values to show immediate visual impact
         await recalculateEmployeeValues(novedadData.empleado_id);
+        
+        // Additional logging for debugging
+        console.log('✅ Novedad saved as pending adjustment:', {
+          employeeId: novedadData.empleado_id,
+          tipoNovedad: novedadData.tipo_novedad,
+          valor: novedadData.valor
+        });
         
         return { isPending: true };
       } else {
@@ -688,11 +696,12 @@ function PayrollHistoryDetailPageContent() {
   // Handle changes in employee novedades (e.g., deletion from modal)
   const handleEmployeeNovedadesChange = async (employeeId: string) => {
     console.log('🔄 Employee novedades changed for:', employeeId, 'refreshing UI...');
-    // Reload pending adjustments from database to sync state after changes
+    // CRITICAL: Force immediate reload of pending adjustments to ensure UI consistency
     await loadPendingFromDatabase();
     await refetchNovedades();
     // Recalculate employee values to show updated calculations immediately
     await recalculateEmployeeValues(employeeId);
+    console.log('✅ Post-change synchronization completed for employee:', employeeId);
   };
 
   // Handle version viewer modal
