@@ -372,7 +372,7 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
       
       return {
         id: p.id,
-        origen: isDeleteAction ? 'pending_delete' as any : 'pending_adjustment' as any,
+        origen: 'pending_adjustment' as any, // Use single origin for consistency
         tipo_novedad: p.tipo_novedad as any,
         subtipo: p.subtipo,
         valor: p.valor,
@@ -383,9 +383,9 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
         isConfirmed: false, // Pending adjustments are never confirmed
         badgeLabel: isDeleteAction 
           ? `Eliminar: ${formatTipoNovedad(p.tipo_novedad, p.subtipo)}`
-          : formatTipoNovedad(p.tipo_novedad, p.subtipo),
+          : `Agregar: ${formatTipoNovedad(p.tipo_novedad, p.subtipo)}`,
         badgeColor: isDeleteAction ? 'bg-red-100 text-red-800' : 'bg-orange-100 text-orange-800',
-        badgeIcon: isDeleteAction ? '🗑️' : '⏳',
+        badgeIcon: isDeleteAction ? '🗑️' : '➕',
         statusColor: isDeleteAction ? 'border-red-200 text-red-700' : 'border-orange-200 text-orange-700',
         status: 'pendiente',
         canEdit: false,
@@ -451,7 +451,8 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
   };
 
   const getActionButtons = (item: DisplayNovedad) => {
-    if (item.origen === 'pending_adjustment' as any) {
+    // Handle both pending adjustment types (create and delete)
+    if (item.origen === 'pending_adjustment' as any || item.origen === 'pending_delete' as any) {
       return (
         <div className="flex gap-1">
           <Button
