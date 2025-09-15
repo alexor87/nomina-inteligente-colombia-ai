@@ -83,7 +83,9 @@ export const EmployeeChangeCard: React.FC<EmployeeChangeCardProps> = ({
           <div className="flex items-start gap-3 flex-1">
             <Avatar className="h-10 w-10">
               <AvatarFallback className="bg-primary/10 text-primary font-medium">
-                {change.employeeName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                {change.employeeName?.trim() 
+                  ? change.employeeName.trim().split(/\s+/).map(p => p[0]).join('').slice(0, 2).toUpperCase()
+                  : 'EM'}
               </AvatarFallback>
             </Avatar>
             

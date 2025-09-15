@@ -225,15 +225,15 @@ export class PeriodVersionComparisonService {
         impactAmount = (currentEmp.neto_pagado || 0) - (initialEmp.neto_pagado || 0);
       }
 
-      // Get employee name and cedula, handling cases where they might be empty  
+      // Get employee name and cedula with robust fallback and trimming
       const empInfo = employeeNames.get(employeeId);
-      const currentName = currentEmp?.nombre || empInfo?.nombre || '';
-      const currentLastName = currentEmp?.apellido || empInfo?.apellido || '';
-      const initialName = initialEmp?.nombre || empInfo?.nombre || '';
-      const initialLastName = initialEmp?.apellido || empInfo?.apellido || '';
-      
-      const employeeName = (currentName || initialName) + ' ' + (currentLastName || initialLastName) || `Empleado ${employeeId.slice(0, 8)}`;
-      const cedula = (currentEmp || initialEmp)?.cedula || empInfo?.cedula || 'N/A';
+      const nameParts = [
+        currentEmp?.nombre ?? initialEmp?.nombre ?? empInfo?.nombre ?? '',
+        currentEmp?.apellido ?? initialEmp?.apellido ?? empInfo?.apellido ?? ''
+      ].filter(Boolean);
+      const assembledName = nameParts.join(' ').trim();
+      const employeeName = assembledName.length > 0 ? assembledName : `Empleado ${employeeId.slice(0, 8)}`;
+      const cedula = currentEmp?.cedula ?? initialEmp?.cedula ?? empInfo?.cedula ?? 'N/A';
 
       changes.push({
         employeeId,
@@ -471,13 +471,9 @@ export class PeriodVersionComparisonService {
 
       if (employees && employees.length > 0) {
         employees.forEach(emp => {
-          const fullName = [emp.nombre, emp.segundo_nombre, emp.apellido]
-            .filter(Boolean)
-            .join(' ') || `Empleado ${emp.id.slice(0, 8)}`;
-            
           employeeMap.set(emp.id, {
-            nombre: fullName,
-            apellido: '', // We store full name in nombre field
+            nombre: emp.nombre || '',
+            apellido: emp.apellido || '',
             cedula: emp.cedula || 'N/A'
           });
         });
