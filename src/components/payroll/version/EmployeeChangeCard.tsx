@@ -92,7 +92,7 @@ export const EmployeeChangeCard: React.FC<EmployeeChangeCardProps> = ({
             <div className="flex-1 space-y-2">
               <div>
                 <h4 className="font-medium text-foreground">{change.employeeName}</h4>
-                <p className="text-sm text-muted-foreground">{change.documentType || 'Doc'}: {change.cedula || 'N/A'}</p>
+                <p className="text-sm text-muted-foreground">{change.documentType && change.documentType !== 'N/A' ? `${change.documentType}: ${change.cedula || 'N/A'}` : (change.cedula || 'N/A')}</p>
               </div>
               
               <div className="flex items-center gap-2">

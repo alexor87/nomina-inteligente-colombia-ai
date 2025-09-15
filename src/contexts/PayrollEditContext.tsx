@@ -66,8 +66,24 @@ export const PayrollEditProvider: React.FC<PayrollEditProviderProps> = ({ childr
         throw payrollError;
       }
 
+      // Enrich snapshot with employee identity data
+      const employeeIds = [...new Set((payrolls || []).map(p => p.employee_id))];
+      const { data: employeesIdentity, error: employeesError } = await supabase
+        .from('employees')
+        .select('id, nombre, apellido, tipo_documento, cedula')
+        .in('id', employeeIds);
+
+      if (employeesError) {
+        console.warn('Warning: Could not fetch employee identity:', employeesError);
+      }
+
+      const employeeIdentityMap = new Map(
+        (employeesIdentity || []).map(emp => [emp.id, emp])
+      );
+
       const snapshotData = {
         payrolls: payrolls || [],
+        employeeIdentity: Object.fromEntries(employeeIdentityMap),
         timestamp: new Date().toISOString()
       };
 
@@ -244,8 +260,24 @@ export const PayrollEditProvider: React.FC<PayrollEditProviderProps> = ({ childr
         throw payrollError;
       }
 
+      // Enrich snapshot with employee identity data
+      const employeeIds = [...new Set((updatedPayrolls || []).map(p => p.employee_id))];
+      const { data: employeesIdentity, error: employeesError } = await supabase
+        .from('employees')
+        .select('id, nombre, apellido, tipo_documento, cedula')
+        .in('id', employeeIds);
+
+      if (employeesError) {
+        console.warn('Warning: Could not fetch employee identity:', employeesError);
+      }
+
+      const employeeIdentityMap = new Map(
+        (employeesIdentity || []).map(emp => [emp.id, emp])
+      );
+
       const newSnapshotData = {
         payrolls: updatedPayrolls || [],
+        employeeIdentity: Object.fromEntries(employeeIdentityMap),
         compositionChanges: editMode.compositionChanges,
         timestamp: new Date().toISOString()
       };

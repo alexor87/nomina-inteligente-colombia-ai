@@ -26,6 +26,7 @@ interface PeriodSnapshot {
   employees?: EmployeeSnapshotData[];
   novedades?: NovedadSnapshotData[];
   payrolls?: PayrollSnapshotData[];
+  employeeIdentity?: { [employeeId: string]: { nombre: string; apellido: string; tipo_documento: string; cedula: string } };
   timestamp?: string;
   [key: string]: any;
 }
@@ -134,8 +135,9 @@ export class PeriodVersionComparisonService {
 
       // Generate employee-by-employee comparison
       const employeeChanges = await this.compareEmployeeData(
-        initialVersion?.snapshot_data as PeriodSnapshot || { employees: [], novedades: [], payrolls: [] },
-        currentVersion?.snapshot_data as PeriodSnapshot || { employees: [], novedades: [], payrolls: [] }
+        initialVersion?.snapshot_data as PeriodSnapshot || { employees: [], novedades: [], payrolls: [], employeeIdentity: {} },
+        currentVersion?.snapshot_data as PeriodSnapshot || { employees: [], novedades: [], payrolls: [], employeeIdentity: {} },
+        periodId
       );
 
       // Calculate summary metrics
@@ -161,7 +163,8 @@ export class PeriodVersionComparisonService {
    */
   private static async compareEmployeeData(
     initialSnapshot: PeriodSnapshot,
-    currentSnapshot: PeriodSnapshot
+    currentSnapshot: PeriodSnapshot,
+    periodId?: string
   ): Promise<EmployeeVersionChange[]> {
     const changes: EmployeeVersionChange[] = [];
     
@@ -192,8 +195,13 @@ export class PeriodVersionComparisonService {
       ...currentEmpMap.keys()
     ]);
 
-    // Get employee names from database
-    const employeeNames = await this.getEmployeeNames(Array.from(allEmployeeIds));
+    // Get employee identity - first from enriched snapshots, then from database
+    const employeeIdentity = await this.getEmployeeIdentity(
+      Array.from(allEmployeeIds), 
+      initialSnapshot.employeeIdentity || {}, 
+      currentSnapshot.employeeIdentity || {},
+      periodId
+    );
 
     for (const employeeId of allEmployeeIds) {
       const initialEmp = initialEmpMap.get(employeeId);
@@ -227,8 +235,8 @@ export class PeriodVersionComparisonService {
         impactAmount = (currentEmp.neto_pagado || 0) - (initialEmp.neto_pagado || 0);
       }
 
-      // Get employee name, document type and number with robust fallback and trimming
-      const empInfo = employeeNames.get(employeeId);
+      // Get employee identity with robust fallback and trimming
+      const empInfo = employeeIdentity.get(employeeId);
       const nameParts = [
         currentEmp?.nombre ?? initialEmp?.nombre ?? empInfo?.nombre ?? '',
         currentEmp?.apellido ?? initialEmp?.apellido ?? empInfo?.apellido ?? ''
@@ -236,7 +244,7 @@ export class PeriodVersionComparisonService {
       const assembledName = nameParts.join(' ').trim();
       const employeeName = assembledName.length > 0 ? assembledName : `Empleado ${employeeId.slice(0, 8)}`;
       const cedula = currentEmp?.cedula ?? initialEmp?.cedula ?? empInfo?.cedula ?? 'N/A';
-      const documentType = (currentEmp as any)?.tipo_documento ?? (initialEmp as any)?.tipo_documento ?? empInfo?.tipo_documento ?? 'N/A';
+      const documentType = (currentEmp as any)?.tipo_documento ?? (initialEmp as any)?.tipo_documento ?? empInfo?.tipo_documento ?? 'CC';
 
       changes.push({
         employeeId,
@@ -447,70 +455,86 @@ export class PeriodVersionComparisonService {
   }
 
   /**
-   * Get employee identity from database for display
+   * Get employee identity using enriched snapshot data first, then database fallback
    */
-  private static async getEmployeeNames(employeeIds: string[]): Promise<Map<string, { nombre: string; apellido: string; cedula: string; tipo_documento: string }>> {
+  private static async getEmployeeIdentity(
+    employeeIds: string[],
+    initialSnapshotIdentity: { [key: string]: any },
+    currentSnapshotIdentity: { [key: string]: any },
+    periodId?: string
+  ): Promise<Map<string, { nombre: string; apellido: string; cedula: string; tipo_documento: string }>> {
     const employeeMap = new Map<string, { nombre: string; apellido: string; cedula: string; tipo_documento: string }>();
     
     if (employeeIds.length === 0) {
       return employeeMap;
     }
     
-    try {
-      const { supabase } = await import('@/integrations/supabase/client');
+    const missingIds: string[] = [];
+    
+    // First, use enriched snapshot data
+    for (const employeeId of employeeIds) {
+      const fromCurrent = currentSnapshotIdentity[employeeId];
+      const fromInitial = initialSnapshotIdentity[employeeId];
+      const empData = fromCurrent || fromInitial;
       
-      console.log('🔍 Fetching employee identity for IDs:', employeeIds);
-      
-      const ids = Array.from(new Set(employeeIds.filter(Boolean)));
-      const { data: employees, error } = await supabase
-        .from('employees')
-        .select('id, nombre, apellido, tipo_documento, cedula')
-        .in('id', ids);
-
-      if (error) {
-        console.error('❌ Error fetching employee identity:', error);
-        throw error;
-      }
-
-      console.log('✅ Fetched employees data:', employees);
-
-      if (employees && employees.length > 0) {
-        employees.forEach((emp: any) => {
-          employeeMap.set(emp.id, {
-            nombre: emp.nombre || '',
-            apellido: emp.apellido || '',
-            cedula: emp.cedula || 'N/A',
-            tipo_documento: emp.tipo_documento || 'N/A',
-          });
+      if (empData && empData.nombre) {
+        employeeMap.set(employeeId, {
+          nombre: empData.nombre || '',
+          apellido: empData.apellido || '',
+          cedula: empData.cedula || 'N/A',
+          tipo_documento: empData.tipo_documento || 'CC',
         });
+      } else {
+        missingIds.push(employeeId);
       }
-      
-      // Add placeholders for any missing employees with more descriptive names
-      employeeIds.forEach(id => {
-        if (!employeeMap.has(id)) {
-          employeeMap.set(id, {
-            nombre: `Empleado ${id.slice(0, 8)}`,
-            apellido: '',
-            cedula: 'N/A',
-            tipo_documento: 'N/A',
+    }
+    
+    console.log('📊 Employee identity resolution:', { 
+      total: employeeIds.length, 
+      fromSnapshot: employeeIds.length - missingIds.length, 
+      missing: missingIds.length 
+    });
+    
+    // Fallback: query database for missing employee data
+    if (missingIds.length > 0) {
+      try {
+        const { supabase } = await import('@/integrations/supabase/client');
+        
+        const { data: employees, error } = await supabase
+          .from('employees')
+          .select('id, nombre, apellido, tipo_documento, cedula')
+          .in('id', missingIds);
+
+        if (error) {
+          console.warn('⚠️ Warning fetching missing employee identity:', error);
+        } else if (employees && employees.length > 0) {
+          employees.forEach((emp: any) => {
+            employeeMap.set(emp.id, {
+              nombre: emp.nombre || '',
+              apellido: emp.apellido || '',
+              cedula: emp.cedula || 'N/A',
+              tipo_documento: emp.tipo_documento || 'CC',
+            });
           });
+          console.log(`✅ Resolved ${employees.length} missing employees from database`);
         }
-      });
-      
-    } catch (error) {
-      console.error('❌ Critical error fetching employee identity:', error);
-      
-      // Enhanced fallback with better naming
-      employeeIds.forEach(id => {
-        employeeMap.set(id, {
-          nombre: `Empleado ${id.slice(0, 8)}`,
+      } catch (error) {
+        console.warn('⚠️ Error in fallback employee lookup:', error);
+      }
+    }
+    
+    // Final fallback for any still missing employees
+    for (const employeeId of employeeIds) {
+      if (!employeeMap.has(employeeId)) {
+        employeeMap.set(employeeId, {
+          nombre: `Empleado ${employeeId.slice(0, 8)}`,
           apellido: '',
           cedula: 'N/A',
-          tipo_documento: 'N/A',
+          tipo_documento: 'CC',
         });
-      });
+      }
     }
-
+    
     return employeeMap;
   }
 

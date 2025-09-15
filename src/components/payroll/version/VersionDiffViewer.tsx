@@ -195,7 +195,7 @@ export const VersionDiffViewer: React.FC<VersionDiffViewerProps> = ({
                         <span className="font-medium">{change.employeeName}</span>
                       </div>
                     </TableCell>
-                    <TableCell>{change.documentType ? `${change.documentType} ${change.cedula || 'N/A'}` : (change.cedula || 'N/A')}</TableCell>
+                    <TableCell>{change.documentType && change.documentType !== 'N/A' ? `${change.documentType}: ${change.cedula || 'N/A'}` : (change.cedula || 'N/A')}</TableCell>
                     <TableCell>
                       <Badge className={PeriodVersionComparisonService.getChangeTypeColor(change.changeType)}>
                         {PeriodVersionComparisonService.getChangeTypeLabel(change.changeType)}
