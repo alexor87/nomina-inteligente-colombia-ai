@@ -124,6 +124,7 @@ export type Database = {
       companies: {
         Row: {
           actividad_economica: string | null
+          auto_store_vouchers: boolean | null
           ciudad: string | null
           created_at: string
           created_by: string | null
@@ -139,9 +140,12 @@ export type Database = {
           representante_legal: string | null
           telefono: string | null
           updated_at: string
+          voucher_retention_years: number | null
+          voucher_storage_enabled: boolean | null
         }
         Insert: {
           actividad_economica?: string | null
+          auto_store_vouchers?: boolean | null
           ciudad?: string | null
           created_at?: string
           created_by?: string | null
@@ -157,9 +161,12 @@ export type Database = {
           representante_legal?: string | null
           telefono?: string | null
           updated_at?: string
+          voucher_retention_years?: number | null
+          voucher_storage_enabled?: boolean | null
         }
         Update: {
           actividad_economica?: string | null
+          auto_store_vouchers?: boolean | null
           ciudad?: string | null
           created_at?: string
           created_by?: string | null
@@ -175,6 +182,8 @@ export type Database = {
           representante_legal?: string | null
           telefono?: string | null
           updated_at?: string
+          voucher_retention_years?: number | null
+          voucher_storage_enabled?: boolean | null
         }
         Relationships: []
       }
@@ -1618,6 +1627,7 @@ export type Database = {
       }
       payroll_vouchers: {
         Row: {
+          auto_generated: boolean | null
           company_id: string
           created_at: string
           dian_cufe: string | null
@@ -1625,7 +1635,10 @@ export type Database = {
           electronic_signature_date: string | null
           employee_id: string
           end_date: string
+          file_path: string | null
+          file_size: number | null
           generated_by: string | null
+          generation_attempts: number | null
           id: string
           net_pay: number
           payroll_id: string | null
@@ -1634,11 +1647,13 @@ export type Database = {
           sent_date: string | null
           sent_to_employee: boolean | null
           start_date: string
+          storage_bucket: string | null
           updated_at: string
           voucher_status: string | null
           xml_url: string | null
         }
         Insert: {
+          auto_generated?: boolean | null
           company_id: string
           created_at?: string
           dian_cufe?: string | null
@@ -1646,7 +1661,10 @@ export type Database = {
           electronic_signature_date?: string | null
           employee_id: string
           end_date: string
+          file_path?: string | null
+          file_size?: number | null
           generated_by?: string | null
+          generation_attempts?: number | null
           id?: string
           net_pay?: number
           payroll_id?: string | null
@@ -1655,11 +1673,13 @@ export type Database = {
           sent_date?: string | null
           sent_to_employee?: boolean | null
           start_date: string
+          storage_bucket?: string | null
           updated_at?: string
           voucher_status?: string | null
           xml_url?: string | null
         }
         Update: {
+          auto_generated?: boolean | null
           company_id?: string
           created_at?: string
           dian_cufe?: string | null
@@ -1667,7 +1687,10 @@ export type Database = {
           electronic_signature_date?: string | null
           employee_id?: string
           end_date?: string
+          file_path?: string | null
+          file_size?: number | null
           generated_by?: string | null
+          generation_attempts?: number | null
           id?: string
           net_pay?: number
           payroll_id?: string | null
@@ -1676,6 +1699,7 @@ export type Database = {
           sent_date?: string | null
           sent_to_employee?: boolean | null
           start_date?: string
+          storage_bucket?: string | null
           updated_at?: string
           voucher_status?: string | null
           xml_url?: string | null

@@ -57,6 +57,8 @@ serve(async (req) => {
     console.log('📥 Full request body received:', JSON.stringify(requestBody, null, 2));
 
     const returnBase64: boolean = !!requestBody.returnBase64;
+    const storeInStorage: boolean = !!requestBody.storeInStorage;
+    const voucherId: string = requestBody.voucherId;
 
     // Get user from auth header
     const authHeader = req.headers.get('Authorization');
@@ -463,6 +465,74 @@ serve(async (req) => {
     const pdfBytes = await generateProfessionalVoucherPDF(payrollData);
     console.log('✅ PDF generated successfully: ' + pdfBytes.length + ' bytes');
 
+    let pdfUrl = '';
+    let filePath = '';
+    let fileSize = pdfBytes.length;
+
+    // NUEVO: Almacenar en Storage si se solicita
+    if (storeInStorage && voucherId) {
+      try {
+        // Generate file path
+        const year = new Date(payrollData.payroll_periods_real.fecha_inicio).getFullYear();
+        const month = String(new Date(payrollData.payroll_periods_real.fecha_inicio).getMonth() + 1).padStart(2, '0');
+        const companyId = payrollData.companies.id;
+        const employeeId = payrollData.employees.id;
+        filePath = `${companyId}/${year}/${month}/voucher_${voucherId}_${employeeId}.pdf`;
+
+        // Upload to Supabase Storage
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('payroll-vouchers')
+          .upload(filePath, pdfBytes, {
+            contentType: 'application/pdf',
+            upsert: true
+          });
+
+        if (uploadError) {
+          throw new Error(`Storage upload failed: ${uploadError.message}`);
+        }
+
+        // Get public URL
+        const { data: urlData } = supabase.storage
+          .from('payroll-vouchers')
+          .getPublicUrl(filePath);
+
+        pdfUrl = urlData.publicUrl;
+
+        // Update voucher record
+        const { error: updateError } = await supabase
+          .from('payroll_vouchers')
+          .update({
+            pdf_url: pdfUrl,
+            file_path: filePath,
+            file_size: fileSize,
+            voucher_status: 'completado',
+            auto_generated: true,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', voucherId);
+
+        if (updateError) {
+          console.error('Error updating voucher record:', updateError);
+        }
+
+        console.log(`✅ PDF stored at: ${pdfUrl}`);
+        
+        return new Response(JSON.stringify({
+          success: true,
+          pdfUrl,
+          filePath,
+          fileSize,
+          voucherId
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+        
+      } catch (storageError) {
+        console.error('❌ Error storing PDF:', storageError);
+        // Continue with regular response if storage fails
+      }
+    }
+
     // Responder como JSON base64 si se solicita
     if (returnBase64) {
       const base64 = base64Encode(pdfBytes);
@@ -471,6 +541,7 @@ serve(async (req) => {
         fileName,
         mimeType: 'application/pdf',
         base64,
+        ...(pdfUrl && { pdfUrl, filePath, fileSize })
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
