@@ -235,18 +235,28 @@ export class PeriodVersionComparisonService {
         impactAmount = (currentEmp.neto_pagado || 0) - (initialEmp.neto_pagado || 0);
       }
 
-      // Get employee identity with robust fallback and trimming
+      // Get employee identity with simplified, reliable fallback chain
       const empInfo = employeeIdentity.get(employeeId);
-      const resolvedNombre = currentEmp?.nombre ?? initialEmp?.nombre ?? empInfo?.nombre ?? '';
-      const resolvedApellido = currentEmp?.apellido ?? initialEmp?.apellido ?? empInfo?.apellido ?? '';
-      const nameParts = [resolvedNombre, resolvedApellido].filter(Boolean);
-      let baseName = nameParts.join(' ').trim();
-      if (changeType === 'employee_removed' && baseName.length === 0) {
-        baseName = 'Empleado eliminado';
+      
+      // Priority: current > initial > identity map > fallback
+      const nombre = currentEmp?.nombre || initialEmp?.nombre || empInfo?.nombre || '';
+      const apellido = currentEmp?.apellido || initialEmp?.apellido || empInfo?.apellido || '';
+      const cedula = currentEmp?.cedula || initialEmp?.cedula || empInfo?.cedula || 'N/A';
+      const documentType = (currentEmp as any)?.tipo_documento || (initialEmp as any)?.tipo_documento || empInfo?.tipo_documento || 'CC';
+
+      // Construct employee name with specific fallbacks for different scenarios
+      let employeeName: string;
+      const fullName = [nombre, apellido].filter(Boolean).join(' ').trim();
+      
+      if (fullName) {
+        employeeName = fullName;
+      } else if (changeType === 'employee_removed') {
+        employeeName = 'Empleado eliminado';
+      } else if (cedula && cedula !== 'N/A') {
+        employeeName = `Empleado ${cedula}`;
+      } else {
+        employeeName = `Empleado ${employeeId.slice(0, 8)}`;
       }
-      const employeeName = baseName.length > 0 ? baseName : `Empleado ${employeeId.slice(0, 8)}`;
-      const cedula = currentEmp?.cedula ?? initialEmp?.cedula ?? empInfo?.cedula ?? 'N/A';
-      const documentType = (currentEmp as any)?.tipo_documento ?? (initialEmp as any)?.tipo_documento ?? empInfo?.tipo_documento ?? 'CC';
 
       changes.push({
         employeeId,
@@ -450,28 +460,34 @@ export class PeriodVersionComparisonService {
   }
 
   /**
-   * Convert payroll records to employee snapshot format
+   * Convert payroll records to employee snapshot format with robust identity handling
    */
   private static convertPayrollsToEmployees(payrolls: PayrollSnapshotData[]): EmployeeSnapshotData[] {
-    return payrolls.map(payroll => ({
-      id: payroll.employee_id,
-      // Prefer embedded identity fields if present in the payroll snapshot
-      nombre: (payroll as any).employee_nombre ?? (payroll as any).nombre ?? '',
-      apellido: (payroll as any).employee_apellido ?? (payroll as any).apellido ?? '',
-      cedula: (payroll as any).employee_cedula ?? (payroll as any).cedula ?? '',
-      // Also propagate document type if present
-      tipo_documento: (payroll as any).employee_tipo_documento ?? (payroll as any).tipo_documento ?? 'CC',
-      salario_base: payroll.salario_base,
-      dias_trabajados: payroll.dias_trabajados,
-      total_devengado: payroll.total_devengado,
-      total_deducciones: payroll.total_deducciones,
-      neto_pagado: payroll.neto_pagado,
-      ibc: payroll.ibc,
-      salud_empleado: payroll.salud_empleado,
-      pension_empleado: payroll.pension_empleado,
-      auxilio_transporte: payroll.auxilio_transporte,
-      ...payroll // Include any additional fields
-    }));
+    return payrolls.map(payroll => {
+      // Extract identity with multiple fallbacks
+      const nombre = (payroll as any).employee_nombre || (payroll as any).nombre || '';
+      const apellido = (payroll as any).employee_apellido || (payroll as any).apellido || '';
+      const cedula = (payroll as any).employee_cedula || (payroll as any).cedula || '';
+      const tipo_documento = (payroll as any).employee_tipo_documento || (payroll as any).tipo_documento || 'CC';
+
+      return {
+        id: payroll.employee_id,
+        nombre,
+        apellido,
+        cedula,
+        tipo_documento,
+        salario_base: payroll.salario_base,
+        dias_trabajados: payroll.dias_trabajados,
+        total_devengado: payroll.total_devengado,
+        total_deducciones: payroll.total_deducciones,
+        neto_pagado: payroll.neto_pagado,
+        ibc: payroll.ibc,
+        salud_empleado: payroll.salud_empleado,
+        pension_empleado: payroll.pension_empleado,
+        auxilio_transporte: payroll.auxilio_transporte,
+        ...payroll // Include any additional fields
+      };
+    });
   }
 
   // Simple cache for employee identities per period

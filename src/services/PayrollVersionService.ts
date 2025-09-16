@@ -12,6 +12,74 @@ export interface PayrollVersionData {
 
 export class PayrollVersionService {
   /**
+   * Enrich snapshot data with employee identity information
+   */
+  private static async enrichSnapshotWithIdentity(
+    snapshotData: any,
+    companyId: string
+  ): Promise<any> {
+    try {
+      // If already enriched or no payrolls, return as-is
+      if (!snapshotData?.payrolls?.length || snapshotData.enriched) {
+        return snapshotData;
+      }
+
+      const employeeIds = snapshotData.payrolls.map((p: any) => p.employee_id);
+      
+      // Fetch employee identities from database
+      const { data: employees, error } = await supabase
+        .from('employees')
+        .select('id, nombre, apellido, cedula, tipo_documento')
+        .in('id', employeeIds)
+        .eq('company_id', companyId);
+
+      if (error) {
+        console.warn('⚠️ Could not fetch employee identities:', error);
+        return { ...snapshotData, enriched: true };
+      }
+
+      // Create identity map
+      const identityMap = new Map(
+        (employees || []).map(emp => [emp.id, emp])
+      );
+
+      // Enrich payrolls with embedded identity
+      const enrichedPayrolls = snapshotData.payrolls.map((payroll: any) => {
+        const identity = identityMap.get(payroll.employee_id);
+        return {
+          ...payroll,
+          employee_nombre: identity?.nombre || null,
+          employee_apellido: identity?.apellido || null,
+          employee_cedula: identity?.cedula || null,
+          employee_tipo_documento: identity?.tipo_documento || 'CC',
+        };
+      });
+
+      // Create identity object for backwards compatibility
+      const employeeIdentity: { [key: string]: any } = {};
+      identityMap.forEach((identity, id) => {
+        employeeIdentity[id] = {
+          nombre: identity.nombre,
+          apellido: identity.apellido,
+          cedula: identity.cedula,
+          tipo_documento: identity.tipo_documento,
+        };
+      });
+
+      return {
+        ...snapshotData,
+        payrolls: enrichedPayrolls,
+        employeeIdentity,
+        enriched: true,
+        enrichmentTimestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      console.warn('⚠️ Error enriching snapshot:', error);
+      return { ...snapshotData, enriched: true };
+    }
+  }
+
+  /**
    * Create initial version snapshot when entering edit mode
    */
   static async createInitialVersion(
@@ -21,6 +89,9 @@ export class PayrollVersionService {
   ): Promise<string> {
     try {
       console.log('📸 Creating initial version snapshot for period:', periodId);
+
+      // Enrich snapshot with employee identity data
+      const enrichedSnapshot = await this.enrichSnapshotWithIdentity(snapshotData, companyId);
 
       // Get current highest version number
       const { data: versions, error: versionError } = await supabase
@@ -41,7 +112,7 @@ export class PayrollVersionService {
         company_id: companyId,
         period_id: periodId,
         version_number: nextVersion,
-        snapshot_data: snapshotData,
+        snapshot_data: enrichedSnapshot,
         changes_summary: 'Initial snapshot before editing',
         version_type: 'initial' as const,
         created_by: (await supabase.auth.getUser()).data.user?.id
@@ -79,6 +150,9 @@ export class PayrollVersionService {
     try {
       console.log('💾 Creating new version for period:', periodId);
 
+      // Enrich snapshot with employee identity data
+      const enrichedSnapshot = await this.enrichSnapshotWithIdentity(snapshotData, companyId);
+
       // Get current highest version number
       const { data: versions, error: versionError } = await supabase
         .from('payroll_version_history')
@@ -97,7 +171,7 @@ export class PayrollVersionService {
         company_id: companyId,
         period_id: periodId,
         version_number: nextVersion,
-        snapshot_data: snapshotData,
+        snapshot_data: enrichedSnapshot,
         changes_summary: changesSummary,
         version_type: 'manual' as const,
         previous_version_id: previousVersionId,

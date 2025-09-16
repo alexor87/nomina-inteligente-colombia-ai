@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { History, Download } from 'lucide-react';
+import { History, Download, RefreshCw } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { EmployeeChangeCard } from './EmployeeChangeCard';
 import { BusinessImpactSummary } from './BusinessImpactSummary';
@@ -12,6 +12,7 @@ import {
   PeriodVersionComparisonService, 
   VersionComparison 
 } from '@/services/PeriodVersionComparisonService';
+import { supabase } from '@/integrations/supabase/client';
 
 interface PeriodVersionViewerProps {
   isOpen: boolean;
@@ -31,6 +32,7 @@ export const PeriodVersionViewer: React.FC<PeriodVersionViewerProps> = ({
   const [activeTab, setActiveTab] = useState('overview');
   const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(new Set());
   const [repairing, setRepairing] = useState(false);
+  const [backfilling, setBackfilling] = useState(false);
 
   useEffect(() => {
     if (isOpen && periodId) {
@@ -56,6 +58,81 @@ export const PeriodVersionViewer: React.FC<PeriodVersionViewerProps> = ({
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  /**
+   * In-memory backfill for missing employee names in old versions
+   */
+  const backfillEmployeeNames = async () => {
+    if (!comparison || backfilling) return;
+
+    setBackfilling(true);
+    try {
+      // Find employee changes with generic names that need backfilling
+      const needsBackfill = comparison.employeeChanges.filter(change => 
+        change.employeeName.startsWith('Empleado ') && 
+        change.employeeName.length < 20 && // Generic name pattern
+        change.cedula !== 'N/A'
+      );
+
+      if (needsBackfill.length === 0) {
+        toast({
+          title: "Sin cambios necesarios",
+          description: "Todos los empleados ya tienen nombres identificables",
+        });
+        return;
+      }
+
+      // Fetch current employee data for backfill
+      const employeeIds = needsBackfill.map(change => change.employeeId);
+      const { data: employees, error } = await supabase
+        .from('employees')
+        .select('id, nombre, apellido, cedula')
+        .in('id', employeeIds);
+
+      if (error) {
+        throw error;
+      }
+
+      // Create a map for quick lookup
+      const employeeMap = new Map(
+        (employees || []).map(emp => [emp.id, emp])
+      );
+
+      // Update the comparison data in memory
+      const updatedComparison = {
+        ...comparison,
+        employeeChanges: comparison.employeeChanges.map(change => {
+          const employee = employeeMap.get(change.employeeId);
+          if (employee && change.employeeName.startsWith('Empleado ')) {
+            const fullName = [employee.nombre, employee.apellido].filter(Boolean).join(' ').trim();
+            return {
+              ...change,
+              employeeName: fullName || change.employeeName,
+              cedula: employee.cedula || change.cedula
+            };
+          }
+          return change;
+        })
+      };
+
+      setComparison(updatedComparison);
+
+      toast({
+        title: "Nombres actualizados",
+        description: `Se actualizaron ${needsBackfill.length} nombres de empleados`,
+      });
+
+    } catch (error) {
+      console.error('❌ Error backfilling employee names:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron actualizar los nombres de empleados",
+        variant: "destructive",
+      });
+    } finally {
+      setBackfilling(false);
     }
   };
 
@@ -239,6 +316,10 @@ export const PeriodVersionViewer: React.FC<PeriodVersionViewerProps> = ({
           </Button>
           {comparison && (
             <>
+              <Button onClick={backfillEmployeeNames} disabled={backfilling || loading} variant="secondary">
+                <RefreshCw className={`h-4 w-4 ${backfilling ? 'animate-spin' : ''}`} />
+                {backfilling ? 'Actualizando…' : 'Actualizar nombres'}
+              </Button>
               <Button onClick={repairIdentities} disabled={repairing || loading} variant="secondary">
                 {repairing ? 'Reparando…' : 'Reparar identidades'}
               </Button>
