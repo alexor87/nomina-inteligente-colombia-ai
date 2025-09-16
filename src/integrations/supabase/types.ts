@@ -2527,6 +2527,15 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      get_employee_identity_for_period: {
+        Args: { p_employee_ids: string[]; p_period_id: string }
+        Returns: {
+          apellido: string
+          cedula: string
+          employee_id: string
+          nombre: string
+        }[]
+      }
       get_employee_sensitive_data: {
         Args: { employee_id: string }
         Returns: {

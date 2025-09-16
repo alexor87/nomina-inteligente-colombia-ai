@@ -454,8 +454,11 @@ export class PeriodVersionComparisonService {
     }));
   }
 
+  // Simple cache for employee identities per period
+  private static employeeIdentityCache = new Map<string, { nombre: string; apellido: string; cedula: string; tipo_documento: string }>();
+
   /**
-   * Get employee identity using enriched snapshot data first, then database fallback
+   * Get employee identity using enriched snapshot data first, then secure RPC, then database fallback
    */
   private static async getEmployeeIdentity(
     employeeIds: string[],
@@ -495,10 +498,49 @@ export class PeriodVersionComparisonService {
       missing: missingIds.length 
     });
     
-    // Fallback: query database for missing employee data
+    // Secure RPC fallback for missing employee data
+    if (missingIds.length > 0 && periodId) {
+      try {
+        const { supabase } = await import('@/integrations/supabase/client');
+        
+        console.log(`🔍 [Employee Identity] Using RPC for ${missingIds.length} missing IDs in period ${periodId}`);
+        
+        const { data: identities, error } = await supabase.rpc('get_employee_identity_for_period', {
+          p_period_id: periodId,
+          p_employee_ids: missingIds
+        });
+
+        if (!error && identities && identities.length > 0) {
+          identities.forEach((emp: any) => {
+            const cacheKey = `${periodId}-${emp.employee_id}`;
+            const empData = {
+              nombre: emp.nombre || '',
+              apellido: emp.apellido || '',
+              cedula: emp.cedula || 'N/A',
+              tipo_documento: 'CC' // RPC doesn't return this field
+            };
+            employeeMap.set(emp.employee_id, empData);
+            this.employeeIdentityCache.set(cacheKey, empData);
+          });
+          console.log(`✅ [Employee Identity] Resolved ${identities.length} employees via RPC`);
+          
+          // Update missingIds to remove resolved ones
+          const resolvedIds = identities.map((emp: any) => emp.employee_id);
+          missingIds.splice(0, missingIds.length, ...missingIds.filter(id => !resolvedIds.includes(id)));
+        } else if (error) {
+          console.warn('⚠️ [Employee Identity] RPC error:', error);
+        }
+      } catch (error) {
+        console.warn('⚠️ [Employee Identity] RPC exception:', error);
+      }
+    }
+
+    // Final database fallback for any remaining missing employee data
     if (missingIds.length > 0) {
       try {
         const { supabase } = await import('@/integrations/supabase/client');
+        
+        console.log(`🔍 [Employee Identity] Direct DB query for ${missingIds.length} remaining IDs`);
         
         const { data: employees, error } = await supabase
           .from('employees')
@@ -506,7 +548,7 @@ export class PeriodVersionComparisonService {
           .in('id', missingIds);
 
         if (error) {
-          console.warn('⚠️ Warning fetching missing employee identity:', error);
+          console.warn('⚠️ [Employee Identity] DB query error:', error);
         } else if (employees && employees.length > 0) {
           employees.forEach((emp: any) => {
             employeeMap.set(emp.id, {
@@ -516,22 +558,24 @@ export class PeriodVersionComparisonService {
               tipo_documento: emp.tipo_documento || 'CC',
             });
           });
-          console.log(`✅ Resolved ${employees.length} missing employees from database`);
+          console.log(`✅ [Employee Identity] Resolved ${employees.length} employees from direct DB`);
         }
       } catch (error) {
-        console.warn('⚠️ Error in fallback employee lookup:', error);
+        console.warn('⚠️ [Employee Identity] DB query exception:', error);
       }
     }
     
     // Final fallback for any still missing employees
     for (const employeeId of employeeIds) {
       if (!employeeMap.has(employeeId)) {
+        const shortId = employeeId.slice(0, 8);
         employeeMap.set(employeeId, {
-          nombre: `Empleado ${employeeId.slice(0, 8)}`,
-          apellido: '',
+          nombre: 'Empleado',
+          apellido: shortId,
           cedula: 'N/A',
           tipo_documento: 'CC',
         });
+        console.warn(`🔍 [Employee Identity] Final fallback for ${employeeId}: Empleado ${shortId}`);
       }
     }
     
