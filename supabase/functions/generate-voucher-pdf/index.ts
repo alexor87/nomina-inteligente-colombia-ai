@@ -134,112 +134,9 @@ serve(async (req) => {
       console.log('✅ Payroll data fetched successfully');
       console.log('🔍 Deduction values from DB - Salud:', data.salud_empleado, 'Pensión:', data.pension_empleado);
 
-      // 🔎 Si el registro está marcado como "is_stale", forzar re-liquidación puntual antes de generar el PDF
+      // 🔎 Registro marcado como is_stale: NO re-liquidar. Respetar valores persistidos.
       if (data.is_stale === true) {
-        console.log('♻️ Payroll está is_stale=true. Forzando re-liquidación puntual para PDF...');
-        
-        try {
-          // Call re-liquidation function with proper source parameter
-          const invocation = await supabase.functions.invoke('reliquidate-period-adjustments', {
-            body: {
-              periodId: data.period_id,
-              affectedEmployeeIds: [data.employee_id],
-              justification: 'Auto-reliquidación al generar comprobante',
-              options: {
-                reliquidateScope: 'affected',
-                regenerateVouchers: false,
-                sendEmails: false,
-                source: 'pdf_generation'
-              }
-            },
-            headers: { Authorization: authHeader }
-          });
-          
-          if ((invocation as any).error) {
-            console.error('❌ Error invocando re-liquidación puntual:', (invocation as any).error);
-            throw new Error('Failed to update stale payroll data');
-          } else {
-            console.log('✅ Re-liquidación puntual realizada. Releyendo nómina fresca para PDF...');
-            
-            // Re-fetch the updated payroll data
-            const { data: fresh, error: refetchErr } = await supabase
-              .from('payrolls')
-              .select(`
-                *,
-                employees!inner(
-                  id,
-                  nombre,
-                  apellido,
-                  cedula,
-                  cargo,
-                  eps,
-                  afp,
-                  salario_base,
-                  estado
-                ),
-                payroll_periods_real!inner(
-                  id,
-                  periodo,
-                  fecha_inicio,
-                  fecha_fin,
-                  tipo_periodo
-                ),
-                companies!inner(
-                  id,
-                  razon_social,
-                  nit,
-                  direccion,
-                  ciudad,
-                  telefono,
-                  email,
-                  logo_url
-                )
-              `)
-              .eq('id', requestBody.payrollId)
-              .single();
-              
-            if (refetchErr || !fresh) {
-              throw new Error('Failed to fetch fresh payroll data after re-liquidation');
-            }
-            
-            // Validate that is_stale is now false
-            if (fresh.is_stale === true) {
-              console.error('⚠️ Payroll is still stale after re-liquidation, using fallback calculation...');
-              
-              // Fallback: Use real-time calculation if DB is still stale
-              const { data: backendCalc, error: calcError } = await supabase.functions.invoke('payroll-calculations', {
-                body: {
-                  action: 'calculate',
-                  data: {
-                    baseSalary: fresh.employees.salario_base,
-                    workedDays: fresh.dias_trabajados || 15,
-                    periodType: fresh.payroll_periods_real.tipo_periodo,
-                    novedades: [],
-                    year: '2025'
-                  }
-                }
-              });
-
-              if (!calcError && backendCalc) {
-                // Use calculated values directly for PDF
-                fresh.total_deducciones = backendCalc.totalDeductions;
-                fresh.salud_empleado = backendCalc.healthDeduction;
-                fresh.pension_empleado = backendCalc.pensionDeduction;
-                fresh.neto_pagado = backendCalc.netPay;
-                fresh.total_devengado = backendCalc.grossPay;
-                fresh.auxilio_transporte = backendCalc.transportAllowance;
-                console.log('🔧 Usando cálculo directo para PDF debido a is_stale persistente');
-              }
-            }
-            
-            payrollData = fresh;
-            console.log('💰 Usando valores de BD para PDF - Total deducciones:', fresh.total_deducciones, 'Neto pagado:', fresh.neto_pagado);
-          }
-        } catch (staleErr) {
-          console.error('❌ Error en re-liquidación puntual para PDF:', staleErr);
-          // Continue with current data but log the issue
-          console.warn('⚠️ Continuando con datos actuales de BD (posiblemente obsoletos)');
-        }
+        console.log('ℹ️ Payroll is_stale=true. Generando PDF usando estrictamente valores actuales de BD (sin re-liquidación).');
       }
       
       // ✅ Confiar en valores de BD para el PDF
@@ -303,70 +200,9 @@ serve(async (req) => {
       fileNameBase = `comprobante-${(data.employees.nombre || 'empleado').replace(/\s+/g, '-')}`;
       console.log('✅ Payroll data fetched by period/employee successfully');
 
-      // 🔎 Si el registro está is_stale, forzar re-liquidación puntual del empleado para el período
+      // 🔎 Registro is_stale: NO re-liquidar. Respetar valores persistidos de BD.
       if (data.is_stale === true) {
-        console.log('♻️ Payroll is_stale=true (period+employee). Forzando re-liquidación puntual para PDF...');
-        try {
-          const invocation = await supabase.functions.invoke('reliquidate-period-adjustments', {
-            body: {
-              periodId: data.period_id,
-              affectedEmployeeIds: [data.employee_id],
-              justification: 'Auto-reliquidación al generar comprobante (period+employee)',
-              options: {
-                reliquidateScope: 'affected',
-                regenerateVouchers: false,
-                sendEmails: false
-              }
-            },
-            headers: { Authorization: authHeader }
-          });
-          if ((invocation as any).error) {
-            console.warn('⚠️ Error invocando re-liquidación puntual:', (invocation as any).error);
-          } else {
-            console.log('✅ Re-liquidación puntual realizada. Releyendo nómina fresca...');
-            const { data: fresh, error: refetchErr } = await supabase
-              .from('payrolls')
-              .select(`
-                *,
-                employees!inner(
-                  id,
-                  nombre,
-                  apellido,
-                  cedula,
-                  cargo,
-                  eps,
-                  afp,
-                  salario_base,
-                  estado
-                ),
-                payroll_periods_real!inner(
-                  id,
-                  periodo,
-                  fecha_inicio,
-                  fecha_fin,
-                  tipo_periodo
-                ),
-                companies!inner(
-                  id,
-                  razon_social,
-                  nit,
-                  direccion,
-                  ciudad,
-                  telefono,
-                  email,
-                  logo_url
-                )
-              `)
-              .eq('period_id', requestBody.periodId)
-              .eq('employee_id', requestBody.employeeId)
-              .single();
-            if (!refetchErr && fresh) {
-              payrollData = fresh;
-            }
-          }
-        } catch (staleErr) {
-          console.warn('⚠️ Falló re-liquidación puntual para PDF (continuando con BD actual):', staleErr);
-        }
+        console.log('ℹ️ Payroll is_stale=true (period+employee). Generando PDF con valores actuales de BD sin re-cálculo.');
       }
 
       // ✅ Confiar en valores de BD para el PDF

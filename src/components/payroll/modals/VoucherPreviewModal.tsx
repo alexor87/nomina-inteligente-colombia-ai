@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CustomModal, CustomModalHeader, CustomModalTitle } from '@/components/ui/custom-modal';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -7,6 +7,7 @@ import { PayrollEmployee } from '@/types/payroll';
 import { formatCurrency } from '@/lib/utils';
 import { FileText, Download, X, Loader2, CheckCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface VoucherPreviewModalProps {
   isOpen: boolean;
@@ -42,6 +43,47 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
   const { toast } = useToast();
+
+  // DB payroll record fetched to ensure preview uses persisted values
+  const [dbPayroll, setDbPayroll] = useState<any | null>(null);
+  const [isLoadingDb, setIsLoadingDb] = useState<boolean>(false);
+
+  useEffect(() => {
+    const fetchFromDb = async () => {
+      if (!isOpen) return;
+      try {
+        setIsLoadingDb(true);
+        if (payrollId) {
+          console.log('🔎 VoucherPreviewModal: fetching payroll by payrollId', payrollId);
+          const { data, error } = await supabase
+            .from('payrolls')
+            .select('*')
+            .eq('id', payrollId)
+            .maybeSingle();
+          if (error) throw error;
+          setDbPayroll(data);
+        } else if (periodId && employee?.id) {
+          console.log('🔎 VoucherPreviewModal: fetching payroll by periodId+employeeId', periodId, employee.id);
+          const { data, error } = await supabase
+            .from('payrolls')
+            .select('*')
+            .eq('period_id', periodId)
+            .eq('employee_id', employee.id)
+            .maybeSingle();
+          if (error) throw error;
+          setDbPayroll(data);
+        } else {
+          setDbPayroll(null);
+        }
+      } catch (err) {
+        console.error('❌ Error fetching payroll for preview:', err);
+        setDbPayroll(null);
+      } finally {
+        setIsLoadingDb(false);
+      }
+    };
+    fetchFromDb();
+  }, [isOpen, payrollId, periodId, employee?.id]);
 
   const handleDownloadVoucher = async () => {
     if (!employee || !period) {
@@ -240,21 +282,21 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
     }
   };
 
-  // Use actual historical values from the liquidated data
-  const salarioBase = Number(employee.baseSalary) || 0;
-  const diasTrabajados = Number(employee.workedDays) || 30;
-  const salarioNeto = Number(employee.netPay) || 0;
-  const totalDeducciones = Number(employee.deductions) || 0;
-  const horasExtra = Number(employee.extraHours) || 0;
-  const bonificaciones = Number(employee.bonuses) || 0;
-  const subsidioTransporte = Number(employee.transportAllowance) || 0;
+  // Prefer values persisted in DB; fallback to provided employee snapshot
+  const salarioBase = dbPayroll ? Number(dbPayroll.salario_base) || 0 : Number(employee.baseSalary) || 0;
+  const diasTrabajados = dbPayroll ? Number(dbPayroll.dias_trabajados) || 30 : Number(employee.workedDays) || 30;
+  const salarioNeto = dbPayroll ? Number(dbPayroll.neto_pagado) || 0 : Number(employee.netPay) || 0;
+  const totalDeducciones = dbPayroll ? Number(dbPayroll.total_deducciones) || 0 : Number(employee.deductions) || 0;
+  const horasExtra = dbPayroll ? Number((dbPayroll as any).horas_extra ?? (dbPayroll as any).horas_extras) || 0 : Number(employee.extraHours) || 0;
+  const bonificaciones = dbPayroll ? Number((dbPayroll as any).bonificaciones ?? 0) : Number(employee.bonuses) || 0;
+  const subsidioTransporte = dbPayroll ? Number((dbPayroll as any).auxilio_transporte ?? (dbPayroll as any).subsidio_transporte ?? 0) : Number(employee.transportAllowance) || 0;
   
-  // Use actual historical deduction values instead of calculating with fixed percentages
-  const saludEmpleado = Number(employee.healthDeduction) || 0;
-  const pensionEmpleado = Number(employee.pensionDeduction) || 0;
+  // Use historical deduction values from DB when available
+  const saludEmpleado = dbPayroll ? Number((dbPayroll as any).salud_empleado) || 0 : Number(employee.healthDeduction) || 0;
+  const pensionEmpleado = dbPayroll ? Number((dbPayroll as any).pension_empleado) || 0 : Number(employee.pensionDeduction) || 0;
   
   // Calculate actual percentages based on historical data (for display purposes)
-  const ibc = Number(employee.ibc) || salarioBase;
+  const ibc = dbPayroll ? Number((dbPayroll as any).ibc ?? (dbPayroll as any).salario_base) || salarioBase : Number(employee.ibc) || salarioBase;
   const saludPorcentaje = ibc > 0 ? (saludEmpleado / ibc * 100).toFixed(1) : '4.0';
   const pensionPorcentaje = ibc > 0 ? (pensionEmpleado / ibc * 100).toFixed(1) : '4.0';
   
