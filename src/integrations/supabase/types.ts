@@ -585,6 +585,57 @@ export type Database = {
           },
         ]
       }
+      employee_identity_ledger: {
+        Row: {
+          apellido: string | null
+          cargo: string | null
+          cedula: string | null
+          company_id: string
+          created_at: string
+          effective_at: string
+          email: string | null
+          employee_id: string
+          estado: string | null
+          id: string
+          is_deleted: boolean
+          nombre: string | null
+          source: string
+          tipo_documento: string | null
+        }
+        Insert: {
+          apellido?: string | null
+          cargo?: string | null
+          cedula?: string | null
+          company_id: string
+          created_at?: string
+          effective_at?: string
+          email?: string | null
+          employee_id: string
+          estado?: string | null
+          id?: string
+          is_deleted?: boolean
+          nombre?: string | null
+          source?: string
+          tipo_documento?: string | null
+        }
+        Update: {
+          apellido?: string | null
+          cargo?: string | null
+          cedula?: string | null
+          company_id?: string
+          created_at?: string
+          effective_at?: string
+          email?: string | null
+          employee_id?: string
+          estado?: string | null
+          id?: string
+          is_deleted?: boolean
+          nombre?: string | null
+          source?: string
+          tipo_documento?: string | null
+        }
+        Relationships: []
+      }
       employee_imports: {
         Row: {
           company_id: string
@@ -2532,7 +2583,9 @@ export type Database = {
         Returns: string
       }
       get_employee_identity_for_period: {
-        Args: { p_employee_ids: string[]; p_period_id: string }
+        Args:
+          | { p_employee_ids: string[]; p_period_id: string }
+          | { p_employee_ids: string[]; p_period_id: string }
         Returns: {
           apellido: string
           cedula: string
