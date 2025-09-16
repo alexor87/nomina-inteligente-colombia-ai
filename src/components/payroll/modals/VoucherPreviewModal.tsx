@@ -282,21 +282,21 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
     }
   };
 
-  // Prefer values persisted in DB; fallback to provided employee snapshot
-  const salarioBase = dbPayroll ? Number(dbPayroll.salario_base) || 0 : Number(employee.baseSalary) || 0;
-  const diasTrabajados = dbPayroll ? Number(dbPayroll.dias_trabajados) || 30 : Number(employee.workedDays) || 30;
-  const salarioNeto = dbPayroll ? Number(dbPayroll.neto_pagado) || 0 : Number(employee.netPay) || 0;
-  const totalDeducciones = dbPayroll ? Number(dbPayroll.total_deducciones) || 0 : Number(employee.deductions) || 0;
-  const horasExtra = dbPayroll ? Number((dbPayroll as any).horas_extra ?? (dbPayroll as any).horas_extras) || 0 : Number(employee.extraHours) || 0;
-  const bonificaciones = dbPayroll ? Number((dbPayroll as any).bonificaciones ?? 0) : Number(employee.bonuses) || 0;
-  const subsidioTransporte = dbPayroll ? Number((dbPayroll as any).auxilio_transporte ?? (dbPayroll as any).subsidio_transporte ?? 0) : Number(employee.transportAllowance) || 0;
+  // Mostrar EXACTAMENTE lo que viene en el objeto employee (vista previa original)
+  const salarioBase = Number(employee.baseSalary) || 0;
+  const diasTrabajados = Number(employee.workedDays) || 30;
+  const salarioNeto = Number(employee.netPay) || 0;
+  const totalDeducciones = Number(employee.deductions) || 0;
+  const horasExtra = Number(employee.extraHours) || 0;
+  const bonificaciones = Number(employee.bonuses) || 0;
+  const subsidioTransporte = Number(employee.transportAllowance) || 0;
   
-  // Use historical deduction values from DB when available
-  const saludEmpleado = dbPayroll ? Number((dbPayroll as any).salud_empleado) || 0 : Number(employee.healthDeduction) || 0;
-  const pensionEmpleado = dbPayroll ? Number((dbPayroll as any).pension_empleado) || 0 : Number(employee.pensionDeduction) || 0;
+  // Deducciones históricas desde el snapshot del empleado (no forzar DB aquí)
+  const saludEmpleado = Number(employee.healthDeduction) || 0;
+  const pensionEmpleado = Number(employee.pensionDeduction) || 0;
   
-  // Calculate actual percentages based on historical data (for display purposes)
-  const ibc = dbPayroll ? Number((dbPayroll as any).ibc ?? (dbPayroll as any).salario_base) || salarioBase : Number(employee.ibc) || salarioBase;
+  // IBC desde el snapshot (coincidir con la vista previa original)
+  const ibc = Number(employee.ibc) || salarioBase;
   const saludPorcentaje = ibc > 0 ? (saludEmpleado / ibc * 100).toFixed(1) : '4.0';
   const pensionPorcentaje = ibc > 0 ? (pensionEmpleado / ibc * 100).toFixed(1) : '4.0';
   
