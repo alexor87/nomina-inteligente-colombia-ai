@@ -535,33 +535,60 @@ export class PeriodVersionComparisonService {
       missing: missingIds.length 
     });
     
-    // Database fallback for missing employee data
+    // Database fallback for missing employee data (RPC first, then direct query)
     if (missingIds.length > 0) {
       try {
         const { supabase } = await import('@/integrations/supabase/client');
-        
-        console.log(`🔍 [Employee Identity] Direct DB query for ${missingIds.length} missing IDs`);
-        
-        const { data: employees, error } = await supabase
-          .from('employees')
-          .select('id, nombre, apellido, tipo_documento, cedula')
-          .in('id', missingIds);
 
-        if (error) {
-          console.warn('⚠️ [Employee Identity] DB query error:', error);
-        } else if (employees && employees.length > 0) {
-          employees.forEach((emp: any) => {
-            employeeMap.set(emp.id, {
-              nombre: emp.nombre || '',
-              apellido: emp.apellido || '',
-              cedula: emp.cedula || 'N/A',
-              tipo_documento: emp.tipo_documento || 'CC',
-            });
+        // 1) Try secure RPC bound to the period/company context
+        if (periodId) {
+          console.log(`🔍 [Employee Identity] RPC get_employee_identity_for_period for ${missingIds.length} IDs`);
+          const { data: rpcData, error: rpcError } = await (supabase as any).rpc('get_employee_identity_for_period', {
+            p_period_id: periodId,
+            p_employee_ids: missingIds,
           });
-          console.log(`✅ [Employee Identity] Resolved ${employees.length} employees from direct DB`);
+
+          if (rpcError) {
+            console.warn('⚠️ [Employee Identity] RPC error:', rpcError);
+          } else if (rpcData && rpcData.length > 0) {
+            rpcData.forEach((emp: any) => {
+              const key = emp.employee_id || emp.id; // RPC returns employee_id
+              employeeMap.set(key, {
+                nombre: emp.nombre || '',
+                apellido: emp.apellido || '',
+                cedula: emp.cedula || 'N/A',
+                tipo_documento: emp.tipo_documento || 'CC',
+              });
+            });
+            console.log(`✅ [Employee Identity] Resolved ${rpcData.length} via RPC`);
+          }
+        }
+
+        // 2) For any still-missing IDs, try direct SELECT (RLS will enforce company access)
+        const stillMissing = missingIds.filter(id => !employeeMap.has(id));
+        if (stillMissing.length > 0) {
+          console.log(`🔍 [Employee Identity] Direct DB query for ${stillMissing.length} remaining IDs`);
+          const { data: employees, error } = await supabase
+            .from('employees')
+            .select('id, nombre, apellido, tipo_documento, cedula')
+            .in('id', stillMissing);
+
+          if (error) {
+            console.warn('⚠️ [Employee Identity] DB query error:', error);
+          } else if (employees && employees.length > 0) {
+            employees.forEach((emp: any) => {
+              employeeMap.set(emp.id, {
+                nombre: emp.nombre || '',
+                apellido: emp.apellido || '',
+                cedula: emp.cedula || 'N/A',
+                tipo_documento: emp.tipo_documento || 'CC',
+              });
+            });
+            console.log(`✅ [Employee Identity] Resolved ${employees.length} employees from direct DB`);
+          }
         }
       } catch (error) {
-        console.warn('⚠️ [Employee Identity] DB query exception:', error);
+        console.warn('⚠️ [Employee Identity] Identity resolution exception:', error);
       }
     }
     

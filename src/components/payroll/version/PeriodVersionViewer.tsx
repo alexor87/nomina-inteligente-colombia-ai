@@ -190,27 +190,18 @@ export const PeriodVersionViewer: React.FC<PeriodVersionViewerProps> = ({
   const repairIdentities = async () => {
     try {
       setRepairing(true);
-      const { supabase } = await import('@/integrations/supabase/client');
-      const { data, error } = await (supabase as any).rpc('backfill_version_employee_identity', {
-        p_period_id: periodId,
-      });
-
-      if (error) {
-        console.error('❌ Error repairing identities:', error);
-        toast({
-          title: 'Error',
-          description: 'No se pudieron reparar las identidades de empleados',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      toast({
-        title: 'Identidades reparadas',
-        description: `Versiones actualizadas: ${data?.versions_updated ?? 0}. Empleados procesados: ${data?.employees_processed ?? 0}.`,
-      });
-
       await loadComparison();
+      toast({
+        title: 'Identidades actualizadas',
+        description: 'Se reintentó la resolución de nombres usando el período actual.',
+      });
+    } catch (error) {
+      console.error('❌ Error refreshing identities:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudieron actualizar las identidades de empleados',
+        variant: 'destructive',
+      });
     } finally {
       setRepairing(false);
     }
