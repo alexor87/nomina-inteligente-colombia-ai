@@ -542,8 +542,8 @@ export class PeriodVersionComparisonService {
 
         // 1) Try secure RPC bound to the period/company context
         if (periodId) {
-          console.log(`🔍 [Employee Identity] RPC get_employee_identity_for_period for ${missingIds.length} IDs`);
-          const { data: rpcData, error: rpcError } = await (supabase as any).rpc('get_employee_identity_for_period', {
+          console.log(`🔍 [Employee Identity] RPC get_employee_identity_for_period_v2 for ${missingIds.length} IDs`);
+          const { data: rpcData, error: rpcError } = await (supabase as any).rpc('get_employee_identity_for_period_v2', {
             p_period_id: periodId,
             p_employee_ids: missingIds,
           });
@@ -552,7 +552,7 @@ export class PeriodVersionComparisonService {
             console.warn('⚠️ [Employee Identity] RPC error:', rpcError);
           } else if (rpcData && rpcData.length > 0) {
             rpcData.forEach((emp: any) => {
-              const key = emp.employee_id || emp.id; // RPC returns employee_id
+              const key = emp.employee_id;
               employeeMap.set(key, {
                 nombre: emp.nombre || '',
                 apellido: emp.apellido || '',
