@@ -81,8 +81,20 @@ export const PayrollEditProvider: React.FC<PayrollEditProviderProps> = ({ childr
         (employeesIdentity || []).map(emp => [emp.id, emp])
       );
 
+      // Embed identity directly into each payroll item for self-contained snapshots
+      const enrichedPayrolls = (payrolls || []).map(p => {
+        const emp = employeeIdentityMap.get(p.employee_id);
+        return {
+          ...p,
+          employee_nombre: emp?.nombre ?? null,
+          employee_apellido: emp?.apellido ?? null,
+          employee_cedula: emp?.cedula ?? null,
+          employee_tipo_documento: emp?.tipo_documento ?? null,
+        };
+      });
+
       const snapshotData = {
-        payrolls: payrolls || [],
+        payrolls: enrichedPayrolls,
         employeeIdentity: Object.fromEntries(employeeIdentityMap),
         timestamp: new Date().toISOString()
       };
@@ -275,8 +287,20 @@ export const PayrollEditProvider: React.FC<PayrollEditProviderProps> = ({ childr
         (employeesIdentity || []).map(emp => [emp.id, emp])
       );
 
+      // Embed identity directly into each payroll item for self-contained snapshots
+      const enrichedPayrolls = (updatedPayrolls || []).map(p => {
+        const emp = employeeIdentityMap.get(p.employee_id);
+        return {
+          ...p,
+          employee_nombre: emp?.nombre ?? null,
+          employee_apellido: emp?.apellido ?? null,
+          employee_cedula: emp?.cedula ?? null,
+          employee_tipo_documento: emp?.tipo_documento ?? null,
+        };
+      });
+
       const newSnapshotData = {
-        payrolls: updatedPayrolls || [],
+        payrolls: enrichedPayrolls,
         employeeIdentity: Object.fromEntries(employeeIdentityMap),
         compositionChanges: editMode.compositionChanges,
         timestamp: new Date().toISOString()

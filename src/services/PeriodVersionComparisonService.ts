@@ -237,12 +237,14 @@ export class PeriodVersionComparisonService {
 
       // Get employee identity with robust fallback and trimming
       const empInfo = employeeIdentity.get(employeeId);
-      const nameParts = [
-        currentEmp?.nombre ?? initialEmp?.nombre ?? empInfo?.nombre ?? '',
-        currentEmp?.apellido ?? initialEmp?.apellido ?? empInfo?.apellido ?? ''
-      ].filter(Boolean);
-      const assembledName = nameParts.join(' ').trim();
-      const employeeName = assembledName.length > 0 ? assembledName : `Empleado ${employeeId.slice(0, 8)}`;
+      const resolvedNombre = currentEmp?.nombre ?? initialEmp?.nombre ?? empInfo?.nombre ?? '';
+      const resolvedApellido = currentEmp?.apellido ?? initialEmp?.apellido ?? empInfo?.apellido ?? '';
+      const nameParts = [resolvedNombre, resolvedApellido].filter(Boolean);
+      let baseName = nameParts.join(' ').trim();
+      if (changeType === 'employee_removed' && baseName.length === 0) {
+        baseName = 'Empleado eliminado';
+      }
+      const employeeName = baseName.length > 0 ? baseName : `Empleado ${employeeId.slice(0, 8)}`;
       const cedula = currentEmp?.cedula ?? initialEmp?.cedula ?? empInfo?.cedula ?? 'N/A';
       const documentType = (currentEmp as any)?.tipo_documento ?? (initialEmp as any)?.tipo_documento ?? empInfo?.tipo_documento ?? 'CC';
 
@@ -453,9 +455,12 @@ export class PeriodVersionComparisonService {
   private static convertPayrollsToEmployees(payrolls: PayrollSnapshotData[]): EmployeeSnapshotData[] {
     return payrolls.map(payroll => ({
       id: payroll.employee_id,
-      nombre: '', // Will be filled from employee data if needed
-      apellido: '',
-      cedula: '',
+      // Prefer embedded identity fields if present in the payroll snapshot
+      nombre: (payroll as any).employee_nombre ?? (payroll as any).nombre ?? '',
+      apellido: (payroll as any).employee_apellido ?? (payroll as any).apellido ?? '',
+      cedula: (payroll as any).employee_cedula ?? (payroll as any).cedula ?? '',
+      // Also propagate document type if present
+      tipo_documento: (payroll as any).employee_tipo_documento ?? (payroll as any).tipo_documento ?? 'CC',
       salario_base: payroll.salario_base,
       dias_trabajados: payroll.dias_trabajados,
       total_devengado: payroll.total_devengado,
