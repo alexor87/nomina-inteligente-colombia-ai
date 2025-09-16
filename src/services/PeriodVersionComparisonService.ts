@@ -463,30 +463,25 @@ export class PeriodVersionComparisonService {
    * Convert payroll records to employee snapshot format with robust identity handling
    */
   private static convertPayrollsToEmployees(payrolls: PayrollSnapshotData[]): EmployeeSnapshotData[] {
-    return payrolls.map(payroll => {
+    return payrolls.map((payroll) => {
       // Extract identity with multiple fallbacks
       const nombre = (payroll as any).employee_nombre || (payroll as any).nombre || '';
       const apellido = (payroll as any).employee_apellido || (payroll as any).apellido || '';
       const cedula = (payroll as any).employee_cedula || (payroll as any).cedula || '';
       const tipo_documento = (payroll as any).employee_tipo_documento || (payroll as any).tipo_documento || 'CC';
 
+      // Preserve payroll record ID separately to avoid overwriting employee id
+      const { id: payroll_id, ...rest } = payroll as any;
+
       return {
-        id: payroll.employee_id,
+        ...rest,
+        id: payroll.employee_id, // Employee identity key
+        payroll_id, // Keep payroll id for traceability
         nombre,
         apellido,
         cedula,
         tipo_documento,
-        salario_base: payroll.salario_base,
-        dias_trabajados: payroll.dias_trabajados,
-        total_devengado: payroll.total_devengado,
-        total_deducciones: payroll.total_deducciones,
-        neto_pagado: payroll.neto_pagado,
-        ibc: payroll.ibc,
-        salud_empleado: payroll.salud_empleado,
-        pension_empleado: payroll.pension_empleado,
-        auxilio_transporte: payroll.auxilio_transporte,
-        ...payroll // Include any additional fields
-      };
+      } as any;
     });
   }
 
