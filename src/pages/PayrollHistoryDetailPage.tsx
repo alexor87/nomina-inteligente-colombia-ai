@@ -33,6 +33,7 @@ import { AddEmployeeModal } from '@/components/payroll/edit/AddEmployeeModal';
 import { CompositionChangesModal } from '@/components/payroll/edit/CompositionChangesModal';
 import { PeriodVersionViewer } from '@/components/payroll/version/PeriodVersionViewer';
 import { Edit } from 'lucide-react';
+import { StalePayrollAlert } from '@/components/payroll/StalePayrollAlert';
 
 // Use PayrollPeriodData from service instead of local interface
 
@@ -832,6 +833,11 @@ function PayrollHistoryDetailPageContent() {
             </Button>
             
         </div>
+      </div>
+
+      {/* Stale Payroll Alert */}
+      <div className="px-6">
+        <StalePayrollAlert periodId={periodId} />
       </div>
 
       {/* Unified Actions Panel */}

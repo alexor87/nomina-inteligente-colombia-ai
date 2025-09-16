@@ -134,9 +134,74 @@ serve(async (req) => {
       console.log('✅ Payroll data fetched successfully');
       console.log('🔍 Deduction values from DB - Salud:', data.salud_empleado, 'Pensión:', data.pension_empleado);
 
-      // 🔎 Registro marcado como is_stale: NO re-liquidar. Respetar valores persistidos.
+      // FASE 3: Check if payroll is stale and recalculate if needed
       if (data.is_stale === true) {
-        console.log('ℹ️ Payroll is_stale=true. Generando PDF usando estrictamente valores actuales de BD (sin re-liquidación).');
+        console.log('⚠️ Payroll is stale, triggering automatic recalculation...');
+        
+        try {
+          const { data: recalcResult, error: recalcError } = await supabase.functions.invoke(
+            'recalculate-stale-payrolls',
+            {
+              body: {
+                action: 'recalculate_stale_payrolls',
+                data: {
+                  company_id: data.company_id,
+                  period_id: data.period_id
+                }
+              }
+            }
+          );
+
+          if (recalcError) {
+            console.warn('⚠️ Could not recalculate stale payroll, proceeding with current data:', recalcError);
+          } else {
+            console.log('✅ Payroll recalculated successfully:', recalcResult);
+            
+            // Refetch the updated payroll data
+            const { data: updatedPayroll, error: refetchError } = await supabase
+              .from('payrolls')
+              .select(`
+                *,
+                employees!inner(
+                  id,
+                  nombre,
+                  apellido,
+                  cedula,
+                  cargo,
+                  eps,
+                  afp,
+                  salario_base,
+                  estado
+                ),
+                payroll_periods_real!inner(
+                  id,
+                  periodo,
+                  fecha_inicio,
+                  fecha_fin,
+                  tipo_periodo
+                ),
+                companies!inner(
+                  id,
+                  razon_social,
+                  nit,
+                  direccion,
+                  ciudad,
+                  telefono,
+                  email,
+                  logo_url
+                )
+              `)
+              .eq('id', requestBody.payrollId)
+              .single();
+
+            if (!refetchError && updatedPayroll) {
+              payrollData = updatedPayroll;
+              console.log('✅ Using recalculated payroll data for PDF generation');
+            }
+          }
+        } catch (error) {
+          console.warn('⚠️ Recalculation failed, proceeding with current data:', error);
+        }
       }
       
       // ✅ Confiar en valores de BD para el PDF
@@ -200,9 +265,75 @@ serve(async (req) => {
       fileNameBase = `comprobante-${(data.employees.nombre || 'empleado').replace(/\s+/g, '-')}`;
       console.log('✅ Payroll data fetched by period/employee successfully');
 
-      // 🔎 Registro is_stale: NO re-liquidar. Respetar valores persistidos de BD.
+      // FASE 3: Check if payroll is stale and recalculate if needed
       if (data.is_stale === true) {
-        console.log('ℹ️ Payroll is_stale=true (period+employee). Generando PDF con valores actuales de BD sin re-cálculo.');
+        console.log('⚠️ Payroll is stale (period+employee), triggering automatic recalculation...');
+        
+        try {
+          const { data: recalcResult, error: recalcError } = await supabase.functions.invoke(
+            'recalculate-stale-payrolls',
+            {
+              body: {
+                action: 'recalculate_stale_payrolls',
+                data: {
+                  company_id: data.company_id,
+                  period_id: data.period_id
+                }
+              }
+            }
+          );
+
+          if (recalcError) {
+            console.warn('⚠️ Could not recalculate stale payroll, proceeding with current data:', recalcError);
+          } else {
+            console.log('✅ Payroll recalculated successfully:', recalcResult);
+            
+            // Refetch the updated payroll data
+            const { data: updatedPayroll, error: refetchError } = await supabase
+              .from('payrolls')
+              .select(`
+                *,
+                employees!inner(
+                  id,
+                  nombre,
+                  apellido,
+                  cedula,
+                  cargo,
+                  eps,
+                  afp,
+                  salario_base,
+                  estado
+                ),
+                payroll_periods_real!inner(
+                  id,
+                  periodo,
+                  fecha_inicio,
+                  fecha_fin,
+                  tipo_periodo
+                ),
+                companies!inner(
+                  id,
+                  razon_social,
+                  nit,
+                  direccion,
+                  ciudad,
+                  telefono,
+                  email,
+                  logo_url
+                )
+              `)
+              .eq('period_id', requestBody.periodId)
+              .eq('employee_id', requestBody.employeeId)
+              .single();
+
+            if (!refetchError && updatedPayroll) {
+              payrollData = updatedPayroll;
+              console.log('✅ Using recalculated payroll data for PDF generation');
+            }
+          }
+        } catch (error) {
+          console.warn('⚠️ Recalculation failed, proceeding with current data:', error);
+        }
       }
 
       // ✅ Confiar en valores de BD para el PDF

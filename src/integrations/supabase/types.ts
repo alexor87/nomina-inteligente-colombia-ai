@@ -2692,6 +2692,18 @@ export type Database = {
           value_change: number
         }[]
       }
+      get_stale_payrolls_for_company: {
+        Args: { p_company_id: string }
+        Returns: {
+          employee_id: string
+          employee_name: string
+          is_stale: boolean
+          payroll_id: string
+          period_id: string
+          periodo: string
+          updated_at: string
+        }[]
+      }
       get_user_companies_simple: {
         Args: { _user_id?: string }
         Returns: {
