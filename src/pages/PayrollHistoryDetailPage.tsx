@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { XCircle, ArrowLeft, Users, History, RefreshCw } from "lucide-react"
+import { XCircle, ArrowLeft, Users, History, RefreshCw, AlertCircle } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { toast } from "@/hooks/use-toast"
@@ -327,10 +327,12 @@ function PayrollHistoryDetailPageContent() {
       console.log('✅ Loaded employees from payrolls table:', expandedEmployees.length);
       console.log('Sample employee:', expandedEmployees[0]);
       
-      // Auto-recalculate all employees immediately after loading
-      if (expandedEmployees.length > 0) {
+      // Skip auto-recalculation for closed periods to show true DB values
+      if (expandedEmployees.length > 0 && periodData.estado !== 'cerrado') {
         console.log('🔄 Starting immediate backend recalculation...');
         recalculateAllEmployees();
+      } else if (periodData.estado === 'cerrado') {
+        console.log('📋 Período cerrado: mostrando valores históricos de BD sin recálculo automático');
       }
       
     } catch (error) {
@@ -834,6 +836,26 @@ function PayrollHistoryDetailPageContent() {
             
         </div>
       </div>
+
+      {/* Closed Period Alert - show when there are pending adjustments */}
+      {periodData.estado === 'cerrado' && totalPendingCount > 0 && (
+        <div className="px-6">
+          <Alert className="border-orange-500/50 bg-orange-50/50 mb-4">
+            <AlertCircle className="h-4 w-4 text-orange-600" />
+            <AlertDescription className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-orange-900">Período Cerrado</span>
+                <Badge variant="secondary" className="bg-orange-100 text-orange-800 animate-pulse">
+                  {totalPendingCount} ajustes pendientes sin aplicar
+                </Badge>
+              </div>
+              <div className="text-sm text-orange-700">
+                Los ajustes se guardan como pendientes y deben aplicarse manualmente
+              </div>
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
 
       {/* Stale Payroll Alert */}
       <div className="px-6">

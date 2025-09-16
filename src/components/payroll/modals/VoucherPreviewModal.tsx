@@ -282,12 +282,17 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
     }
   };
 
-  // Mostrar EXACTAMENTE lo que viene en el objeto employee (vista previa original)
-  const salarioBase = Number(employee.baseSalary) || 0;
-  const diasTrabajados = Number(employee.workedDays) || 30;
-  const salarioNeto = Number(employee.netPay) || 0;
-  const totalDeducciones = Number(employee.deductions) || 0;
-  const horasExtra = Number(employee.extraHours) || 0;
+  // Show DB values for preview consistency when available
+  // Use dbPayroll values as source of truth for historical data
+  const displayValues = dbPayroll || employee;
+  
+  // Extract display values with fallbacks
+  const salarioBase = Number(displayValues?.salario_base) || Number(employee.baseSalary) || 0;
+  const diasTrabajados = Number(displayValues?.dias_trabajados) || Number(employee.workedDays) || 30;
+  const totalDevengado = Number(displayValues?.total_devengado) || Number(employee.grossPay) || salarioBase;
+  const totalDeducciones = Number(displayValues?.total_deducciones) || Number(employee.deductions) || 0;
+  const salarioNeto = Number(displayValues?.neto_pagado) || Number(employee.netPay) || 0;
+  const horasExtra = Number(displayValues?.horas_extra) || Number(employee.extraHours) || 0;
   const bonificaciones = Number(employee.bonuses) || 0;
   const subsidioTransporte = Number(employee.transportAllowance) || 0;
   
@@ -436,12 +441,16 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
                     <td className="px-4 py-3 text-sm text-gray-900 text-right">{formatCurrency(totalHorasExtra)}</td>
                   </tr>
                 )}
+                 <tr className="bg-blue-50">
+                  <td className="px-4 py-3 text-sm font-semibold text-blue-700">Total Devengado {dbPayroll ? '(DB)' : ''}</td>
+                  <td className="px-4 py-3 text-sm font-semibold text-blue-700 text-right">{formatCurrency(totalDevengado)}</td>
+                </tr>
                 <tr className="bg-red-50">
-                  <td className="px-4 py-3 text-sm font-semibold text-red-700">Total Deducciones</td>
+                  <td className="px-4 py-3 text-sm font-semibold text-red-700">Total Deducciones {dbPayroll ? '(DB)' : ''}</td>
                   <td className="px-4 py-3 text-sm font-semibold text-red-700 text-right">-{formatCurrency(totalDeducciones)}</td>
                 </tr>
                 <tr className="bg-green-50">
-                  <td className="px-4 py-3 text-sm font-semibold text-green-700">NETO A PAGAR</td>
+                  <td className="px-4 py-3 text-sm font-semibold text-green-700">NETO A PAGAR {dbPayroll ? '(DB)' : ''}</td>
                   <td className="px-4 py-3 text-sm font-semibold text-green-700 text-right">{formatCurrency(salarioNeto)}</td>
                 </tr>
               </tbody>
@@ -540,7 +549,7 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
           <div className="text-center text-xs text-gray-600 space-y-1">
             <p>Este documento fue generado con <span className="font-semibold text-blue-800">Nómina Inteligente</span> – Software de Nómina y Seguridad Social</p>
             <p><a href="https://www.nomina.com" className="text-blue-600 hover:underline">www.nomina.com</a></p>
-            <p className="mt-2">Generado el {new Date().toLocaleString('es-CO')} - <span className="text-green-600 font-semibold">Valores Históricos Reales</span></p>
+            <p className="mt-2">Generado el {new Date().toLocaleString('es-CO')} - <span className="text-green-600 font-semibold">Valores {dbPayroll ? 'Históricos de BD' : 'Calculados'}</span></p>
           </div>
         </div>
       </div>

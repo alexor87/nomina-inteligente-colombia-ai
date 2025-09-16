@@ -120,29 +120,19 @@ export const DevengoModal: React.FC<DevengoModalProps> = ({
   const handleUpdate = async () => {
     setIsSubmitting(true);
     try {
-      // ✅ Ensure all required fields are present
-      const updateData: CreateNovedadData = {
-        ...formData,
-        company_id: companyId, // ✅ Ensure company_id is always present
-        valor: formData.valor || 0
-      };
-      
-      const result = await NovedadesEnhancedService.updateNovedad(formData.empleado_id, updateData);
-      
-      if (result) {
-        toast({
-          title: "✅ Devengo actualizado",
-          description: "El devengo se ha actualizado correctamente",
-          className: "border-green-200 bg-green-50"
-        });
-        onSuccess?.();
-        onClose();
-      }
-    } catch (error: any) {
-      console.error('Error updating devengo:', error);
+      // ❌ DISABLED: This modal is only for creating new novedades
+      // Update functionality should be handled by a separate modal with proper novedad ID
+      console.error('❌ Update not supported in DevengoModal - use dedicated edit modal');
       toast({
         title: "❌ Error",
-        description: error.message || "No se pudo actualizar el devengo",
+        description: "Esta modal solo permite crear nuevos devengos. Use el modal de edición para actualizar.",
+        variant: "destructive"
+      });
+    } catch (error: any) {
+      console.error('Error in disabled update function:', error);
+      toast({
+        title: "❌ Error",
+        description: error.message || "Función de actualización deshabilitada",
         variant: "destructive"
       });
     } finally {
