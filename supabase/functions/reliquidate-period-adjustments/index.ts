@@ -208,10 +208,8 @@ Deno.serve(async (req) => {
           updated_at: new Date().toISOString()
         };
 
-        // Only set is_stale: false for payroll history adjustments
-        if (source === 'payroll_history') {
-          updateData.is_stale = false;
-        }
+        // Always set is_stale: false when we successfully update the payroll
+        updateData.is_stale = false;
 
         const { error: updateError } = await supabase
           .from('payrolls')

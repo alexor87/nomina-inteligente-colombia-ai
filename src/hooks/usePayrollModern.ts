@@ -35,14 +35,14 @@ export const usePayrollModern = (periodId: string) => {
       const employeesData = await EmployeeUnifiedService.getEmployeesForPeriod(periodId);
       console.log('✅ Empleados calculados:', employeesData.length);
       
-      // 2. Automáticamente actualizar registros en BD
+      // 2. Automáticamente actualizar registros en BD (marcando is_stale=false)
       console.log('🔄 Actualizando automáticamente registros en BD...');
       await EmployeeUnifiedService.updatePayrollRecords(periodId);
-      console.log('✅ Registros actualizados automáticamente');
+      console.log('✅ Registros actualizados automáticamente (is_stale=false)');
       
       // 3. Cargar datos actualizados de la BD
       const updatedEmployees = await EmployeeUnifiedService.getEmployeesForPeriod(periodId);
-      
+
       setEmployees(updatedEmployees);
       
       // Calcular totales
@@ -57,7 +57,7 @@ export const usePayrollModern = (periodId: string) => {
       
       toast({
         title: "Nómina actualizada",
-        description: `${updatedEmployees.length} empleados calculados automáticamente`
+        description: `${updatedEmployees.length} empleados calculados y sincronizados automáticamente`
       });
       
     } catch (err) {

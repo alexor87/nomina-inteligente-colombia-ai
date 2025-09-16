@@ -153,6 +153,7 @@ export class EmployeeUnifiedService {
             pension_empleado: employee.pensionDeduction,
             total_deducciones: employee.totalDeductions,
             neto_pagado: employee.netPay,
+            is_stale: false, // Marcar como actualizado
             updated_at: new Date().toISOString()
           })
           .eq('employee_id', employee.id)
