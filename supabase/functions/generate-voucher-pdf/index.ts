@@ -476,14 +476,33 @@ async function generateProfessionalVoucherPDF(payrollData: any): Promise<Uint8Ar
   const bonuses = Number(payrollData.bonificaciones ?? payrollData.bonuses ?? 0);
   const ibc = Number((payrollData.ibc ?? payrollData.ibc_salud ?? payrollData.ibcSalud ?? employee.salario_base) || 0);
 
-  // USAR VALORES REALES DE DEDUCCIONES DESDE LA BD
+  // OBTENER TODOS LOS TIPOS DE DEDUCCIONES DESDE LA BD
   const saludEmpleado = Number(payrollData.salud_empleado) || 0;
   const pensionEmpleado = Number(payrollData.pension_empleado) || 0;
+  const retencionFuente = Number(payrollData.retencion_fuente) || 0;
+  const otrasDeducciones = Number(payrollData.otras_deducciones) || 0;
+  const fondoSolidaridad = Number(payrollData.fondo_solidaridad) || 0;
+  const prestamos = Number(payrollData.prestamos) || 0;
+  const embargos = Number(payrollData.embargos) || 0;
+  const descuentosVarios = Number(payrollData.descuentos_varios) || 0;
+  const otrosDescuentos = Number(payrollData.otros_descuentos) || 0;
+  
+  // Calcular total de deducciones individuales
+  const calculatedTotalDeducciones = saludEmpleado + pensionEmpleado + retencionFuente + 
+    otrasDeducciones + fondoSolidaridad + prestamos + embargos + descuentosVarios + otrosDescuentos;
+  
   const saludPorcentaje = ibc > 0 && saludEmpleado > 0 ? (Math.round((saludEmpleado / ibc) * 1000) / 10).toFixed(1) : '4.0';
   const pensionPorcentaje = ibc > 0 && pensionEmpleado > 0 ? (Math.round((pensionEmpleado / ibc) * 1000) / 10).toFixed(1) : '4.0';
   
   console.log('💰 Using real deduction values from DB - Salud:', saludEmpleado, 'Pensión:', pensionEmpleado);
+  console.log('💰 Other deductions - Retención:', retencionFuente, 'Otras:', otrasDeducciones, 'Fondo Solidaridad:', fondoSolidaridad);
+  console.log('💰 Calculated total deductions:', calculatedTotalDeducciones, 'vs DB total:', totalDeducciones);
   console.log('💰 PDF will use - Total deducciones:', totalDeducciones, 'Neto pagado:', netoPagado);
+  
+  // Verificar discrepancias
+  if (Math.abs(calculatedTotalDeducciones - totalDeducciones) > 1) {
+    console.warn('⚠️ Discrepancia en deducciones - Calculado:', calculatedTotalDeducciones, 'DB:', totalDeducciones);
+  }
 
   // Cálculos auxiliares (sin cambios funcionales)
   const salarioProporcional = Math.round((salarioBase * diasTrabajados) / 30);
@@ -622,33 +641,96 @@ async function generateProfessionalVoucherPDF(payrollData: any): Promise<Uint8Ar
   drawSeparator(yPos);
   yPos += 12;
 
-  // Sección: Deducciones - USANDO VALORES REALES DE LA BD
+  // Sección: Deducciones - MOSTRAR TODAS LAS DEDUCCIONES NO CERO
   if (totalDeducciones > 0) {
     sectionTitle('DEDUCCIONES');
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
 
-    // Mostrar deducciones reales de la base de datos
+    // Mostrar todas las deducciones no cero
     if (saludEmpleado > 0) {
       doc.setFont('helvetica', 'bold');
       doc.text(normalizeText(`Salud (${saludPorcentaje}%):`), margin, yPos);
       doc.setFont('helvetica', 'normal');
-      doc.text(formatCurrency(saludEmpleado), margin + 40, yPos);
+      doc.text(formatCurrency(saludEmpleado), margin + 60, yPos);
       yPos += lineHeight;
     }
 
     if (pensionEmpleado > 0) {
       doc.setFont('helvetica', 'bold');
-      doc.text(normalizeText(`Pensión (${pensionPorcentaje}%):`), margin, yPos);
+      doc.text(normalizeText(`Pension (${pensionPorcentaje}%):`), margin, yPos);
       doc.setFont('helvetica', 'normal');
-      doc.text(formatCurrency(pensionEmpleado), margin + 40, yPos);
+      doc.text(formatCurrency(pensionEmpleado), margin + 60, yPos);
       yPos += lineHeight;
     }
 
+    if (retencionFuente > 0) {
+      doc.setFont('helvetica', 'bold');
+      doc.text(normalizeText('Retencion en la Fuente:'), margin, yPos);
+      doc.setFont('helvetica', 'normal');
+      doc.text(formatCurrency(retencionFuente), margin + 60, yPos);
+      yPos += lineHeight;
+    }
+
+    if (fondoSolidaridad > 0) {
+      doc.setFont('helvetica', 'bold');
+      doc.text(normalizeText('Fondo de Solidaridad:'), margin, yPos);
+      doc.setFont('helvetica', 'normal');
+      doc.text(formatCurrency(fondoSolidaridad), margin + 60, yPos);
+      yPos += lineHeight;
+    }
+
+    if (prestamos > 0) {
+      doc.setFont('helvetica', 'bold');
+      doc.text(normalizeText('Prestamos:'), margin, yPos);
+      doc.setFont('helvetica', 'normal');
+      doc.text(formatCurrency(prestamos), margin + 60, yPos);
+      yPos += lineHeight;
+    }
+
+    if (embargos > 0) {
+      doc.setFont('helvetica', 'bold');
+      doc.text(normalizeText('Embargos:'), margin, yPos);
+      doc.setFont('helvetica', 'normal');
+      doc.text(formatCurrency(embargos), margin + 60, yPos);
+      yPos += lineHeight;
+    }
+
+    if (descuentosVarios > 0) {
+      doc.setFont('helvetica', 'bold');
+      doc.text(normalizeText('Descuentos Varios:'), margin, yPos);
+      doc.setFont('helvetica', 'normal');
+      doc.text(formatCurrency(descuentosVarios), margin + 60, yPos);
+      yPos += lineHeight;
+    }
+
+    if (otrosDescuentos > 0) {
+      doc.setFont('helvetica', 'bold');
+      doc.text(normalizeText('Otros Descuentos:'), margin, yPos);
+      doc.setFont('helvetica', 'normal');
+      doc.text(formatCurrency(otrosDescuentos), margin + 60, yPos);
+      yPos += lineHeight;
+    }
+
+    if (otrasDeducciones > 0) {
+      doc.setFont('helvetica', 'bold');
+      doc.text(normalizeText('Otras Deducciones:'), margin, yPos);
+      doc.setFont('helvetica', 'normal');
+      doc.text(formatCurrency(otrasDeducciones), margin + 60, yPos);
+      yPos += lineHeight;
+    }
+
+    // Línea separadora antes del total
+    yPos += 2;
+    drawSeparator(yPos);
+    yPos += 6;
+
+    // Total de deducciones
     doc.setFont('helvetica', 'bold');
-    doc.text(normalizeText('TOTAL:'), margin, yPos);
-    doc.text(formatCurrency(totalDeducciones), margin + 40, yPos);
+    doc.setFontSize(10);
+    doc.text(normalizeText('TOTAL DEDUCCIONES:'), margin, yPos);
+    doc.text(formatCurrency(totalDeducciones), margin + 60, yPos);
     yPos += 14;
 
     drawSeparator(yPos);
