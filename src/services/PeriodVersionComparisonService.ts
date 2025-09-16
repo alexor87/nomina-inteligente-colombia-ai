@@ -423,9 +423,24 @@ export class PeriodVersionComparisonService {
    * Extract employees from snapshot, handling both old and new formats
    */
   private static extractEmployeesFromSnapshot(snapshot: PeriodSnapshot): EmployeeSnapshotData[] {
-    // If the snapshot has the new payrolls format, convert it
+    // If the snapshot has the new payrolls format, convert it and merge with identity data
     if (snapshot.payrolls && snapshot.payrolls.length > 0) {
-      return this.convertPayrollsToEmployees(snapshot.payrolls);
+      const employees = this.convertPayrollsToEmployees(snapshot.payrolls);
+      
+      // Merge with employeeIdentity data if available
+      if (snapshot.employeeIdentity) {
+        employees.forEach(emp => {
+          const identity = snapshot.employeeIdentity![emp.id];
+          if (identity) {
+            emp.nombre = identity.nombre || '';
+            emp.apellido = identity.apellido || '';
+            emp.cedula = identity.cedula || '';
+            (emp as any).tipo_documento = identity.tipo_documento || 'CC';
+          }
+        });
+      }
+      
+      return employees;
     }
     
     // Otherwise use the old employees format
@@ -458,7 +473,7 @@ export class PeriodVersionComparisonService {
   private static employeeIdentityCache = new Map<string, { nombre: string; apellido: string; cedula: string; tipo_documento: string }>();
 
   /**
-   * Get employee identity using enriched snapshot data first, then secure RPC, then database fallback
+   * Get employee identity using snapshot data first, then database fallback
    */
   private static async getEmployeeIdentity(
     employeeIds: string[],
@@ -474,7 +489,7 @@ export class PeriodVersionComparisonService {
     
     const missingIds: string[] = [];
     
-    // First, use enriched snapshot data
+    // First, use snapshot data (most reliable source)
     for (const employeeId of employeeIds) {
       const fromCurrent = currentSnapshotIdentity[employeeId];
       const fromInitial = initialSnapshotIdentity[employeeId];
@@ -487,6 +502,7 @@ export class PeriodVersionComparisonService {
           cedula: empData.cedula || 'N/A',
           tipo_documento: empData.tipo_documento || 'CC',
         });
+        console.log(`✅ [Employee Identity] From snapshot: ${empData.nombre} ${empData.apellido} (${empData.cedula})`);
       } else {
         missingIds.push(employeeId);
       }
@@ -498,79 +514,12 @@ export class PeriodVersionComparisonService {
       missing: missingIds.length 
     });
     
-    // Secure RPC fallback for missing employee data
-    if (missingIds.length > 0 && periodId) {
-      try {
-        const { supabase } = await import('@/integrations/supabase/client');
-        
-        console.log(`🔍 [Employee Identity] Using RPC for ${missingIds.length} missing IDs in period ${periodId}`);
-        
-        // Try RPC v2 first (includes tipo_documento), then fallback to v1
-        let resolvedCount = 0;
-        try {
-          const { data: identitiesV2, error: errorV2 } = await (supabase as any).rpc('get_employee_identity_for_period_v2', {
-            p_period_id: periodId,
-            p_employee_ids: missingIds
-          });
-
-          if (!errorV2 && identitiesV2 && identitiesV2.length > 0) {
-            identitiesV2.forEach((emp: any) => {
-              const cacheKey = `${periodId}-${emp.employee_id}`;
-              const empData = {
-                nombre: emp.nombre || '',
-                apellido: emp.apellido || '',
-                cedula: emp.cedula || 'N/A',
-                tipo_documento: emp.tipo_documento || 'CC'
-              };
-              employeeMap.set(emp.employee_id, empData);
-              this.employeeIdentityCache.set(cacheKey, empData);
-            });
-            resolvedCount = identitiesV2.length;
-            console.log(`✅ [Employee Identity] Resolved ${resolvedCount} via RPC v2`);
-          }
-        } catch (e) {
-          console.warn('⚠️ [Employee Identity] RPC v2 not available or failed, will try v1:', e);
-        }
-
-        // If still missing, try legacy RPC v1
-        if (resolvedCount === 0) {
-          const { data: identities, error } = await supabase.rpc('get_employee_identity_for_period', {
-            p_period_id: periodId,
-            p_employee_ids: missingIds
-          });
-
-          if (!error && identities && identities.length > 0) {
-            identities.forEach((emp: any) => {
-              const cacheKey = `${periodId}-${emp.employee_id}`;
-              const empData = {
-                nombre: emp.nombre || '',
-                apellido: emp.apellido || '',
-                cedula: emp.cedula || 'N/A',
-                tipo_documento: 'CC' // RPC v1 doesn't return this field
-              };
-              employeeMap.set(emp.employee_id, empData);
-              this.employeeIdentityCache.set(cacheKey, empData);
-            });
-            console.log(`✅ [Employee Identity] Resolved ${identities.length} employees via RPC v1`);
-
-            // Update missingIds to remove resolved ones
-            const resolvedIds = identities.map((emp: any) => emp.employee_id);
-            missingIds.splice(0, missingIds.length, ...missingIds.filter(id => !resolvedIds.includes(id)));
-          } else if (error) {
-            console.warn('⚠️ [Employee Identity] RPC v1 error:', error);
-          }
-        }
-      } catch (error) {
-        console.warn('⚠️ [Employee Identity] RPC exception:', error);
-      }
-    }
-
-    // Final database fallback for any remaining missing employee data
+    // Database fallback for missing employee data
     if (missingIds.length > 0) {
       try {
         const { supabase } = await import('@/integrations/supabase/client');
         
-        console.log(`🔍 [Employee Identity] Direct DB query for ${missingIds.length} remaining IDs`);
+        console.log(`🔍 [Employee Identity] Direct DB query for ${missingIds.length} missing IDs`);
         
         const { data: employees, error } = await supabase
           .from('employees')
