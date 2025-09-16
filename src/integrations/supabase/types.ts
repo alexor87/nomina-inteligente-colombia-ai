@@ -2411,6 +2411,10 @@ export type Database = {
       }
     }
     Functions: {
+      backfill_version_employee_identity: {
+        Args: { p_period_id: string }
+        Returns: Json
+      }
       calculate_period_intersection_days: {
         Args: {
           absence_end: string
@@ -2534,6 +2538,16 @@ export type Database = {
           cedula: string
           employee_id: string
           nombre: string
+        }[]
+      }
+      get_employee_identity_for_period_v2: {
+        Args: { p_employee_ids: string[]; p_period_id: string }
+        Returns: {
+          apellido: string
+          cedula: string
+          employee_id: string
+          nombre: string
+          tipo_documento: string
         }[]
       }
       get_employee_sensitive_data: {
