@@ -327,13 +327,8 @@ function PayrollHistoryDetailPageContent() {
       console.log('✅ Loaded employees from payrolls table:', expandedEmployees.length);
       console.log('Sample employee:', expandedEmployees[0]);
       
-      // Skip auto-recalculation for closed periods to show true DB values
-      if (expandedEmployees.length > 0 && periodData.estado !== 'cerrado') {
-        console.log('🔄 Starting immediate backend recalculation...');
-        recalculateAllEmployees();
-      } else if (periodData.estado === 'cerrado') {
-        console.log('📋 Período cerrado: mostrando valores históricos de BD sin recálculo automático');
-      }
+      // Show exact values from database without automatic recalculation
+      console.log('📋 Mostrando valores exactos guardados en BD sin recálculo automático');
       
     } catch (error) {
       console.error('Error loading employees:', error);
