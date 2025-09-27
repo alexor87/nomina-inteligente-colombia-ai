@@ -279,11 +279,9 @@ export const ExpandedEmployeesTable = ({
                 <TableHead className="min-w-[140px] bg-blue-100 text-right font-semibold">
                   Neto Pagado
                 </TableHead>
-                {canEdit && (
-                  <TableHead className="min-w-[140px] sticky right-0 bg-background z-10 text-center">
-                    Acciones
-                  </TableHead>
-                )}
+                <TableHead className="min-w-[140px] sticky right-0 bg-background z-10 text-center">
+                  Acciones
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -454,36 +452,34 @@ export const ExpandedEmployeesTable = ({
                       )}
                     </TableCell>
                     
-                    {canEdit && (
-                      <TableCell className="sticky right-0 bg-background z-10 text-center font-medium">
-                        <div className="flex items-center gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            aria-label="Descargar comprobante"
-                            title="Descargar comprobante"
-                            onClick={() => handleDownloadPDF(employee.id, `${employee.nombre} ${employee.apellido}`)}
-                          >
-                            <FileText className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={isSendingEmail || !hasEmail}
-                            aria-label="Enviar por email"
-                            title={hasEmail ? "Enviar comprobante por email" : "Empleado sin email registrado"}
-                            className={!hasEmail ? "opacity-50 cursor-not-allowed" : ""}
-                            onClick={() => handleSendEmail(employee.id, `${employee.nombre} ${employee.apellido}`, hasEmail)}
-                          >
-                            {isSendingEmail ? (
-                              <div className="animate-spin rounded-full h-4 w-4 border-2 border-primary border-t-transparent" />
-                            ) : (
-                              <Mail className="h-4 w-4" />
-                            )}
-                          </Button>
-                        </div>
-                      </TableCell>
-                    )}
+                    <TableCell className="sticky right-0 bg-background z-10 text-center font-medium">
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          aria-label="Descargar comprobante"
+                          title="Descargar comprobante"
+                          onClick={() => handleDownloadPDF(employee.id, `${employee.nombre} ${employee.apellido}`)}
+                        >
+                          <FileText className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={isSendingEmail || !hasEmail}
+                          aria-label="Enviar por email"
+                          title={hasEmail ? "Enviar comprobante por email" : "Empleado sin email registrado"}
+                          className={!hasEmail ? "opacity-50 cursor-not-allowed" : ""}
+                          onClick={() => handleSendEmail(employee.id, `${employee.nombre} ${employee.apellido}`, hasEmail)}
+                        >
+                          {isSendingEmail ? (
+                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-primary border-t-transparent" />
+                          ) : (
+                            <Mail className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
                 );
               })}
