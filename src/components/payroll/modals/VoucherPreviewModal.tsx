@@ -105,78 +105,87 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
       console.log('🔍 PeriodId prop:', periodId);
       console.log('🔍 Employee.id (fallback):', employee.id);
       
-      // Prioridad: payrollId > periodId+employeeId > employee data fallback
-      let requestBody: any;
+      // Fetch complete data for consistent PDF generation
+      console.log('📋 Obteniendo datos completos del empleado y empresa');
       
-      if (payrollId) {
-        console.log('📋 Usando payrollId para datos históricos exactos');
-        requestBody = { payrollId: payrollId };
-      } else if (periodId && employee.id) {
-        console.log('📋 Usando periodId + employeeId para búsqueda directa en BD');
-        requestBody = { 
-          periodId: periodId, 
-          employeeId: employee.id 
-        };
-      } else {
-        console.log('📋 Fallback a datos del empleado + período');
-        
-        // Fetch employee details from database to ensure consistency
-        const { data: employeeData, error: employeeError } = await import('@/integrations/supabase/client').then(m => 
-          m.supabase
-            .from('employees')
-            .select('nombre, apellido, cedula, cargo')
-            .eq('id', employee.id)
-            .single()
-        );
+      // Get employee details from database
+      const { data: employeeData, error: employeeError } = await import('@/integrations/supabase/client').then(m => 
+        m.supabase
+          .from('employees')
+          .select('nombre, apellido, cedula, cargo, salario_base')
+          .eq('id', employee.id)
+          .single()
+      );
 
-        if (employeeError) {
-          console.warn('Could not fetch employee details, using fallback data');
-        }
+      // Get company info
+      const { data: companyInfo } = await import('@/integrations/supabase/client').then(m => 
+        m.supabase
+          .from('companies')
+          .select('razon_social, nit, email, telefono')
+          .single()
+      );
 
-        // Transform employee data to match the format used by VoucherSendDialog
-        const transformedEmployee = {
-          nombre: employeeData?.nombre || employee.name?.split(' ')[0] || 'N/A',
-          apellido: employeeData?.apellido || employee.name?.split(' ').slice(1).join(' ') || 'N/A',
-          cedula: employeeData?.cedula || (employee as any).cedula || 'N/A',
-          cargo: employeeData?.cargo || (employee as any).cargo || 'N/A',
-          salario_base: employee.baseSalary || (employee as any).salario_base || 0,
-          auxilio_transporte: employee.transportAllowance || (employee as any).auxilio_transporte || 0,
-          horas_extra: employee.extraHours || (employee as any).horas_extra || 0,
-          bonificaciones: employee.bonuses || (employee as any).bonificaciones || 0,
-          comisiones: 0,
-          prima: 0,
-          cesantias: 0,
-          vacaciones: 0,
-          otros_devengos: 0,
-          salud_empleado: employee.healthDeduction || (employee as any).salud_empleado || 0,
-          pension_empleado: employee.pensionDeduction || (employee as any).pension_empleado || 0,
-          retencion_fuente: 0,
-          otros_descuentos: (employee.deductions || (employee as any).total_deducciones || 0) - (employee.healthDeduction || (employee as any).salud_empleado || 0) - (employee.pensionDeduction || (employee as any).pension_empleado || 0),
-          total_devengado: employee.grossPay || (employee as any).total_devengado || 0,
-          total_deducciones: employee.deductions || (employee as any).total_deducciones || 0,
-          neto_pagado: employee.netPay || (employee as any).neto_pagado || 0
-        };
-
-        // Get company info
-        const { data: companyInfo } = await import('@/integrations/supabase/client').then(m => 
-          m.supabase
-            .from('companies')
-            .select('razon_social, nit, email, telefono')
-            .single()
-        );
-
-        requestBody = { 
-          employee: transformedEmployee, 
-          period: {
-            startDate: period.startDate,
-            endDate: period.endDate,
-            type: period.type,
-            periodo: `${period.startDate} - ${period.endDate}`
-          },
-          companyInfo,
-          returnBase64: false 
-        };
+      if (employeeError) {
+        throw new Error('No se pudieron obtener los datos del empleado');
       }
+
+      // Get payroll data if available
+      let payrollData = null;
+      if (payrollId) {
+        const { data } = await import('@/integrations/supabase/client').then(m => 
+          m.supabase
+            .from('payrolls')
+            .select('*')
+            .eq('id', payrollId)
+            .single()
+        );
+        payrollData = data;
+      } else if (periodId) {
+        const { data } = await import('@/integrations/supabase/client').then(m => 
+          m.supabase
+            .from('payrolls')
+            .select('*')
+            .eq('period_id', periodId)
+            .eq('employee_id', employee.id)
+            .single()
+        );
+        payrollData = data;
+      }
+
+      // Transform employee data using payroll data if available, otherwise use employee/period data
+      const transformedEmployee = {
+        nombre: employeeData.nombre,
+        apellido: employeeData.apellido,
+        cedula: employeeData.cedula,
+        cargo: employeeData.cargo,
+        salario_base: payrollData?.salario_base || employeeData.salario_base || employee.baseSalary || 0,
+        auxilio_transporte: payrollData?.auxilio_transporte || employee.transportAllowance || 0,
+        horas_extra: payrollData?.horas_extra || employee.extraHours || 0,
+        bonificaciones: payrollData?.bonificaciones || employee.bonuses || 0,
+        comisiones: payrollData?.comisiones || 0,
+        prima: payrollData?.prima || 0,
+        cesantias: payrollData?.cesantias || 0,
+        vacaciones: payrollData?.vacaciones || 0,
+        otros_devengos: payrollData?.otros_devengos || 0,
+        salud_empleado: payrollData?.salud_empleado || employee.healthDeduction || 0,
+        pension_empleado: payrollData?.pension_empleado || employee.pensionDeduction || 0,
+        retencion_fuente: payrollData?.retencion_fuente || 0,
+        otros_descuentos: payrollData?.otros_descuentos || 0,
+        total_devengado: payrollData?.total_devengado || employee.grossPay || 0,
+        total_deducciones: payrollData?.total_deducciones || employee.deductions || 0,
+        neto_pagado: payrollData?.neto_pagado || employee.netPay || 0
+      };
+
+      const requestBody = { 
+        employee: transformedEmployee, 
+        period: {
+          startDate: period.startDate,
+          endDate: period.endDate,
+          type: period.type,
+          periodo: `${period.startDate} - ${period.endDate}`
+        },
+        companyInfo
+      };
 
       console.log('📤 Enviando request al generador nativo:', JSON.stringify(requestBody, null, 2));
 
