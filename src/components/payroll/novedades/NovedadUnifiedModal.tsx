@@ -317,7 +317,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
           description: `${formData.type === 'incapacidad' && valorCalculado > 0 
             ? `Incapacidad por $${valorCalculado.toLocaleString()} agregada` 
             : 'Ausencia agregada'}. Usa "Aplicar Ajustes" para confirmar y reliquidar el período.`,
-          className: "border-warning/50 bg-warning/5 text-warning-foreground"
+          variant: "warning"
         });
       } else {
         toast({
@@ -325,7 +325,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
           description: `${formData.type === 'incapacidad' && valorCalculado > 0 
             ? `Incapacidad calculada correctamente ($${valorCalculado.toLocaleString()})` 
             : 'Ausencia registrada correctamente'} y aplicada al período`,
-          className: "border-green-200 bg-green-50"
+          variant: "success"
         });
       }
 
@@ -400,7 +400,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
           description: isArrayData 
             ? `${dataArray.length} novedades por $${totalValue.toLocaleString()} agregadas. Usa "Aplicar Ajustes" para confirmar y reliquidar el período.`
             : `Novedad por $${totalValue.toLocaleString()} agregada. Usa "Aplicar Ajustes" para confirmar y reliquidar el período.`,
-          className: "border-warning/50 bg-warning/5 text-warning-foreground"
+          variant: "warning"
         });
       } else {
         toast({
@@ -408,7 +408,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
           description: isArrayData 
             ? `${dataArray.length} novedades por $${totalValue.toLocaleString()} aplicadas al período`
             : `Novedad por $${totalValue.toLocaleString()} aplicada al período`,
-          className: "border-green-200 bg-green-50"
+          variant: "success"
         });
       }
 
