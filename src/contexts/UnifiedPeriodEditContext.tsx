@@ -68,6 +68,7 @@ interface UnifiedPeriodEditContextType {
   recalculatePreview: () => Promise<void>;
   saveChanges: (justification: string) => Promise<void>;
   discardChanges: () => void;
+  validateChanges: () => { isValid: boolean; summary: any };
 }
 
 const UnifiedPeriodEditContext = createContext<UnifiedPeriodEditContextType | undefined>(undefined);
@@ -573,6 +574,20 @@ export const UnifiedPeriodEditProvider: React.FC<UnifiedPeriodEditProviderProps>
     }
   };
 
+  // Validate changes before saving
+  const validateChanges = useCallback(() => {
+    // For now, return basic validation - can be enhanced later
+    return {
+      isValid: editState.employees.length > 0,
+      summary: {
+        totalEmployees: editState.employees.filter(emp => !emp.isRemoved).length,
+        totalErrors: 0,
+        totalWarnings: 0,
+        canSave: true
+      }
+    };
+  }, [editState.employees]);
+
   const value: UnifiedPeriodEditContextType = {
     editState,
     startEditSession,
@@ -584,7 +599,8 @@ export const UnifiedPeriodEditProvider: React.FC<UnifiedPeriodEditProviderProps>
     removeNovedad,
     recalculatePreview,
     saveChanges,
-    discardChanges
+    discardChanges,
+    validateChanges
   };
 
   return (

@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { processUnifiedChanges } from './processUnifiedChanges.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -88,6 +89,17 @@ interface ReliquidationRequest {
   periodId: string
   affectedEmployeeIds: string[]
   justification: string
+  // Unified edit support
+  editType?: 'unified_edit' | 'legacy'
+  compositionChanges?: {
+    added_employees: any[]
+    removed_employees: string[]
+  }
+  novedadChanges?: {
+    created: any[]
+    updated: any[]
+    deleted: string[]
+  }
 }
 
 interface ReliquidationResponse {
@@ -110,9 +122,24 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { periodId, affectedEmployeeIds, justification }: ReliquidationRequest = await req.json()
+    const { 
+      periodId, 
+      affectedEmployeeIds, 
+      justification, 
+      editType = 'legacy',
+      compositionChanges,
+      novedadChanges 
+    }: ReliquidationRequest = await req.json()
 
-    console.log('🔄 Starting period reliquidation:', { periodId, affectedEmployeeIds: affectedEmployeeIds.length })
+    console.log('🔄 Starting period reliquidation:', { 
+      periodId, 
+      editType,
+      affectedEmployeeIds: affectedEmployeeIds.length,
+      compositionChanges: compositionChanges ? 
+        `+${compositionChanges.added_employees?.length || 0} -${compositionChanges.removed_employees?.length || 0}` : 'none',
+      novedadChanges: novedadChanges ? 
+        `+${novedadChanges.created?.length || 0} ~${novedadChanges.updated?.length || 0} -${novedadChanges.deleted?.length || 0}` : 'none'
+    })
 
     // Validate period exists and get period info
     const { data: periodData, error: periodError } = await supabase
@@ -152,6 +179,24 @@ serve(async (req) => {
     let employeesAffected = 0
     let correctionsApplied = 0
     const errors: string[] = []
+
+    // ✅ UNIFIED EDIT: Process composition and novelty changes first
+    if (editType === 'unified_edit') {
+      try {
+        await processUnifiedChanges(
+          supabase, 
+          periodId, 
+          periodData, 
+          compositionChanges, 
+          novedadChanges, 
+          justification
+        );
+        console.log('✅ Unified changes processed successfully');
+      } catch (unifiedError) {
+        console.error('❌ Error processing unified changes:', unifiedError);
+        throw unifiedError;
+      }
+    }
 
     // Process each affected employee with proper calculation logic
     for (const employeeId of affectedEmployeeIds) {
