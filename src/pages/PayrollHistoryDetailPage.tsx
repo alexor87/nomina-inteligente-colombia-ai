@@ -155,35 +155,6 @@ function PayrollHistoryDetailPageContent() {
     loadPeriodData();
   }, [periodId]);
 
-  // Trigger IBC recalculation for this specific period if needed
-  useEffect(() => {
-    const recalculateIBC = async () => {
-      if (periodData?.id === '570c775d-a680-425c-9566-d6e38ae7f729' && periodData?.company_id) {
-        try {
-          console.log('🔧 Running IBC fix for affected period...');
-          const result = await PayrollRecalculationService.recalculateIBC(periodData.id, periodData.company_id);
-          
-          if (result.success) {
-            console.log('✅ IBC recalculation completed:', result);
-            // Reload employees to show corrected IBC
-            await loadEmployees();
-            // Reload period detail to refresh header totals
-            await loadPeriodDetail();
-            toast({
-              title: "IBC Corregido",
-              description: `IBC recalculado para ${result.employees_processed} empleados`,
-            });
-          }
-        } catch (error) {
-          console.error('❌ IBC recalculation failed:', error);
-        }
-      }
-    };
-
-    if (periodData) {
-      recalculateIBC();
-    }
-  }, [periodData]);
 
   // Recalculate all employees using backend service
   const recalculateAllEmployees = async () => {
