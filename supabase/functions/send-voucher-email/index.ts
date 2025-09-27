@@ -29,14 +29,14 @@ const handler = async (req: Request): Promise<Response> => {
     const employeeName = `${employee.nombre} ${employee.apellido}`;
     const periodText = `${period.startDate} - ${period.endDate}`;
     
-    // Email HTML template
+    // Email HTML template - Generic version
     const emailHtml = `
       <!DOCTYPE html>
       <html>
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Comprobante de Pago</title>
+          <title>Comprobante de Nómina</title>
           <style>
             body { 
               font-family: Arial, sans-serif; 
@@ -62,33 +62,25 @@ const handler = async (req: Request): Promise<Response> => {
               padding: 30px; 
               border-radius: 0 0 10px 10px; 
             }
-            .info-section { 
+            .message-section { 
               background: white; 
-              padding: 20px; 
-              margin: 15px 0; 
+              padding: 25px; 
+              margin: 20px 0; 
               border-radius: 8px; 
               border-left: 4px solid #667eea; 
+              text-align: center;
             }
-            .info-section h3 { 
-              margin: 0 0 10px 0; 
-              color: #667eea; 
+            .attachment-note {
+              background: #fff3cd;
+              border: 1px solid #ffeaa7;
+              padding: 20px;
+              border-radius: 8px;
+              margin: 20px 0;
+              text-align: center;
             }
-            .amount { 
-              background: #e8f5e8; 
-              padding: 15px; 
-              border-radius: 8px; 
-              text-align: center; 
-              margin: 20px 0; 
-            }
-            .amount .label { 
-              font-size: 14px; 
-              color: #666; 
-              margin-bottom: 5px; 
-            }
-            .amount .value { 
-              font-size: 24px; 
-              font-weight: bold; 
-              color: #2d5a2d; 
+            .attachment-note strong { 
+              color: #856404; 
+              font-size: 16px;
             }
             .footer { 
               text-align: center; 
@@ -98,50 +90,46 @@ const handler = async (req: Request): Promise<Response> => {
               color: #666; 
               font-size: 12px; 
             }
-            .attachment-note {
-              background: #fff3cd;
-              border: 1px solid #ffeaa7;
-              padding: 15px;
+            .company-info {
+              background: white;
+              padding: 20px;
+              margin: 15px 0;
               border-radius: 8px;
-              margin: 20px 0;
+              text-align: center;
+              border: 1px solid #e1e5e9;
             }
-            .attachment-note strong { color: #856404; }
           </style>
         </head>
         <body>
           <div class="header">
-            <h1>📧 Comprobante de Pago</h1>
-            <p>Tu comprobante de nómina está listo</p>
+            <h1>📄 Comprobante de Nómina</h1>
+            <p>Comprobante de pago adjunto</p>
           </div>
           
           <div class="content">
-            <div class="info-section">
-              <h3>👤 Información del Empleado</h3>
-              <p><strong>Nombre:</strong> ${employeeName}</p>
-              <p><strong>Cédula:</strong> ${employee.cedula || 'N/A'}</p>
-              <p><strong>Cargo:</strong> ${employee.cargo || 'N/A'}</p>
-            </div>
-
-            <div class="info-section">
-              <h3>📅 Información del Período</h3>
-              <p><strong>Período:</strong> ${periodText}</p>
-              <p><strong>Tipo:</strong> ${period.type || 'mensual'}</p>
-            </div>
-
-            <div class="amount">
-              <div class="label">💰 Neto a Pagar</div>
-              <div class="value">${formatCurrency(employee.neto_pagado || 0)}</div>
+            <div class="message-section">
+              <h2 style="color: #667eea; margin-bottom: 20px;">Estimado colaborador,</h2>
+              <p style="font-size: 16px; margin-bottom: 15px;">
+                La empresa <strong>${companyInfo?.razon_social || 'Su empresa'}</strong> le ha enviado 
+                el comprobante de nómina correspondiente al período <strong>${periodText}</strong>.
+              </p>
+              <p style="font-size: 14px; color: #666;">
+                Encontrará todos los detalles de su pago en el archivo PDF adjunto a este correo.
+              </p>
             </div>
 
             <div class="attachment-note">
-              <strong>📎 Adjunto:</strong> Encontrarás tu comprobante de pago detallado en el archivo PDF adjunto a este correo.
+              <strong>📎 Archivo Adjunto:</strong><br>
+              <span style="color: #666; font-size: 14px;">
+                Su comprobante de nómina se encuentra en el archivo PDF adjunto
+              </span>
             </div>
 
-            <div class="info-section">
-              <h3>🏢 ${companyInfo?.razon_social || 'Empresa'}</h3>
-              <p><strong>NIT:</strong> ${companyInfo?.nit || 'N/A'}</p>
-              ${companyInfo?.email ? `<p><strong>Email:</strong> ${companyInfo.email}</p>` : ''}
-              ${companyInfo?.telefono ? `<p><strong>Teléfono:</strong> ${companyInfo.telefono}</p>` : ''}
+            <div class="company-info">
+              <h3 style="color: #667eea; margin-bottom: 10px;">${companyInfo?.razon_social || 'Empresa'}</h3>
+              ${companyInfo?.nit ? `<p style="margin: 5px 0;"><strong>NIT:</strong> ${companyInfo.nit}</p>` : ''}
+              ${companyInfo?.email ? `<p style="margin: 5px 0;"><strong>Email:</strong> ${companyInfo.email}</p>` : ''}
+              ${companyInfo?.telefono ? `<p style="margin: 5px 0;"><strong>Teléfono:</strong> ${companyInfo.telefono}</p>` : ''}
             </div>
           </div>
 
@@ -157,7 +145,7 @@ const handler = async (req: Request): Promise<Response> => {
     const emailResponse = await resend.emails.send({
       from: `${companyInfo?.razon_social || 'Nómina'} <onboarding@resend.dev>`,
       to: emails,
-      subject: `💰 Comprobante de Pago - ${employeeName} - ${periodText}`,
+      subject: `💰 Comprobante de Nómina - ${periodText}`,
       html: emailHtml,
       attachments: [
         {
