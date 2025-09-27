@@ -237,11 +237,10 @@ export const PeriodVersionViewer: React.FC<PeriodVersionViewerProps> = ({
             ) : (
               comparison && (
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-                  <TabsList className="grid w-full grid-cols-4">
+                  <TabsList className="grid w-full grid-cols-3">
                     <TabsTrigger value="overview">Resumen</TabsTrigger>
                     <TabsTrigger value="employees">Empleados</TabsTrigger>
                     <TabsTrigger value="timeline">Cronología</TabsTrigger>
-                    <TabsTrigger value="audit">Auditoría</TabsTrigger>
                   </TabsList>
 
                   <TabsContent value="overview">
@@ -287,14 +286,6 @@ export const PeriodVersionViewer: React.FC<PeriodVersionViewerProps> = ({
                     />
                   </TabsContent>
 
-                  <TabsContent value="audit">
-                    <ChangeTimelineComponent
-                      initialVersion={comparison.initialVersion}
-                      currentVersion={comparison.currentVersion}
-                      metrics={comparison.summaryMetrics}
-                      periodName={periodName}
-                    />
-                  </TabsContent>
                 </Tabs>
               )
             )}

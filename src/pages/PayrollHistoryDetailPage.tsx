@@ -950,9 +950,9 @@ function PayrollHistoryDetailPageContent() {
               <Users className="h-4 w-4" />
               Empleados
             </TabsTrigger>
-            <TabsTrigger value="audit" className="flex items-center gap-2">
+            <TabsTrigger value="audit" className="flex items-center gap-2 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 hover:from-blue-100 hover:to-indigo-100 data-[state=active]:from-blue-600 data-[state=active]:to-indigo-600 data-[state=active]:text-white transition-all duration-200">
               <History className="h-4 w-4" />
-              Auditoría
+              Auditoría y Trazabilidad
             </TabsTrigger>
           </TabsList>
           
