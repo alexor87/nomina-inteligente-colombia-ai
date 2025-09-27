@@ -227,7 +227,7 @@ export const usePayrollNovedadesUnified = (
       toast({
         title: "Novedad creada",
         description: "La novedad se ha creado correctamente",
-        variant: "success"
+        className: "border-green-200 bg-green-50"
       });
     },
     onError: (error: Error) => {
@@ -287,7 +287,7 @@ export const usePayrollNovedadesUnified = (
       toast({
         title: "Novedad actualizada",
         description: "La novedad se ha actualizado correctamente",
-        variant: "success"
+        className: "border-green-200 bg-green-50"
       });
     },
     onError: (error: Error) => {
@@ -364,7 +364,7 @@ export const usePayrollNovedadesUnified = (
       toast({
         title: "Novedad eliminada",
         description: "La novedad se ha eliminado correctamente",
-        variant: "success"
+        className: "border-green-200 bg-green-50"
       });
     },
     onError: (error: Error) => {

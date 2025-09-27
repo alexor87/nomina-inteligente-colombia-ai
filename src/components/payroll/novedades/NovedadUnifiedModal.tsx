@@ -325,7 +325,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
           description: `${formData.type === 'incapacidad' && valorCalculado > 0 
             ? `Incapacidad calculada correctamente ($${valorCalculado.toLocaleString()})` 
             : 'Ausencia registrada correctamente'} y aplicada al período`,
-          variant: "success"
+          className: "border-green-200 bg-green-50"
         });
       }
 
@@ -408,7 +408,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
           description: isArrayData 
             ? `${dataArray.length} novedades por $${totalValue.toLocaleString()} aplicadas al período`
             : `Novedad por $${totalValue.toLocaleString()} aplicada al período`,
-          variant: "success"
+          className: "border-green-200 bg-green-50"
         });
       }
 

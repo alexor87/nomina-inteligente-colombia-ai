@@ -315,7 +315,7 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
       setDownloadSuccess(true);
 
       toast({
-        title: "✅ PDF generado exitosamente",
+        title: "PDF generado exitosamente",
         description: `El comprobante de ${employee.name} se ha descargado correctamente con el generador nativo`,
         className: "border-green-200 bg-green-50"
       });

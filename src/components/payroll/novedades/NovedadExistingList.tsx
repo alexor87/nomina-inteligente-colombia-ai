@@ -456,7 +456,7 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
           description: isDeleteAction 
             ? "La eliminación pendiente fue cancelada. La novedad original se mantiene."
             : "El ajuste fue eliminado inmediatamente. No afecta la liquidación actual.",
-          variant: "success"
+          className: "border-green-200 bg-green-50"
         });
       } catch (error) {
         console.error('❌ Error eliminando ajuste pendiente:', error);
