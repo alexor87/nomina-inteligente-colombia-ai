@@ -251,13 +251,16 @@ serve(async (req) => {
         const totalDeducciones = calculationResult.totalDeductions
         const netoCalculado = calculationResult.netPay
 
-        // Update payroll record
+        // Update payroll record with all calculated fields
         const { error: updateError } = await supabase
           .from('payrolls')
           .update({
             total_devengado: totalDevengado,
             total_deducciones: totalDeducciones,
             neto_pagado: netoCalculado,
+            salud_empleado: calculationResult.healthDeduction,
+            pension_empleado: calculationResult.pensionDeduction,
+            ibc: calculationResult.ibc,
             is_stale: false,
             updated_at: new Date().toISOString()
           })
