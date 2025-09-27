@@ -249,7 +249,7 @@ serve(async (req) => {
 
       } catch (employeeError) {
         console.error(`Error processing employee ${employeeId}:`, employeeError)
-        errors.push(`Error processing employee ${employeeId}: ${employeeError.message}`)
+        errors.push(`Error processing employee ${employeeId}: ${(employeeError as Error).message}`)
       }
     }
 
@@ -311,7 +311,7 @@ serve(async (req) => {
       success: false,
       employeesAffected: 0,
       correctionsApplied: 0,
-      message: `Error en reliquidación: ${error.message}`
+      message: `Error en reliquidación: ${(error as Error).message}`
     }
 
     return new Response(JSON.stringify(errorResponse), {

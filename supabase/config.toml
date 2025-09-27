@@ -10,14 +10,8 @@ verify_jwt = true
 [functions.payroll-liquidation-atomic]
 verify_jwt = true
 
-[functions.generate-voucher-pdf]
+[functions.reliquidate-period-adjustments]
 verify_jwt = true
-
-[functions.migrate-existing-vouchers]
-verify_jwt = false
 
 [functions.provision-social-benefits]
-verify_jwt = true
-
-[functions.reliquidate-period-adjustments]
 verify_jwt = true

@@ -215,7 +215,7 @@ async function getCompanyPolicy(supabase: any): Promise<{ incapacity_policy: str
     console.log('ℹ️ No company policies found, using default');
     return { incapacity_policy: 'standard_2d_100_rest_66' };
   } catch (error) {
-    console.log('ℹ️ Error loading company policies, using default:', error.message);
+    console.log('ℹ️ Error loading company policies, using default:', (error as Error).message);
     return { incapacity_policy: 'standard_2d_100_rest_66' };
   }
 }

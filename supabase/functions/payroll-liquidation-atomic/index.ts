@@ -390,7 +390,8 @@ serve(async (req) => {
       }
 
       // Ejecutar provisiones como tarea en background (sin bloquear la respuesta)
-      EdgeRuntime.waitUntil(executeBackgroundProvisioning())
+      // Use background processing without EdgeRuntime
+      executeBackgroundProvisioning().catch(console.error)
 
       return new Response(JSON.stringify({ success: true, liquidation: liquidationResult }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
