@@ -377,9 +377,23 @@ export const ExpandedEmployeesTable = ({
                           </div>
                         </div>
                       ) : (
-                        <span className="font-semibold text-red-600">
-                          {formatCurrency(employee.total_deducciones)}
-                        </span>
+                        (() => {
+                          // UI Fallback: mostrar suma de deducciones individuales si no coincide con total
+                          const calculatedDeductions = (employee.salud_empleado || 0) + (employee.pension_empleado || 0);
+                          const displayedDeductions = Math.abs(calculatedDeductions - employee.total_deducciones) > 1 
+                            ? calculatedDeductions 
+                            : employee.total_deducciones;
+                          
+                          if (calculatedDeductions !== employee.total_deducciones && Math.abs(calculatedDeductions - employee.total_deducciones) > 1) {
+                            console.warn(`⚠️ Deduction mismatch for ${employee.nombre}: total=${employee.total_deducciones}, calculated=${calculatedDeductions}`);
+                          }
+                          
+                          return (
+                            <span className="font-semibold text-red-600">
+                              {formatCurrency(displayedDeductions)}
+                            </span>
+                          );
+                        })()
                       )}
                     </TableCell>
                     

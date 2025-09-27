@@ -10,6 +10,9 @@ verify_jwt = true
 [functions.payroll-liquidation-atomic]
 verify_jwt = true
 
+[functions.payroll-recalc-ibc]
+verify_jwt = true
+
 [functions.reliquidate-period-adjustments]
 verify_jwt = true
 
