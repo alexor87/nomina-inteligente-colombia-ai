@@ -28,9 +28,9 @@ const OFFICIAL_VALUES = {
     }
   },
   2025: { 
-    salarioMinimo: 1423000, 
-    auxilioTransporte: 162000, 
-    uvt: 47065,
+    salarioMinimo: 1423500, 
+    auxilioTransporte: 200000, 
+    uvt: 49799,
     porcentajes: {
       saludEmpleado: 0.04,
       pensionEmpleado: 0.04,
@@ -125,25 +125,48 @@ const calculateDeductions = (salarioBase: number, workedDays: number, constituti
   };
 };
 
-// Función simplificada para obtener totales de novedades (llamada al edge function)
+// Función mejorada para obtener totales de novedades con fallback directo
 const getNovedadesTotals = async (supabase: any, employeeId: string, periodId: string) => {
   try {
-    const { data, error } = await supabase.functions.invoke('payroll-calculations', {
-      body: {
-        action: 'calculate_novedades_totals',
-        data: {
-          employee_id: employeeId,
-          period_id: periodId
-        }
-      }
-    });
+    // First try direct database query as fallback
+    const { data: novedades, error: directError } = await supabase
+      .from('payroll_novedades')
+      .select('tipo_novedad, valor')
+      .eq('empleado_id', employeeId)
+      .eq('periodo_id', periodId);
 
-    if (error) {
-      console.warn(`⚠️ Error getting novedades for employee ${employeeId}:`, error);
+    if (directError) {
+      console.warn(`⚠️ Error fetching novedades directly for employee ${employeeId}:`, directError);
       return { totalDevengos: 0, totalDeducciones: 0, totalNeto: 0 };
     }
 
-    return data?.totals || { totalDevengos: 0, totalDeducciones: 0, totalNeto: 0 };
+    if (!novedades || novedades.length === 0) {
+      return { totalDevengos: 0, totalDeducciones: 0, totalNeto: 0 };
+    }
+
+    // Calculate totals directly from novedades
+    const tiposDevengos = ['horas_extra', 'recargo_nocturno', 'comision', 'prima_extralegal', 'bonificacion'];
+    const tiposDeducciones = ['descuento', 'prestamo', 'multa', 'retencion'];
+    
+    let totalDevengos = 0;
+    let totalDeducciones = 0;
+
+    novedades.forEach((novedad: any) => {
+      const valor = parseFloat(novedad.valor) || 0;
+      
+      if (tiposDevengos.includes(novedad.tipo_novedad)) {
+        totalDevengos += valor;
+      } else if (tiposDeducciones.includes(novedad.tipo_novedad)) {
+        totalDeducciones += Math.abs(valor); // Ensure positive for deductions
+      }
+    });
+
+    const totalNeto = totalDevengos - totalDeducciones;
+
+    console.log(`📋 Novedades para empleado ${employeeId}: Devengos=${totalDevengos}, Deducciones=${totalDeducciones}, Neto=${totalNeto}`);
+    
+    return { totalDevengos, totalDeducciones, totalNeto };
+    
   } catch (error) {
     console.warn(`⚠️ Exception getting novedades for employee ${employeeId}:`, error);
     return { totalDevengos: 0, totalDeducciones: 0, totalNeto: 0 };
