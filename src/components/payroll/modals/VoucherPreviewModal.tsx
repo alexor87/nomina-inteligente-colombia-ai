@@ -241,10 +241,23 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
         throw new Error(errorMessage);
       }
 
-      console.log('✅ Response OK del generador nativo, obteniendo ArrayBuffer...');
+      console.log('✅ Response OK del generador nativo, obteniendo JSON...');
 
-      const arrayBuffer = await response.arrayBuffer();
-      console.log('📋 ArrayBuffer recibido del generador nativo, tamaño:', arrayBuffer.byteLength);
+      const jsonResponse = await response.json();
+      if (!jsonResponse.success || !jsonResponse.pdfBase64) {
+        throw new Error(jsonResponse.message || 'Error generating PDF');
+      }
+
+      console.log('📋 PDF Base64 recibido del generador nativo');
+
+      // Convert base64 to ArrayBuffer
+      const binaryString = atob(jsonResponse.pdfBase64);
+      const arrayBuffer = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        arrayBuffer[i] = binaryString.charCodeAt(i);
+      }
+      
+      console.log('📋 ArrayBuffer convertido, tamaño:', arrayBuffer.byteLength);
 
       // Validaciones mejoradas para el generador nativo
       if (arrayBuffer.byteLength === 0) {
