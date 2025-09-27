@@ -44,8 +44,8 @@ export const PayrollActionsPanel: React.FC<PayrollActionsPanelProps> = ({
   const isInEditMode = editMode.isActive;
   const hasAnyChanges = hasPendingAdjustments || hasCompositionChanges;
   
-  // Show if any actions are available or if period is closed (for version viewer)
-  const shouldShow = hasPendingAdjustments || isInEditMode || (periodStatus === 'cerrado' && onViewInitialLiquidation);
+  // Show if any actions are available
+  const shouldShow = hasPendingAdjustments || isInEditMode;
   
   // Unified apply changes handler
   const handleApplyAllChanges = async () => {
@@ -155,27 +155,6 @@ export const PayrollActionsPanel: React.FC<PayrollActionsPanelProps> = ({
         </Alert>
       )}
 
-      {/* Version Viewer Section - Show for closed periods */}
-      {periodStatus === 'cerrado' && onViewInitialLiquidation && (
-        <Alert className="border-primary/50 bg-primary/5">
-          <History className="h-4 w-4 text-primary" />
-          <AlertDescription className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="font-medium">Auditoría y Trazabilidad</span>
-              <span className="text-muted-foreground text-sm">Ver liquidación inicial vs. estado actual</span>
-            </div>
-            <Button 
-              variant="outline"
-              size="sm"
-              onClick={onViewInitialLiquidation}
-              className="h-8 hover:bg-primary/10"
-            >
-              <History className="h-3 w-3 mr-1" />
-              Ver Liquidación Inicial
-            </Button>
-          </AlertDescription>
-        </Alert>
-      )}
     </div>
   );
 };

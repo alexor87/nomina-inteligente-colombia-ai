@@ -862,15 +862,28 @@ function PayrollHistoryDetailPageContent() {
             
             {/* Edit Period Button - only for liquidated periods */}
             {!editMode.isActive && periodData.estado === 'cerrado' && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleEnterEditMode}
-                className="flex items-center gap-2"
-              >
-                <Edit className="h-4 w-4" />
-                Editar periodo
-              </Button>
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleEnterEditMode}
+                  className="flex items-center gap-2"
+                >
+                  <Edit className="h-4 w-4" />
+                  Editar periodo
+                </Button>
+                
+                {/* Auditoría Button - only for closed periods */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleViewInitialLiquidation}
+                  className="flex items-center gap-2"
+                >
+                  <History className="h-4 w-4" />
+                  Auditoría
+                </Button>
+              </>
             )}
             
             {/* Recalcular Todo Button */}
