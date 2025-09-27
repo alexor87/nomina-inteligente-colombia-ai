@@ -78,101 +78,106 @@ export const VoucherSendDialog: React.FC<VoucherSendDialogProps> = ({
     try {
       console.log('🚀 Iniciando envío de comprobantes...');
       
+      // Obtener información de la empresa
+      const { data: companyInfo, error: companyError } = await supabase
+        .from('companies')
+        .select('razon_social, nit, email, telefono')
+        .single();
+
+      if (companyError) {
+        throw new Error(`Error obteniendo información de empresa: ${companyError.message}`);
+      }
+
+      // Obtener datos completos del empleado desde la BD
+      const { data: employeeData, error: employeeError } = await supabase
+        .from('employees')
+        .select('nombre, apellido, cedula, cargo, salario_base, email')
+        .eq('id', employee.id)
+        .single();
+
+      if (employeeError) {
+        throw new Error(`Error obteniendo datos del empleado: ${employeeError.message}`);
+      }
+
       let successCount = 0;
       let errorCount = 0;
       const errors: string[] = [];
 
-      // Enviar a cada email secuencialmente
-      for (const email of emails) {
-        try {
-          // 1. Generar el PDF del comprobante
-          const { data: pdfData, error: pdfError } = await supabase.functions.invoke('generate-voucher-pdf', {
-            body: {
-              employee: {
-                id: employee.id,
-                name: employee.name,
-                position: employee.position,
-                baseSalary: employee.baseSalary,
-                workedDays: employee.workedDays,
-                extraHours: employee.extraHours,
-                bonuses: employee.bonuses,
-                disabilities: employee.disabilities,
-                grossPay: employee.grossPay,
-                deductions: employee.deductions,
-                netPay: employee.netPay,
-                eps: employee.eps,
-                afp: employee.afp
-              },
-              period: {
-                startDate: period.startDate,
-                endDate: period.endDate,
-                type: period.type,
-                periodo: `${period.startDate} - ${period.endDate}`
-              },
-              returnBase64: true
-            }
-          });
-
-          if (pdfError || !pdfData) {
-            throw new Error(`Error generando PDF: ${pdfError?.message || 'Error desconocido'}`);
-          }
-
-          // 2. Enviar el email con el PDF adjunto
-          const { error: emailError } = await supabase.functions.invoke('send-voucher-email', {
-            body: {
-              employeeEmail: email,
-              employeeName: employee.name,
-              period: {
-                startDate: period.startDate,
-                endDate: period.endDate,
-                type: period.type,
-                periodo: `${period.startDate} - ${period.endDate}`
-              },
-              netPay: employee.netPay,
-              attachment: {
-                fileName: pdfData.fileName || `comprobante-${employee.name}.pdf`,
-                base64: pdfData.base64,
-                mimeType: pdfData.mimeType || 'application/pdf'
-              }
-            }
-          });
-
-          if (emailError) {
-            throw new Error(`Error enviando email: ${emailError.message}`);
-          }
-
-          successCount++;
-          console.log(`✅ Email enviado exitosamente a ${email}`);
-
-        } catch (error: any) {
-          errorCount++;
-          errors.push(`${email}: ${error.message}`);
-          console.error(`❌ Error enviando a ${email}:`, error);
+      // 1. Generar el PDF del comprobante una vez
+      const { data: pdfData, error: pdfError } = await supabase.functions.invoke('generate-voucher-pdf', {
+        body: {
+          employee: {
+            nombre: employeeData.nombre,
+            apellido: employeeData.apellido,
+            cedula: employeeData.cedula,
+            cargo: employeeData.cargo,
+            salario_base: employee.baseSalary,
+            auxilio_transporte: employee.transportAllowance || 0,
+            horas_extra: employee.extraHours || 0,
+            bonificaciones: employee.bonuses || 0,
+            comisiones: 0,
+            prima: 0,
+            cesantias: 0,
+            vacaciones: 0,
+            otros_devengos: 0,
+            salud_empleado: employee.healthDeduction || 0,
+            pension_empleado: employee.pensionDeduction || 0,
+            retencion_fuente: 0,
+            otros_descuentos: employee.deductions - (employee.healthDeduction || 0) - (employee.pensionDeduction || 0),
+            total_devengado: employee.grossPay,
+            total_deducciones: employee.deductions,
+            neto_pagado: employee.netPay
+          },
+          period: {
+            startDate: period.startDate,
+            endDate: period.endDate,
+            type: period.type,
+            periodo: `${period.startDate} - ${period.endDate}`
+          },
+          companyInfo
         }
+      });
+
+      if (pdfError || !pdfData?.success) {
+        throw new Error(`Error generando PDF: ${pdfError?.message || pdfData?.error || 'Error desconocido'}`);
       }
+
+      // 2. Enviar email a todos los destinatarios
+      const { error: emailError } = await supabase.functions.invoke('send-voucher-email', {
+        body: {
+          emails: emails,
+          pdfBase64: pdfData.pdfBase64,
+          employee: {
+            nombre: employeeData.nombre,
+            apellido: employeeData.apellido,
+            cedula: employeeData.cedula,
+            cargo: employeeData.cargo
+          },
+          period: {
+            startDate: period.startDate,
+            endDate: period.endDate,
+            type: period.type,
+            periodo: `${period.startDate} - ${period.endDate}`
+          },
+          companyInfo
+        }
+      });
+
+      if (emailError) {
+        throw new Error(`Error enviando emails: ${emailError.message}`);
+      }
+
+      successCount = emails.length;
+      console.log(`✅ Emails enviados exitosamente a ${emails.length} destinatarios`);
 
       // Mostrar resultado final
-      if (successCount > 0 && errorCount === 0) {
-        toast({
-          title: "¡Éxito!",
-          description: `Comprobante enviado exitosamente a ${successCount} email${successCount > 1 ? 's' : ''}`,
-          className: "border-green-200 bg-green-50"
-        });
-        setEmails([]);
-        onClose();
-      } else if (successCount > 0 && errorCount > 0) {
-        toast({
-          title: "Envío parcialmente exitoso",
-          description: `Enviado a ${successCount} email${successCount > 1 ? 's' : ''}, ${errorCount} fallaron`,
-          variant: "default"
-        });
-      } else {
-        toast({
-          title: "Error al enviar comprobantes",
-          description: `Falló el envío a todos los emails: ${errors.slice(0, 2).join(', ')}`,
-          variant: "destructive"
-        });
-      }
+      toast({
+        title: "¡Éxito!",
+        description: `Comprobante enviado exitosamente a ${successCount} email${successCount > 1 ? 's' : ''}`,
+        className: "border-green-200 bg-green-50"
+      });
+      setEmails([]);
+      onClose();
 
     } catch (error: any) {
       console.error('❌ Error general enviando comprobantes:', error);
