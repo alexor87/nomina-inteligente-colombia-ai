@@ -1,18 +1,31 @@
 import React, { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { PeriodVersionComparisonService } from '@/services/PeriodVersionComparisonService';
+import type { VersionComparison } from '@/services/PeriodVersionComparisonService';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { History, Download, RefreshCw } from 'lucide-react';
-import { toast } from '@/hooks/use-toast';
-import { EmployeeChangeCard } from './EmployeeChangeCard';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BusinessImpactSummary } from './BusinessImpactSummary';
+import { EmployeeChangeCard } from './EmployeeChangeCard';
 import { ChangeTimelineComponent } from './ChangeTimelineComponent';
+import { RollbackConfirmationModal } from './RollbackConfirmationModal';
+import { Separator } from '@/components/ui/separator';
+import { useToast } from '@/hooks/use-toast';
+import { PayrollRollbackService, type RollbackImpact } from '@/services/PayrollRollbackService';
 import { 
-  PeriodVersionComparisonService, 
-  VersionComparison 
-} from '@/services/PeriodVersionComparisonService';
-import { supabase } from '@/integrations/supabase/client';
+  Clock, 
+  Download, 
+  FileText, 
+  RefreshCw, 
+  Users, 
+  AlertTriangle, 
+  CheckCircle,
+  FileX,
+  RotateCcw
+} from 'lucide-react';
 
 interface PeriodVersionViewerProps {
   isOpen: boolean;
@@ -33,6 +46,22 @@ export const PeriodVersionViewer: React.FC<PeriodVersionViewerProps> = ({
   const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(new Set());
   const [repairing, setRepairing] = useState(false);
   const [backfilling, setBackfilling] = useState(false);
+  const [rollbackModal, setRollbackModal] = useState<{
+    isOpen: boolean;
+    versionId: string | null;
+    versionNumber: number | null;
+    impact: RollbackImpact | null;
+    hasVouchers: boolean;
+  }>({
+    isOpen: false,
+    versionId: null,
+    versionNumber: null,
+    impact: null,
+    hasVouchers: false
+  });
+  const [isRollbackLoading, setIsRollbackLoading] = useState(false);
+  
+  const { toast } = useToast();
 
   useEffect(() => {
     if (isOpen && periodId) {
@@ -43,164 +72,118 @@ export const PeriodVersionViewer: React.FC<PeriodVersionViewerProps> = ({
   const loadComparison = async () => {
     setLoading(true);
     try {
-      console.log('📊 Loading period version comparison...');
-      const comparisonData = await PeriodVersionComparisonService.generatePeriodComparison(
+      const data = await PeriodVersionComparisonService.generatePeriodComparison(
         periodId,
         periodName
       );
-      setComparison(comparisonData);
+      setComparison(data);
     } catch (error) {
-      console.error('❌ Error loading comparison:', error);
+      console.error('Error loading period comparison:', error);
       toast({
         title: "Error",
-        description: "No se pudo cargar la comparación de versiones",
-        variant: "destructive",
+        description: "No se pudo cargar el historial de versiones",
+        variant: "destructive"
       });
     } finally {
       setLoading(false);
     }
   };
 
-  /**
-   * In-memory backfill for missing employee names in old versions
-   */
   const backfillEmployeeNames = async () => {
-    if (!comparison || backfilling) return;
-
+    if (!comparison || !comparison.employeeChanges) return;
+    
     setBackfilling(true);
     try {
-      // Find employee changes with generic names that need backfilling
-      const needsBackfill = comparison.employeeChanges.filter(change => 
-        change.employeeName.startsWith('Empleado ') && 
-        change.employeeName.length < 20 && // Generic name pattern
-        change.cedula !== 'N/A'
-      );
-
-      if (needsBackfill.length === 0) {
-        toast({
-          title: "Sin cambios necesarios",
-          description: "Todos los empleados ya tienen nombres identificables",
-        });
-        return;
-      }
-
-      // Fetch current employee data for backfill
-      const employeeIds = needsBackfill.map(change => change.employeeId);
+      const employeeIds = Object.keys(comparison.employeeChanges);
+      
       const { data: employees, error } = await supabase
         .from('employees')
-        .select('id, nombre, apellido, cedula')
+        .select('id, nombre, apellido')
         .in('id', employeeIds);
 
       if (error) {
-        throw error;
+        console.error('Error fetching employees:', error);
+        return;
       }
 
-      // Create a map for quick lookup
-      const employeeMap = new Map(
-        (employees || []).map(emp => [emp.id, emp])
-      );
-
-      // Update the comparison data in memory
-      const updatedComparison = {
-        ...comparison,
-        employeeChanges: comparison.employeeChanges.map(change => {
-          const employee = employeeMap.get(change.employeeId);
-          if (employee && change.employeeName.startsWith('Empleado ')) {
-            const fullName = [employee.nombre, employee.apellido].filter(Boolean).join(' ').trim();
-            return {
-              ...change,
-              employeeName: fullName || change.employeeName,
-              cedula: employee.cedula || change.cedula
-            };
+      if (employees && employees.length > 0) {
+        const updatedComparison = { ...comparison };
+        employees.forEach(emp => {
+          if (updatedComparison.employeeChanges[emp.id]) {
+            updatedComparison.employeeChanges[emp.id].employeeName = `${emp.nombre} ${emp.apellido}`;
           }
-          return change;
-        })
-      };
-
-      setComparison(updatedComparison);
-
-      toast({
-        title: "Nombres actualizados",
-        description: `Se actualizaron ${needsBackfill.length} nombres de empleados`,
-      });
-
+        });
+        
+        setComparison(updatedComparison);
+        toast({
+          title: "Nombres actualizados",
+          description: `Se actualizaron los nombres de ${employees.length} empleados`,
+          variant: "default"
+        });
+      }
     } catch (error) {
-      console.error('❌ Error backfilling employee names:', error);
+      console.error('Error backfilling employee names:', error);
       toast({
         title: "Error",
-        description: "No se pudieron actualizar los nombres de empleados",
-        variant: "destructive",
+        description: "Error actualizando los nombres de empleados",
+        variant: "destructive"
       });
     } finally {
       setBackfilling(false);
     }
   };
 
-  const exportComparison = async () => {
-    try {
-      if (!comparison) return;
+  const exportComparison = () => {
+    if (!comparison || !comparison.employeeChanges) return;
 
-      // Create CSV content
-      const csvRows = [
-        ['Empleado', 'Cédula', 'Tipo de Cambio', 'Impacto Económico', 'Estado Inicial', 'Estado Actual'].join(',')
-      ];
+    const csvData = [
+      ['Empleado ID', 'Nombre', 'Valor Anterior', 'Valor Nuevo', 'Diferencia', 'Tipo de Cambio']
+    ];
 
-      comparison.employeeChanges.forEach(change => {
-        const initialPay = change.initialData?.neto_pagado || 0;
-        const currentPay = change.currentData?.neto_pagado || 0;
-        
-        csvRows.push([
-          `"${change.employeeName}"`,
-          change.cedula,
-          `"${PeriodVersionComparisonService.getChangeTypeLabel(change.changeType)}"`,
-          change.impactAmount.toString(),
-          initialPay.toString(),
-          currentPay.toString()
-        ].join(','));
-      });
+    Object.entries(comparison.employeeChanges).forEach(([employeeId, change]) => {
+      csvData.push([
+        employeeId,
+        change.employeeName || 'Desconocido',
+        change.oldValue?.toString() || '0',
+        change.newValue?.toString() || '0',
+        change.difference?.toString() || '0',
+        change.changeType || 'unknown'
+      ]);
+    });
 
-      const csvContent = csvRows.join('\n');
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      
-      if (link.download !== undefined) {
-        const url = URL.createObjectURL(blob);
-        link.setAttribute('href', url);
-        link.setAttribute('download', `comparacion_${periodName.replace(/\s/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      }
+    const csvContent = csvData.map(row => row.join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `comparacion-versiones-${periodName}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 
-      toast({
-        title: "Exportación completada",
-        description: "El reporte de comparación se ha descargado exitosamente",
-      });
-    } catch (error) {
-      console.error('Error exporting comparison:', error);
-      toast({
-        title: "Error en exportación",
-        description: "No se pudo exportar el reporte",
-        variant: "destructive",
-      });
-    }
+    toast({
+      title: "Exportación exitosa",
+      description: "El archivo CSV se ha descargado correctamente",
+      variant: "default"
+    });
   };
 
   const repairIdentities = async () => {
+    setRepairing(true);
     try {
-      setRepairing(true);
       await loadComparison();
       toast({
-        title: 'Identidades actualizadas',
-        description: 'Se reintentó la resolución de nombres usando el período actual.',
+        title: "Identidades reparadas",
+        description: "Se ha recargado la comparación con las identidades actualizadas",
+        variant: "default"
       });
     } catch (error) {
-      console.error('❌ Error refreshing identities:', error);
       toast({
-        title: 'Error',
-        description: 'No se pudieron actualizar las identidades de empleados',
-        variant: 'destructive',
+        title: "Error",
+        description: "Error reparando las identidades",
+        variant: "destructive"
       });
     } finally {
       setRepairing(false);
@@ -208,111 +191,318 @@ export const PeriodVersionViewer: React.FC<PeriodVersionViewerProps> = ({
   };
 
   const toggleEmployeeExpansion = (employeeId: string) => {
-    const newExpanded = new Set(expandedEmployees);
-    if (newExpanded.has(employeeId)) {
-      newExpanded.delete(employeeId);
-    } else {
-      newExpanded.add(employeeId);
-    }
-    setExpandedEmployees(newExpanded);
+    setExpandedEmployees(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(employeeId)) {
+        newSet.delete(employeeId);
+      } else {
+        newSet.add(employeeId);
+      }
+      return newSet;
+    });
   };
 
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-7xl max-h-[90vh] overflow-hidden">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <History className="h-5 w-5" />
-            Comparación de Versiones - {periodName}
-          </DialogTitle>
-        </DialogHeader>
+  const handleRollbackClick = async (versionId: string, versionNumber: number) => {
+    try {
+      console.log('🔍 Preparing rollback to version:', versionId);
+      
+      // Validate rollback possibility
+      const validation = await PayrollRollbackService.canRollbackToVersion(versionId, periodId);
+      
+      if (!validation.canRollback) {
+        toast({
+          title: "Rollback no disponible",
+          description: validation.reason || "No se puede ejecutar el rollback en este momento",
+          variant: "destructive"
+        });
+        return;
+      }
 
-        <ScrollArea className="h-[calc(90vh-140px)]">
-          <div className="space-y-6">
+      // Get detailed impact
+      const impact = await PayrollRollbackService.getRollbackImpact(versionId, periodId);
+      
+      setRollbackModal({
+        isOpen: true,
+        versionId,
+        versionNumber,
+        impact,
+        hasVouchers: validation.impactSummary.hasVouchers
+      });
+
+    } catch (error) {
+      console.error('❌ Error preparing rollback:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo preparar el rollback. Intente nuevamente.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleRollbackConfirm = async (justification: string) => {
+    if (!rollbackModal.versionId) return;
+    
+    setIsRollbackLoading(true);
+    
+    try {
+      const result = await PayrollRollbackService.rollbackToVersion(
+        rollbackModal.versionId,
+        periodId,
+        justification
+      );
+
+      if (result.success) {
+        toast({
+          title: "Rollback Exitoso",
+          description: "La nómina ha sido restaurada exitosamente",
+          variant: "default"
+        });
+        
+        // Close modal and refresh
+        setRollbackModal({
+          isOpen: false,
+          versionId: null,
+          versionNumber: null,
+          impact: null,
+          hasVouchers: false
+        });
+        
+        // Reload comparison data
+        await loadComparison();
+        
+        // Optionally close the main dialog or refresh parent
+        onClose();
+        
+      } else {
+        toast({
+          title: "Error en Rollback",
+          description: result.message,
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('❌ Rollback failed:', error);
+      toast({
+        title: "Error",
+        description: "Error ejecutando el rollback. Intente nuevamente.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsRollbackLoading(false);
+    }
+  };
+
+  const handleRollbackCancel = () => {
+    setRollbackModal({
+      isOpen: false,
+      versionId: null,
+      versionNumber: null,
+      impact: null,
+      hasVouchers: false
+    });
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <>
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="max-w-6xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3">
+              <FileText className="h-6 w-6 text-primary" />
+              Historial de Versiones - {periodName}
+            </DialogTitle>
+          </DialogHeader>
+
+          <ScrollArea className="max-h-[70vh]">
             {loading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                <span className="ml-2">Generando comparación...</span>
+              <div className="flex items-center justify-center p-8">
+                <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+                <span className="ml-3 text-lg">Cargando historial...</span>
+              </div>
+            ) : !comparison ? (
+              <div className="flex items-center justify-center p-8">
+                <AlertTriangle className="h-8 w-8 text-muted-foreground" />
+                <span className="ml-3 text-lg text-muted-foreground">
+                  No se pudo cargar el historial de versiones
+                </span>
               </div>
             ) : (
-              comparison && (
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-                  <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="overview">Resumen</TabsTrigger>
-                    <TabsTrigger value="employees">Empleados</TabsTrigger>
-                    <TabsTrigger value="timeline">Cronología</TabsTrigger>
-                  </TabsList>
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="overview" className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4" />
+                    Resumen
+                  </TabsTrigger>
+                  <TabsTrigger value="employees" className="flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    Empleados ({Object.keys(comparison.employeeChanges || {}).length})
+                  </TabsTrigger>
+                  <TabsTrigger value="timeline" className="flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    Timeline
+                  </TabsTrigger>
+                </TabsList>
 
-                  <TabsContent value="overview">
-                    <BusinessImpactSummary 
-                      metrics={comparison.summaryMetrics}
-                      employeeChanges={comparison.employeeChanges}
-                    />
-                  </TabsContent>
-
-                  <TabsContent value="employees">
+                <TabsContent value="overview" className="space-y-6">
+                  <BusinessImpactSummary 
+                    metrics={comparison.summaryMetrics}
+                    employeeChanges={comparison.employeeChanges}
+                  />
+                  
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                      <Clock className="h-5 w-5" />
+                      Historial de Versiones
+                    </h3>
                     <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-lg font-semibold">
-                          Empleados Afectados ({comparison.employeeChanges.length})
-                        </h3>
-                      </div>
-                      
-                      {comparison.employeeChanges.length === 0 ? (
-                        <div className="text-center py-8 text-muted-foreground">
-                          <p>No se encontraron cambios entre versiones.</p>
-                        </div>
-                      ) : (
-                        <div className="space-y-4">
-                          {comparison.employeeChanges.map((change) => (
-                            <EmployeeChangeCard
-                              key={change.employeeId}
-                              change={change}
-                              isExpanded={expandedEmployees.has(change.employeeId)}
-                              onToggleExpanded={() => toggleEmployeeExpansion(change.employeeId)}
-                            />
-                          ))}
-                        </div>
-                      )}
+                      {/* Show initial and current versions */}
+                      {[comparison.currentVersion, comparison.initialVersion].filter(Boolean).map((version, index) => (
+                        <Card key={version.id} className="relative">
+                          <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2">
+                                  <Clock className="h-4 w-4 text-muted-foreground" />
+                                  <span className="font-medium">Versión {version.version_number}</span>
+                                </div>
+                                <Badge variant={
+                                  version.version_type === 'initial' ? 'secondary' :
+                                  version.version_type === 'correction' ? 'destructive' :
+                                  version.version_type === 'rollback' ? 'outline' :
+                                  'default'
+                                }>
+                                  {version.version_type === 'initial' ? 'Inicial' :
+                                   version.version_type === 'correction' ? 'Corrección' :
+                                   version.version_type === 'rollback' ? 'Rollback' :
+                                   'Manual'}
+                                </Badge>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {/* Show rollback button only for non-current versions */}
+                                {index > 0 && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleRollbackClick(version.id, version.version_number)}
+                                    disabled={isRollbackLoading}
+                                    className="gap-2"
+                                  >
+                                    <RotateCcw className="h-3 w-3" />
+                                    Restaurar
+                                  </Button>
+                                )}
+                                <div className="text-right">
+                                  <div className="text-sm text-muted-foreground">
+                                    {new Date(version.created_at).toLocaleDateString('es-ES', {
+                                      year: 'numeric',
+                                      month: 'short',
+                                      day: 'numeric',
+                                      hour: '2-digit',
+                                      minute: '2-digit'
+                                    })}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {(version as any).created_by_email || 'Usuario desconocido'}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            <p className="text-sm text-muted-foreground">
+                              {version.changes_summary}
+                            </p>
+                          </CardContent>
+                        </Card>
+                      ))}
                     </div>
-                  </TabsContent>
+                  </div>
+                </TabsContent>
 
-                  <TabsContent value="timeline">
-                    <ChangeTimelineComponent
-                      initialVersion={comparison.initialVersion}
-                      currentVersion={comparison.currentVersion}
-                      metrics={comparison.summaryMetrics}
-                      periodName={periodName}
+                <TabsContent value="employees" className="space-y-4">
+                  {Object.entries(comparison.employeeChanges || {}).map(([employeeId, change]) => (
+                    <EmployeeChangeCard
+                      key={employeeId}
+                      employeeId={employeeId}
+                      change={change}
+                      isExpanded={expandedEmployees.has(employeeId)}
+                      onToggleExpansion={() => toggleEmployeeExpansion(employeeId)}
                     />
-                  </TabsContent>
+                  ))}
+                </TabsContent>
 
-                </Tabs>
-              )
+                <TabsContent value="timeline" className="space-y-4">
+                <ChangeTimelineComponent
+                  initialVersion={comparison.initialVersion}
+                  currentVersion={comparison.currentVersion}
+                  metrics={comparison.summaryMetrics}
+                  periodName={periodName}
+                />
+                </TabsContent>
+              </Tabs>
             )}
-          </div>
-        </ScrollArea>
+          </ScrollArea>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            Cerrar
-          </Button>
-          {comparison && (
-            <>
-              <Button onClick={backfillEmployeeNames} disabled={backfilling || loading} variant="secondary">
-                <RefreshCw className={`h-4 w-4 ${backfilling ? 'animate-spin' : ''}`} />
-                {backfilling ? 'Actualizando…' : 'Actualizar nombres'}
-              </Button>
-              <Button onClick={repairIdentities} disabled={repairing || loading} variant="secondary">
-                {repairing ? 'Reparando…' : 'Reparar identidades'}
-              </Button>
-              <Button onClick={exportComparison} className="gap-2">
-                <Download className="h-4 w-4" />
-                Exportar Comparación
-              </Button>
-            </>
-          )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={onClose}>
+              Cerrar
+            </Button>
+            
+            {comparison && (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={backfillEmployeeNames}
+                  disabled={backfilling}
+                  className="gap-2"
+                >
+                  {backfilling ? (
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Users className="h-4 w-4" />
+                  )}
+                  {backfilling ? 'Actualizando...' : 'Actualizar Nombres'}
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  onClick={repairIdentities}
+                  disabled={repairing}
+                  className="gap-2"
+                >
+                  {repairing ? (
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <FileX className="h-4 w-4" />
+                  )}
+                  {repairing ? 'Reparando...' : 'Reparar Identidades'}
+                </Button>
+                
+                <Button
+                  onClick={exportComparison}
+                  className="gap-2"
+                >
+                  <Download className="h-4 w-4" />
+                  Exportar CSV
+                </Button>
+              </>
+            )}
+          </DialogFooter>
+        </DialogContent>
+
+        {/* Rollback Confirmation Modal */}
+        <RollbackConfirmationModal
+          isOpen={rollbackModal.isOpen}
+          onClose={handleRollbackCancel}
+          onConfirm={handleRollbackConfirm}
+          isLoading={isRollbackLoading}
+          versionNumber={rollbackModal.versionNumber || 0}
+          rollbackImpact={rollbackModal.impact}
+          hasVouchers={rollbackModal.hasVouchers}
+        />
+      </Dialog>
+    </>
   );
 };
