@@ -343,7 +343,7 @@ export const VersionSnapshotViewer: React.FC<VersionSnapshotViewerProps> = ({
             />
           </div>
 
-          <ScrollArea className="h-[400px]">
+          <ScrollArea className="h-[350px]">
             <div className="space-y-2">
               {filteredEmployees.map((employee) => (
                 <Card key={employee.id} className="p-4">
