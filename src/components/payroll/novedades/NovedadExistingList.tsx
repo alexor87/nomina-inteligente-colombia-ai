@@ -452,7 +452,7 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
         }
         
         toast({
-          title: isDeleteAction ? "📋 Eliminación Cancelada" : "🗑️ Ajuste Eliminado",
+          title: isDeleteAction ? "Eliminación cancelada" : "Ajuste eliminado",
           description: isDeleteAction 
             ? "La eliminación pendiente fue cancelada. La novedad original se mantiene."
             : "El ajuste fue eliminado inmediatamente. No afecta la liquidación actual.",

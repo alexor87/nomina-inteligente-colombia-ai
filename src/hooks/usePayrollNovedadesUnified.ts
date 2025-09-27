@@ -225,7 +225,7 @@ export const usePayrollNovedadesUnified = (
       });
       
       toast({
-        title: "✅ Novedad creada",
+        title: "Novedad creada",
         description: "La novedad se ha creado correctamente",
         variant: "success"
       });
@@ -233,7 +233,7 @@ export const usePayrollNovedadesUnified = (
     onError: (error: Error) => {
       console.error('❌ Error creando novedad:', error);
       toast({
-        title: "❌ Error",
+        title: "Error",
         description: error.message || "Error creando la novedad",
         variant: "destructive"
       });
@@ -285,7 +285,7 @@ export const usePayrollNovedadesUnified = (
       });
       
       toast({
-        title: "✅ Novedad actualizada",
+        title: "Novedad actualizada",
         description: "La novedad se ha actualizado correctamente",
         variant: "success"
       });
@@ -293,7 +293,7 @@ export const usePayrollNovedadesUnified = (
     onError: (error: Error) => {
       console.error('❌ Error actualizando novedad:', error);
       toast({
-        title: "❌ Error",
+        title: "Error",
         description: error.message || "Error actualizando la novedad",
         variant: "destructive"
       });
@@ -362,7 +362,7 @@ export const usePayrollNovedadesUnified = (
       }
       
       toast({
-        title: "✅ Novedad eliminada",
+        title: "Novedad eliminada",
         description: "La novedad se ha eliminado correctamente",
         variant: "success"
       });
@@ -370,7 +370,7 @@ export const usePayrollNovedadesUnified = (
     onError: (error: Error) => {
       console.error('❌ Error eliminando novedad:', error);
       toast({
-        title: "❌ Error",
+        title: "Error",
         description: error.message || "Error eliminando la novedad",
         variant: "destructive"
       });

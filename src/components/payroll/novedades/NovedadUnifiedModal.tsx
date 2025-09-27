@@ -313,7 +313,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       // Show different messages based on submission result
       if (result && 'isPending' in result && result.isPending) {
         toast({
-          title: "✅ Novedad Guardada como Ajuste Pendiente",
+          title: "Novedad guardada como ajuste pendiente",
           description: `${formData.type === 'incapacidad' && valorCalculado > 0 
             ? `Incapacidad por $${valorCalculado.toLocaleString()} agregada` 
             : 'Ausencia agregada'}. Usa "Aplicar Ajustes" para confirmar y reliquidar el período.`,
@@ -321,7 +321,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
         });
       } else {
         toast({
-          title: "✅ Novedad Aplicada Inmediatamente",
+          title: "Novedad aplicada inmediatamente",
           description: `${formData.type === 'incapacidad' && valorCalculado > 0 
             ? `Incapacidad calculada correctamente ($${valorCalculado.toLocaleString()})` 
             : 'Ausencia registrada correctamente'} y aplicada al período`,
@@ -396,7 +396,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       // Show different messages based on submission results
       if (hasPendingSubmissions) {
         toast({
-          title: "✅ Novedad Guardada como Ajuste Pendiente",
+          title: "Novedad guardada como ajuste pendiente",
           description: isArrayData 
             ? `${dataArray.length} novedades por $${totalValue.toLocaleString()} agregadas. Usa "Aplicar Ajustes" para confirmar y reliquidar el período.`
             : `Novedad por $${totalValue.toLocaleString()} agregada. Usa "Aplicar Ajustes" para confirmar y reliquidar el período.`,
@@ -404,7 +404,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
         });
       } else {
         toast({
-          title: "✅ Novedad Aplicada Inmediatamente",
+          title: "Novedad aplicada inmediatamente",
           description: isArrayData 
             ? `${dataArray.length} novedades por $${totalValue.toLocaleString()} aplicadas al período`
             : `Novedad por $${totalValue.toLocaleString()} aplicada al período`,
