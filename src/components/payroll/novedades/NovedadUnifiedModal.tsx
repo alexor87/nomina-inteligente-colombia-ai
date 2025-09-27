@@ -48,6 +48,7 @@ interface NovedadUnifiedModalProps {
   mode?: 'liquidacion' | 'ajustes';
   companyId?: string | null;
   currentLiquidatedValues?: EmployeeLiquidatedValues;
+  canEdit?: boolean;
 }
 
 const categoryToNovedadType: Record<NovedadCategory, NovedadType> = {
@@ -86,7 +87,8 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   endDate,
   mode = 'liquidacion',
   companyId,
-  currentLiquidatedValues
+  currentLiquidatedValues,
+  canEdit = true
 }) => {
   const [currentStep, setCurrentStep] = useState<'list' | 'selector' | 'form' | 'absence'>('list');
   const [selectedType, setSelectedType] = useState<NovedadType | null>(selectedNovedadType);
@@ -546,6 +548,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
             onEmployeeNovedadesChange={onEmployeeNovedadesChange}
             mode={mode}
             companyId={companyId}
+            canEdit={canEdit}
           />
         </div>
       );

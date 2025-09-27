@@ -24,6 +24,7 @@ interface NovedadExistingListProps {
   onEmployeeNovedadesChange?: (employeeId: string) => Promise<void>;
   mode?: 'liquidacion' | 'ajustes';
   companyId?: string | null;
+  canEdit?: boolean;
 }
 
 export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
@@ -35,7 +36,8 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
   refreshTrigger,
   onEmployeeNovedadesChange,
   mode = 'liquidacion',
-  companyId
+  companyId,
+  canEdit = true
 }) => {
   const [integratedData, setIntegratedData] = useState<DisplayNovedad[]>([]);
   const [pendingAdjustments, setPendingAdjustments] = useState<PendingAdjustmentRecord[]>([]);
@@ -455,15 +457,17 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
     if (item.origen === 'pending_adjustment' as any || item.origen === 'pending_delete' as any) {
       return (
         <div className="flex gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-red-600 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
-            onClick={() => handleDeletePendingAdjustment(item.id)}
-            title="Eliminar ajuste pendiente"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          {canEdit && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-red-600 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
+              onClick={() => handleDeletePendingAdjustment(item.id)}
+              title="Eliminar ajuste pendiente"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       );
     } else if (item.origen === 'vacaciones') {
@@ -487,7 +491,7 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
           >
             <ExternalLink className="h-4 w-4" />
           </Button>
-          {item.status === 'pendiente' && (
+          {item.status === 'pendiente' && canEdit && (
             <Button
               variant="ghost"
               size="sm"
@@ -503,24 +507,28 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
     } else {
       return (
         <div className="flex gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 h-8 w-8 p-0"
-            onClick={() => handleEditNovedad(item)}
-            title="Editar novedad"
-          >
-            <Edit className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleDeleteByOrigin(item)}
-            className="text-red-600 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
-            title="Eliminar novedad"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          {canEdit && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 h-8 w-8 p-0"
+                onClick={() => handleEditNovedad(item)}
+                title="Editar novedad"
+              >
+                <Edit className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleDeleteByOrigin(item)}
+                className="text-red-600 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
+                title="Eliminar novedad"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </>
+          )}
         </div>
       );
     }
@@ -568,9 +576,11 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
               <p className="text-gray-600 mb-4">
                 Este empleado no tiene novedades ni ausencias registradas
               </p>
-              <Button onClick={onAddNew} variant="outline">
-                Agregar Primera Novedad
-              </Button>
+              {canEdit && (
+                <Button onClick={onAddNew} variant="outline">
+                  Agregar Primera Novedad
+                </Button>
+              )}
             </CardContent>
           </Card>
         ) : (

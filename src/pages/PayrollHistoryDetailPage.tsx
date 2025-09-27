@@ -412,16 +412,6 @@ function PayrollHistoryDetailPageContent() {
 
   // Handle adding novedad - detect period state and show appropriate modal
   const handleAddNovedad = (employeeId: string) => {
-    // Prevent adding novelties for closed periods when not in edit mode
-    if (periodData?.estado === 'cerrado' && !editMode.isActive) {
-      toast({
-        title: "⚠️ Período cerrado",
-        description: "Active el modo edición para agregar novedades",
-        variant: "destructive"
-      });
-      return;
-    }
-    
     const employeeData = employees.find(e => e.id === employeeId);
     setSelectedEmployeeId(employeeId);
     setSelectedEmployeeName(employeeData ? `${employeeData.nombre} ${employeeData.apellido}` : '');
@@ -1021,6 +1011,7 @@ function PayrollHistoryDetailPageContent() {
         onClose={() => setShowAdjustmentModal(false)}
         onEmployeeNovedadesChange={handleEmployeeNovedadesChange}
         selectedNovedadType={null}
+        canEdit={editMode.isActive || periodData?.estado !== 'cerrado'}
         mode={periodData?.estado === 'cerrado' ? 'ajustes' : 'liquidacion'}
         startDate={periodData?.fecha_inicio}
         endDate={periodData?.fecha_fin}
