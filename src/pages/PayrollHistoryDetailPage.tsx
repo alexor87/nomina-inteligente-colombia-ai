@@ -33,6 +33,8 @@ import { AddEmployeeModal } from '@/components/payroll/edit/AddEmployeeModal';
 import { CompositionChangesModal } from '@/components/payroll/edit/CompositionChangesModal';
 import { PeriodVersionViewer } from '@/components/payroll/version/PeriodVersionViewer';
 import { Edit } from 'lucide-react';
+import { UnifiedPeriodEditProvider } from '@/contexts/UnifiedPeriodEditContext';
+import { UnifiedPeriodEditor } from '@/components/payroll/unified-editor/UnifiedPeriodEditor';
 import { StalePayrollAlert } from '@/components/payroll/StalePayrollAlert';
 import { ReliquidationDialog } from '@/components/payroll/liquidation/ReliquidationDialog';
 import { supabase } from '@/integrations/supabase/client';
@@ -106,6 +108,7 @@ function PayrollHistoryDetailPageContent() {
   const [showCompositionChangesModal, setShowCompositionChangesModal] = useState(false);
   const [showReliquidationDialog, setShowReliquidationDialog] = useState(false);
   const [isReliquidating, setIsReliquidating] = useState(false);
+  const [showUnifiedEditor, setShowUnifiedEditor] = useState(false);
 
   // Load novedades for the period
   const {
@@ -1090,14 +1093,24 @@ function PayrollHistoryDetailPageContent() {
         }}
         isReliquidating={isReliquidating}
       />
+
+      {/* Unified Period Editor */}
+      <UnifiedPeriodEditor
+        open={showUnifiedEditor}
+        onClose={() => setShowUnifiedEditor(false)}
+        periodId={periodData?.id || ''}
+        periodName={periodData?.periodo || ''}
+      />
     </div>
   );
 }
 
 export default function PayrollHistoryDetailPage() {
   return (
-    <PayrollEditProvider>
-      <PayrollHistoryDetailPageContent />
-    </PayrollEditProvider>
+    <UnifiedPeriodEditProvider>
+      <PayrollEditProvider>
+        <PayrollHistoryDetailPageContent />
+      </PayrollEditProvider>
+    </UnifiedPeriodEditProvider>
   );
 }
