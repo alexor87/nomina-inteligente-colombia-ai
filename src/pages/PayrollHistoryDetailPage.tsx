@@ -37,6 +37,7 @@ import { UnifiedPeriodEditProvider } from '@/contexts/UnifiedPeriodEditContext';
 import { UnifiedPeriodEditor } from '@/components/payroll/unified-editor/UnifiedPeriodEditor';
 import { StalePayrollAlert } from '@/components/payroll/StalePayrollAlert';
 import { supabase } from '@/integrations/supabase/client';
+import { RecalculateButton } from '@/components/payroll/RecalculateButton';
 
 // Use PayrollPeriodData from service instead of local interface
 
@@ -754,6 +755,11 @@ function PayrollHistoryDetailPageContent() {
           </div>
           
           <div className="flex items-center gap-2">
+            {/* Recalculate Button - always show for closed periods */}
+            {periodData.estado === 'cerrado' && (
+              <RecalculateButton />
+            )}
+            
             {/* Edit Mode Actions */}
             {editMode.isActive && (
               <>
