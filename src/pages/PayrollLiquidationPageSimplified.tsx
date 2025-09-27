@@ -10,6 +10,9 @@ import { useSimplePeriodSelection } from '@/hooks/useSimplePeriodSelection';
 import { EmployeeAddModal } from '@/components/payroll/modals/EmployeeAddModal';
 import { NoveltyImportDrawer } from '@/components/payroll/novelties-import/NoveltyImportDrawer';
 import { useCurrentCompany } from '@/hooks/useCurrentCompany';
+import { MayaProvider } from '@/maya/MayaProvider';
+import { MayaFloatingAssistant } from '@/maya/MayaFloatingAssistant';
+import { MayaIntegratedComponent } from '@/maya/MayaIntegratedComponent';
 
 import { SelectablePeriod } from '@/services/payroll/SimplePeriodService';
 import { PayrollProgressIndicator } from '@/components/payroll/liquidation/PayrollProgressIndicator';
@@ -286,7 +289,19 @@ const PayrollLiquidationPageSimplified = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <MayaProvider>
+      {/* MAYA Integration Components */}
+      <MayaFloatingAssistant />
+      <MayaIntegratedComponent
+        employees={employees}
+        isLoading={isLoading}
+        isLiquidating={isLiquidating}
+        selectedPeriod={selectedPeriod}
+        currentPeriodId={currentPeriodId}
+        liquidationResult={liquidationResult}
+      />
+      
+      <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2">
           <Calculator className="h-6 w-6 text-blue-600" />
@@ -520,6 +535,7 @@ const PayrollLiquidationPageSimplified = () => {
         />
       )}
     </div>
+    </MayaProvider>
   );
 };
 
