@@ -476,23 +476,19 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
       const isDeleteAction = (adjustmentData?.novedad_data as any)?.action === 'delete';
       
       return (
-        <div className="flex gap-2">
+        <div className="flex gap-1">
           {canEdit && (
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
-              className={`${isDeleteAction 
-                ? 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800' 
-                : 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-800'
-              } h-8 px-3 font-medium transition-all duration-200 hover:scale-105`}
+              className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
               onClick={() => handleDeletePendingAdjustment(item.id)}
               title={isDeleteAction 
                 ? "Cancelar eliminación - La novedad original se mantendrá" 
                 : "Eliminar inmediatamente - No afecta liquidación actual"
               }
             >
-              <Trash2 className="h-3 w-3 mr-1" />
-              {isDeleteAction ? 'Cancelar' : 'Quitar'}
+              <Trash2 className="h-3 w-3" />
             </Button>
           )}
         </div>
