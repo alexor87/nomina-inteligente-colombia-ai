@@ -119,7 +119,63 @@ export const VoucherPreviewModal: React.FC<VoucherPreviewModalProps> = ({
         };
       } else {
         console.log('📋 Fallback a datos del empleado + período');
-        requestBody = { employee, period, returnBase64: false };
+        
+        // Fetch employee details from database to ensure consistency
+        const { data: employeeData, error: employeeError } = await import('@/integrations/supabase/client').then(m => 
+          m.supabase
+            .from('employees')
+            .select('nombre, apellido, cedula, cargo')
+            .eq('id', employee.id)
+            .single()
+        );
+
+        if (employeeError) {
+          console.warn('Could not fetch employee details, using fallback data');
+        }
+
+        // Transform employee data to match the format used by VoucherSendDialog
+        const transformedEmployee = {
+          nombre: employeeData?.nombre || employee.name?.split(' ')[0] || 'N/A',
+          apellido: employeeData?.apellido || employee.name?.split(' ').slice(1).join(' ') || 'N/A',
+          cedula: employeeData?.cedula || (employee as any).cedula || 'N/A',
+          cargo: employeeData?.cargo || (employee as any).cargo || 'N/A',
+          salario_base: employee.baseSalary || (employee as any).salario_base || 0,
+          auxilio_transporte: employee.transportAllowance || (employee as any).auxilio_transporte || 0,
+          horas_extra: employee.extraHours || (employee as any).horas_extra || 0,
+          bonificaciones: employee.bonuses || (employee as any).bonificaciones || 0,
+          comisiones: 0,
+          prima: 0,
+          cesantias: 0,
+          vacaciones: 0,
+          otros_devengos: 0,
+          salud_empleado: employee.healthDeduction || (employee as any).salud_empleado || 0,
+          pension_empleado: employee.pensionDeduction || (employee as any).pension_empleado || 0,
+          retencion_fuente: 0,
+          otros_descuentos: (employee.deductions || (employee as any).total_deducciones || 0) - (employee.healthDeduction || (employee as any).salud_empleado || 0) - (employee.pensionDeduction || (employee as any).pension_empleado || 0),
+          total_devengado: employee.grossPay || (employee as any).total_devengado || 0,
+          total_deducciones: employee.deductions || (employee as any).total_deducciones || 0,
+          neto_pagado: employee.netPay || (employee as any).neto_pagado || 0
+        };
+
+        // Get company info
+        const { data: companyInfo } = await import('@/integrations/supabase/client').then(m => 
+          m.supabase
+            .from('companies')
+            .select('razon_social, nit, email, telefono')
+            .single()
+        );
+
+        requestBody = { 
+          employee: transformedEmployee, 
+          period: {
+            startDate: period.startDate,
+            endDate: period.endDate,
+            type: period.type,
+            periodo: `${period.startDate} - ${period.endDate}`
+          },
+          companyInfo,
+          returnBase64: false 
+        };
       }
 
       console.log('📤 Enviando request al generador nativo:', JSON.stringify(requestBody, null, 2));
