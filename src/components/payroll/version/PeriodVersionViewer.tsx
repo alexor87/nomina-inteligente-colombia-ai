@@ -8,10 +8,12 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { BusinessImpactSummary } from './BusinessImpactSummary';
 import { EmployeeChangeCard } from './EmployeeChangeCard';
 import { ChangeTimelineComponent } from './ChangeTimelineComponent';
 import { RollbackConfirmationModal } from './RollbackConfirmationModal';
+import { VersionSnapshotViewer } from './VersionSnapshotViewer';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { PayrollRollbackService, type RollbackImpact } from '@/services/PayrollRollbackService';
@@ -24,7 +26,9 @@ import {
   AlertTriangle, 
   CheckCircle,
   FileX,
-  RotateCcw
+  RotateCcw,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react';
 
 interface PeriodVersionViewerProps {
@@ -44,6 +48,7 @@ export const PeriodVersionViewer: React.FC<PeriodVersionViewerProps> = ({
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(new Set());
+  const [expandedVersions, setExpandedVersions] = useState<Set<string>>(new Set());
   const [repairing, setRepairing] = useState(false);
   const [backfilling, setBackfilling] = useState(false);
   const [rollbackModal, setRollbackModal] = useState<{
@@ -209,6 +214,18 @@ export const PeriodVersionViewer: React.FC<PeriodVersionViewerProps> = ({
     });
   };
 
+  const toggleVersionExpansion = (versionId: string) => {
+    setExpandedVersions(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(versionId)) {
+        newSet.delete(versionId);
+      } else {
+        newSet.add(versionId);
+      }
+      return newSet;
+    });
+  };
+
   const handleRollbackClick = async (versionId: string, versionNumber: number) => {
     try {
       console.log('🔍 Preparing rollback to version:', versionId);
@@ -366,63 +383,92 @@ export const PeriodVersionViewer: React.FC<PeriodVersionViewerProps> = ({
                     <div className="space-y-4">
                       {/* Show initial and current versions */}
                       {[comparison.currentVersion, comparison.initialVersion].filter(Boolean).map((version, index) => (
-                        <Card key={version?.id} className="relative">
-                          <CardHeader className="pb-3">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-3">
-                                <div className="flex items-center gap-2">
-                                  <Clock className="h-4 w-4 text-muted-foreground" />
-                                  <span className="font-medium">Versión {version?.version_number}</span>
+                        <Collapsible key={version?.id}>
+                          <Card className="relative">
+                            <CollapsibleTrigger asChild>
+                              <CardHeader 
+                                className="pb-3 cursor-pointer hover:bg-muted/50 transition-colors"
+                                onClick={() => toggleVersionExpansion(version?.id || '')}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-2">
+                                      {expandedVersions.has(version?.id || '') ? (
+                                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                      ) : (
+                                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                      )}
+                                      <Clock className="h-4 w-4 text-muted-foreground" />
+                                      <span className="font-medium">Versión {version?.version_number}</span>
+                                    </div>
+                                    <Badge variant={
+                                      version?.version_type === 'initial' ? 'secondary' :
+                                      version?.version_type === 'correction' ? 'destructive' :
+                                      (version?.version_type as string) === 'rollback' ? 'outline' :
+                                      'default'
+                                    }>
+                                      {version?.version_type === 'initial' ? 'Inicial' :
+                                       version?.version_type === 'correction' ? 'Corrección' :
+                                       (version?.version_type as string) === 'rollback' ? 'Rollback' :
+                                       'Manual'}
+                                    </Badge>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {/* Show rollback button only for non-current versions */}
+                                    {index > 0 && version && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleRollbackClick(version.id, version.version_number);
+                                        }}
+                                        disabled={isRollbackLoading}
+                                        className="gap-2"
+                                      >
+                                        <RotateCcw className="h-3 w-3" />
+                                        Restaurar
+                                      </Button>
+                                    )}
+                                    <div className="text-right">
+                                      <div className="text-sm text-muted-foreground">
+                                        {version && new Date(version.created_at).toLocaleDateString('es-ES', {
+                                          year: 'numeric',
+                                          month: 'short',
+                                          day: 'numeric',
+                                          hour: '2-digit',
+                                          minute: '2-digit'
+                                        })}
+                                      </div>
+                                      <div className="text-xs text-muted-foreground">
+                                        Usuario desconocido
+                                      </div>
+                                    </div>
+                                  </div>
                                 </div>
-                                <Badge variant={
-                                  version?.version_type === 'initial' ? 'secondary' :
-                                  version?.version_type === 'correction' ? 'destructive' :
-                                  (version?.version_type as string) === 'rollback' ? 'outline' :
-                                  'default'
-                                }>
-                                  {version?.version_type === 'initial' ? 'Inicial' :
-                                   version?.version_type === 'correction' ? 'Corrección' :
-                                   (version?.version_type as string) === 'rollback' ? 'Rollback' :
-                                   'Manual'}
-                                </Badge>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {/* Show rollback button only for non-current versions */}
-                                {index > 0 && version && (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleRollbackClick(version.id, version.version_number)}
-                                    disabled={isRollbackLoading}
-                                    className="gap-2"
-                                  >
-                                    <RotateCcw className="h-3 w-3" />
-                                    Restaurar
-                                  </Button>
+                              </CardHeader>
+                            </CollapsibleTrigger>
+                            <CardContent>
+                              <p className="text-sm text-muted-foreground mb-4">
+                                {version?.changes_summary}
+                              </p>
+                            </CardContent>
+                            <CollapsibleContent>
+                              <CardContent className="pt-0">
+                                {version && (
+                                  <VersionSnapshotViewer
+                                    versionId={version.id}
+                                    versionNumber={version.version_number}
+                                    snapshotData={version.snapshot_data || {}}
+                                    createdAt={version.created_at}
+                                    versionType={version.version_type}
+                                    changesSummary={version.changes_summary}
+                                  />
                                 )}
-                                <div className="text-right">
-                                  <div className="text-sm text-muted-foreground">
-                                    {version && new Date(version.created_at).toLocaleDateString('es-ES', {
-                                      year: 'numeric',
-                                      month: 'short',
-                                      day: 'numeric',
-                                      hour: '2-digit',
-                                      minute: '2-digit'
-                                    })}
-                                  </div>
-                                  <div className="text-xs text-muted-foreground">
-                                    Usuario desconocido
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </CardHeader>
-                          <CardContent>
-                            <p className="text-sm text-muted-foreground">
-                              {version?.changes_summary}
-                            </p>
-                          </CardContent>
-                        </Card>
+                              </CardContent>
+                            </CollapsibleContent>
+                          </Card>
+                        </Collapsible>
                       ))}
                     </div>
                   </div>
