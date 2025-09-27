@@ -9,6 +9,7 @@ import { Plus, FileText, Mail, RefreshCw } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { PayrollNovedad } from '@/types/novedades';
 import { VoucherPreviewModal } from '@/components/payroll/modals/VoucherPreviewModal';
+import { VoucherSendDialog } from '@/components/payroll/modals/VoucherSendDialog';
 import { transformPayrollHistoryToEmployee, PayrollHistoryData } from '@/utils/payrollDataTransformer';
 import { useCompanyDetails } from '@/hooks/useCompanyDetails';
 import { PayrollEmployee } from '@/types/payroll';
@@ -94,6 +95,10 @@ export const ExpandedEmployeesTable = ({
   const [selectedEmployee, setSelectedEmployee] = useState<PayrollEmployee | null>(null);
   const [selectedPayrollId, setSelectedPayrollId] = useState<string | null>(null);
   
+  // Voucher send dialog state
+  const [showVoucherSend, setShowVoucherSend] = useState(false);
+  const [selectedEmployeeForSend, setSelectedEmployeeForSend] = useState<PayrollEmployee | null>(null);
+  
   // Get company details for voucher
   const { companyDetails } = useCompanyDetails();
 
@@ -169,19 +174,68 @@ export const ExpandedEmployeesTable = ({
     };
   };
 
-  const handleSendEmail = async (employeeId: string, employeeName: string, hasEmail: boolean) => {
+  const handleSendEmail = (employeeId: string, employeeName: string, hasEmail: boolean) => {
     if (!hasEmail) return;
     
-    setSendingEmails(prev => ({ ...prev, [employeeId]: true }));
-    
+    const employee = employees.find(emp => emp.id === employeeId);
+    if (!employee || !periodData) {
+      console.error('Employee or period data not found');
+      return;
+    }
+
     try {
-      // Mock email sending
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      console.log(`Email sent to ${employeeName}`);
+      // Transform ExpandedEmployee to PayrollHistoryData format
+      const historyData: PayrollHistoryData = {
+        employee_id: employee.id,
+        employee_name: employee.nombre,
+        employee_lastname: employee.apellido,
+        total_devengado: employee.total_devengado,
+        total_deducciones: employee.total_deducciones,
+        neto_pagado: employee.neto_pagado,
+        salario_base: employee.salario_base,
+        dias_trabajados: employee.dias_trabajados,
+        ibc: employee.ibc,
+        auxilio_transporte: employee.auxilio_transporte,
+        salud_empleado: employee.salud_empleado,
+        pension_empleado: employee.pension_empleado,
+        horas_extra: employee.horas_extra,
+        bonificaciones: employee.bonificaciones,
+        comisiones: employee.comisiones,
+        cesantias: employee.cesantias,
+        prima: employee.prima,
+        vacaciones: employee.vacaciones,
+        incapacidades: employee.incapacidades,
+        otros_devengos: employee.otros_devengos,
+        otros_descuentos: employee.descuentos_varios,
+        retencion_fuente: employee.retencion_fuente,
+        completeEmployeeData: {
+          id: employee.id,
+          nombre: employee.nombre,
+          apellido: employee.apellido,
+          cedula: employee.cedula || 'N/A',
+          email: '',
+          telefono: '',
+          cargo: employee.cargo || 'N/A',
+          salario_base: employee.salario_base,
+          banco: '',
+          tipo_cuenta: '',
+          numero_cuenta: '',
+          eps: employee.eps || 'N/A',
+          afp: employee.afp || 'N/A',
+          arl: 'N/A',
+          caja_compensacion: 'N/A'
+        }
+      };
+
+      // Transform to PayrollEmployee format
+      const payrollEmployee = transformPayrollHistoryToEmployee(historyData);
+      
+      // Set selected employee and show send dialog
+      setSelectedEmployeeForSend(payrollEmployee);
+      setShowVoucherSend(true);
+      
     } catch (error) {
-      console.error('Error sending email:', error);
-    } finally {
-      setSendingEmails(prev => ({ ...prev, [employeeId]: false }));
+      console.error('Error transforming employee data for email:', error);
     }
   };
 
@@ -527,6 +581,23 @@ export const ExpandedEmployeesTable = ({
           email: companyDetails.email
         } : null}
       />
+
+      {/* Voucher Send Dialog */}
+      {showVoucherSend && selectedEmployeeForSend && (
+        <VoucherSendDialog
+          isOpen={showVoucherSend}
+          onClose={() => {
+            setShowVoucherSend(false);
+            setSelectedEmployeeForSend(null);
+          }}
+          employee={selectedEmployeeForSend}
+          period={{
+            startDate: periodData?.fecha_inicio || '',
+            endDate: periodData?.fecha_fin || '',
+            type: periodData?.tipo_periodo || 'mensual'
+          }}
+        />
+      )}
     </Card>
   );
 };
