@@ -23,8 +23,12 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error('No se proporcionó el PDF del comprobante');
     }
 
-    // Convert base64 to buffer for attachment
-    const pdfBuffer = Uint8Array.from(atob(pdfBase64), c => c.charCodeAt(0));
+    // Validate base64 format
+    if (!pdfBase64.match(/^[A-Za-z0-9+/]+=*$/)) {
+      throw new Error('El PDF no está en formato base64 válido');
+    }
+
+    console.log('PDF attachment size (base64):', pdfBase64.length);
     
     const employeeName = `${employee.nombre} ${employee.apellido}`;
     const periodText = `${period.startDate} - ${period.endDate}`;
@@ -150,7 +154,7 @@ const handler = async (req: Request): Promise<Response> => {
       attachments: [
         {
           filename: `Comprobante_${employee.nombre}_${employee.apellido}_${period.startDate.replace(/-/g, '')}.pdf`,
-          content: pdfBuffer,
+          content: pdfBase64
         },
       ],
     });
