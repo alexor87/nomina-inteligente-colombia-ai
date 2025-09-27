@@ -79,6 +79,47 @@ export const VersionSnapshotViewer: React.FC<VersionSnapshotViewerProps> = ({
   const employees = snapshotData.employees || [];
   const novedades = snapshotData.novedades || [];
   const payrolls = snapshotData.payrolls || [];
+  const employeeIdentity = snapshotData.employeeIdentity || {};
+
+  // Helper function to resolve employee identity from multiple sources
+  const resolveEmployeeIdentity = (employeeId: string) => {
+    // 1. Try to find in employees array first
+    const employeeInArray = employees.find(emp => emp.id === employeeId);
+    if (employeeInArray) {
+      return {
+        nombre: employeeInArray.nombre,
+        apellido: employeeInArray.apellido,
+        cedula: employeeInArray.cedula
+      };
+    }
+
+    // 2. Try to find in employeeIdentity object
+    const identityData = employeeIdentity[employeeId];
+    if (identityData) {
+      return {
+        nombre: identityData.nombre,
+        apellido: identityData.apellido,
+        cedula: identityData.cedula
+      };
+    }
+
+    // 3. Try to find in embedded payroll data
+    const payrollData = payrolls.find(p => p.employee_id === employeeId);
+    if (payrollData && (payrollData as any).employee_nombre) {
+      return {
+        nombre: (payrollData as any).employee_nombre,
+        apellido: (payrollData as any).employee_apellido || '',
+        cedula: (payrollData as any).employee_cedula || ''
+      };
+    }
+
+    // 4. Fallback: return ID with partial info
+    return {
+      nombre: `Empleado ${employeeId.slice(-8)}`,
+      apellido: '',
+      cedula: ''
+    };
+  };
 
   // Filter employees based on search
   const filteredEmployees = employees.filter(emp => 
@@ -292,7 +333,7 @@ export const VersionSnapshotViewer: React.FC<VersionSnapshotViewerProps> = ({
           <ScrollArea className="h-[400px]">
             <div className="space-y-2">
               {novedades.map((novedad) => {
-                const employee = employees.find(emp => emp.id === novedad.empleado_id);
+                const employeeInfo = resolveEmployeeIdentity(novedad.empleado_id);
                 return (
                   <Card key={novedad.id} className="p-4">
                     <div className="flex items-center justify-between">
@@ -302,7 +343,8 @@ export const VersionSnapshotViewer: React.FC<VersionSnapshotViewerProps> = ({
                           <div className="text-sm text-muted-foreground">{novedad.subtipo}</div>
                         )}
                         <div className="text-sm text-muted-foreground">
-                          {employee ? `${employee.nombre} ${employee.apellido}` : 'Empleado no encontrado'}
+                          {employeeInfo.nombre} {employeeInfo.apellido}
+                          {employeeInfo.cedula && ` - ${employeeInfo.cedula}`}
                         </div>
                       </div>
                       <div className="text-right">
@@ -322,16 +364,17 @@ export const VersionSnapshotViewer: React.FC<VersionSnapshotViewerProps> = ({
           <ScrollArea className="h-[400px]">
             <div className="space-y-2">
               {payrolls.map((payroll) => {
-                const employee = employees.find(emp => emp.id === payroll.employee_id);
+                const employeeInfo = resolveEmployeeIdentity(payroll.employee_id);
                 return (
                   <Card key={payroll.id} className="p-4">
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="font-medium">
-                          {employee ? `${employee.nombre} ${employee.apellido}` : 'Empleado no encontrado'}
+                          {employeeInfo.nombre} {employeeInfo.apellido}
                         </div>
                         <div className="text-sm text-muted-foreground">
                           Período: {payroll.periodo} | Estado: {payroll.estado}
+                          {employeeInfo.cedula && ` | ${employeeInfo.cedula}`}
                         </div>
                       </div>
                       <div className="text-right">
