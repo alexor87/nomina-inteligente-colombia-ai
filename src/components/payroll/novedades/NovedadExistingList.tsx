@@ -216,7 +216,7 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
         toast({
           title: "⏳ Eliminación Pendiente",
           description: `La novedad será eliminada cuando apliques los ajustes. Se reliquidará el período automáticamente.`,
-          className: "border-yellow-200 bg-yellow-50"
+          variant: "warning"
         });
 
         // Trigger parent component update to show pending adjustments banner
@@ -427,8 +427,22 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
 
   // Handle deletion of pending adjustments
   const handleDeletePendingAdjustment = async (adjustmentId: string) => {
-    if (window.confirm('¿Estás seguro de que deseas eliminar este ajuste pendiente?')) {
+    const adjustmentToDelete = pendingAdjustments.find(p => p.id === adjustmentId);
+    const isDeleteAction = (adjustmentToDelete?.novedad_data as any)?.action === 'delete';
+    
+    const confirmMessage = isDeleteAction 
+      ? '¿Estás seguro de que deseas cancelar la eliminación pendiente? La novedad original se mantendrá en el período.'
+      : '¿Estás seguro de que deseas eliminar este ajuste? Se eliminará inmediatamente sin afectar la liquidación actual.';
+    
+    if (window.confirm(confirmMessage)) {
       try {
+        // Add fade-out animation class before deletion
+        const cardElement = document.querySelector(`[data-pending-id="${adjustmentId}"]`);
+        if (cardElement) {
+          cardElement.classList.add('animate-fade-out');
+          await new Promise(resolve => setTimeout(resolve, 200)); // Wait for animation
+        }
+        
         await PendingAdjustmentsService.deletePendingAdjustment(adjustmentId);
         setPendingAdjustments(prev => prev.filter(p => p.id !== adjustmentId));
         
@@ -438,8 +452,11 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
         }
         
         toast({
-          title: "Ajuste eliminado",
-          description: "El ajuste pendiente se ha eliminado correctamente",
+          title: isDeleteAction ? "📋 Eliminación Cancelada" : "🗑️ Ajuste Eliminado",
+          description: isDeleteAction 
+            ? "La eliminación pendiente fue cancelada. La novedad original se mantiene."
+            : "El ajuste fue eliminado inmediatamente. No afecta la liquidación actual.",
+          variant: "success"
         });
       } catch (error) {
         console.error('❌ Error eliminando ajuste pendiente:', error);
@@ -455,17 +472,27 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
   const getActionButtons = (item: DisplayNovedad) => {
     // Handle both pending adjustment types (create and delete)
     if (item.origen === 'pending_adjustment' as any || item.origen === 'pending_delete' as any) {
+      const adjustmentData = pendingAdjustments.find(p => p.id === item.id);
+      const isDeleteAction = (adjustmentData?.novedad_data as any)?.action === 'delete';
+      
       return (
-        <div className="flex gap-1">
+        <div className="flex gap-2">
           {canEdit && (
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
-              className="text-red-600 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
+              className={`${isDeleteAction 
+                ? 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800' 
+                : 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-800'
+              } h-8 px-3 font-medium transition-all duration-200 hover:scale-105`}
               onClick={() => handleDeletePendingAdjustment(item.id)}
-              title="Eliminar ajuste pendiente"
+              title={isDeleteAction 
+                ? "Cancelar eliminación - La novedad original se mantendrá" 
+                : "Eliminar inmediatamente - No afecta liquidación actual"
+              }
             >
-              <Trash2 className="h-4 w-4" />
+              <Trash2 className="h-3 w-3 mr-1" />
+              {isDeleteAction ? 'Cancelar' : 'Quitar'}
             </Button>
           )}
         </div>
@@ -736,7 +763,7 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
               
               {/* Pending adjustments */}
               {convertPendingToDisplay(pendingAdjustments).map((item) => (
-                <Card key={`pending-${item.id}`} className="border-orange-200 bg-orange-50 hover:shadow-md transition-shadow">
+                <Card key={`pending-${item.id}`} data-pending-id={item.id} className="border-orange-200 bg-orange-50 hover:shadow-md transition-all duration-200 hover:border-orange-300">
                   <CardContent className="pt-4">
                     <div className="grid grid-cols-12 gap-4 items-center">
                       <div className="col-span-12 sm:col-span-4 lg:col-span-3">
