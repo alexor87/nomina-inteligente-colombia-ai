@@ -128,8 +128,8 @@ const calculatePayrollLiquidationStyle = async (supabase: any, employeeData: any
   // FASE 4: Total devengado = salario proporcional + auxilio transporte + devengos novedades
   const totalDevengado = salarioProporcional + auxilioTransporte + novedadesTotals.totalDevengos;
   
-  // FASE 5: Calcular deducciones usando salario base (igual que PayrollLiquidationService líneas 132-138)
-  const deductionResult = calculateDeductions(salarioBase, year);
+  // FASE 5: Calcular deducciones usando salario proporcional (corregido para períodos no mensuales)
+  const deductionResult = calculateDeductions(salarioProporcional, year);
   
   // FASE 6: Total deducciones = deducciones calculadas + deducciones por novedades
   const totalDeducciones = deductionResult.totalDeducciones + novedadesTotals.totalDeducciones;
