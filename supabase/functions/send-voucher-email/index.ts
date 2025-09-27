@@ -167,13 +167,32 @@ const handler = async (req: Request): Promise<Response> => {
       ],
     });
 
-    console.log("Email sent successfully:", emailResponse);
+    console.log("Email response from Resend:", emailResponse);
+
+    // Check if Resend returned an error
+    if (emailResponse.error) {
+      console.error("Resend API error:", emailResponse.error);
+      
+      // Handle specific Resend errors based on message content
+      const errorMessage = emailResponse.error.message || '';
+      
+      if (errorMessage.includes('verify a domain') || errorMessage.includes('testing emails')) {
+        throw new Error('Error de configuración: Para enviar emails a otros destinatarios, necesitas verificar un dominio en resend.com/domains y actualizar el email "from" para usar ese dominio verificado. Actualmente solo puedes enviar emails de prueba a tu propio email registrado.');
+      }
+      
+      throw new Error(`Error del servicio de email: ${errorMessage}`);
+    }
+
+    // Verify we have a successful response
+    if (!emailResponse.data?.id) {
+      throw new Error('El email no se pudo enviar. Verifica la configuración de Resend.');
+    }
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         message: `Comprobante enviado exitosamente a ${emails.length} destinatario(s)`,
-        emailId: emailResponse.data?.id 
+        emailId: emailResponse.data.id 
       }),
       {
         headers: { 
