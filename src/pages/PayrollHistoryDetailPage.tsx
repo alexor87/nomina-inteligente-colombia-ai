@@ -167,6 +167,8 @@ function PayrollHistoryDetailPageContent() {
             console.log('✅ IBC recalculation completed:', result);
             // Reload employees to show corrected IBC
             await loadEmployees();
+            // Reload period detail to refresh header totals
+            await loadPeriodDetail();
             toast({
               title: "IBC Corregido",
               description: `IBC recalculado para ${result.employees_processed} empleados`,
@@ -534,6 +536,8 @@ function PayrollHistoryDetailPageContent() {
           console.log('🔄 Triggering IBC recalculation after adjustments...');
           await PayrollRecalculationService.recalculateIBC(periodId, periodData.company_id);
           console.log('✅ IBC recalculation completed');
+          // Reload period detail to refresh header totals after IBC recalculation
+          await loadPeriodDetail();
         } catch (ibcError) {
           console.error('⚠️ IBC recalculation failed:', ibcError);
           // Don't fail the whole operation, just log the warning

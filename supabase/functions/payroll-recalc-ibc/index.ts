@@ -14,16 +14,30 @@ interface RecalculateIBCRequest {
   };
 }
 
-// Configuración oficial por año
+// Configuración oficial por año - replicando ConfigurationService
 const OFFICIAL_VALUES = {
-  2024: { salarioMinimo: 1300000, auxilioTransporte: 162000, uvt: 47065 },
-  2025: { salarioMinimo: 1423000, auxilioTransporte: 162000, uvt: 47065 }
-};
-
-const getTransportAssistanceLimit = (year: string = '2025') => {
-  const yearKey = (year === '2024' || year === '2025') ? year : '2025';
-  const { salarioMinimo } = OFFICIAL_VALUES[yearKey];
-  return salarioMinimo * 2;
+  2024: { 
+    salarioMinimo: 1300000, 
+    auxilioTransporte: 162000, 
+    uvt: 47065,
+    porcentajes: {
+      saludEmpleado: 0.04,
+      pensionEmpleado: 0.04,
+      saludEmpleador: 0.085,
+      pensionEmpleador: 0.12
+    }
+  },
+  2025: { 
+    salarioMinimo: 1423000, 
+    auxilioTransporte: 162000, 
+    uvt: 47065,
+    porcentajes: {
+      saludEmpleado: 0.04,
+      pensionEmpleado: 0.04,
+      saludEmpleador: 0.085,
+      pensionEmpleador: 0.12
+    }
+  }
 };
 
 const calculateWorkedDays = (periodType: string) => {
@@ -35,128 +49,105 @@ const calculateWorkedDays = (periodType: string) => {
   }
 };
 
-const convertNovedadesToIBC = (novedades: any[]) => {
-  return novedades.map(novedad => {
-    let constitutivo = false;
-    
-    // Lógica de constitutividad igual a otras funciones
-    const tipo = novedad.tipo_novedad?.toLowerCase();
-    switch (tipo) {
-      case 'horas_extra':
-      case 'recargos':
-      case 'comisiones':
-      case 'bonificaciones':
-      case 'primas':
-        constitutivo = true;
-        break;
-      case 'incapacidad':
-      case 'vacaciones':
-      case 'ausencia':
-      case 'licencia_no_remunerada':
-        constitutivo = false;
-        break;
-      default:
-        constitutivo = novedad.constitutivo_salario === true;
-    }
-
-    return {
-      valor: Number(novedad.valor) || 0,
-      constitutivo_salario: constitutivo,
-      tipo_novedad: novedad.tipo_novedad,
-      dias: novedad.dias,
-      subtipo: novedad.subtipo === 'general' || novedad.subtipo === 'laboral' 
-        ? novedad.subtipo 
-        : (novedad.subtipo?.includes('general') || novedad.subtipo?.includes('General') ? 'general' : 'laboral')
-    };
-  });
-};
-
-const isNovedadConstitutiva = (tipoNovedad: string, valorExplicito?: boolean) => {
-  if (valorExplicito !== undefined) return valorExplicito;
+// Replicando DeductionCalculationService.calculateTransportAllowance
+const calculateTransportAllowance = (baseSalary: number, workedDays: number, year: string = '2025') => {
+  const yearKey = (year === '2024' || year === '2025') ? year : '2025';
+  const config = OFFICIAL_VALUES[yearKey];
   
-  const tipo = tipoNovedad?.toLowerCase();
-  switch (tipo) {
-    case 'horas_extra':
-    case 'recargos':
-    case 'comisiones':
-    case 'bonificaciones':
-    case 'primas':
-      return true;
-    default:
-      return false;
+  const limite2SMMLV = config.salarioMinimo * 2;
+  
+  if (baseSalary <= limite2SMMLV) {
+    return Math.round((config.auxilioTransporte / 30) * workedDays);
   }
+  
+  return 0;
 };
 
-const getCompanyPolicy = async (supabase: any, companyId: string) => {
-  // Mock policy - en producción vendría de la DB
+// Replicando DeductionCalculationService.calculateDeductions (lógica simple: IBC = salarioBase)
+const calculateDeductions = (salarioBase: number, year: string = '2025') => {
+  const yearKey = (year === '2024' || year === '2025') ? year : '2025';
+  const config = OFFICIAL_VALUES[yearKey];
+  
+  // IBC = salario base (lógica simple de PayrollLiquidationService)
+  const ibcFinal = salarioBase;
+  
+  const saludEmpleado = Math.round(ibcFinal * config.porcentajes.saludEmpleado);
+  const pensionEmpleado = Math.round(ibcFinal * config.porcentajes.pensionEmpleado);
+  const totalDeducciones = saludEmpleado + pensionEmpleado;
+  
   return {
-    incapacidad_general_percentage: 66.67,
-    incapacidad_laboral_percentage: 100,
-    dias_carencia_incapacidad: 2
+    saludEmpleado,
+    pensionEmpleado,
+    totalDeducciones,
+    ibc: ibcFinal
   };
 };
 
-const calculatePayroll = async (supabase: any, employeeData: any, periodData: any, novedades: any[], companyId: string) => {
+// Función simplificada para obtener totales de novedades (llamada al edge function)
+const getNovedadesTotals = async (supabase: any, employeeId: string, periodId: string) => {
+  try {
+    const { data, error } = await supabase.functions.invoke('payroll-calculations', {
+      body: {
+        action: 'calculate_novedades_totals',
+        data: {
+          employee_id: employeeId,
+          period_id: periodId
+        }
+      }
+    });
+
+    if (error) {
+      console.warn(`⚠️ Error getting novedades for employee ${employeeId}:`, error);
+      return { totalDevengos: 0, totalDeducciones: 0, totalNeto: 0 };
+    }
+
+    return data?.totals || { totalDevengos: 0, totalDeducciones: 0, totalNeto: 0 };
+  } catch (error) {
+    console.warn(`⚠️ Exception getting novedades for employee ${employeeId}:`, error);
+    return { totalDevengos: 0, totalDeducciones: 0, totalNeto: 0 };
+  }
+};
+
+// Nueva función que replica EXACTAMENTE la lógica de PayrollLiquidationService
+const calculatePayrollLiquidationStyle = async (supabase: any, employeeData: any, periodData: any, companyId: string) => {
   const year = new Date(periodData.fecha_inicio).getFullYear().toString();
-  const yearKey = (year === '2024' || year === '2025') ? year : '2025';
-  const officialValues = OFFICIAL_VALUES[yearKey];
-  const transportLimit = getTransportAssistanceLimit(year);
-  
   const salarioBase = Number(employeeData.salario_base) || 0;
-  const workedDays = calculateWorkedDays(periodData.tipo_periodo);
-  const proportionalFactor = workedDays / 30;
+  const diasTrabajados = calculateWorkedDays(periodData.tipo_periodo);
   
-  // Auxilio de transporte prorrateado
-  const auxTransp = salarioBase <= transportLimit ? (officialValues.auxilioTransporte * proportionalFactor) : 0;
+  console.log(`🧮 Calculando empleado ${employeeData.nombre} - Salario base: ${salarioBase}, Días: ${diasTrabajados}`);
   
-  // Calcular IBC
-  let ibcConstitutivo = salarioBase;
-  let ibcIncapacidades = 0;
+  // FASE 1: Calcular salario proporcional (igual que PayrollLiquidationService línea 128)
+  const salarioProporcional = (salarioBase / 30) * diasTrabajados;
   
-  for (const novedad of novedades) {
-    if (isNovedadConstitutiva(novedad.tipo_novedad, novedad.constitutivo_salario)) {
-      ibcConstitutivo += Number(novedad.valor) || 0;
-    }
-    
-    if (novedad.tipo_novedad === 'incapacidad') {
-      ibcIncapacidades += Number(novedad.valor) || 0;
-    }
-  }
+  // FASE 2: Calcular auxilio de transporte prorrateado (igual que PayrollLiquidationService línea 129)
+  const auxilioTransporte = calculateTransportAllowance(salarioBase, diasTrabajados, year);
   
-  const ibcProporcional = ibcConstitutivo * proportionalFactor;
-  const ibc = Math.max(ibcProporcional - Math.abs(ibcIncapacidades), officialValues.salarioMinimo * proportionalFactor);
+  // FASE 3: Obtener devengos por novedades usando el servicio de cálculo
+  const novedadesTotals = await getNovedadesTotals(supabase, employeeData.id, periodData.id);
   
-  // Calcular deducciones
-  const healthDeduction = ibc * 0.04;
-  const pensionDeduction = ibc * 0.04;
-  const totalDeductions = healthDeduction + pensionDeduction;
+  // FASE 4: Total devengado = salario proporcional + auxilio transporte + devengos novedades
+  const totalDevengado = salarioProporcional + auxilioTransporte + novedadesTotals.totalDevengos;
   
-  // Calcular devengos totales
-  let totalDevengos = salarioBase + auxTransp;
-  for (const novedad of novedades) {
-    if (Number(novedad.valor) > 0) {
-      totalDevengos += Number(novedad.valor);
-    }
-  }
+  // FASE 5: Calcular deducciones usando salario base (igual que PayrollLiquidationService líneas 132-138)
+  const deductionResult = calculateDeductions(salarioBase, year);
   
-  // Calcular descuentos adicionales (novedades negativas)
-  let descuentos = 0;
-  for (const novedad of novedades) {
-    if (Number(novedad.valor) < 0) {
-      descuentos += Math.abs(Number(novedad.valor));
-    }
-  }
+  // FASE 6: Total deducciones = deducciones calculadas + deducciones por novedades
+  const totalDeducciones = deductionResult.totalDeducciones + novedadesTotals.totalDeducciones;
   
-  const netPay = totalDevengos - totalDeductions - descuentos;
+  // FASE 7: Neto pagado = total devengado - total deducciones
+  const netoPagado = totalDevengado - totalDeducciones;
+  
+  console.log(`✅ Empleado ${employeeData.nombre}: Devengado=${totalDevengado}, Deducciones=${totalDeducciones}, Neto=${netoPagado}`);
   
   return {
-    totalDevengos,
-    totalDeductions,
-    healthDeduction,
-    pensionDeduction,
-    ibc,
-    netPay,
-    auxTransp
+    totalDevengado,
+    totalDeducciones,
+    saludEmpleado: deductionResult.saludEmpleado,
+    pensionEmpleado: deductionResult.pensionEmpleado,
+    ibc: deductionResult.ibc,
+    netoPagado,
+    auxilioTransporte,
+    salarioProporcional
   };
 };
 
@@ -229,46 +220,34 @@ serve(async (req) => {
 
     console.log(`📝 Found ${novedades.length} novedades`);
 
-    // Agrupar novedades por empleado
-    const novedadesByEmployee = novedades.reduce((acc, novedad) => {
-      const empId = novedad.empleado_id;
-      if (!acc[empId]) acc[empId] = [];
-      acc[empId].push(novedad);
-      return acc;
-    }, {} as Record<string, any[]>);
-
     let updatedCount = 0;
     let totalDevengado = 0;
     let totalDeducciones = 0;
     let totalNeto = 0;
 
-    // 4. Procesar cada payroll
+    // 4. Procesar cada payroll con la nueva lógica de PayrollLiquidationService
     for (const payroll of payrolls) {
-      const employeeNovedades = novedadesByEmployee[payroll.employee_id] || [];
-      const convertedNovedades = convertNovedadesToIBC(employeeNovedades);
-      
       console.log(`🔄 Processing ${payroll.employees.nombre} ${payroll.employees.apellido}...`);
 
-      // Calcular con la misma lógica que otras funciones
-      const calculation = await calculatePayroll(
+      // Usar la nueva función que replica PayrollLiquidationService
+      const calculation = await calculatePayrollLiquidationStyle(
         supabase, 
         payroll.employees, 
         periodData, 
-        convertedNovedades, 
         company_id
       );
 
-      // Actualizar payroll con TODOS los campos
+      // Actualizar payroll con TODOS los campos necesarios
       const { error: updateError } = await supabase
         .from('payrolls')
         .update({
-          total_devengado: calculation.totalDevengos,
-          total_deducciones: calculation.totalDeductions,
-          salud_empleado: calculation.healthDeduction,
-          pension_empleado: calculation.pensionDeduction,
+          total_devengado: calculation.totalDevengado,
+          total_deducciones: calculation.totalDeducciones,
+          salud_empleado: calculation.saludEmpleado,
+          pension_empleado: calculation.pensionEmpleado,
           ibc: calculation.ibc,
-          neto_pagado: calculation.netPay,
-          auxilio_transporte: calculation.auxTransp,
+          neto_pagado: calculation.netoPagado,
+          auxilio_transporte: calculation.auxilioTransporte,
           is_stale: false,
           updated_at: new Date().toISOString()
         })
@@ -280,11 +259,11 @@ serve(async (req) => {
       }
 
       updatedCount++;
-      totalDevengado += calculation.totalDevengos;
-      totalDeducciones += calculation.totalDeductions;
-      totalNeto += calculation.netPay;
+      totalDevengado += calculation.totalDevengado;
+      totalDeducciones += calculation.totalDeducciones;
+      totalNeto += calculation.netoPagado;
 
-      console.log(`✅ Updated ${payroll.employees.nombre}: IBC=${calculation.ibc.toFixed(0)}, Deductions=${calculation.totalDeductions.toFixed(0)}, Net=${calculation.netPay.toFixed(0)}`);
+      console.log(`✅ Updated ${payroll.employees.nombre}: IBC=${calculation.ibc.toFixed(0)}, Deductions=${calculation.totalDeducciones.toFixed(0)}, Net=${calculation.netoPagado.toFixed(0)}`);
     }
 
     // 5. Actualizar totales del período
