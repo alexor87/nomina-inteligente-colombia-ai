@@ -34,6 +34,8 @@ import { CompositionChangesModal } from '@/components/payroll/edit/CompositionCh
 import { PeriodVersionViewer } from '@/components/payroll/version/PeriodVersionViewer';
 import { Edit } from 'lucide-react';
 import { StalePayrollAlert } from '@/components/payroll/StalePayrollAlert';
+import { ReliquidationDialog } from '@/components/payroll/liquidation/ReliquidationDialog';
+import { supabase } from '@/integrations/supabase/client';
 
 // Use PayrollPeriodData from service instead of local interface
 
@@ -102,6 +104,8 @@ function PayrollHistoryDetailPageContent() {
   const [selectedEmployeeName, setSelectedEmployeeName] = useState<string>('');
   const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false);
   const [showCompositionChangesModal, setShowCompositionChangesModal] = useState(false);
+  const [showReliquidationDialog, setShowReliquidationDialog] = useState(false);
+  const [isReliquidating, setIsReliquidating] = useState(false);
 
   // Load novedades for the period
   const {
@@ -256,6 +260,59 @@ function PayrollHistoryDetailPageContent() {
       });
     } finally {
       setIsRecalculatingAll(false);
+    }
+  };
+
+  // Handle reliquidation with edge function for persistence and audit
+  const handleReliquidation = () => {
+    setShowReliquidationDialog(true);
+  };
+
+  const executeReliquidation = async (justification: string) => {
+    if (!periodData || employees.length === 0) return;
+    
+    console.log('🔄 Iniciando reliquidación formal con auditoría...');
+    setIsReliquidating(true);
+    
+    try {
+      // Get employee IDs for reliquidation
+      const affectedEmployeeIds = employees.map(emp => emp.id);
+      
+      // Call the edge function for reliquidation with audit
+      const { data, error } = await supabase.functions.invoke('reliquidate-period-adjustments', {
+        body: {
+          periodId: periodData.id,
+          affectedEmployeeIds,
+          justification
+        }
+      });
+
+      if (error) {
+        console.error('❌ Error en reliquidación:', error);
+        throw new Error(error.message || 'Error en el proceso de reliquidación');
+      }
+
+      console.log('✅ Reliquidación completada:', data);
+      
+      // Reload employees to show updated values from database
+      await loadEmployees();
+      
+      toast({
+        title: "Reliquidación completada",
+        description: `${data.employeesAffected} empleados reliquidados y cambios auditados`,
+      });
+      
+      setShowReliquidationDialog(false);
+      
+    } catch (error) {
+      console.error('❌ Error en reliquidación:', error);
+      toast({
+        title: "Error en reliquidación",
+        description: error instanceof Error ? error.message : "No se pudo completar la reliquidación",
+        variant: "destructive",
+      });
+    } finally {
+      setIsReliquidating(false);
     }
   };
 
@@ -817,16 +874,16 @@ function PayrollHistoryDetailPageContent() {
             <Button 
               variant="outline"
               size="sm"
-              onClick={recalculateAllEmployees}
-              disabled={isRecalculatingAll || isLoadingEmployees}
+              onClick={handleReliquidation}
+              disabled={isReliquidating || isLoadingEmployees}
               className="flex items-center gap-2"
             >
-              {isRecalculatingAll ? (
+              {isReliquidating ? (
                 <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary" />
               ) : (
                 <RefreshCw className="h-3 w-3" />
               )}
-              {isRecalculatingAll ? "Recalculando..." : "Recalcular Todo"}
+              {isReliquidating ? "Reliquidando..." : "Recalcular Todo"}
             </Button>
             
         </div>
@@ -1014,6 +1071,24 @@ function PayrollHistoryDetailPageContent() {
         onClose={() => setShowVersionViewer(false)}
         periodId={periodId || ''}
         periodName={periodData?.periodo || ''}
+      />
+
+      {/* Reliquidation Confirmation Dialog */}
+      <ReliquidationDialog
+        isOpen={showReliquidationDialog}
+        onClose={() => setShowReliquidationDialog(false)}
+        onViewResults={() => {
+          // Navigate to audit tab
+          setShowReliquidationDialog(false);
+        }}
+        onReliquidate={executeReliquidation}
+        periodName={periodData?.periodo || ''}
+        summary={{
+          totalEmployees: employees.length,
+          totalDevengado: periodData?.total_devengado || 0,
+          totalNeto: periodData?.total_neto || 0
+        }}
+        isReliquidating={isReliquidating}
       />
     </div>
   );
