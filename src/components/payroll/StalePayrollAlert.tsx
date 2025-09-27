@@ -35,7 +35,21 @@ export const StalePayrollAlert: React.FC<StalePayrollAlertProps> = ({
     ? stalePayrolls.filter(sp => sp.period_id === periodId)
     : stalePayrolls;
 
+  // Solo mostrar si realmente hay registros desactualizados después de un tiempo
+  // para evitar mostrar alertas innecesarias durante flujos normales
   if (loading || relevantStalePayrolls.length === 0) {
+    return null;
+  }
+  
+  // Evitar mostrar la alerta inmediatamente después de cambios
+  // Solo mostrar si los registros han estado desactualizados por más de 10 segundos
+  const hasOldStaleRecords = relevantStalePayrolls.some(sp => {
+    const updatedAt = new Date(sp.updated_at);
+    const tenSecondsAgo = new Date(Date.now() - 10000);
+    return updatedAt < tenSecondsAgo;
+  });
+  
+  if (!hasOldStaleRecords) {
     return null;
   }
 

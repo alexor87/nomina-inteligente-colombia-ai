@@ -84,11 +84,42 @@ export const useStalePayrollSync = () => {
     }
   };
 
+  const autoSyncStalePayrolls = async (companyId: string, periodId?: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        'recalculate-stale-payrolls',
+        {
+          body: {
+            action: 'recalculate_stale_payrolls',
+            data: { 
+              company_id: companyId,
+              ...(periodId && { period_id: periodId })
+            }
+          }
+        }
+      );
+
+      if (error) {
+        console.error('Error en auto-sincronización:', error);
+        return false;
+      }
+
+      // Solo actualizar la lista silenciosamente, sin toasts
+      await getStalePayrolls(companyId);
+      return true;
+      
+    } catch (error) {
+      console.error('Error en auto-sincronización:', error);
+      return false;
+    }
+  };
+
   return {
     stalePayrolls,
     loading,
     syncing,
     getStalePayrolls,
-    syncStalePayrolls
+    syncStalePayrolls,
+    autoSyncStalePayrolls
   };
 };

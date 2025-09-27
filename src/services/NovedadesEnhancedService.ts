@@ -185,6 +185,27 @@ export class NovedadesEnhancedService {
         console.warn('⚠️ No se pudo registrar acción de auditoría:', auditError);
       }
 
+      // ✅ AUTO-SINCRONIZACIÓN: Sincronizar automáticamente después de crear novedad
+      try {
+        // Obtener el supabase client para llamar la función
+        const { supabase } = await import('@/integrations/supabase/client');
+        
+        await supabase.functions.invoke('recalculate-stale-payrolls', {
+          body: {
+            action: 'recalculate_stale_payrolls',
+            data: { 
+              company_id: companyId,
+              period_id: novedadData.periodo_id
+            }
+          }
+        });
+        
+        console.log('✅ Auto-sincronización completada para novedad:', novedad.id);
+      } catch (syncError) {
+        console.warn('⚠️ Error en auto-sincronización (no crítico):', syncError);
+        // No lanzar error, la novedad ya se creó correctamente
+      }
+
       return mapDbRowToApp(novedad);
       
     } catch (error) {
