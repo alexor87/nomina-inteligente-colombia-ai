@@ -94,7 +94,7 @@ export const PeriodVersionViewer: React.FC<PeriodVersionViewerProps> = ({
     
     setBackfilling(true);
     try {
-      const employeeIds = Object.keys(comparison.employeeChanges);
+      const employeeIds = comparison.employeeChanges.map(change => change.employeeId);
       
       const { data: employees, error } = await supabase
         .from('employees')
@@ -108,10 +108,17 @@ export const PeriodVersionViewer: React.FC<PeriodVersionViewerProps> = ({
 
       if (employees && employees.length > 0) {
         const updatedComparison = { ...comparison };
-        employees.forEach(emp => {
-          if (updatedComparison.employeeChanges[emp.id]) {
-            updatedComparison.employeeChanges[emp.id].employeeName = `${emp.nombre} ${emp.apellido}`;
+        const employeeMap = new Map(employees.map(emp => [emp.id, emp]));
+        
+        updatedComparison.employeeChanges = updatedComparison.employeeChanges.map(change => {
+          const employee = employeeMap.get(change.employeeId);
+          if (employee) {
+            return {
+              ...change,
+              employeeName: `${employee.nombre} ${employee.apellido}`
+            };
           }
+          return change;
         });
         
         setComparison(updatedComparison);
@@ -140,13 +147,13 @@ export const PeriodVersionViewer: React.FC<PeriodVersionViewerProps> = ({
       ['Empleado ID', 'Nombre', 'Valor Anterior', 'Valor Nuevo', 'Diferencia', 'Tipo de Cambio']
     ];
 
-    Object.entries(comparison.employeeChanges).forEach(([employeeId, change]) => {
+    comparison.employeeChanges.forEach((change) => {
       csvData.push([
-        employeeId,
+        change.employeeId,
         change.employeeName || 'Desconocido',
-        change.oldValue?.toString() || '0',
-        change.newValue?.toString() || '0',
-        change.difference?.toString() || '0',
+        change.initialData?.neto_pagado?.toString() || '0',
+        change.currentData?.neto_pagado?.toString() || '0',
+        change.impactAmount?.toString() || '0',
         change.changeType || 'unknown'
       ]);
     });
@@ -337,7 +344,7 @@ export const PeriodVersionViewer: React.FC<PeriodVersionViewerProps> = ({
                   </TabsTrigger>
                   <TabsTrigger value="employees" className="flex items-center gap-2">
                     <Users className="h-4 w-4" />
-                    Empleados ({Object.keys(comparison.employeeChanges || {}).length})
+                    Empleados ({comparison.employeeChanges?.length || 0})
                   </TabsTrigger>
                   <TabsTrigger value="timeline" className="flex items-center gap-2">
                     <Clock className="h-4 w-4" />
@@ -359,29 +366,29 @@ export const PeriodVersionViewer: React.FC<PeriodVersionViewerProps> = ({
                     <div className="space-y-4">
                       {/* Show initial and current versions */}
                       {[comparison.currentVersion, comparison.initialVersion].filter(Boolean).map((version, index) => (
-                        <Card key={version.id} className="relative">
+                        <Card key={version?.id} className="relative">
                           <CardHeader className="pb-3">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-3">
                                 <div className="flex items-center gap-2">
                                   <Clock className="h-4 w-4 text-muted-foreground" />
-                                  <span className="font-medium">Versión {version.version_number}</span>
+                                  <span className="font-medium">Versión {version?.version_number}</span>
                                 </div>
                                 <Badge variant={
-                                  version.version_type === 'initial' ? 'secondary' :
-                                  version.version_type === 'correction' ? 'destructive' :
-                                  version.version_type === 'rollback' ? 'outline' :
+                                  version?.version_type === 'initial' ? 'secondary' :
+                                  version?.version_type === 'correction' ? 'destructive' :
+                                  (version?.version_type as string) === 'rollback' ? 'outline' :
                                   'default'
                                 }>
-                                  {version.version_type === 'initial' ? 'Inicial' :
-                                   version.version_type === 'correction' ? 'Corrección' :
-                                   version.version_type === 'rollback' ? 'Rollback' :
+                                  {version?.version_type === 'initial' ? 'Inicial' :
+                                   version?.version_type === 'correction' ? 'Corrección' :
+                                   (version?.version_type as string) === 'rollback' ? 'Rollback' :
                                    'Manual'}
                                 </Badge>
                               </div>
                               <div className="flex items-center gap-2">
                                 {/* Show rollback button only for non-current versions */}
-                                {index > 0 && (
+                                {index > 0 && version && (
                                   <Button
                                     variant="outline"
                                     size="sm"
@@ -395,7 +402,7 @@ export const PeriodVersionViewer: React.FC<PeriodVersionViewerProps> = ({
                                 )}
                                 <div className="text-right">
                                   <div className="text-sm text-muted-foreground">
-                                    {new Date(version.created_at).toLocaleDateString('es-ES', {
+                                    {version && new Date(version.created_at).toLocaleDateString('es-ES', {
                                       year: 'numeric',
                                       month: 'short',
                                       day: 'numeric',
@@ -404,7 +411,7 @@ export const PeriodVersionViewer: React.FC<PeriodVersionViewerProps> = ({
                                     })}
                                   </div>
                                   <div className="text-xs text-muted-foreground">
-                                    {(version as any).created_by_email || 'Usuario desconocido'}
+                                    Usuario desconocido
                                   </div>
                                 </div>
                               </div>
@@ -412,7 +419,7 @@ export const PeriodVersionViewer: React.FC<PeriodVersionViewerProps> = ({
                           </CardHeader>
                           <CardContent>
                             <p className="text-sm text-muted-foreground">
-                              {version.changes_summary}
+                              {version?.changes_summary}
                             </p>
                           </CardContent>
                         </Card>
@@ -422,24 +429,23 @@ export const PeriodVersionViewer: React.FC<PeriodVersionViewerProps> = ({
                 </TabsContent>
 
                 <TabsContent value="employees" className="space-y-4">
-                  {Object.entries(comparison.employeeChanges || {}).map(([employeeId, change]) => (
+                  {comparison.employeeChanges.map((change) => (
                     <EmployeeChangeCard
-                      key={employeeId}
-                      employeeId={employeeId}
+                      key={change.employeeId}
                       change={change}
-                      isExpanded={expandedEmployees.has(employeeId)}
-                      onToggleExpansion={() => toggleEmployeeExpansion(employeeId)}
+                      isExpanded={expandedEmployees.has(change.employeeId)}
+                      onToggleExpanded={() => toggleEmployeeExpansion(change.employeeId)}
                     />
                   ))}
                 </TabsContent>
 
                 <TabsContent value="timeline" className="space-y-4">
-                <ChangeTimelineComponent
-                  initialVersion={comparison.initialVersion}
-                  currentVersion={comparison.currentVersion}
-                  metrics={comparison.summaryMetrics}
-                  periodName={periodName}
-                />
+                  <ChangeTimelineComponent
+                    initialVersion={comparison.initialVersion}
+                    currentVersion={comparison.currentVersion}
+                    metrics={comparison.summaryMetrics}
+                    periodName={periodName}
+                  />
                 </TabsContent>
               </Tabs>
             )}
