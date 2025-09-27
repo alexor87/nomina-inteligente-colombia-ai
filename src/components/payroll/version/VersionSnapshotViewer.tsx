@@ -76,10 +76,65 @@ export const VersionSnapshotViewer: React.FC<VersionSnapshotViewerProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('employees');
 
-  const employees = snapshotData.employees || [];
-  const novedades = snapshotData.novedades || [];
+  // Convert payroll records to employee snapshot format with robust identity handling
+  const convertPayrollsToEmployees = (payrolls: PayrollSnapshotData[]): EmployeeSnapshotData[] => {
+    return payrolls.map((payroll) => {
+      // Extract identity with multiple fallbacks
+      const nombre = (payroll as any).employee_nombre || (payroll as any).nombre || '';
+      const apellido = (payroll as any).employee_apellido || (payroll as any).apellido || '';
+      const cedula = (payroll as any).employee_cedula || (payroll as any).cedula || '';
+      const tipo_documento = (payroll as any).employee_tipo_documento || (payroll as any).tipo_documento || 'CC';
+
+      // Preserve payroll record ID separately to avoid overwriting employee id
+      const { id: payroll_id, ...rest } = payroll as any;
+
+      return {
+        ...rest,
+        id: payroll.employee_id, // Employee identity key
+        payroll_id, // Keep payroll id for traceability
+        nombre,
+        apellido,
+        cedula,
+        tipo_documento,
+      } as any;
+    });
+  };
+
+  // Extract employees from snapshot, handling both old and new formats
+  const extractEmployeesFromSnapshot = (snapshot: PeriodSnapshot): EmployeeSnapshotData[] => {
+    // If the snapshot has the new payrolls format, convert it and merge with identity data
+    if (snapshot.payrolls && snapshot.payrolls.length > 0) {
+      const employees = convertPayrollsToEmployees(snapshot.payrolls);
+      
+      // Merge with employeeIdentity data if available
+      if (snapshot.employeeIdentity) {
+        employees.forEach(emp => {
+          const identity = snapshot.employeeIdentity![emp.id];
+          if (identity) {
+            emp.nombre = identity.nombre || '';
+            emp.apellido = identity.apellido || '';
+            emp.cedula = identity.cedula || '';
+            (emp as any).tipo_documento = identity.tipo_documento || 'CC';
+          }
+        });
+      }
+      
+      return employees;
+    }
+    
+    // Otherwise use the old employees format
+    return snapshot.employees || [];
+  };
+
+  // Extract data using the same logic as PeriodVersionComparisonService
   const payrolls = snapshotData.payrolls || [];
   const employeeIdentity = snapshotData.employeeIdentity || {};
+  
+  // Convert payrolls to employees using extracted service logic
+  const employees = extractEmployeesFromSnapshot(snapshotData);
+  
+  // Extract novedades from snapshot or from payroll data
+  const novedades = snapshotData.novedades || [];
 
   // Helper function to resolve employee identity from multiple sources
   const resolveEmployeeIdentity = (employeeId: string) => {
