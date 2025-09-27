@@ -1,6 +1,9 @@
 
 project_id = "xrmorlkakwujyozgmilf"
 
+[functions.maya-intelligence]
+verify_jwt = true
+
 [functions.calculate-social-benefits]
 verify_jwt = true
 
