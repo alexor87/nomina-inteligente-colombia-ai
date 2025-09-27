@@ -945,14 +945,10 @@ function PayrollHistoryDetailPageContent() {
       {/* Content Section */}
       <div className="px-6 space-y-6">
         <Tabs defaultValue="employees" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-1">
             <TabsTrigger value="employees" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
               Empleados
-            </TabsTrigger>
-            <TabsTrigger value="audit" className="flex items-center gap-2 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 hover:from-blue-100 hover:to-indigo-100 data-[state=active]:from-blue-600 data-[state=active]:to-indigo-600 data-[state=active]:text-white transition-all duration-200">
-              <History className="h-4 w-4" />
-              Auditoría y Trazabilidad
             </TabsTrigger>
           </TabsList>
           
@@ -991,12 +987,6 @@ function PayrollHistoryDetailPageContent() {
             )}
           </TabsContent>
           
-          <TabsContent value="audit">
-            <PeriodAuditSummaryComponent 
-              periodId={periodId || ''} 
-              periodName={periodData?.periodo || ''} 
-            />
-          </TabsContent>
         </Tabs>
       </div>
 

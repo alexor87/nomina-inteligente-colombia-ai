@@ -157,18 +157,18 @@ export const PayrollActionsPanel: React.FC<PayrollActionsPanelProps> = ({
 
       {/* Version Viewer Section - Show for closed periods */}
       {periodStatus === 'cerrado' && onViewInitialLiquidation && (
-        <Alert className="border-blue-500/50 bg-blue-50/50">
-          <History className="h-4 w-4 text-blue-600" />
+        <Alert className="border-primary/50 bg-primary/5">
+          <History className="h-4 w-4 text-primary" />
           <AlertDescription className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="font-medium text-blue-900">Auditoría y Trazabilidad</span>
-              <span className="text-blue-700 text-sm">Ver liquidación inicial vs. estado actual</span>
+              <span className="font-medium">Auditoría y Trazabilidad</span>
+              <span className="text-muted-foreground text-sm">Ver liquidación inicial vs. estado actual</span>
             </div>
             <Button 
               variant="outline"
               size="sm"
               onClick={onViewInitialLiquidation}
-              className="h-8 border-blue-200 text-blue-700 hover:bg-blue-50"
+              className="h-8 hover:bg-primary/10"
             >
               <History className="h-3 w-3 mr-1" />
               Ver Liquidación Inicial
