@@ -339,35 +339,37 @@ export const PeriodVersionViewer: React.FC<PeriodVersionViewerProps> = ({
             </DialogTitle>
           </DialogHeader>
 
-          <ScrollArea className="max-h-[70vh]">
-            {loading ? (
-              <div className="flex items-center justify-center p-8">
-                <RefreshCw className="h-8 w-8 animate-spin text-primary" />
-                <span className="ml-3 text-lg">Cargando historial...</span>
-              </div>
-            ) : !comparison ? (
-              <div className="flex items-center justify-center p-8">
-                <AlertTriangle className="h-8 w-8 text-muted-foreground" />
-                <span className="ml-3 text-lg text-muted-foreground">
-                  No se pudo cargar el historial de versiones
-                </span>
-              </div>
-            ) : (
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="overview" className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4" />
-                    Resumen
-                  </TabsTrigger>
-                  <TabsTrigger value="employees" className="flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    Empleados ({comparison.employeeChanges?.length || 0})
-                  </TabsTrigger>
-                  <TabsTrigger value="timeline" className="flex items-center gap-2">
-                    <Clock className="h-4 w-4" />
-                    Timeline
-                  </TabsTrigger>
-                </TabsList>
+          {loading ? (
+            <div className="flex items-center justify-center p-8">
+              <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+              <span className="ml-3 text-lg">Cargando historial...</span>
+            </div>
+          ) : !comparison ? (
+            <div className="flex items-center justify-center p-8">
+              <AlertTriangle className="h-8 w-8 text-muted-foreground" />
+              <span className="ml-3 text-lg text-muted-foreground">
+                No se pudo cargar el historial de versiones
+              </span>
+            </div>
+          ) : (
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="overview" className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4" />
+                  Resumen
+                </TabsTrigger>
+                <TabsTrigger value="employees" className="flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Empleados ({comparison.employeeChanges?.length || 0})
+                </TabsTrigger>
+                <TabsTrigger value="timeline" className="flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  Timeline
+                </TabsTrigger>
+              </TabsList>
+
+              <div className="h-[65vh]">
+                <ScrollArea className="h-full pr-2">
 
                 <TabsContent value="overview" className="space-y-6">
                   <BusinessImpactSummary 
@@ -493,9 +495,10 @@ export const PeriodVersionViewer: React.FC<PeriodVersionViewerProps> = ({
                     periodName={periodName}
                   />
                 </TabsContent>
-              </Tabs>
-            )}
-          </ScrollArea>
+                </ScrollArea>
+              </div>
+            </Tabs>
+          )}
 
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={onClose}>
