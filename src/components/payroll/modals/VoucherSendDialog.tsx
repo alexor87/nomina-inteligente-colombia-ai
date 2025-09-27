@@ -1,8 +1,7 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CustomModal, CustomModalHeader, CustomModalTitle } from '@/components/ui/custom-modal';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { MultiEmailInput } from '@/components/ui/multi-email-input';
 import { Label } from '@/components/ui/label';
 import { PayrollEmployee } from '@/types/payroll';
 import { Send, X, Loader2, Mail } from 'lucide-react';
@@ -26,101 +25,160 @@ export const VoucherSendDialog: React.FC<VoucherSendDialogProps> = ({
   employee,
   period
 }) => {
-  const [email, setEmail] = useState('');
+  const [emails, setEmails] = useState<string[]>([]);
   const [isSending, setIsSending] = useState(false);
+  const [isLoadingEmployeeEmail, setIsLoadingEmployeeEmail] = useState(false);
   const { toast } = useToast();
 
+  // Cargar email del empleado desde la BD cuando se abre el diálogo
+  useEffect(() => {
+    const loadEmployeeEmail = async () => {
+      if (!isOpen || !employee?.id || emails.length > 0) return;
+      
+      setIsLoadingEmployeeEmail(true);
+      try {
+        const { data: employeeData, error } = await supabase
+          .from('employees')
+          .select('email')
+          .eq('id', employee.id)
+          .single();
+
+        if (!error && employeeData?.email) {
+          setEmails([employeeData.email]);
+        }
+      } catch (error) {
+        console.warn('Error loading employee email:', error);
+      } finally {
+        setIsLoadingEmployeeEmail(false);
+      }
+    };
+
+    loadEmployeeEmail();
+  }, [isOpen, employee?.id, emails.length]);
+
+  // Resetear emails cuando se cierre el diálogo
+  useEffect(() => {
+    if (!isOpen) {
+      setEmails([]);
+    }
+  }, [isOpen]);
+
   const handleSendVoucher = async () => {
-    if (!employee || !period || !email.trim()) {
+    if (!employee || !period || emails.length === 0) {
       toast({
         title: "Error de validación",
-        description: "Por favor ingresa un email válido",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Validar formato de email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      toast({
-        title: "Email inválido",
-        description: "Por favor ingresa un email con formato válido",
+        description: "Por favor agrega al menos un email válido",
         variant: "destructive"
       });
       return;
     }
 
     setIsSending(true);
+    
     try {
-      // Generar PDF en base64 desde la Edge Function (modo simple)
-      const { data: pdfData, error: pdfError } = await supabase.functions.invoke('generate-voucher-pdf', {
-        body: {
-          employee: {
-            id: employee.id,
-            name: employee.name,
-            position: employee.position,
-            baseSalary: employee.baseSalary,
-            workedDays: employee.workedDays,
-            extraHours: employee.extraHours,
-            bonuses: employee.bonuses,
-            disabilities: employee.disabilities,
-            grossPay: employee.grossPay,
-            deductions: employee.deductions,
-            netPay: employee.netPay,
-            eps: employee.eps,
-            afp: employee.afp
-          },
-          period: {
-            startDate: period.startDate,
-            endDate: period.endDate,
-            type: period.type,
-            periodo: `${period.startDate} - ${period.endDate}`
-          },
-          returnBase64: true
-        }
-      });
+      console.log('🚀 Iniciando envío de comprobantes...');
+      
+      let successCount = 0;
+      let errorCount = 0;
+      const errors: string[] = [];
 
-      if (pdfError || !pdfData) {
-        console.error('Error generating PDF:', pdfError);
-        throw new Error('No se pudo generar el PDF del comprobante');
+      // Enviar a cada email secuencialmente
+      for (const email of emails) {
+        try {
+          // 1. Generar el PDF del comprobante
+          const { data: pdfData, error: pdfError } = await supabase.functions.invoke('generate-voucher-pdf', {
+            body: {
+              employee: {
+                id: employee.id,
+                name: employee.name,
+                position: employee.position,
+                baseSalary: employee.baseSalary,
+                workedDays: employee.workedDays,
+                extraHours: employee.extraHours,
+                bonuses: employee.bonuses,
+                disabilities: employee.disabilities,
+                grossPay: employee.grossPay,
+                deductions: employee.deductions,
+                netPay: employee.netPay,
+                eps: employee.eps,
+                afp: employee.afp
+              },
+              period: {
+                startDate: period.startDate,
+                endDate: period.endDate,
+                type: period.type,
+                periodo: `${period.startDate} - ${period.endDate}`
+              },
+              returnBase64: true
+            }
+          });
+
+          if (pdfError || !pdfData) {
+            throw new Error(`Error generando PDF: ${pdfError?.message || 'Error desconocido'}`);
+          }
+
+          // 2. Enviar el email con el PDF adjunto
+          const { error: emailError } = await supabase.functions.invoke('send-voucher-email', {
+            body: {
+              employeeEmail: email,
+              employeeName: employee.name,
+              period: {
+                startDate: period.startDate,
+                endDate: period.endDate,
+                type: period.type,
+                periodo: `${period.startDate} - ${period.endDate}`
+              },
+              netPay: employee.netPay,
+              attachment: {
+                fileName: pdfData.fileName || `comprobante-${employee.name}.pdf`,
+                base64: pdfData.base64,
+                mimeType: pdfData.mimeType || 'application/pdf'
+              }
+            }
+          });
+
+          if (emailError) {
+            throw new Error(`Error enviando email: ${emailError.message}`);
+          }
+
+          successCount++;
+          console.log(`✅ Email enviado exitosamente a ${email}`);
+
+        } catch (error: any) {
+          errorCount++;
+          errors.push(`${email}: ${error.message}`);
+          console.error(`❌ Error enviando a ${email}:`, error);
+        }
       }
 
-      // Enviar el email con Resend adjuntando el PDF
-      const { error: emailError } = await supabase.functions.invoke('send-voucher-email', {
-        body: {
-          employeeEmail: email,
-          employeeName: employee.name,
-          period: {
-            startDate: period.startDate,
-            endDate: period.endDate,
-            type: period.type,
-            periodo: `${period.startDate} - ${period.endDate}`
-          },
-          netPay: employee.netPay,
-          attachment: {
-            fileName: pdfData.fileName || `comprobante-${employee.name}.pdf`,
-            base64: pdfData.base64,
-            mimeType: pdfData.mimeType || 'application/pdf'
-          }
-        }
-      });
+      // Mostrar resultado final
+      if (successCount > 0 && errorCount === 0) {
+        toast({
+          title: "¡Éxito!",
+          description: `Comprobante enviado exitosamente a ${successCount} email${successCount > 1 ? 's' : ''}`,
+          className: "border-green-200 bg-green-50"
+        });
+        setEmails([]);
+        onClose();
+      } else if (successCount > 0 && errorCount > 0) {
+        toast({
+          title: "Envío parcialmente exitoso",
+          description: `Enviado a ${successCount} email${successCount > 1 ? 's' : ''}, ${errorCount} fallaron`,
+          variant: "default"
+        });
+      } else {
+        toast({
+          title: "Error al enviar comprobantes",
+          description: `Falló el envío a todos los emails: ${errors.slice(0, 2).join(', ')}`,
+          variant: "destructive"
+        });
+      }
 
-      if (emailError) throw emailError;
-
+    } catch (error: any) {
+      console.error('❌ Error general enviando comprobantes:', error);
       toast({
-        title: "✅ Comprobante enviado",
-        description: `El comprobante de pago se ha enviado exitosamente a ${email}`,
-        className: "border-green-200 bg-green-50"
-      });
-
-      onClose();
-      setEmail('');
-    } catch (error) {
-      console.error('Error sending voucher:', error);
-      toast({
-        title: "Error al enviar comprobante",
-        description: "No se pudo enviar el comprobante por email",
+        title: "Error al enviar comprobantes",
+        description: error.message || "Ocurrió un error inesperado",
         variant: "destructive"
       });
     } finally {
@@ -153,16 +211,24 @@ export const VoucherSendDialog: React.FC<VoucherSendDialogProps> = ({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="email">Email del destinatario</Label>
-          <Input
-            id="email"
-            type="email"
-            placeholder="ejemplo@correo.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            disabled={isSending}
-          />
+          <Label htmlFor="emails">Email(s) del destinatario</Label>
+          {isLoadingEmployeeEmail ? (
+            <div className="flex items-center justify-center p-4 border border-input rounded-md bg-muted/50">
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              <span className="text-sm text-muted-foreground">Cargando email del empleado...</span>
+            </div>
+          ) : (
+            <MultiEmailInput
+              value={emails}
+              onChange={setEmails}
+              placeholder={emails.length === 0 ? "Ingresa emails y presiona espacio o enter" : "Agregar otro email..."}
+              disabled={isSending}
+              maxEmails={10}
+              className="w-full"
+            />
+          )}
           <p className="text-xs text-gray-500">
+            Puedes agregar múltiples emails. Presiona espacio, enter o tab para agregar cada email.
             Se enviará el comprobante de pago en formato PDF como adjunto.
           </p>
         </div>
@@ -173,13 +239,25 @@ export const VoucherSendDialog: React.FC<VoucherSendDialogProps> = ({
           <X className="h-4 w-4 mr-2" />
           Cancelar
         </Button>
-        <Button onClick={handleSendVoucher} disabled={isSending || !email.trim()}>
+        <Button
+          onClick={handleSendVoucher}
+          disabled={isSending || emails.length === 0 || isLoadingEmployeeEmail}
+          className="w-full sm:w-auto"
+        >
           {isSending ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            <>
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              Enviando a {emails.length} email{emails.length > 1 ? 's' : ''}...
+            </>
           ) : (
-            <Send className="h-4 w-4 mr-2" />
+            <>
+              <Send className="h-4 w-4 mr-2" />
+              Enviar Comprobante{emails.length > 1 ? 's' : ''}
+              {emails.length > 0 && (
+                <span className="ml-1 text-xs opacity-75">({emails.length})</span>
+              )}
+            </>
           )}
-          {isSending ? 'Enviando...' : 'Enviar Comprobante'}
         </Button>
       </div>
     </CustomModal>
