@@ -63,23 +63,35 @@ const calculateTransportAllowance = (baseSalary: number, workedDays: number, yea
   return 0;
 };
 
-// Replicando DeductionCalculationService.calculateDeductions (lógica simple: IBC = salarioBase)
-const calculateDeductions = (salarioBase: number, year: string = '2025') => {
+// Calcular deducciones proporcionales según tipo de período (igual que módulo de liquidación)
+const calculateDeductions = (salarioBase: number, periodType: string, year: string = '2025') => {
   const yearKey = (year === '2024' || year === '2025') ? year : '2025';
   const config = OFFICIAL_VALUES[yearKey];
   
-  // IBC = salario base (lógica simple de PayrollLiquidationService)
-  const ibcFinal = salarioBase;
+  // IBC proporcional según tipo de período (igual que en liquidación)
+  let ibcForDeductions = salarioBase;
+  switch (periodType) {
+    case 'quincenal':
+      ibcForDeductions = salarioBase / 2;
+      break;
+    case 'semanal':
+      ibcForDeductions = salarioBase * (7/30);
+      break;
+    case 'mensual':
+    default:
+      ibcForDeductions = salarioBase;
+      break;
+  }
   
-  const saludEmpleado = Math.round(ibcFinal * config.porcentajes.saludEmpleado);
-  const pensionEmpleado = Math.round(ibcFinal * config.porcentajes.pensionEmpleado);
+  const saludEmpleado = Math.round(ibcForDeductions * config.porcentajes.saludEmpleado);
+  const pensionEmpleado = Math.round(ibcForDeductions * config.porcentajes.pensionEmpleado);
   const totalDeducciones = saludEmpleado + pensionEmpleado;
   
   return {
     saludEmpleado,
     pensionEmpleado,
     totalDeducciones,
-    ibc: ibcFinal
+    ibc: ibcForDeductions
   };
 };
 
@@ -128,8 +140,8 @@ const calculatePayrollLiquidationStyle = async (supabase: any, employeeData: any
   // FASE 4: Total devengado = salario proporcional + auxilio transporte + devengos novedades
   const totalDevengado = salarioProporcional + auxilioTransporte + novedadesTotals.totalDevengos;
   
-  // FASE 5: Calcular deducciones usando salario proporcional (corregido para períodos no mensuales)
-  const deductionResult = calculateDeductions(salarioProporcional, year);
+  // FASE 5: Calcular deducciones proporcionales (igual que módulo de liquidación)
+  const deductionResult = calculateDeductions(salarioBase, periodData.tipo_periodo, year);
   
   // FASE 6: Total deducciones = deducciones calculadas + deducciones por novedades
   const totalDeducciones = deductionResult.totalDeducciones + novedadesTotals.totalDeducciones;
@@ -137,7 +149,7 @@ const calculatePayrollLiquidationStyle = async (supabase: any, employeeData: any
   // FASE 7: Neto pagado = total devengado - total deducciones
   const netoPagado = totalDevengado - totalDeducciones;
   
-  console.log(`✅ Empleado ${employeeData.nombre}: Devengado=${totalDevengado}, Deducciones=${totalDeducciones}, Neto=${netoPagado}`);
+  console.log(`✅ ${employeeData.nombre}: Base=${salarioBase}, IBC=${deductionResult.ibc}, Salud=${deductionResult.saludEmpleado}, Pensión=${deductionResult.pensionEmpleado}, Deducciones=${totalDeducciones}, Neto=${netoPagado}`);
   
   return {
     totalDevengado,
