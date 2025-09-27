@@ -397,15 +397,39 @@ export const ExpandedEmployeesTable = ({
                              <Plus className="h-4 w-4" />
                            </Button>
                          )}
-                         {(novedadesCount > 0) && (
-                           <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                             {novedadesCount}
-                           </Badge>
-                         )}
-                         {preview.pendingCount > 0 && (
-                           <Badge variant="secondary" className="bg-orange-100 text-orange-800 animate-pulse text-xs">
-                             +{preview.pendingCount}
-                           </Badge>
+                         {(novedadesCount > 0 || preview.pendingCount > 0) ? (
+                           <div className="flex gap-2">
+                             {novedadesCount > 0 && (
+                               <Badge 
+                                 variant="secondary" 
+                                 className="bg-blue-100 text-blue-800 cursor-pointer hover:bg-blue-200"
+                                 onClick={() => onAddNovedad(employee.id)}
+                                 title="Ver novedades"
+                               >
+                                 {novedadesCount}
+                               </Badge>
+                             )}
+                             {preview.pendingCount > 0 && (
+                               <Badge 
+                                 variant="secondary" 
+                                 className="bg-orange-100 text-orange-800 animate-pulse text-xs cursor-pointer hover:bg-orange-200"
+                                 onClick={() => onAddNovedad(employee.id)}
+                                 title="Ver ajustes pendientes"
+                               >
+                                 +{preview.pendingCount}
+                               </Badge>
+                             )}
+                           </div>
+                         ) : (
+                           <Button
+                             size="sm"
+                             variant="ghost"
+                             className="h-8 text-xs text-muted-foreground hover:text-foreground"
+                             onClick={() => onAddNovedad(employee.id)}
+                             title="Ver novedades"
+                           >
+                             Ver
+                           </Button>
                          )}
                        </div>
                      </TableCell>

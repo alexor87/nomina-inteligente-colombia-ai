@@ -558,10 +558,12 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
               )}
             </p>
           </div>
-          <Button onClick={onAddNew} className="bg-blue-600 hover:bg-blue-700">
-            <Plus className="h-4 w-4 mr-2" />
-            Agregar Novedad
-          </Button>
+          {canEdit && (
+            <Button onClick={onAddNew} className="bg-blue-600 hover:bg-blue-700">
+              <Plus className="h-4 w-4 mr-2" />
+              Agregar Novedad
+            </Button>
+          )}
         </div>
 
         {integratedData.length === 0 && pendingAdjustments.length === 0 ? (
