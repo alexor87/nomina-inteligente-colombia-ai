@@ -745,26 +745,75 @@ RESPUESTA:`;
         }
       }
       
-      // Enhanced fallback: If voucher keywords found but no specific employee, offer generic action
+      // Enhanced fallback: Ask clarifying questions instead of generic actions
       if (richContext?.employeeData?.allEmployees?.length > 0) {
-        console.log('[maya-intelligence] 📤 Generic voucher action fallback (no specific employee found)');
-        return {
-          hasExecutableAction: true,
-          action: {
-            id: `send_voucher_generic_${Date.now()}`,
-            type: 'send_voucher',
-            label: 'Enviar comprobante de nómina',
-            description: 'Seleccionar empleado y proceder con el envío',
-            parameters: {
-              email: sanitizedEmail
-            },
-            requiresConfirmation: true,
-            icon: 'send'
-          },
-          response: `Puedo ayudarte a enviar un comprobante de nómina${sanitizedEmail ? ` al email ${sanitizedEmail}` : ''}. Haz clic en el botón para seleccionar el empleado.`
-        };
+        console.log('[maya-intelligence] 🤖 No specific employee found - asking clarifying questions');
+        
+        // Check if there are potential partial matches for clarification
+        const normalizedMessage = normalizeText(userMessage);
+        const messageWords = normalizedMessage.split(' ').filter(word => word.length >= 2);
+        
+        // Find employees with partial name matches
+        const partialMatches = richContext.employeeData.allEmployees.filter((emp: any) => {
+          const normalizedEmpName = normalizeText(emp.name);
+          const empWords = normalizedEmpName.split(' ').filter(word => word.length >= 2);
+          
+          // Check if any employee name words appear in the message
+          return empWords.some(empWord => 
+            messageWords.some(msgWord => 
+              (msgWord.includes(empWord) || empWord.includes(msgWord)) && msgWord.length >= 2
+            )
+          );
+        });
+        
+        // If we found partial matches, ask for clarification
+        if (partialMatches.length > 0 && partialMatches.length <= 5) {
+          const employeeList = partialMatches.map((emp: any) => `• ${emp.name}`).join('\n');
+          return {
+            hasExecutableAction: false,
+            response: `Encontré varios empleados que podrían coincidir. ¿A cuál te refieres?
+
+📋 **Empleados encontrados:**
+${employeeList}
+
+¿Podrías especificar el nombre completo del empleado?`
+          };
+        }
+        
+        // If no partial matches or too many, ask for complete employee list
+        const totalEmployees = richContext.employeeData.allEmployees.length;
+        
+        if (totalEmployees <= 8) {
+          // Small list - show all employees
+          const employeeList = richContext.employeeData.allEmployees.map((emp: any) => `• ${emp.name}`).join('\n');
+          return {
+            hasExecutableAction: false,
+            response: `Para enviarte el desprendible de nómina necesito saber de qué empleado se trata.
+
+📋 **Empleados disponibles:**
+${employeeList}
+
+¿De cuál empleado necesitas el desprendible?`
+          };
+        } else {
+          // Large list - ask for more specific information
+          return {
+            hasExecutableAction: false,
+            response: `Para enviarte el desprendible de nómina necesito saber de qué empleado se trata.
+
+📋 Tengo registrados **${totalEmployees} empleados** en el sistema.
+
+¿Podrías decirme el nombre completo o al menos el primer nombre y apellido del empleado?`
+          };
+        }
       } else {
         console.log('[maya-intelligence] ❌ No employees available for voucher action');
+        return {
+          hasExecutableAction: false,
+          response: `No hay empleados registrados en el sistema para enviar desprendibles de nómina. 
+
+¿Necesitas ayuda con algo más?`
+        };
       }
     }
 
