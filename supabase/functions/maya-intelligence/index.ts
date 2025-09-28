@@ -46,8 +46,34 @@ const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     const { context, phase, data, message: userMessage, conversation, sessionId, debug: debugBody, richContext }: MayaRequest & { debug?: boolean } = await req.json();
     const debugMode = debug || debugBody;
 
-    // Handle interactive chat mode
-    if (phase === 'interactive_chat' && userMessage && conversation) {
+    // 🔄 Interactive Chat Mode
+    if (phase === 'interactive_chat') {
+      console.log(`[maya-intelligence] ↪ r_${requestId} interactive_chat {
+  convLen: ${conversation.length},
+  lastUserLen: ${conversation[conversation.length - 1]?.content?.length || 0},
+  sessionId: "${sessionId}",
+  hasContext: !!richContext,
+  employeeCount: ${richContext?.employeeData?.totalCount || 0},
+  hasMetrics: !!richContext?.dashboardData?.metrics,
+  pageType: ${richContext?.pageType || 'unknown'}
+}`);
+
+      // 🎯 Detectar intención de acción ejecutable
+      const userMessage = conversation[conversation.length - 1]?.content || '';
+      const actionDetectionResult = await detectExecutableAction(userMessage, richContext, OPENAI_API_KEY);
+      
+      if (actionDetectionResult.hasExecutableAction) {
+        console.log(`[maya-intelligence] 🎯 ${requestId} Executable action detected:`, actionDetectionResult.action);
+        
+        return new Response(JSON.stringify({
+          response: actionDetectionResult.response,
+          conversationId: sessionId,
+          executableActions: [actionDetectionResult.action]
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
       // Create comprehensive contextual information from ALL available company data
       let contextualInfo = '';
       if (richContext) {
@@ -333,12 +359,16 @@ Genera una respuesta contextual apropiada para este momento del proceso de liqui
       emotionalState = 'analyzing';
     }
 
+    // 🎯 Detectar intención de acción ejecutable también en modo contextual
+    const actionDetectionResult = await detectExecutableAction(contextualMessage, data, OPENAI_API_KEY);
+    
     return new Response(JSON.stringify({
       requestId,
       sessionId: sessionHeader,
       message: contextualMessage,
       emotionalState,
       contextualActions: generateContextualActions(context, phase),
+      executableActions: actionDetectionResult.hasExecutableAction ? [actionDetectionResult.action] : undefined,
       timestamp: new Date().toISOString()
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -359,6 +389,114 @@ Genera una respuesta contextual apropiada para este momento del proceso de liqui
     });
   }
 });
+
+// 🎯 Detect if user message requires an executable action
+async function detectExecutableAction(userMessage: string, richContext: any, openaiKey: string): Promise<{
+  hasExecutableAction: boolean;
+  action?: any;
+  response?: string;
+}> {
+  try {
+    // Keywords and patterns that indicate executable actions
+    const voucherKeywords = ['envía', 'manda', 'enviar', 'mandar', 'comprobante', 'voucher', 'liquidación', 'email', 'correo'];
+    const searchKeywords = ['busca', 'encuentra', 'mostrar', 'ver', 'detalles de', 'información de'];
+    
+    const messageWords = userMessage.toLowerCase();
+    
+    // 📧 Detect voucher sending intent
+    if (voucherKeywords.some(keyword => messageWords.includes(keyword))) {
+      // Extract employee name and email using AI
+      const extractionPrompt = `Extrae información de esta solicitud de envío de comprobante:
+      
+Mensaje: "${userMessage}"
+
+Empleados disponibles: ${richContext?.employeeData?.allEmployees?.map((emp: any) => `${emp.name} (ID: ${emp.id})`).join(', ') || 'No disponible'}
+
+Responde SOLO en formato JSON:
+{
+  "employeeName": "nombre del empleado mencionado",
+  "employeeId": "id del empleado si se puede determinar",
+  "email": "email mencionado si existe",
+  "confidence": "alto|medio|bajo"
+}`;
+
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openaiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [{ role: 'user', content: extractionPrompt }],
+          max_tokens: 200,
+          temperature: 0.1,
+        }),
+      });
+
+      if (response.ok) {
+        const aiData = await response.json();
+        try {
+          const extraction = JSON.parse(aiData.choices[0].message.content);
+          
+          if (extraction.confidence === 'alto' && extraction.employeeName) {
+            // Find employee in context
+            const employee = richContext?.employeeData?.allEmployees?.find((emp: any) => 
+              emp.name.toLowerCase().includes(extraction.employeeName.toLowerCase()) ||
+              extraction.employeeId === emp.id
+            );
+
+            if (employee) {
+              return {
+                hasExecutableAction: true,
+                action: {
+                  id: `send_voucher_${Date.now()}`,
+                  type: 'send_voucher',
+                  label: `Enviar comprobante a ${employee.name}`,
+                  description: extraction.email ? `Al email: ${extraction.email}` : 'Al email registrado del empleado',
+                  parameters: {
+                    employeeId: employee.id,
+                    employeeName: employee.name,
+                    email: extraction.email
+                  },
+                  requiresConfirmation: false,
+                  icon: 'send'
+                },
+                response: `¡Perfecto! Puedo ayudarte a enviar el comprobante de ${employee.name}${extraction.email ? ` al email ${extraction.email}` : ' a su email registrado'}. Haz clic en el botón de acción para proceder.`
+              };
+            }
+          }
+        } catch (e) {
+          console.log('[maya-intelligence] Could not parse extraction result');
+        }
+      }
+    }
+
+    // 👤 Detect search/view intent
+    if (searchKeywords.some(keyword => messageWords.includes(keyword))) {
+      return {
+        hasExecutableAction: true,
+        action: {
+          id: `search_${Date.now()}`,
+          type: 'search_employee',
+          label: 'Buscar empleados',
+          description: 'Mostrar resultados detallados',
+          parameters: {
+            query: userMessage
+          },
+          requiresConfirmation: false,
+          icon: 'search'
+        },
+        response: 'Puedo ayudarte a buscar esa información. Haz clic en el botón para ver los resultados detallados.'
+      };
+    }
+
+    return { hasExecutableAction: false };
+  } catch (error) {
+    console.error('[maya-intelligence] Error detecting executable action:', error);
+    return { hasExecutableAction: false };
+  }
+}
 
 function generateContextualActions(context: string, phase: string): string[] {
   const actions: string[] = [];

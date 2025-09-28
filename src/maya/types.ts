@@ -1,8 +1,11 @@
+import { ExecutableAction } from './types/ExecutableAction';
+
 export interface MayaMessage {
   id: string;
   message: string;
   emotionalState: EmotionalState;
   contextualActions?: string[];
+  executableActions?: ExecutableAction[];
   timestamp: string;
   isVisible: boolean;
 }

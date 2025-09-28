@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { MayaAvatar } from './MayaAvatar';
 import { useMaya } from './MayaProvider';
 import { MayaReactivationButton } from './MayaReactivationButton';
+import { MayaActionExecutor } from './components/MayaActionExecutor';
 
 export const MayaFloatingAssistant: React.FC = () => {
   const { 
@@ -183,8 +184,19 @@ export const MayaFloatingAssistant: React.FC = () => {
                          </p>
                        </div>
 
-                      {/* Contextual Actions */}
-                      {currentMessage.contextualActions && currentMessage.contextualActions.length > 0 && (
+                      {/* Executable Actions */}
+                      {currentMessage.executableActions && currentMessage.executableActions.length > 0 && (
+                        <MayaActionExecutor 
+                          actions={currentMessage.executableActions}
+                          onActionExecuted={(action, result) => {
+                            console.log('Action executed:', action, result);
+                          }}
+                        />
+                      )}
+
+                      {/* Contextual Actions (fallback) */}
+                      {(!currentMessage.executableActions || currentMessage.executableActions.length === 0) && 
+                       currentMessage.contextualActions && currentMessage.contextualActions.length > 0 && (
                         <div className="space-y-2">
                           <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">
                             Sugerencias:

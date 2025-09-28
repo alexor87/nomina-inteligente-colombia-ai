@@ -250,6 +250,8 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
         id: response.id,
         message: response.content,
         emotionalState: 'neutral',
+        contextualActions: [],
+        executableActions: (response as any).executableActions || [], // Support new executable actions
         timestamp: response.timestamp,
         isVisible: true
       };
