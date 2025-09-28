@@ -143,17 +143,23 @@ export const MayaFloatingAssistant: React.FC = () => {
                             </div>
                          </div>
                          
-                         {/* Executable Actions for Assistant Messages */}
-                         {msg.role === 'assistant' && msg.executableActions && msg.executableActions.length > 0 && (
-                           <div className="mt-2 pl-4">
-                             <MayaActionExecutor 
-                               actions={msg.executableActions}
-                               onActionExecuted={(action, result) => {
-                                 console.log('Action executed:', action, result);
-                               }}
-                             />
-                           </div>
-                         )}
+                          {/* Executable Actions for Assistant Messages */}
+                          {msg.role === 'assistant' && Array.isArray(msg.executableActions) && msg.executableActions.length > 0 && (
+                            <div className="mt-2 pl-4">
+                              <div className="mb-2">
+                                <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">
+                                  Acciones disponibles:
+                                </p>
+                              </div>
+                              <MayaActionExecutor 
+                                actions={msg.executableActions}
+                                onActionExecuted={(action, result) => {
+                                  console.log('🎯 Render executable actions (chat):', msg.executableActions);
+                                  console.log('Action executed:', action, result);
+                                }}
+                              />
+                            </div>
+                          )}
                        </div>
                     )) : (
                       <div className="text-center text-gray-500 text-sm mt-8">
@@ -197,15 +203,18 @@ export const MayaFloatingAssistant: React.FC = () => {
                          </p>
                        </div>
 
-                      {/* Executable Actions */}
-                      {currentMessage.executableActions && currentMessage.executableActions.length > 0 && (
-                        <MayaActionExecutor 
-                          actions={currentMessage.executableActions}
-                          onActionExecuted={(action, result) => {
-                            console.log('Action executed:', action, result);
-                          }}
-                        />
-                      )}
+                       {/* Executable Actions */}
+                       {Array.isArray(currentMessage.executableActions) && currentMessage.executableActions.length > 0 && (
+                         <div>
+                           <MayaActionExecutor 
+                             actions={currentMessage.executableActions}
+                             onActionExecuted={(action, result) => {
+                               console.log('🎯 Render executable actions (info):', currentMessage.executableActions);
+                               console.log('Action executed:', action, result);
+                             }}
+                           />
+                         </div>
+                       )}
 
                       {/* Contextual Actions (fallback) */}
                       {(!currentMessage.executableActions || currentMessage.executableActions.length === 0) && 

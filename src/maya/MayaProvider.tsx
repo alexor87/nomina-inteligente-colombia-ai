@@ -251,7 +251,7 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
         message: response.content,
         emotionalState: 'neutral',
         contextualActions: [],
-        executableActions: (response as any).executableActions || [], // Support new executable actions
+        executableActions: Array.isArray(response.executableActions) ? response.executableActions : [], // Ensure it's always an array
         timestamp: response.timestamp,
         isVisible: true
       };

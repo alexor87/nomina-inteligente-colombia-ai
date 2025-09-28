@@ -202,7 +202,7 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
     };
   };
 
-  if (actions.length === 0) return null;
+  if (!Array.isArray(actions) || actions.length === 0) return null;
 
   return (
     <>

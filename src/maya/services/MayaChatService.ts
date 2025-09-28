@@ -91,8 +91,14 @@ export class MayaChatService {
         role: 'assistant',
         content: data?.message ?? data?.response ?? "Disculpa, no pude procesar tu mensaje en este momento.",
         timestamp: new Date().toISOString(),
-        executableActions: data?.executableActions
+        executableActions: data?.executableActions || data?.executable_actions || []
       };
+
+      // Debug log for executable actions
+      console.log('🎯 Actions from function:', { 
+        count: (data?.executableActions || data?.executable_actions || []).length,
+        actions: data?.executableActions || data?.executable_actions || []
+      });
 
       console.log('🤖 MAYA Chat: Assistant response created:', assistantMessage);
 
