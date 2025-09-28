@@ -4,6 +4,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
 interface MayaRequest {
@@ -17,14 +18,27 @@ interface MayaRequest {
 }
 
 serve(async (req) => {
+  const requestId = `r_${Date.now()}_${Math.random().toString(36).slice(2,7)}`;
+  const url = new URL(req.url);
+  const sessionHeader = req.headers.get('x-maya-session-id') || undefined;
+  const debug = req.headers.get('x-maya-debug') === '1';
+  console.info(`[maya-intelligence] ▶ req ${requestId}`, { path: url.pathname, method: req.method, sessionId: sessionHeader });
+
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     if (!OPENAI_API_KEY) {
-      throw new Error('OPENAI_API_KEY is not configured');
+      console.error(`[maya-intelligence] ✖ ${requestId} Missing OPENAI_API_KEY`);
+      return new Response(JSON.stringify({
+        error: 'Missing OPENAI_API_KEY',
+        errorCode: 'OPENAI_KEY_MISSING',
+        message: 'No hay configuración de OpenAI en el servidor.',
+        requestId,
+        sessionId: sessionHeader
+      }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     const { context, phase, data, message: userMessage, conversation, sessionId }: MayaRequest = await req.json();
@@ -54,6 +68,14 @@ Responde de manera natural a la pregunta del usuario. Si no sabes algo específi
         { role: 'user', content: userMessage }
       ];
 
+      if (debug) {
+        console.info(`[maya-intelligence] ↪ ${requestId} interactive_chat`, {
+          convLen: conversation.length,
+          lastUserLen: userMessage.length,
+          sessionId: sessionId || sessionHeader
+        });
+      }
+
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -68,10 +90,24 @@ Responde de manera natural a la pregunta del usuario. Si no sabes algo específi
         }),
       });
 
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error(`[maya-intelligence] ✖ ${requestId} OpenAI error`, { status: response.status, body: errText?.slice(0, 500) });
+        return new Response(JSON.stringify({
+          error: 'OPENAI_API_ERROR',
+          message: 'Disculpa, no pude procesar tu pregunta ahora. Intenta de nuevo.',
+          requestId,
+          sessionId: sessionId || sessionHeader
+        }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
       const aiData = await response.json();
+      if (debug) console.info(`[maya-intelligence] ✔ ${requestId} OpenAI ok`, { status: response.status });
       const responseMessage = aiData.choices[0]?.message?.content || "Disculpa, no pude procesar tu pregunta. ¿Podrías reformularla?";
 
       return new Response(JSON.stringify({
+        requestId,
+        sessionId: sessionId || sessionHeader,
         message: responseMessage,
         emotionalState: 'neutral',
         timestamp: new Date().toISOString()
@@ -113,6 +149,17 @@ Genera una respuesta contextual apropiada para este momento del proceso de liqui
       }),
     });
 
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error(`[maya-intelligence] ✖ ${requestId} OpenAI error (context)`, { status: response.status, body: errText?.slice(0, 500) });
+      return new Response(JSON.stringify({
+        error: 'OPENAI_API_ERROR',
+        message: 'No pude generar una respuesta contextual en este momento.',
+        requestId,
+        sessionId: sessionHeader
+      }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
     const aiData = await response.json();
     const contextualMessage = aiData.choices[0]?.message?.content || "¡Hola! Soy MAYA, tu asistente de nómina. Estoy aquí para ayudarte.";
 
@@ -127,6 +174,8 @@ Genera una respuesta contextual apropiada para este momento del proceso de liqui
     }
 
     return new Response(JSON.stringify({
+      requestId,
+      sessionId: sessionHeader,
       message: contextualMessage,
       emotionalState,
       contextualActions: generateContextualActions(context, phase),
@@ -136,11 +185,14 @@ Genera una respuesta contextual apropiada para este momento del proceso de liqui
     });
 
   } catch (error) {
-    console.error('Error in maya-intelligence:', error);
+    console.error('[maya-intelligence] ✖ Unhandled error', { error });
     return new Response(JSON.stringify({ 
       error: error instanceof Error ? error.message : 'Unknown error',
-      message: "Disculpa, tengo un pequeño problema técnico. Pero puedes continuar con tu liquidación normalmente.",
-      emotionalState: 'neutral'
+      errorCode: 'UNHANDLED_SERVER_ERROR',
+      message: 'Disculpa, tengo un problema técnico en el servidor.',
+      emotionalState: 'neutral',
+      requestId,
+      sessionId: sessionHeader
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

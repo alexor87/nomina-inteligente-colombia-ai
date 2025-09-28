@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { FunctionsHttpError, FunctionsRelayError, FunctionsFetchError } from '@supabase/supabase-js';
 
 export interface ChatMessage {
   id: string;
@@ -54,6 +55,11 @@ export class MayaChatService {
           context: context || 'chat_conversation',
           phase: 'interactive_chat',
           sessionId: this.currentConversation.sessionId
+        },
+        headers: {
+          'x-maya-session-id': this.currentConversation.sessionId,
+          'x-maya-context': String(context || 'chat_conversation'),
+          'x-maya-debug': '1'
         }
       });
 
@@ -77,14 +83,28 @@ export class MayaChatService {
       this.currentConversation.messages.push(assistantMessage);
       return assistantMessage;
 
-    } catch (error) {
-      console.error('🤖 MAYA Chat: Error sending message:', error);
+    } catch (error: any) {
+      const debugCode = `E-${Date.now().toString().slice(-6)}`;
+      try {
+        if (error instanceof FunctionsHttpError) {
+          const errJson = await error.context.json().catch(() => null);
+          console.error('🤖 MAYA Chat: FunctionsHttpError', { errJson });
+        } else if (error instanceof FunctionsRelayError) {
+          console.error('🤖 MAYA Chat: FunctionsRelayError', { name: error.name, message: error.message });
+        } else if (error instanceof FunctionsFetchError) {
+          console.error('🤖 MAYA Chat: FunctionsFetchError', { message: error.message });
+        } else {
+          console.error('🤖 MAYA Chat: Unknown error type', error);
+        }
+      } catch (parseErr) {
+        console.error('🤖 MAYA Chat: Error parsing error context', parseErr);
+      }
       
-      // Fallback response
+      // Fallback response with lightweight debug code
       const fallbackMessage: ChatMessage = {
         id: `maya_fallback_${Date.now()}`,
         role: 'assistant',
-        content: "Disculpa, tengo un problema técnico. Por favor intenta de nuevo.",
+        content: `Disculpa, tengo un problema técnico (${debugCode}). Por favor intenta de nuevo en unos segundos.`,
         timestamp: new Date().toISOString()
       };
 
@@ -113,5 +133,13 @@ export class MayaChatService {
     };
     
     this.currentConversation.messages.push(systemMessage);
+  }
+
+  getDebugInfo() {
+    return {
+      sessionId: this.currentConversation.sessionId,
+      messagesCount: this.currentConversation.messages.length,
+      lastMessage: this.currentConversation.messages[this.currentConversation.messages.length - 1],
+    };
   }
 }
