@@ -48,6 +48,16 @@ const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
 
     // 🔄 Interactive Chat Mode
     if (phase === 'interactive_chat') {
+      // Add safety check for conversation
+      if (!conversation || !Array.isArray(conversation)) {
+        return new Response(JSON.stringify({
+          error: 'INVALID_CONVERSATION',
+          message: 'Conversación no válida.',
+          requestId,
+          sessionId: sessionId || sessionHeader
+        }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
       console.log(`[maya-intelligence] ↪ r_${requestId} interactive_chat {
   convLen: ${conversation.length},
   lastUserLen: ${conversation[conversation.length - 1]?.content?.length || 0},
@@ -405,70 +415,129 @@ async function detectExecutableAction(userMessage: string, richContext: any, ope
     
     // 📧 Detect voucher sending intent
     if (voucherKeywords.some(keyword => messageWords.includes(keyword))) {
-      // Extract employee name and email using AI
-      const extractionPrompt = `Extrae información de esta solicitud de envío de comprobante:
+      console.log(`[maya-intelligence] 📧 Voucher intent detected in: "${userMessage}"`);
       
-Mensaje: "${userMessage}"
-
-Empleados disponibles: ${richContext?.employeeData?.allEmployees?.map((emp: any) => `${emp.name} (ID: ${emp.id})`).join(', ') || 'No disponible'}
-
-Responde SOLO en formato JSON:
-{
-  "employeeName": "nombre del empleado mencionado",
-  "employeeId": "id del empleado si se puede determinar",
-  "email": "email mencionado si existe",
-  "confidence": "alto|medio|bajo"
-}`;
-
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openaiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [{ role: 'user', content: extractionPrompt }],
-          max_tokens: 200,
-          temperature: 0.1,
-        }),
-      });
-
-      if (response.ok) {
-        const aiData = await response.json();
-        try {
-          const extraction = JSON.parse(aiData.choices[0].message.content);
+      // Simple pattern matching first for common cases
+      const emailPattern = /(\S+@\S+\.\S+)/g;
+      const extractedEmail = userMessage.match(emailPattern)?.[0];
+      
+      // Try to find employee in message
+      let foundEmployee = null;
+      if (richContext?.employeeData?.allEmployees) {
+        foundEmployee = richContext.employeeData.allEmployees.find((emp: any) => {
+          const empName = emp.name.toLowerCase();
+          const messageLower = messageWords;
           
-          if (extraction.confidence === 'alto' && extraction.employeeName) {
-            // Find employee in context
+          // Check if employee name appears in message
+          const nameWords = empName.split(' ');
+          return nameWords.some((word: string) => 
+            word.length > 2 && messageLower.includes(word)
+          );
+        });
+      }
+      
+      // If we found an employee directly, create action
+      if (foundEmployee) {
+        console.log(`[maya-intelligence] 🎯 Direct employee match found: ${foundEmployee.name}`);
+        return {
+          hasExecutableAction: true,
+          action: {
+            id: `send_voucher_${Date.now()}`,
+            type: 'send_voucher',
+            label: `Enviar comprobante a ${foundEmployee.name}`,
+            description: extractedEmail ? `Al email: ${extractedEmail}` : 'Al email registrado del empleado',
+            parameters: {
+              employeeId: foundEmployee.id,
+              employeeName: foundEmployee.name,
+              email: extractedEmail
+            },
+            requiresConfirmation: false,
+            icon: 'send'
+          },
+          response: `¡Perfecto! Puedo ayudarte a enviar el comprobante de ${foundEmployee.name}${extractedEmail ? ` al email ${extractedEmail}` : ' a su email registrado'}. Haz clic en el botón de acción para proceder.`
+        };
+      }
+      
+      // If no direct match, use AI extraction as fallback
+      const extractionPrompt = `Extrae SOLO el nombre del empleado de este mensaje:
+"${userMessage}"
+
+Empleados disponibles: ${richContext?.employeeData?.allEmployees?.map((emp: any) => emp.name).join(', ') || 'No disponible'}
+
+Responde SOLO con el nombre exacto del empleado mencionado o "NO_ENCONTRADO" si no hay coincidencia clara.`;
+
+      try {
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openaiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [{ role: 'user', content: extractionPrompt }],
+            max_tokens: 50,
+            temperature: 0.1,
+          }),
+        });
+
+        if (response.ok) {
+          const aiData = await response.json();
+          const extractedName = aiData.choices[0]?.message?.content?.trim();
+          
+          if (extractedName && extractedName !== 'NO_ENCONTRADO') {
+            console.log(`[maya-intelligence] 🤖 AI extracted name: "${extractedName}"`);
+            
+            // Find employee by AI extracted name
             const employee = richContext?.employeeData?.allEmployees?.find((emp: any) => 
-              emp.name.toLowerCase().includes(extraction.employeeName.toLowerCase()) ||
-              extraction.employeeId === emp.id
+              emp.name.toLowerCase().includes(extractedName.toLowerCase()) ||
+              extractedName.toLowerCase().includes(emp.name.toLowerCase())
             );
 
             if (employee) {
+              console.log(`[maya-intelligence] ✅ Employee found via AI: ${employee.name}`);
               return {
                 hasExecutableAction: true,
                 action: {
                   id: `send_voucher_${Date.now()}`,
                   type: 'send_voucher',
                   label: `Enviar comprobante a ${employee.name}`,
-                  description: extraction.email ? `Al email: ${extraction.email}` : 'Al email registrado del empleado',
+                  description: extractedEmail ? `Al email: ${extractedEmail}` : 'Al email registrado del empleado',
                   parameters: {
                     employeeId: employee.id,
                     employeeName: employee.name,
-                    email: extraction.email
+                    email: extractedEmail
                   },
                   requiresConfirmation: false,
                   icon: 'send'
                 },
-                response: `¡Perfecto! Puedo ayudarte a enviar el comprobante de ${employee.name}${extraction.email ? ` al email ${extraction.email}` : ' a su email registrado'}. Haz clic en el botón de acción para proceder.`
+                response: `¡Perfecto! Puedo ayudarte a enviar el comprobante de ${employee.name}${extractedEmail ? ` al email ${extractedEmail}` : ' a su email registrado'}. Haz clic en el botón de acción para proceder.`
               };
             }
           }
-        } catch (e) {
-          console.log('[maya-intelligence] Could not parse extraction result');
         }
+      } catch (e) {
+        console.error('[maya-intelligence] AI extraction error:', e);
+      }
+      
+      // Fallback: If voucher keywords found but no specific employee, offer generic action
+      if (richContext?.employeeData?.allEmployees?.length > 0) {
+        console.log('[maya-intelligence] 📤 Generic voucher action fallback');
+        return {
+          hasExecutableAction: true,
+          action: {
+            id: `send_voucher_generic_${Date.now()}`,
+            type: 'send_voucher',
+            label: 'Enviar comprobante de nómina',
+            description: 'Seleccionar empleado y proceder con el envío',
+            parameters: {
+              email: extractedEmail
+            },
+            requiresConfirmation: true,
+            icon: 'send'
+          },
+          response: `Puedo ayudarte a enviar un comprobante de nómina${extractedEmail ? ` al email ${extractedEmail}` : ''}. Haz clic en el botón para seleccionar el empleado.`
+        };
       }
     }
 
