@@ -9,6 +9,7 @@ interface MayaProviderValue {
   hideMessage: () => void;
   showMessage: () => void;
   setPhase: (phase: PayrollPhase, additionalData?: Partial<MayaContextType>) => Promise<void>;
+  performIntelligentValidation: (companyId: string, periodId?: string, employees?: any[]) => Promise<any>;
 }
 
 const MayaContext = createContext<MayaProviderValue | null>(null);
@@ -64,6 +65,32 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
     setIsVisible(true);
   }, []);
 
+  const performIntelligentValidation = useCallback(async (
+    companyId: string,
+    periodId?: string,
+    employees?: any[]
+  ) => {
+    try {
+      const { MayaIntelligentValidationService } = await import('./services/MayaIntelligentValidationService');
+      const validationResults = await MayaIntelligentValidationService.performIntelligentValidation(
+        companyId,
+        periodId,
+        employees
+      );
+
+      // Actualizar contexto con resultados de validación
+      await setPhase('data_validation', {
+        hasErrors: validationResults.hasIssues,
+        validationResults
+      });
+
+      return validationResults;
+    } catch (error) {
+      console.error('Error en validación inteligente de MAYA:', error);
+      throw error;
+    }
+  }, [setPhase]);
+
   // Initialize Maya with welcome message
   useEffect(() => {
     const initializeMaya = async () => {
@@ -81,7 +108,8 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
     updateContext,
     hideMessage,
     showMessage,
-    setPhase
+    setPhase,
+    performIntelligentValidation
   };
 
   return (

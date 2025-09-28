@@ -22,6 +22,7 @@ export interface MayaContext {
   hasErrors?: boolean;
   isProcessing?: boolean;
   completionPercentage?: number;
+  validationResults?: any;
 }
 
 export type PayrollPhase = 

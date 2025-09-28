@@ -25,7 +25,9 @@ export class MayaEngine {
             employeeCount: context.employeeCount,
             periodName: context.periodName,
             hasErrors: context.hasErrors,
-            isProcessing: context.isProcessing
+            isProcessing: context.isProcessing,
+            completionPercentage: context.completionPercentage,
+            validationResults: context.validationResults
           }
         }
       });
@@ -91,7 +93,7 @@ export class MayaEngine {
         emotion: 'analyzing' 
       },
       data_validation: { 
-        message: "Revisando datos de empleados y detectando posibles inconsistencias.", 
+        message: "Analizando datos de empleados y período para detectar posibles problemas...", 
         emotion: 'analyzing' 
       },
       liquidation_ready: { 
