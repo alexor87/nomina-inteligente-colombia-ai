@@ -24,13 +24,15 @@ export const MayaFloatingAssistant: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  if (!isVisible || !currentMessage) {
-    return <MayaReactivationButton />;
-  }
-
+  // All hooks must be called before any conditional returns
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatHistory]);
+
+  // Conditional return AFTER all hooks
+  if (!isVisible || !currentMessage) {
+    return <MayaReactivationButton />;
+  }
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
