@@ -1,19 +1,57 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Minimize2, Maximize2 } from 'lucide-react';
+import { X, Minimize2, Maximize2, Send, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { MayaAvatar } from './MayaAvatar';
 import { useMaya } from './MayaProvider';
 import { MayaReactivationButton } from './MayaReactivationButton';
 
 export const MayaFloatingAssistant: React.FC = () => {
-  const { currentMessage, isVisible, hideMessage, showMessage } = useMaya();
+  const { 
+    currentMessage, 
+    isVisible, 
+    hideMessage, 
+    showMessage,
+    chatHistory,
+    sendMessage,
+    isChatMode,
+    setChatMode 
+  } = useMaya();
   const [isMinimized, setIsMinimized] = useState(false);
+  const [userInput, setUserInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   if (!isVisible || !currentMessage) {
     return <MayaReactivationButton />;
   }
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatHistory]);
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!userInput.trim() || isLoading) return;
+
+    const message = userInput.trim();
+    setUserInput('');
+    setIsLoading(true);
+
+    try {
+      await sendMessage(message);
+    } catch (error) {
+      console.error('Error sending message:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const toggleChatMode = () => {
+    setChatMode(!isChatMode);
+  };
 
   return (
     <motion.div
@@ -27,17 +65,28 @@ export const MayaFloatingAssistant: React.FC = () => {
         <div className="flex items-center justify-between p-3 bg-gradient-to-r from-primary/10 to-primary/5 border-b">
           <div className="flex items-center gap-3">
             <MayaAvatar 
-              emotionalState={currentMessage.emotionalState} 
+              emotionalState={currentMessage?.emotionalState || 'neutral'} 
               isVisible={true}
               size="sm"
             />
             <div>
               <p className="font-semibold text-sm text-gray-900">MAYA</p>
-              <p className="text-xs text-gray-600">Asistente de Nómina</p>
+              <p className="text-xs text-gray-600">
+                {isChatMode ? 'Chat Interactivo' : 'Asistente de Nómina'}
+              </p>
             </div>
           </div>
           
           <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={toggleChatMode}
+              className="h-8 w-8 p-0 hover:bg-primary/10"
+              title={isChatMode ? 'Modo Información' : 'Modo Chat'}
+            >
+              <MessageSquare className={`h-4 w-4 ${isChatMode ? 'text-primary' : ''}`} />
+            </Button>
             <Button
               variant="ghost"
               size="sm"
@@ -70,38 +119,111 @@ export const MayaFloatingAssistant: React.FC = () => {
               exit={{ height: 0, opacity: 0 }}
               transition={{ duration: 0.3 }}
             >
-              <div className="p-4">
-                {/* Message */}
-                <div className="mb-3">
-                  <p className="text-sm text-gray-800 leading-relaxed">
-                    {currentMessage.message}
-                  </p>
-                </div>
-
-                {/* Contextual Actions */}
-                {currentMessage.contextualActions && currentMessage.contextualActions.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">
-                      Sugerencias:
-                    </p>
-                    {currentMessage.contextualActions.map((action, index) => (
-                      <div key={index} className="text-xs text-gray-600 bg-gray-50 rounded-md p-2">
-                        {action}
+              {isChatMode ? (
+                /* Chat Mode */
+                <div className="h-80 flex flex-col">
+                  {/* Chat Messages */}
+                  <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                    {chatHistory.length > 0 ? chatHistory.map((msg, index) => (
+                      <div
+                        key={msg.id || index}
+                        className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                      >
+                        <div
+                          className={`max-w-[80%] p-3 rounded-lg text-sm ${
+                            msg.role === 'user'
+                              ? 'bg-primary text-primary-foreground'
+                              : 'bg-gray-100 text-gray-800'
+                          }`}
+                        >
+                          {msg.content}
+                        </div>
                       </div>
-                    ))}
+                    )) : (
+                      <div className="text-center text-gray-500 text-sm mt-8">
+                        <MayaAvatar emotionalState="neutral" isVisible={true} size="md" />
+                        <p className="mt-2">¡Hola! Pregúntame lo que necesites sobre nómina.</p>
+                      </div>
+                    )}
+                    <div ref={chatEndRef} />
                   </div>
-                )}
 
-                {/* Timestamp */}
-                <div className="mt-3 pt-2 border-t border-gray-100">
-                  <p className="text-xs text-gray-500">
-                    {new Date(currentMessage.timestamp).toLocaleTimeString('es-CO', {
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
-                  </p>
+                  {/* Chat Input */}
+                  <div className="border-t p-3">
+                    <form onSubmit={handleSendMessage} className="flex gap-2">
+                      <Input
+                        value={userInput}
+                        onChange={(e) => setUserInput(e.target.value)}
+                        placeholder="Escribe tu pregunta..."
+                        disabled={isLoading}
+                        className="flex-1"
+                      />
+                      <Button
+                        type="submit"
+                        size="sm"
+                        disabled={!userInput.trim() || isLoading}
+                        className="px-3"
+                      >
+                        <Send className="h-4 w-4" />
+                      </Button>
+                    </form>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                /* Information Mode */
+                <div className="p-4">
+                  {currentMessage && (
+                    <>
+                      {/* Message */}
+                      <div className="mb-3">
+                        <p className="text-sm text-gray-800 leading-relaxed">
+                          {currentMessage.message}
+                        </p>
+                      </div>
+
+                      {/* Contextual Actions */}
+                      {currentMessage.contextualActions && currentMessage.contextualActions.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">
+                            Sugerencias:
+                          </p>
+                          {currentMessage.contextualActions.map((action, index) => (
+                            <div key={index} className="text-xs text-gray-600 bg-gray-50 rounded-md p-2">
+                              {action}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Timestamp */}
+                      <div className="mt-3 pt-2 border-t border-gray-100">
+                        <p className="text-xs text-gray-500">
+                          {new Date(currentMessage.timestamp).toLocaleTimeString('es-CO', {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </p>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Chat Mode Suggestion */}
+                  <div className="mt-4 p-3 bg-primary/5 rounded-lg border border-primary/20">
+                    <p className="text-xs text-primary font-medium mb-2">💬 ¿Tienes preguntas?</p>
+                    <p className="text-xs text-gray-600 mb-2">
+                      Activa el modo chat para preguntarme directamente
+                    </p>
+                    <Button
+                      onClick={toggleChatMode}
+                      size="sm"
+                      variant="outline"
+                      className="text-xs h-7"
+                    >
+                      Iniciar Chat
+                    </Button>
+                  </div>
+                </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
@@ -115,11 +237,18 @@ export const MayaFloatingAssistant: React.FC = () => {
           className="absolute -top-2 -left-2 cursor-pointer"
           onClick={() => setIsMinimized(false)}
         >
-          <MayaAvatar 
-            emotionalState={currentMessage.emotionalState} 
-            isVisible={true}
-            size="md"
-          />
+          <div className="relative">
+            <MayaAvatar 
+              emotionalState={currentMessage?.emotionalState || 'neutral'} 
+              isVisible={true}
+              size="md"
+            />
+            {isChatMode && (
+              <div className="absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full border-2 border-white">
+                <MessageSquare className="h-2 w-2 text-white" />
+              </div>
+            )}
+          </div>
         </motion.div>
       )}
     </motion.div>

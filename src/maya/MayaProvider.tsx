@@ -1,13 +1,18 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { MayaEngine } from './MayaEngine';
+import { MayaChatService, type ChatMessage } from './services/MayaChatService';
 import type { MayaMessage, MayaContext as MayaContextType, PayrollPhase } from './types';
 
 interface MayaProviderValue {
   currentMessage: MayaMessage | null;
   isVisible: boolean;
+  isChatMode: boolean;
+  chatHistory: ChatMessage[];
   updateContext: (context: MayaContextType) => Promise<void>;
   hideMessage: () => void;
   showMessage: () => void;
+  setChatMode: (enabled: boolean) => void;
+  sendMessage: (message: string) => Promise<void>;
   setPhase: (phase: PayrollPhase, additionalData?: Partial<MayaContextType>) => Promise<void>;
   performIntelligentValidation: (companyId: string, periodId?: string, employees?: any[]) => Promise<any>;
 }
@@ -33,7 +38,10 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
 }) => {
   const [currentMessage, setCurrentMessage] = useState<MayaMessage | null>(null);
   const [isVisible, setIsVisible] = useState(autoShow);
+  const [isChatMode, setIsChatMode] = useState(false);
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [mayaEngine] = useState(() => MayaEngine.getInstance());
+  const [chatService] = useState(() => MayaChatService.getInstance());
 
   const updateContext = useCallback(async (context: MayaContextType) => {
     try {
@@ -64,6 +72,41 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
   const showMessage = useCallback(() => {
     setIsVisible(true);
   }, []);
+
+  const setChatMode = useCallback((enabled: boolean) => {
+    setIsChatMode(enabled);
+    if (enabled) {
+      // Switch to chat mode and show existing conversation
+      setChatHistory(chatService.getConversation().messages);
+    }
+  }, [chatService]);
+
+  const sendMessage = useCallback(async (message: string) => {
+    try {
+      const response = await chatService.sendMessage(message, {
+        currentPage: window.location.pathname,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Update chat history
+      setChatHistory([...chatService.getConversation().messages]);
+      
+      // Also create a contextual message for non-chat mode
+      const contextualMessage: MayaMessage = {
+        id: response.id,
+        message: response.content,
+        emotionalState: 'neutral',
+        timestamp: response.timestamp,
+        isVisible: true
+      };
+      
+      setCurrentMessage(contextualMessage);
+      
+    } catch (error) {
+      console.error('Error sending message to MAYA:', error);
+      throw error;
+    }
+  }, [chatService]);
 
   const performIntelligentValidation = useCallback(async (
     companyId: string,
@@ -102,12 +145,24 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
     }
   }, [setPhase, autoShow]);
 
+  // Initialize chat with current message when switching to chat mode
+  useEffect(() => {
+    if (currentMessage && isChatMode && chatHistory.length === 0) {
+      chatService.addSystemMessage(currentMessage.message);
+      setChatHistory([...chatService.getConversation().messages]);
+    }
+  }, [currentMessage, isChatMode, chatHistory.length, chatService]);
+
   const value: MayaProviderValue = {
     currentMessage,
     isVisible,
+    isChatMode,
+    chatHistory,
     updateContext,
     hideMessage,
     showMessage,
+    setChatMode,
+    sendMessage,
     setPhase,
     performIntelligentValidation
   };

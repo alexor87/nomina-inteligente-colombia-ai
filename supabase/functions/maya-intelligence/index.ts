@@ -10,6 +10,10 @@ interface MayaRequest {
   context: string;
   phase: string;
   data?: any;
+  // Chat-specific fields
+  message?: string;
+  conversation?: Array<{role: string, content: string}>;
+  sessionId?: string;
 }
 
 serve(async (req) => {
@@ -23,8 +27,60 @@ serve(async (req) => {
       throw new Error('OPENAI_API_KEY is not configured');
     }
 
-    const { context, phase, data }: MayaRequest = await req.json();
+    const { context, phase, data, message: userMessage, conversation, sessionId }: MayaRequest = await req.json();
 
+    // Handle interactive chat mode
+    if (phase === 'interactive_chat' && userMessage && conversation) {
+      const conversationalPrompt = `Eres MAYA, una asistente de nómina profesional y amigable para pequeñas empresas colombianas. 
+
+Tu personalidad es:
+- Profesional pero cálida y conversacional
+- Experta en nómina, liquidación, empleados, y procesos de RRHH
+- Ayudas con preguntas específicas del usuario
+- Respondes de manera natural y útil
+- Puedes mantener conversaciones fluidas
+- Usas emojis ocasionalmente
+
+Contexto de la conversación:
+- Página actual: ${context}
+- Empresa colombiana
+- Sistema de nómina
+
+Responde de manera natural a la pregunta del usuario. Si no sabes algo específico, sé honesta pero siempre trata de ser útil.`;
+
+      const messages = [
+        { role: 'system', content: conversationalPrompt },
+        ...conversation.slice(-10), // Last 10 messages for context
+        { role: 'user', content: userMessage }
+      ];
+
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${OPENAI_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages,
+          max_tokens: 200,
+          temperature: 0.8
+        }),
+      });
+
+      const aiData = await response.json();
+      const responseMessage = aiData.choices[0]?.message?.content || "Disculpa, no pude procesar tu pregunta. ¿Podrías reformularla?";
+
+      return new Response(JSON.stringify({
+        message: responseMessage,
+        emotionalState: 'neutral',
+        timestamp: new Date().toISOString()
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Original contextual message mode
     const systemPrompt = `Eres MAYA, una asistente de nómina profesional y amigable para pequeñas empresas colombianas. 
 Tu personalidad es:
 - Profesional pero cálida
@@ -58,7 +114,7 @@ Genera una respuesta contextual apropiada para este momento del proceso de liqui
     });
 
     const aiData = await response.json();
-    const message = aiData.choices[0]?.message?.content || "¡Hola! Soy MAYA, tu asistente de nómina. Estoy aquí para ayudarte.";
+    const contextualMessage = aiData.choices[0]?.message?.content || "¡Hola! Soy MAYA, tu asistente de nómina. Estoy aquí para ayudarte.";
 
     // Determine emotional state based on context
     let emotionalState = 'neutral';
@@ -71,7 +127,7 @@ Genera una respuesta contextual apropiada para este momento del proceso de liqui
     }
 
     return new Response(JSON.stringify({
-      message,
+      message: contextualMessage,
       emotionalState,
       contextualActions: generateContextualActions(context, phase),
       timestamp: new Date().toISOString()
@@ -82,7 +138,7 @@ Genera una respuesta contextual apropiada para este momento del proceso de liqui
   } catch (error) {
     console.error('Error in maya-intelligence:', error);
     return new Response(JSON.stringify({ 
-      error: error.message,
+      error: error instanceof Error ? error.message : 'Unknown error',
       message: "Disculpa, tengo un pequeño problema técnico. Pero puedes continuar con tu liquidación normalmente.",
       emotionalState: 'neutral'
     }), {
