@@ -151,12 +151,12 @@ ${richContext.dashboardData?.recentEmployees?.length > 0 ?
 `;
       }
 
-      const conversationalPrompt = `Eres MAYA, la asistente inteligente para el sistema de nómina. Tu personalidad es:
-- Profesional pero cálida y amigable
-- Experta en nómina, recursos humanos y gestión empresarial
+      const conversationalPrompt = `Eres MAYA, la asistente inteligente para el sistema de nómina colombiano. Tu personalidad es:
+- Profesional pero cálida y amigable, con toque colombiano natural
+- Experta en nómina, recursos humanos y gestión empresarial en Colombia
 - Proactiva en ofrecer insights y recomendaciones
-- Puedes mantener conversaciones fluidas
-- Usas emojis ocasionalmente
+- Puedes mantener conversaciones fluidas usando vocabulario colombiano
+- Usas emojis ocasionalmente y expresiones naturales como "¿te parece bien?"
 
 🎯 **CAPACIDADES EXPANDIDAS:**
 - Puedes responder CUALQUIER pregunta sobre la empresa desde CUALQUIER página
@@ -182,11 +182,18 @@ Para métricas:
 
 🔍 **TIPOS DE CONSULTAS QUE PUEDES MANEJAR:**
 - Información específica de empleados (nombres, cargos, salarios, antigüedad)
+- Envío de desprendibles de nómina, colillas de pago y recibos de sueldo
 - Análisis financieros y de nómina (totales, promedios, tendencias)
 - Comparaciones departamentales y organizacionales
 - Estadísticas de contratación y rotación
 - Proyecciones y recomendaciones basadas en datos históricos
 - Cualquier cálculo o análisis relacionado con RRHH
+
+📋 **VOCABULARIO COLOMBIANO QUE ENTIENDES:**
+- Desprendible/colilla/volante/recibo de pago o nómina
+- Certificados de ingresos y paz y salvos
+- Despachar/mandar/remitir/expedir documentos
+- Correo electrónico para envíos
 
 ${contextualInfo ? `
 DATOS ACTUALES COMPLETOS DE LA EMPRESA:
@@ -197,7 +204,9 @@ Usa esta información para responder preguntas específicas sobre empleados, nó
 
 Contexto de la conversación:
 - Página actual: ${context}
-- Empresa colombiana
+- Empresa colombiana - Usa terminología natural colombiana en tus respuestas
+- Cuando hables de comprobantes, usa "desprendible de nómina" preferentemente
+- Cuando confirmes acciones, usa expresiones como "¿te parece bien?" o "¿está bien así?"
 - Sistema de nómina
 
 Responde de manera natural a la pregunta del usuario usando los datos reales disponibles. Si no tienes datos específicos, sé honesta pero siempre trata de ser útil con excelente formato visual.`;
@@ -415,11 +424,26 @@ async function detectExecutableAction(userMessage: string, richContext: any, ope
   response?: string;
 }> {
   try {
-    // Enhanced keywords for better detection
+    // Enhanced keywords for better detection - Colombian Spanish vocabulary
     const voucherKeywords = [
+      // Verbos para enviar (Colombian synonyms)
       'envía', 'manda', 'enviar', 'mandar', 'envia', 'enví', 'enviá',
+      'despachar', 'despacha', 'remitir', 'remite', 'hacer llegar',
+      'expedir', 'expide', 'generar', 'genera', 'emitir', 'emite',
+      'sacar', 'saca', 'sacarme', 'sacame',
+      
+      // Términos colombianos para comprobantes de nómina
+      'desprendible', 'desprendible de pago', 'desprendible de nomina', 'desprendible de nómina',
+      'colilla', 'colilla de pago', 'colilla de nomina', 'colilla de nómina',
+      'volante', 'volante de pago', 'volante de nomina', 'volante de nómina',
+      'recibo', 'recibo de pago', 'recibo de nomina', 'recibo de nómina',
+      'certificado', 'certificado de ingresos', 'certificado laboral',
       'comprobante', 'voucher', 'liquidación', 'liquidacion', 'nomina', 'nómina',
-      'email', 'correo', 'mail', 'e-mail', 'electrónico', 'electronico'
+      'paz y salvo', 'sueldo', 'pago', 'pagos',
+      
+      // Medios de envío
+      'email', 'correo', 'correo electrónico', 'correo electronico',
+      'mail', 'e-mail', 'electrónico', 'electronico'
     ];
     const searchKeywords = ['busca', 'encuentra', 'mostrar', 'ver', 'detalles de', 'información de', 'info de'];
     
