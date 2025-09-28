@@ -91,94 +91,148 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
     }
   }, [chatService]);
 
-  // Generate rich contextual data based on current page and available data
+  // Generate comprehensive company context - ALWAYS include ALL available data regardless of page
   const generatePageContext = useCallback(() => {
     const currentPath = location.pathname;
-    const pageContext = {
+    
+    // Determine page type for context
+    let pageType = 'unknown';
+    if (currentPath.includes('/dashboard')) pageType = 'dashboard';
+    else if (currentPath.includes('/employees')) pageType = 'employees';
+    else if (currentPath.includes('/payroll')) pageType = 'payroll';
+    else if (currentPath.includes('/reports')) pageType = 'reports';
+    
+    // ALWAYS include ALL available company data regardless of current page
+    const comprehensiveContext = {
+      // Basic page context
       currentPage: currentPath,
-      pageType: 'unknown',
+      pageType,
       companyId,
       timestamp: new Date().toISOString(),
-      isLoading: dashboardLoading || employeesLoading
+      isLoading: dashboardLoading || employeesLoading,
+      
+      // COMPLETE Dashboard metrics - always available
+      dashboardData: {
+        metrics: metrics ? {
+          totalEmployees: metrics.totalEmployees,
+          activeEmployees: metrics.activeEmployees,
+          monthlyPayroll: metrics.monthlyPayrollTotal,
+          pendingPayroll: metrics.pendingPayrolls
+        } : null,
+        
+        recentEmployees: recentEmployees?.map(emp => ({
+          id: emp.id,
+          name: emp.name,
+          position: emp.position,
+          hireDate: emp.dateAdded,
+          status: emp.status,
+          department: 'N/A' // Default since department is not in RecentEmployee type
+        })) || [],
+        
+        recentActivity: recentActivity?.map(activity => ({
+          type: activity.type,
+          action: activity.action,
+          user: activity.user,
+          timestamp: activity.timestamp
+        })) || [],
+        
+        payrollTrends: payrollTrends?.map(trend => ({
+          month: trend.month,
+          total: trend.totalNeto,
+          employeeCount: trend.employeesCount,
+          avgPerEmployee: trend.employeesCount > 0 ? trend.totalNeto / trend.employeesCount : 0
+        })) || [],
+        
+        efficiencyMetrics: efficiencyMetrics?.map(metric => ({
+          metric: metric.metric,
+          value: metric.value,
+          change: metric.change,
+          unit: metric.unit
+        })) || []
+      },
+      
+      // COMPLETE Employee data - always available
+      employeeData: {
+        totalCount: employees?.length || 0,
+        activeCount: employees?.filter(e => e.estado === 'activo').length || 0,
+        inactiveCount: employees?.filter(e => e.estado === 'inactivo').length || 0,
+        
+        // Complete employee list with all details
+        allEmployees: employees?.map(emp => ({
+          id: emp.id,
+          name: `${emp.nombre} ${emp.apellido}`,
+          firstName: emp.nombre,
+          lastName: emp.apellido,
+          position: emp.cargo,
+          department: emp.departamento || 'N/A',
+          salary: emp.salarioBase,
+          hireDate: emp.fechaIngreso,
+          status: emp.estado,
+          documentType: emp.tipoDocumento,
+          documentNumber: emp.numeroCuenta || 'N/A', // Using available field
+          email: emp.email,
+          phone: emp.telefono,
+          contractType: emp.tipoContrato || 'N/A',
+          // Calculate years of service
+          yearsOfService: emp.fechaIngreso ? 
+            Math.floor((new Date().getTime() - new Date(emp.fechaIngreso).getTime()) / (1000 * 60 * 60 * 24 * 365.25)) : 0
+        })) || [],
+        
+        // Summary statistics
+        totalSalaryBase: employees?.reduce((sum, emp) => sum + (emp.salarioBase || 0), 0) || 0,
+        avgSalary: employees?.length ? 
+          (employees.reduce((sum, emp) => sum + (emp.salarioBase || 0), 0) / employees.length) : 0,
+          
+        // Departmental breakdown
+        byDepartment: employees?.reduce((acc, emp) => {
+          const dept = emp.departamento || 'Sin Departamento';
+          if (!acc[dept]) {
+            acc[dept] = { count: 0, totalSalary: 0 };
+          }
+          acc[dept].count++;
+          acc[dept].totalSalary += emp.salarioBase || 0;
+          return acc;
+        }, {} as Record<string, { count: number; totalSalary: number }>) || {},
+        
+        // Recent hires (last 6 months)
+        recentHires: employees?.filter(emp => {
+          if (!emp.fechaIngreso) return false;
+          const hireDate = new Date(emp.fechaIngreso);
+          const sixMonthsAgo = new Date();
+          sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+          return hireDate >= sixMonthsAgo;
+        }).map(emp => ({
+          name: `${emp.nombre} ${emp.apellido}`,
+          position: emp.cargo,
+          hireDate: emp.fechaIngreso,
+          salary: emp.salarioBase
+        })) || [],
+        
+        // Senior employees (5+ years)
+        seniorEmployees: employees?.filter(emp => {
+          if (!emp.fechaIngreso) return false;
+          const yearsOfService = Math.floor((new Date().getTime() - new Date(emp.fechaIngreso).getTime()) / (1000 * 60 * 60 * 24 * 365.25));
+          return yearsOfService >= 5;
+        }).map(emp => ({
+          name: `${emp.nombre} ${emp.apellido}`,
+          position: emp.cargo,
+          hireDate: emp.fechaIngreso,
+          yearsOfService: Math.floor((new Date().getTime() - new Date(emp.fechaIngreso).getTime()) / (1000 * 60 * 60 * 24 * 365.25))
+        })) || []
+      }
     };
-
-    // Dashboard context
-    if (currentPath.includes('/dashboard')) {
-      return {
-        ...pageContext,
-        pageType: 'dashboard',
-        dashboardData: {
-          metrics: metrics ? {
-            totalEmployees: metrics.totalEmployees,
-            activeEmployees: metrics.activeEmployees,
-            monthlyPayroll: metrics.monthlyPayrollTotal,
-            pendingPayroll: metrics.pendingPayrolls
-          } : null,
-          recentEmployees: recentEmployees?.slice(0, 5).map(emp => ({
-            id: emp.id,
-            name: emp.name,
-            position: emp.position,
-            hireDate: emp.dateAdded,
-            status: emp.status
-          })),
-          recentActivity: recentActivity?.slice(0, 3).map(activity => ({
-            type: activity.type,
-            action: activity.action,
-            user: activity.user,
-            timestamp: activity.timestamp
-          })),
-          payrollTrends: payrollTrends?.slice(0, 6).map(trend => ({
-            month: trend.month,
-            total: trend.totalNeto,
-            employeeCount: trend.employeesCount
-          })),
-          efficiencyMetrics: efficiencyMetrics?.map(metric => ({
-            metric: metric.metric,
-            value: metric.value,
-            change: metric.change,
-            unit: metric.unit
-          }))
-        }
-      };
-    }
-
-    // Employees page context
-    if (currentPath.includes('/employees')) {
-      return {
-        ...pageContext,
-        pageType: 'employees',
-        employeeData: {
-          totalCount: employees?.length || 0,
-          activeCount: employees?.filter(e => e.estado === 'activo').length || 0,
-          inactiveCount: employees?.filter(e => e.estado === 'inactivo').length || 0,
-          recentHires: employees?.filter(e => e.estado === 'activo')
-            .slice(0, 5)
-            .map(emp => ({
-              id: emp.id,
-              name: `${emp.nombre} ${emp.apellido}`,
-              position: emp.cargo,
-              salary: emp.salarioBase,
-              hireDate: emp.fechaIngreso
-            }))
-        }
-      };
-    }
-
-    // Payroll context
-    if (currentPath.includes('/payroll')) {
-      return {
-        ...pageContext,
-        pageType: 'payroll',
-        payrollData: {
-          employeeCount: employees?.length || 0,
-          totalSalaryBase: employees?.reduce((sum, emp) => sum + (emp.salarioBase || 0), 0) || 0,
-          avgSalary: employees?.length ? 
-            (employees.reduce((sum, emp) => sum + (emp.salarioBase || 0), 0) / employees.length) : 0
-        }
-      };
-    }
-
-    return pageContext;
+    
+    // Add debug logging to verify context completeness
+    console.log('🔍 MAYA Context Generated:', {
+      pageType,
+      employeeCount: comprehensiveContext.employeeData.totalCount,
+      hasMetrics: !!comprehensiveContext.dashboardData.metrics,
+      hasTrends: comprehensiveContext.dashboardData.payrollTrends.length,
+      hasActivity: comprehensiveContext.dashboardData.recentActivity.length,
+      departmentCount: Object.keys(comprehensiveContext.employeeData.byDepartment).length
+    });
+    
+    return comprehensiveContext;
   }, [location.pathname, companyId, dashboardLoading, employeesLoading, metrics, recentEmployees, recentActivity, payrollTrends, efficiencyMetrics, employees]);
 
   const sendMessage = useCallback(async (message: string) => {

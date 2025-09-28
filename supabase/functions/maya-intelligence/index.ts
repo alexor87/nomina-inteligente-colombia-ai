@@ -48,59 +48,79 @@ const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
 
     // Handle interactive chat mode
     if (phase === 'interactive_chat' && userMessage && conversation) {
-      // Build contextual information from richContext
+      // Create comprehensive contextual information from ALL available company data
       let contextualInfo = '';
-      
       if (richContext) {
-        const { pageType, dashboardData, employeeData, payrollData } = richContext;
-        
-        if (pageType === 'dashboard' && dashboardData) {
-          const { metrics, recentEmployees, payrollTrends } = dashboardData;
-          contextualInfo = `
-📊 DATOS DE LA EMPRESA:
-- Total empleados: ${metrics?.totalEmployees || 'No disponible'}
-- Empleados activos: ${metrics?.activeEmployees || 'No disponible'}  
-- Nómina mensual: $${metrics?.monthlyPayroll?.toLocaleString() || 'No disponible'}
-- Nóminas pendientes: ${metrics?.pendingPayroll || 'No disponible'}
+        contextualInfo = `📍 PÁGINA ACTUAL: ${richContext.currentPage || 'Dashboard'} (Tipo: ${richContext.pageType || 'unknown'})
+🏢 EMPRESA ID: ${richContext.companyId || 'N/A'}
+⏰ ÚLTIMA ACTUALIZACIÓN: ${richContext.timestamp || new Date().toISOString()}
 
-👥 EMPLEADOS RECIENTES:
-${recentEmployees?.map((emp: any) => `- ${emp.name} (${emp.position || 'Sin cargo'}) - ${emp.status}`).join('\n') || 'No hay empleados recientes'}
+📊 **MÉTRICAS GENERALES:**
+• Total empleados: ${richContext.dashboardData?.metrics?.totalEmployees || 0}
+• Empleados activos: ${richContext.dashboardData?.metrics?.activeEmployees || 0}
+• Empleados inactivos: ${richContext.employeeData?.inactiveCount || 0}
+• Nómina total mensual: $${richContext.dashboardData?.metrics?.monthlyPayroll?.toLocaleString() || '0'}
+• Nóminas pendientes: ${richContext.dashboardData?.metrics?.pendingPayroll || 0}
+• Salario promedio: $${Math.round(richContext.employeeData?.avgSalary || 0).toLocaleString()}
 
-📈 TENDENCIAS DE NÓMINA:
-${payrollTrends?.map((trend: any) => `- ${trend.month}: $${trend.total?.toLocaleString()} (${trend.employeeCount} empleados)`).join('\n') || 'No hay datos de tendencias'}`;
-        }
-        
-        if (pageType === 'employees' && employeeData) {
-          contextualInfo = `
-👥 INFORMACIÓN DE EMPLEADOS:
-- Total empleados: ${employeeData.totalCount}
-- Empleados activos: ${employeeData.activeCount}
-- Empleados inactivos: ${employeeData.inactiveCount}
-- Salario base total: $${employeeData.totalSalaryBase?.toLocaleString()}
-- Salario promedio: $${employeeData.avgSalary?.toLocaleString()}
+👥 **INFORMACIÓN DETALLADA DE EMPLEADOS:**
+${richContext.employeeData?.allEmployees?.length > 0 ? 
+  `• Lista completa de empleados (${richContext.employeeData.allEmployees.length}):
+${richContext.employeeData.allEmployees.map((emp: any) => 
+  `  - ${emp.name} | ${emp.position} | ${emp.department} | $${emp.salary?.toLocaleString() || 'N/A'} | Ingreso: ${emp.hireDate || 'N/A'} | ${emp.yearsOfService} años`
+).join('\n')}
 
-👥 EMPLEADOS RECIENTES:
-${employeeData.recentHires?.map((emp: any) => `- ${emp.name} (${emp.position || 'Sin cargo'}) - $${emp.salary?.toLocaleString()}`).join('\n') || 'No hay empleados recientes'}`;
-        }
-        
-        if (pageType === 'payroll' && payrollData) {
-          contextualInfo = `
-💰 DATOS DE NÓMINA:
-- Empleados para liquidar: ${payrollData.employeeCount}
-- Total salarios base: $${payrollData.totalSalaryBase?.toLocaleString()}
-- Salario promedio: $${payrollData.avgSalary?.toLocaleString()}`;
-        }
+• Empleados por departamento:
+${Object.entries(richContext.employeeData.byDepartment || {}).map(([dept, info]: [string, any]) => 
+  `  - ${dept}: ${info.count} empleados, Nómina: $${info.totalSalary?.toLocaleString()}`
+).join('\n')}
+
+• Contrataciones recientes (últimos 6 meses): ${richContext.employeeData.recentHires?.length || 0}
+${richContext.employeeData.recentHires?.map((hire: any) => `  - ${hire.name} (${hire.position}) - ${hire.hireDate}`).join('\n') || '  Ninguna'}
+
+• Empleados senior (5+ años): ${richContext.employeeData.seniorEmployees?.length || 0}
+${richContext.employeeData.seniorEmployees?.map((senior: any) => `  - ${senior.name} (${senior.position}) - ${senior.yearsOfService} años`).join('\n') || '  Ninguno'}` 
+  : '• No hay información detallada de empleados disponible'}
+
+📈 **TENDENCIAS DE NÓMINA:**
+${richContext.dashboardData?.payrollTrends?.length > 0 ? 
+  richContext.dashboardData.payrollTrends.map((trend: any) => 
+    `• ${trend.month}: $${trend.total?.toLocaleString() || 'N/A'} (${trend.employeeCount} empleados, Promedio: $${Math.round(trend.avgPerEmployee || 0).toLocaleString()})`
+  ).join('\n') 
+  : '• No hay datos de tendencias disponibles'}
+
+🎯 **MÉTRICAS DE EFICIENCIA:**
+${richContext.dashboardData?.efficiencyMetrics?.length > 0 ? 
+  richContext.dashboardData.efficiencyMetrics.map((metric: any) => 
+    `• ${metric.metric}: ${metric.value}${metric.unit} (Cambio: ${metric.change > 0 ? '+' : ''}${metric.change}%)`
+  ).join('\n')
+  : '• No hay métricas de eficiencia disponibles'}
+
+⚡ **ACTIVIDAD RECIENTE:**
+${richContext.dashboardData?.recentActivity?.length > 0 ? 
+  richContext.dashboardData.recentActivity.map((activity: any) => `• ${activity.action} por ${activity.user} (${activity.type})`).join('\n')
+  : '• No hay actividad reciente'}
+
+🆕 **EMPLEADOS RECIENTES:**
+${richContext.dashboardData?.recentEmployees?.length > 0 ? 
+  richContext.dashboardData.recentEmployees.map((emp: any) => `• ${emp.name} - ${emp.position} (${emp.status}) - Departamento: ${emp.department}`).join('\n')
+  : '• No hay empleados recientes registrados'}
+`;
       }
 
-      const conversationalPrompt = `Eres MAYA, una asistente de nómina profesional y amigable para pequeñas empresas colombianas. 
-
-Tu personalidad es:
-- Profesional pero cálida y conversacional
-- Experta en nómina, liquidación, empleados, y procesos de RRHH
-- Ayudas con preguntas específicas del usuario usando datos reales de su empresa
-- Respondes de manera natural y útil con información precisa
+      const conversationalPrompt = `Eres MAYA, la asistente inteligente para el sistema de nómina. Tu personalidad es:
+- Profesional pero cálida y amigable
+- Experta en nómina, recursos humanos y gestión empresarial
+- Proactiva en ofrecer insights y recomendaciones
 - Puedes mantener conversaciones fluidas
 - Usas emojis ocasionalmente
+
+🎯 **CAPACIDADES EXPANDIDAS:**
+- Puedes responder CUALQUIER pregunta sobre la empresa desde CUALQUIER página
+- Tienes acceso COMPLETO a todos los datos de empleados, nómina, métricas y tendencias
+- No estás limitada al contexto de la página actual
+- Puedes hacer análisis cruzados entre diferentes tipos de datos
+- Puedes calcular estadísticas, comparaciones temporales y proyecciones
 
 INSTRUCCIONES CRÍTICAS DE FORMATO:
 - Responde SIEMPRE con estructura clara y espaciado adecuado
@@ -117,8 +137,16 @@ Para listas de empleados:
 Para métricas:
 "📊 **RESUMEN FINANCIERO:**\n• Costo total de nómina: $X,XXX,XXX\n• Empleados activos: XX\n• Tendencia mensual: ↗️ +X%\n\n💡 **RECOMENDACIÓN:**\nBasándome en tus datos actuales..."
 
+🔍 **TIPOS DE CONSULTAS QUE PUEDES MANEJAR:**
+- Información específica de empleados (nombres, cargos, salarios, antigüedad)
+- Análisis financieros y de nómina (totales, promedios, tendencias)
+- Comparaciones departamentales y organizacionales
+- Estadísticas de contratación y rotación
+- Proyecciones y recomendaciones basadas en datos históricos
+- Cualquier cálculo o análisis relacionado con RRHH
+
 ${contextualInfo ? `
-DATOS ACTUALES DE LA EMPRESA:
+DATOS ACTUALES COMPLETOS DE LA EMPRESA:
 ${contextualInfo}
 
 Usa esta información para responder preguntas específicas sobre empleados, nómina, tendencias, etc. con datos reales y precisos.
@@ -143,13 +171,15 @@ Responde de manera natural a la pregunta del usuario usando los datos reales dis
         { role: 'user', content: userMessage }
       ];
 
-      if (debugMode) {
-        console.info(`[maya-intelligence] ↪ ${requestId} interactive_chat`, {
-          convLen: conversation.length,
-          lastUserLen: userMessage.length,
-          sessionId: sessionId || sessionHeader
-        });
-      }
+      console.log(`[maya-intelligence] ↪ r_${requestId} interactive_chat {
+  convLen: ${conversation.length},
+  lastUserLen: ${userMessage.length},
+  sessionId: "${sessionId || sessionHeader}",
+  hasContext: !!richContext,
+  employeeCount: richContext?.employeeData?.totalCount || 0,
+  hasMetrics: !!richContext?.dashboardData?.metrics,
+  pageType: richContext?.pageType || 'unknown'
+}`);
 
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
