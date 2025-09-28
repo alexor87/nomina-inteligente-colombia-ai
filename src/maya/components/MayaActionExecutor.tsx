@@ -43,22 +43,12 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
     
     try {
       let result: ActionExecutionResult;
-
-      switch (action.type) {
-        case 'send_voucher':
-          result = await executeSendVoucher(action);
-          break;
-        case 'search_employee':
-          result = await executeSearchEmployee(action);
-          break;
-        case 'view_details':
-          result = await executeViewDetails(action);
-          break;
-        default:
-          result = {
-            success: false,
-            message: `Acción "${action.type}" no implementada`
-          };
+      
+      // If action doesn't require confirmation, execute automatically
+      if (!action.requiresConfirmation && action.type === 'send_voucher') {
+        result = await executeAutomatically(action);
+      } else {
+        result = await handleAction(action);
       }
 
       if (result.success) {
@@ -87,10 +77,44 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
         description: result.message,
         variant: "destructive"
       });
-      
+
       onActionExecuted?.(action, result);
     } finally {
       setIsExecuting(null);
+    }
+  };
+
+  const executeAutomatically = async (action: ExecutableAction): Promise<ActionExecutionResult> => {
+    console.log('🤖 Executing action automatically:', action);
+    
+    const { data, error } = await supabase.functions.invoke('execute-maya-action', {
+      body: { action }
+    });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return {
+      success: data.success,
+      message: data.message,
+      data: data.data
+    };
+  };
+
+  const handleAction = async (action: ExecutableAction): Promise<ActionExecutionResult> => {
+    switch (action.type) {
+      case 'send_voucher':
+        return await executeSendVoucher(action);
+      case 'search_employee':
+        return await executeSearchEmployee(action);
+      case 'view_details':
+        return await executeViewDetails(action);
+      default:
+        return {
+          success: false,
+          message: `Acción "${action.type}" no implementada`
+        };
     }
   };
 
