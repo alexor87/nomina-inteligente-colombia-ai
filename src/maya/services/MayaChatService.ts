@@ -6,6 +6,7 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: string;
+  executableActions?: any[];
 }
 
 export interface ChatConversation {
@@ -88,8 +89,9 @@ export class MayaChatService {
       const assistantMessage: ChatMessage = {
         id: `maya_${Date.now()}`,
         role: 'assistant',
-        content: data?.message || "Disculpa, no pude procesar tu mensaje en este momento.",
-        timestamp: new Date().toISOString()
+        content: data?.message ?? data?.response ?? "Disculpa, no pude procesar tu mensaje en este momento.",
+        timestamp: new Date().toISOString(),
+        executableActions: data?.executableActions
       };
 
       console.log('🤖 MAYA Chat: Assistant response created:', assistantMessage);

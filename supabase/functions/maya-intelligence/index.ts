@@ -76,7 +76,8 @@ const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
         console.log(`[maya-intelligence] 🎯 ${requestId} Executable action detected:`, actionDetectionResult.action);
         
         return new Response(JSON.stringify({
-          response: actionDetectionResult.response,
+          message: actionDetectionResult.response,
+          response: actionDetectionResult.response, // Include both for compatibility
           conversationId: sessionId,
           executableActions: [actionDetectionResult.action]
         }), {
@@ -421,6 +422,12 @@ async function detectExecutableAction(userMessage: string, richContext: any, ope
       const emailPattern = /(\S+@\S+\.\S+)/g;
       const extractedEmail = userMessage.match(emailPattern)?.[0];
       
+      // Sanitize email - remove trailing punctuation
+      let sanitizedEmail = extractedEmail;
+      if (extractedEmail) {
+        sanitizedEmail = extractedEmail.replace(/[?.!,;]+$/, '');
+      }
+      
       // Try to find employee in message
       let foundEmployee = null;
       if (richContext?.employeeData?.allEmployees) {
@@ -445,16 +452,16 @@ async function detectExecutableAction(userMessage: string, richContext: any, ope
             id: `send_voucher_${Date.now()}`,
             type: 'send_voucher',
             label: `Enviar comprobante a ${foundEmployee.name}`,
-            description: extractedEmail ? `Al email: ${extractedEmail}` : 'Al email registrado del empleado',
+            description: sanitizedEmail ? `Al email: ${sanitizedEmail}` : 'Al email registrado del empleado',
             parameters: {
               employeeId: foundEmployee.id,
               employeeName: foundEmployee.name,
-              email: extractedEmail
+              email: sanitizedEmail
             },
             requiresConfirmation: false,
             icon: 'send'
           },
-          response: `¡Perfecto! Puedo ayudarte a enviar el comprobante de ${foundEmployee.name}${extractedEmail ? ` al email ${extractedEmail}` : ' a su email registrado'}. Haz clic en el botón de acción para proceder.`
+          response: `¡Perfecto! Puedo ayudarte a enviar el comprobante de ${foundEmployee.name}${sanitizedEmail ? ` al email ${sanitizedEmail}` : ' a su email registrado'}. Haz clic en el botón de acción para proceder.`
         };
       }
       

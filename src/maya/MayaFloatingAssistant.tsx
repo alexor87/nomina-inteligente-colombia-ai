@@ -125,23 +125,36 @@ export const MayaFloatingAssistant: React.FC = () => {
               {isChatMode ? (
                 /* Chat Mode */
                 <div className="h-80 flex flex-col">
-                  {/* Chat Messages */}
-                  <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                    {chatHistory.length > 0 ? chatHistory.map((msg, index) => (
-                      <div
-                        key={msg.id || index}
-                        className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                      >
+                   {/* Chat Messages */}
+                   <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                     {chatHistory.length > 0 ? chatHistory.map((msg, index) => (
+                       <div key={msg.id || index}>
                          <div
-                           className={`max-w-[80%] p-3 rounded-lg text-sm whitespace-pre-wrap ${
-                             msg.role === 'user'
-                               ? 'bg-primary text-primary-foreground'
-                               : 'bg-gray-100 text-gray-800'
-                           }`}
+                           className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                          >
-                           {msg.content}
+                            <div
+                              className={`max-w-[80%] p-3 rounded-lg text-sm whitespace-pre-wrap ${
+                                msg.role === 'user'
+                                  ? 'bg-primary text-primary-foreground'
+                                  : 'bg-gray-100 text-gray-800'
+                              }`}
+                            >
+                              {msg.content}
+                            </div>
                          </div>
-                      </div>
+                         
+                         {/* Executable Actions for Assistant Messages */}
+                         {msg.role === 'assistant' && msg.executableActions && msg.executableActions.length > 0 && (
+                           <div className="mt-2 pl-4">
+                             <MayaActionExecutor 
+                               actions={msg.executableActions}
+                               onActionExecuted={(action, result) => {
+                                 console.log('Action executed:', action, result);
+                               }}
+                             />
+                           </div>
+                         )}
+                       </div>
                     )) : (
                       <div className="text-center text-gray-500 text-sm mt-8">
                         <MayaAvatar emotionalState="neutral" isVisible={true} size="md" />
