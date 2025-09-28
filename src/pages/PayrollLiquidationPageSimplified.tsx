@@ -298,6 +298,10 @@ const PayrollLiquidationPageSimplified = () => {
         selectedPeriod={selectedPeriod}
         currentPeriodId={currentPeriodId}
         liquidationResult={liquidationResult}
+        validationResults={exhaustiveValidationResults}
+        isValidating={isValidating}
+        liquidationErrors={liquidationErrors}
+        companyId={companyId}
       />
       
       <div className="flex items-center justify-between">

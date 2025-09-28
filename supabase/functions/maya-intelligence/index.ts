@@ -124,21 +124,72 @@ Responde de manera natural a la pregunta del usuario. Si no sabes algo específi
       });
     }
 
-    // Original contextual message mode
-    const systemPrompt = `Eres MAYA, una asistente de nómina profesional y amigable para pequeñas empresas colombianas. 
-Tu personalidad es:
+    const buildContextString = (contextData: any) => {
+      const { phase, employeeCount, periodName, hasErrors, validationResults, errorType, errorDetails } = contextData;
+      let contextStr = `Fase: ${phase}`;
+      if (periodName) contextStr += `, Período: ${periodName}`;
+      if (employeeCount) contextStr += `, Empleados: ${employeeCount}`;
+      if (hasErrors) contextStr += `, Estado: Con errores`;
+      if (validationResults) contextStr += `, Validación: ${validationResults.hasIssues ? 'Con problemas' : 'Exitosa'}`;
+      if (errorType) contextStr += `, Tipo error: ${errorType}`;
+      return contextStr;
+    };
+
+    // Enhanced contextual responses based on phase
+    let systemPrompt = '';
+    
+    if (phase === 'data_validation') {
+      systemPrompt = `Eres MAYA, una inteligente asistente de nómina colombiana especializada en validación de datos laborales.
+
+🔍 **FASE DE VALIDACIÓN DE DATOS**
+CONTEXTO: ${buildContextString({ phase, ...data })}
+
+Tu tarea es analizar los resultados de validación y proporcionar orientación clara:
+
+${data?.validationResults?.hasIssues ? `❌ SE ENCONTRARON PROBLEMAS:
+- Explica los errores de forma comprensible
+- Proporciona pasos específicos para corregir
+- Indica riesgos laborales y legales
+- Guía la corrección paso a paso` : `✅ VALIDACIÓN EXITOSA:
+- Confirma que los datos están correctos
+- Indica que es seguro proceder
+- Destaca aspectos positivos del proceso`}
+
+Sé precisa, empática y orientada a la acción. Máximo 120 palabras.`;
+
+    } else if (phase === 'error') {
+      systemPrompt = `Eres MAYA, una asistente de nómina empática especializada en resolución de problemas.
+
+🚨 **FASE DE MANEJO DE ERRORES**
+CONTEXTO: ${buildContextString({ phase, ...data })}
+TIPO DE ERROR: ${data?.errorType || 'no especificado'}
+
+Tu enfoque debe ser:
+- Explicar el problema sin tecnicismos excesivos
+- Proporcionar solución CONCRETA y pasos específicos
+- Indicar si requiere ayuda técnica
+- Ofrecer alternativas cuando sea posible
+- Ser empática pero directa
+
+NO te enfoques en explicar qué salió mal, enfócate en la SOLUCIÓN.
+Mantén el tono profesional pero tranquilizador. Máximo 100 palabras.`;
+
+    } else {
+      // Default system prompt for other phases
+      systemPrompt = `Eres MAYA, una asistente de nómina profesional y amigable para pequeñas empresas colombianas. 
+
+Tu personalidad:
 - Profesional pero cálida
 - Proactiva y útil
 - Experta en procesos de liquidación
-- Celebra los logros y tranquiliza en problemas
+- Celebra logros y tranquiliza en problemas
 - Usa emojis con moderación
 - Respuestas concisas (máximo 2 líneas)
 
-Contexto actual: ${context}
-Fase del proceso: ${phase}
-Datos adicionales: ${JSON.stringify(data)}
+CONTEXTO ACTUAL: ${buildContextString({ phase, ...data })}
 
 Genera una respuesta contextual apropiada para este momento del proceso de liquidación de nómina.`;
+    }
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -171,12 +222,16 @@ Genera una respuesta contextual apropiada para este momento del proceso de liqui
     const aiData = await response.json();
     const contextualMessage = aiData.choices[0]?.message?.content || "¡Hola! Soy MAYA, tu asistente de nómina. Estoy aquí para ayudarte.";
 
-    // Determine emotional state based on context
+    // Determine emotional state based on context and phase
     let emotionalState = 'neutral';
-    if (context.includes('error') || context.includes('problema')) {
+    if (phase === 'error' || (data?.hasErrors && phase === 'data_validation')) {
       emotionalState = 'concerned';
-    } else if (context.includes('completado') || context.includes('éxito')) {
+    } else if (phase === 'completed') {
       emotionalState = 'celebrating';
+    } else if (phase === 'data_validation' && !data?.hasErrors) {
+      emotionalState = 'encouraging';
+    } else if (phase === 'processing' || phase === 'employee_loading') {
+      emotionalState = 'analyzing';
     } else if (context.includes('calculando') || context.includes('procesando')) {
       emotionalState = 'analyzing';
     }
@@ -219,8 +274,23 @@ function generateContextualActions(context: string, phase: string): string[] {
     actions.push('📊 Revisando empleados activos para este período...');
   }
   
+  if (phase === 'data_validation') {
+    actions.push('🔍 Validando calidad de datos de nómina');
+    actions.push('✅ Revisando consistencia laboral');
+  }
+  
   if (phase === 'liquidation_ready') {
     actions.push('✨ Todo listo para procesar la liquidación');
+  }
+  
+  if (phase === 'error') {
+    actions.push('🔧 Puedo ayudarte a resolver este problema');
+    actions.push('💡 Consulta los pasos de solución');
+  }
+  
+  if (phase === 'completed') {
+    actions.push('🎉 ¡Liquidación completada exitosamente!');
+    actions.push('📊 Revisar reportes de nómina');
   }
   
   if (context.includes('error')) {

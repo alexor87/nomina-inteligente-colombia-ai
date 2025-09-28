@@ -25,6 +25,8 @@ export interface MayaContext {
   validationResults?: any;
   currentPage?: string;
   contextualHelp?: string;
+  errorType?: string;
+  errorDetails?: any;
 }
 
 export type PayrollPhase = 

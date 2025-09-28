@@ -15,6 +15,7 @@ interface MayaProviderValue {
   sendMessage: (message: string) => Promise<void>;
   setPhase: (phase: PayrollPhase, additionalData?: Partial<MayaContextType>) => Promise<void>;
   performIntelligentValidation: (companyId: string, periodId?: string, employees?: any[]) => Promise<any>;
+  setErrorContext: (errorType: string, errorDetails: any) => Promise<void>;
 }
 
 const MayaContext = createContext<MayaProviderValue | null>(null);
@@ -124,14 +125,31 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
       // Actualizar contexto con resultados de validación
       await setPhase('data_validation', {
         hasErrors: validationResults.hasIssues,
-        validationResults
+        validationResults,
+        employeeCount: employees?.length
       });
 
       return validationResults;
     } catch (error) {
       console.error('Error en validación inteligente de MAYA:', error);
+      
+      // Trigger error phase on validation failure
+      await setPhase('error', {
+        hasErrors: true,
+        errorType: 'validation_system_error',
+        errorDetails: { message: error.message || 'Error en sistema de validación', error }
+      });
+      
       throw error;
     }
+  }, [setPhase]);
+
+  const setErrorContext = useCallback(async (errorType: string, errorDetails: any) => {
+    await setPhase('error', {
+      hasErrors: true,
+      errorType,
+      errorDetails
+    });
   }, [setPhase]);
 
   // Initialize Maya with welcome message
@@ -164,7 +182,8 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
     setChatMode,
     sendMessage,
     setPhase,
-    performIntelligentValidation
+    performIntelligentValidation,
+    setErrorContext
   };
 
   return (
