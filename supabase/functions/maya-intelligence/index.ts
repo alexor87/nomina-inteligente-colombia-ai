@@ -79,13 +79,13 @@ const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
       const actionDetectionResult = await detectExecutableAction(userMessage, richContext, OPENAI_API_KEY);
       
       if (actionDetectionResult.hasExecutableAction) {
-        console.log(`[maya-intelligence] 🎯 ${requestId} Executable action detected:`, actionDetectionResult.action);
+        console.log(`[maya-intelligence] 🎯 ${requestId} Executable action detected:`, actionDetectionResult.actions || actionDetectionResult.action);
         
         return new Response(JSON.stringify({
           message: actionDetectionResult.response,
           response: actionDetectionResult.response, // Include both for compatibility
           conversationId: sessionId,
-          executableActions: [actionDetectionResult.action]
+          executableActions: actionDetectionResult.actions || [actionDetectionResult.action]
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -411,6 +411,7 @@ Genera una respuesta contextual apropiada para este momento del proceso de liqui
 async function detectExecutableAction(userMessage: string, richContext: any, openaiKey: string): Promise<{
   hasExecutableAction: boolean;
   action?: any;
+  actions?: any[];
   response?: string;
 }> {
   try {
@@ -530,7 +531,7 @@ async function detectExecutableAction(userMessage: string, richContext: any, ope
         }
       }
       
-      // If we found an employee directly, create action with period detection
+      // If we found an employee directly, create TWO actions for integrated confirmation
       if (foundEmployee) {
         console.log(`[maya-intelligence] 🎯 Direct employee match found: ${foundEmployee.name}`);
         
@@ -552,23 +553,36 @@ async function detectExecutableAction(userMessage: string, richContext: any, ope
           console.log(`[maya-intelligence] ⚠️ Could not fetch latest period: ${error}`);
         }
         
+        const baseParams = {
+          employeeId: foundEmployee.id,
+          employeeName: foundEmployee.name,
+          email: sanitizedEmail,
+          periodId: latestPeriod?.id,
+          periodName: latestPeriod?.periodo
+        };
+
         return {
           hasExecutableAction: true,
-          action: {
-            id: `send_voucher_${Date.now()}`,
-            type: 'send_voucher',
-            label: `Enviar comprobante a ${foundEmployee.name}`,
-            description: latestPeriod ? `Período: ${latestPeriod.periodo}` : 'Período más reciente',
-            parameters: {
-              employeeId: foundEmployee.id,
-              employeeName: foundEmployee.name,
-              email: sanitizedEmail,
-              periodId: latestPeriod?.id,
-              periodName: latestPeriod?.periodo
+          actions: [
+            {
+              id: `confirm_voucher_${Date.now()}`,
+              type: 'confirm_send_voucher',
+              label: `✅ Sí, enviar a ${foundEmployee.name}`,
+              description: latestPeriod ? `Período: ${latestPeriod.periodo}` : 'Período más reciente',
+              parameters: baseParams,
+              requiresConfirmation: false,
+              icon: 'check-circle'
             },
-            requiresConfirmation: true,
-            icon: 'send'
-          },
+            {
+              id: `alternatives_voucher_${Date.now()}`,
+              type: 'show_period_alternatives', 
+              label: `❌ No, ver otros períodos`,
+              description: 'Mostrar períodos alternativos para seleccionar',
+              parameters: baseParams,
+              requiresConfirmation: false,
+              icon: 'x-circle'
+            }
+          ],
           response: latestPeriod 
             ? `Detecté el período **${latestPeriod.periodo}** para ${foundEmployee.name}. ¿Confirmas el envío del comprobante${sanitizedEmail ? ` al email ${sanitizedEmail}` : ' a su email registrado'}?`
             : `Puedo ayudarte a enviar el comprobante de ${foundEmployee.name}${sanitizedEmail ? ` al email ${sanitizedEmail}` : ' a su email registrado'}. ¿Confirmas el envío?`
@@ -661,23 +675,36 @@ RESPUESTA:`;
                   console.log(`[maya-intelligence] ⚠️ Could not fetch latest period: ${error}`);
                 }
                 
+                const baseParams = {
+                  employeeId: employee.id,
+                  employeeName: employee.name,
+                  email: sanitizedEmail,
+                  periodId: latestPeriod?.id,
+                  periodName: latestPeriod?.periodo
+                };
+
                 return {
                   hasExecutableAction: true,
-                  action: {
-                    id: `send_voucher_${Date.now()}`,
-                    type: 'send_voucher',
-                    label: `Enviar comprobante a ${employee.name}`,
-                    description: latestPeriod ? `Período: ${latestPeriod.periodo}` : 'Período más reciente',
-                    parameters: {
-                      employeeId: employee.id,
-                      employeeName: employee.name,
-                      email: sanitizedEmail,
-                      periodId: latestPeriod?.id,
-                      periodName: latestPeriod?.periodo
+                  actions: [
+                    {
+                      id: `confirm_voucher_${Date.now()}`,
+                      type: 'confirm_send_voucher',
+                      label: `✅ Sí, enviar a ${employee.name}`,
+                      description: latestPeriod ? `Período: ${latestPeriod.periodo}` : 'Período más reciente',
+                      parameters: baseParams,
+                      requiresConfirmation: false,
+                      icon: 'check-circle'
                     },
-                    requiresConfirmation: true,
-                    icon: 'send'
-                  },
+                    {
+                      id: `alternatives_voucher_${Date.now()}`,
+                      type: 'show_period_alternatives',
+                      label: `❌ No, ver otros períodos`,
+                      description: 'Mostrar períodos alternativos para seleccionar',
+                      parameters: baseParams,
+                      requiresConfirmation: false,
+                      icon: 'x-circle'
+                    }
+                  ],
                   response: latestPeriod 
                     ? `Detecté el período **${latestPeriod.periodo}** para ${employee.name}. ¿Confirmas el envío del comprobante${sanitizedEmail ? ` al email ${sanitizedEmail}` : ' a su email registrado'}?`
                     : `Puedo ayudarte a enviar el comprobante de ${employee.name}${sanitizedEmail ? ` al email ${sanitizedEmail}` : ' a su email registrado'}. ¿Confirmas el envío?`

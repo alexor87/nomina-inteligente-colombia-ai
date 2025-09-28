@@ -20,7 +20,7 @@ serve(async (req) => {
     const { action } = await req.json();
     console.log(`[execute-maya-action] Executing action:`, action);
 
-    if (action.type === 'send_voucher') {
+    if (action.type === 'send_voucher' || action.type === 'confirm_send_voucher') {
       return await executeSendVoucherAction(action);
     }
 

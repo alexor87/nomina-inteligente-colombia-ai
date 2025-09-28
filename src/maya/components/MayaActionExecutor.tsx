@@ -6,7 +6,7 @@ import { PeriodConfirmationDialog } from './PeriodConfirmationDialog';
 import { PayrollEmployee } from '@/types/payroll';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Send, User, FileText, Eye, Loader2 } from 'lucide-react';
+import { Send, User, FileText, Eye, Loader2, Calendar } from 'lucide-react';
 
 interface MayaActionExecutorProps {
   actions: ExecutableAction[];
@@ -40,6 +40,8 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
   const getActionIcon = (type: string) => {
     switch (type) {
       case 'send_voucher': return Send;
+      case 'confirm_send_voucher': return Send;
+      case 'show_period_alternatives': return Calendar;
       case 'search_employee': return User;
       case 'view_details': return Eye;
       case 'generate_report': return FileText;
@@ -131,6 +133,10 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
     switch (action.type) {
       case 'send_voucher':
         return await executeSendVoucher(action);
+      case 'confirm_send_voucher':
+        return await executeAutomatically(action);
+      case 'show_period_alternatives':
+        return await showPeriodAlternatives(action);
       case 'search_employee':
         return await executeSearchEmployee(action);
       case 'view_details':
@@ -251,6 +257,39 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
     };
   };
 
+  const showPeriodAlternatives = async (action: ExecutableAction): Promise<ActionExecutionResult> => {
+    try {
+      // Get recent closed periods
+      const { data: periods, error } = await supabase
+        .from('payroll_periods_real')
+        .select('id, periodo, fecha_inicio, fecha_fin, estado')
+        .eq('estado', 'cerrado')
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (error) throw error;
+
+      setPeriodConfirmationDialog({ 
+        isOpen: true, 
+        action: {
+          ...action,
+          type: 'send_voucher', // Convert back to send_voucher for the dialog
+          requiresConfirmation: true
+        }
+      });
+
+      return {
+        success: true,
+        message: `Mostrando períodos alternativos para ${action.parameters.employeeName}`
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: `Error cargando períodos alternativos: ${error.message}`
+      };
+    }
+  };
+
   const handlePeriodConfirmation = async (periodId: string) => {
     const action = periodConfirmationDialog.action;
     if (!action) return;
@@ -310,9 +349,15 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
               key={action.id}
               onClick={() => executeAction(action)}
               disabled={isLoading}
-              variant="outline"
+              variant={action.type === 'confirm_send_voucher' ? 'default' : action.type === 'show_period_alternatives' ? 'outline' : 'outline'}
               size="sm"
-              className="w-full justify-start text-left h-auto p-3 hover:bg-primary/5 border-primary/20"
+              className={`w-full justify-start text-left h-auto p-3 ${
+                action.type === 'confirm_send_voucher' 
+                  ? 'hover:bg-green-500/10 border-green-500/30 text-green-700 dark:text-green-400' 
+                  : action.type === 'show_period_alternatives'
+                  ? 'hover:bg-red-500/10 border-red-500/30 text-red-700 dark:text-red-400'
+                  : 'hover:bg-primary/5 border-primary/20'
+              }`}
             >
               <div className="flex items-center gap-2 w-full">
                 {isLoading ? (
