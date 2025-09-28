@@ -3,8 +3,9 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-maya-session-id, x-maya-context, x-maya-debug',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Max-Age': '3600',
 };
 
 interface MayaRequest {
@@ -41,7 +42,8 @@ const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
       }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const { context, phase, data, message: userMessage, conversation, sessionId }: MayaRequest = await req.json();
+    const { context, phase, data, message: userMessage, conversation, sessionId, debug: debugBody }: MayaRequest & { debug?: boolean } = await req.json();
+    const debugMode = debug || debugBody;
 
     // Handle interactive chat mode
     if (phase === 'interactive_chat' && userMessage && conversation) {
@@ -62,13 +64,19 @@ Contexto de la conversación:
 
 Responde de manera natural a la pregunta del usuario. Si no sabes algo específico, sé honesta pero siempre trata de ser útil.`;
 
+      // Filter conversation to only role and content for OpenAI
+      const filteredConversation = conversation.slice(-10).map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }));
+      
       const messages = [
         { role: 'system', content: conversationalPrompt },
-        ...conversation.slice(-10), // Last 10 messages for context
+        ...filteredConversation,
         { role: 'user', content: userMessage }
       ];
 
-      if (debug) {
+      if (debugMode) {
         console.info(`[maya-intelligence] ↪ ${requestId} interactive_chat`, {
           convLen: conversation.length,
           lastUserLen: userMessage.length,
@@ -102,7 +110,7 @@ Responde de manera natural a la pregunta del usuario. Si no sabes algo específi
       }
 
       const aiData = await response.json();
-      if (debug) console.info(`[maya-intelligence] ✔ ${requestId} OpenAI ok`, { status: response.status });
+      if (debugMode) console.info(`[maya-intelligence] ✔ ${requestId} OpenAI ok`, { status: response.status });
       const responseMessage = aiData.choices[0]?.message?.content || "Disculpa, no pude procesar tu pregunta. ¿Podrías reformularla?";
 
       return new Response(JSON.stringify({

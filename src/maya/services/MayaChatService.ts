@@ -47,19 +47,21 @@ export class MayaChatService {
     try {
       console.log('🤖 MAYA Chat: Calling maya-intelligence function...');
       
+      // Filter conversation for OpenAI (only role and content)
+      const filteredConversation = this.currentConversation.messages.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }));
+
       // Call MAYA intelligence with conversation history
       const { data, error } = await supabase.functions.invoke('maya-intelligence', {
         body: {
           message: userMessage,
-          conversation: this.currentConversation.messages,
+          conversation: filteredConversation,
           context: context || 'chat_conversation',
           phase: 'interactive_chat',
-          sessionId: this.currentConversation.sessionId
-        },
-        headers: {
-          'x-maya-session-id': this.currentConversation.sessionId,
-          'x-maya-context': String(context || 'chat_conversation'),
-          'x-maya-debug': '1'
+          sessionId: this.currentConversation.sessionId,
+          debug: true
         }
       });
 
@@ -85,10 +87,16 @@ export class MayaChatService {
 
     } catch (error: any) {
       const debugCode = `E-${Date.now().toString().slice(-6)}`;
+      let userFriendlyMessage = `Disculpa, tengo un problema técnico (${debugCode}). Por favor intenta de nuevo en unos segundos.`;
+      
       try {
         if (error instanceof FunctionsHttpError) {
           const errJson = await error.context.json().catch(() => null);
           console.error('🤖 MAYA Chat: FunctionsHttpError', { errJson });
+          // Use server's error message if available
+          if (errJson?.message) {
+            userFriendlyMessage = errJson.message;
+          }
         } else if (error instanceof FunctionsRelayError) {
           console.error('🤖 MAYA Chat: FunctionsRelayError', { name: error.name, message: error.message });
         } else if (error instanceof FunctionsFetchError) {
@@ -100,11 +108,11 @@ export class MayaChatService {
         console.error('🤖 MAYA Chat: Error parsing error context', parseErr);
       }
       
-      // Fallback response with lightweight debug code
+      // Fallback response with server message or debug code
       const fallbackMessage: ChatMessage = {
         id: `maya_fallback_${Date.now()}`,
         role: 'assistant',
-        content: `Disculpa, tengo un problema técnico (${debugCode}). Por favor intenta de nuevo en unos segundos.`,
+        content: userFriendlyMessage,
         timestamp: new Date().toISOString()
       };
 
