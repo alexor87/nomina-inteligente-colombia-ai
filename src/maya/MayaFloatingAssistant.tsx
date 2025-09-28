@@ -5,12 +5,15 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { MayaAvatar } from './MayaAvatar';
 import { useMaya } from './MayaProvider';
+import { MayaReactivationButton } from './MayaReactivationButton';
 
 export const MayaFloatingAssistant: React.FC = () => {
   const { currentMessage, isVisible, hideMessage, showMessage } = useMaya();
   const [isMinimized, setIsMinimized] = useState(false);
 
-  if (!isVisible || !currentMessage) return null;
+  if (!isVisible || !currentMessage) {
+    return <MayaReactivationButton />;
+  }
 
   return (
     <motion.div

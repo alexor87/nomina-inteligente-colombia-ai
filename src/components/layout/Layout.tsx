@@ -5,6 +5,9 @@ import { Sidebar } from './Sidebar';
 import Header from './Header';
 import { useAuth } from '@/contexts/AuthContext';
 import { LoadingWithTimeout } from '@/components/ui/LoadingWithTimeout';
+import { MayaProvider } from '@/maya/MayaProvider';
+import { MayaFloatingAssistant } from '@/maya/MayaFloatingAssistant';
+import { MayaGlobalManager } from '@/maya/MayaGlobalManager';
 
 export const Layout = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -30,22 +33,28 @@ export const Layout = () => {
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
-      <Sidebar 
-        collapsed={sidebarCollapsed}
-        onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-      />
-      
-      <main 
-        className={`flex-1 transition-all duration-300 ${
-          sidebarCollapsed ? 'ml-16' : 'ml-64'
-        }`}
-      >
-        <Header />
-        <div className="min-h-screen bg-gray-50">
-          <Outlet />
-        </div>
-      </main>
-    </div>
+    <MayaProvider autoShow={false}>
+      <div className="flex min-h-screen bg-gray-50">
+        <Sidebar 
+          collapsed={sidebarCollapsed}
+          onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+        />
+        
+        <main 
+          className={`flex-1 transition-all duration-300 ${
+            sidebarCollapsed ? 'ml-16' : 'ml-64'
+          }`}
+        >
+          <Header />
+          <div className="min-h-screen bg-gray-50">
+            <Outlet />
+          </div>
+        </main>
+        
+        {/* MAYA Global Components */}
+        <MayaFloatingAssistant />
+        <MayaGlobalManager />
+      </div>
+    </MayaProvider>
   );
 };

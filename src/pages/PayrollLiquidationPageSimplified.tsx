@@ -289,9 +289,8 @@ const PayrollLiquidationPageSimplified = () => {
   };
 
   return (
-    <MayaProvider>
-      {/* MAYA Integration Components */}
-      <MayaFloatingAssistant />
+    <div className="space-y-6">
+      {/* Integración con MAYA para tracking inteligente */}
       <MayaIntegratedComponent
         employees={employees}
         isLoading={isLoading}
@@ -301,7 +300,6 @@ const PayrollLiquidationPageSimplified = () => {
         liquidationResult={liquidationResult}
       />
       
-      <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2">
           <Calculator className="h-6 w-6 text-blue-600" />
@@ -535,7 +533,6 @@ const PayrollLiquidationPageSimplified = () => {
         />
       )}
     </div>
-    </MayaProvider>
   );
 };
 
