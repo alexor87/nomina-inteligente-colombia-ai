@@ -31,7 +31,7 @@ const handler = async (req: Request): Promise<Response> => {
     console.log('PDF attachment size (base64):', pdfBase64.length);
     
     const employeeName = `${employee.nombre} ${employee.apellido}`;
-    const periodText = `${period.startDate} - ${period.endDate}`;
+    const periodText = `${period.fecha_inicio} - ${period.fecha_fin}`;
     
     // Email HTML template - Generic version
     const emailHtml = `
@@ -153,7 +153,7 @@ const handler = async (req: Request): Promise<Response> => {
       html: emailHtml,
       attachments: [
         {
-          filename: `Comprobante_${employee.nombre}_${employee.apellido}_${period.startDate.replace(/-/g, '')}.pdf`,
+          filename: `Comprobante_${employee.nombre}_${employee.apellido}_${period.fecha_inicio.replace(/-/g, '')}.pdf`,
           content: pdfBase64
         },
       ],
