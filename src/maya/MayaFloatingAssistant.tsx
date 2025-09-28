@@ -131,15 +131,15 @@ export const MayaFloatingAssistant: React.FC = () => {
                         key={msg.id || index}
                         className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                       >
-                        <div
-                          className={`max-w-[80%] p-3 rounded-lg text-sm ${
-                            msg.role === 'user'
-                              ? 'bg-primary text-primary-foreground'
-                              : 'bg-gray-100 text-gray-800'
-                          }`}
-                        >
-                          {msg.content}
-                        </div>
+                         <div
+                           className={`max-w-[80%] p-3 rounded-lg text-sm whitespace-pre-wrap ${
+                             msg.role === 'user'
+                               ? 'bg-primary text-primary-foreground'
+                               : 'bg-gray-100 text-gray-800'
+                           }`}
+                         >
+                           {msg.content}
+                         </div>
                       </div>
                     )) : (
                       <div className="text-center text-gray-500 text-sm mt-8">
@@ -177,11 +177,11 @@ export const MayaFloatingAssistant: React.FC = () => {
                   {currentMessage && (
                     <>
                       {/* Message */}
-                      <div className="mb-3">
-                        <p className="text-sm text-gray-800 leading-relaxed">
-                          {currentMessage.message}
-                        </p>
-                      </div>
+                       <div className="mb-3">
+                         <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">
+                           {currentMessage.message}
+                         </p>
+                       </div>
 
                       {/* Contextual Actions */}
                       {currentMessage.contextualActions && currentMessage.contextualActions.length > 0 && (
