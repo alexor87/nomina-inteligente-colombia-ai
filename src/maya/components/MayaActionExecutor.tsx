@@ -41,6 +41,7 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
   const getActionIcon = (type: string) => {
     switch (type) {
       case 'send_voucher': return Send;
+      case 'send_voucher_all': return Send;
       case 'confirm_send_voucher': return Send;
       case 'show_period_alternatives': return Calendar;
       case 'search_employee': return User;
@@ -134,6 +135,8 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
     switch (action.type) {
       case 'send_voucher':
         return await executeSendVoucher(action);
+      case 'send_voucher_all':
+        return await executeAutomatically(action);
       case 'confirm_send_voucher':
         return await executeAutomatically(action);
       case 'show_period_alternatives':

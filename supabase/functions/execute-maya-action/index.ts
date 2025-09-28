@@ -24,6 +24,10 @@ serve(async (req) => {
       return await executeSendVoucherAction(action);
     }
 
+    if (action.type === 'send_voucher_all') {
+      return await executeSendVoucherAllAction(action);
+    }
+
     return new Response(
       JSON.stringify({ success: false, message: 'Tipo de acción no soportado' }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -175,6 +179,110 @@ async function executeSendVoucherAction(action: any) {
         employeeName,
         email: targetEmail,
         period: payrollData.payroll_periods_real.periodo
+      }
+    }),
+    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  );
+}
+
+async function executeSendVoucherAllAction(action: any) {
+  const { periodId, periodName, employeeCount } = action.parameters;
+  
+  console.log(`[execute-maya-action] Processing mass voucher sending for ${employeeCount} employees, period: ${periodName || periodId}`);
+
+  if (!periodId) {
+    throw new Error('Period ID es requerido para envío masivo');
+  }
+
+  // Get period data
+  const { data: period, error: periodError } = await supabase
+    .from('payroll_periods_real')
+    .select('*')
+    .eq('id', periodId)
+    .single();
+
+  if (periodError || !period) {
+    throw new Error(`No se pudo encontrar el período: ${periodError?.message}`);
+  }
+
+  // Get all active employees for this company
+  const { data: employees, error: employeesError } = await supabase
+    .from('employees')
+    .select('*')
+    .eq('company_id', period.company_id)
+    .eq('estado', 'activo');
+
+  if (employeesError || !employees || employees.length === 0) {
+    throw new Error('No se encontraron empleados activos para envío masivo');
+  }
+
+  const results = [];
+  let successCount = 0;
+  let errorCount = 0;
+
+  // Process each employee
+  for (let i = 0; i < employees.length; i++) {
+    const employee = employees[i];
+    console.log(`[execute-maya-action] Processing ${i + 1}/${employees.length}: ${employee.nombre} ${employee.apellido}`);
+
+    try {
+      // Create individual voucher action for each employee
+      const individualAction = {
+        type: 'send_voucher',
+        parameters: {
+          employeeId: employee.id,
+          employeeName: `${employee.nombre} ${employee.apellido}`,
+          email: employee.email,
+          periodId: periodId
+        }
+      };
+
+      // Execute individual voucher sending
+      const result = await executeSendVoucherAction(individualAction);
+      
+      if (result.status === 200) {
+        successCount++;
+        results.push({
+          employee: `${employee.nombre} ${employee.apellido}`,
+          success: true,
+          email: employee.email
+        });
+      } else {
+        errorCount++;
+        results.push({
+          employee: `${employee.nombre} ${employee.apellido}`,
+          success: false,
+          error: 'Error en envío'
+        });
+      }
+    } catch (error: any) {
+      console.error(`[execute-maya-action] Error with employee ${employee.nombre}:`, error);
+      errorCount++;
+      results.push({
+        employee: `${employee.nombre} ${employee.apellido}`,
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  const totalProcessed = successCount + errorCount;
+  const message = successCount === totalProcessed 
+    ? `✅ ¡Envío masivo completado! Se enviaron ${successCount} desprendibles exitosamente para el período "${period.periodo}".`
+    : `⚠️ Envío masivo completado con algunos errores: ${successCount} exitosos, ${errorCount} fallidos de ${totalProcessed} empleados para el período "${period.periodo}".`;
+
+  console.log(`[execute-maya-action] ✅ Mass voucher sending completed: ${successCount} success, ${errorCount} errors`);
+
+  return new Response(
+    JSON.stringify({
+      success: successCount > 0,
+      message,
+      data: {
+        totalProcessed,
+        successCount,
+        errorCount,
+        period: period.periodo,
+        results
       }
     }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

@@ -445,6 +445,15 @@ async function detectExecutableAction(userMessage: string, richContext: any, ope
       'email', 'correo', 'correo electrónico', 'correo electronico',
       'mail', 'e-mail', 'electrónico', 'electronico'
     ];
+
+    // Keywords para envío masivo (todos los empleados)
+    const massKeywords = [
+      'todos', 'todo', 'todas', 'toda',
+      'everyone', 'all', 'everything',
+      'activos', 'empleados activos', 'todos los empleados',
+      'completo', 'completa', 'masivo', 'masiva',
+      'general', 'globalmente'
+    ];
     const searchKeywords = ['busca', 'encuentra', 'mostrar', 'ver', 'detalles de', 'información de', 'info de'];
     
     const messageWords = userMessage.toLowerCase();
@@ -462,6 +471,96 @@ async function detectExecutableAction(userMessage: string, richContext: any, ope
     // 📧 Detect voucher sending intent
     if (voucherKeywords.some(keyword => messageWords.includes(keyword))) {
       console.log(`[maya-intelligence] 📧 Voucher intent detected in: "${userMessage}"`);
+      
+      // 🔍 Detectar envío masivo PRIMERO
+      const isMassRequest = massKeywords.some(keyword => messageWords.includes(keyword));
+      
+      if (isMassRequest) {
+        console.log(`[maya-intelligence] 📤 Mass voucher sending detected: "${userMessage}"`);
+        
+        if (!richContext?.employeeData?.allEmployees?.length) {
+          return {
+            hasExecutableAction: false,
+            response: `No hay empleados registrados en el sistema para enviar desprendibles masivos.`
+          };
+        }
+
+        // SIEMPRE preguntar por el período para envío masivo
+        const employeeCount = richContext.employeeData.allEmployees.length;
+        return {
+          hasExecutableAction: false,
+          response: `📋 **ENVÍO MASIVO DE DESPRENDIBLES**
+
+Detecté que quieres enviar desprendibles a **todos los empleados** (${employeeCount} empleados activos).
+
+⚠️ **Necesito saber el período:** ¿Para qué período de nómina quieres enviar los desprendibles?
+
+📅 Ejemplos: "Marzo 2025", "1-15 Enero 2025", "Diciembre 2024"
+
+Una vez que especifiques el período, procederé con el envío masivo.`
+        };
+      }
+      
+      // 📅 Detectar especificación de período para envío masivo
+      const periodPatterns = [
+        /(\d{1,2})\s*[-–]\s*(\d{1,2})\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\s+(\d{4})/i,
+        /(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\s+(\d{4})/i,
+        /(\d{1,2})\s*[-–]\s*(\d{1,2})\s+(ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic)\.?\s+(\d{4})/i,
+        /(ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic)\.?\s+(\d{4})/i
+      ];
+
+      const periodMatch = periodPatterns.find(pattern => pattern.test(userMessage));
+      if (periodMatch && richContext?.employeeData?.allEmployees?.length > 0) {
+        console.log(`[maya-intelligence] 📅 Period specification detected for mass sending: "${userMessage}"`);
+        
+        // Buscar período en la base de datos usando el contexto de períodos
+        let matchedPeriod = null;
+        if (richContext.payrollData?.periods) {
+          const normalizedUserInput = normalizeText(userMessage);
+          matchedPeriod = richContext.payrollData.periods.find((period: any) => {
+            const normalizedPeriodName = normalizeText(period.periodo || '');
+            return normalizedUserInput.includes(normalizedPeriodName) || 
+                   normalizedPeriodName.includes(normalizedUserInput.replace(/\s+/g, ''));
+          });
+        }
+
+        if (matchedPeriod) {
+          const employeeCount = richContext.employeeData.allEmployees.length;
+          return {
+            hasExecutableAction: true,
+            action: {
+              id: `send_voucher_all_${Date.now()}`,
+              type: 'send_voucher_all',
+              label: `📤 Enviar a todos (${employeeCount} empleados)`,
+              description: `Envío masivo de desprendibles del período "${matchedPeriod.periodo}"`,
+              parameters: {
+                periodId: matchedPeriod.id,
+                periodName: matchedPeriod.periodo,
+                employeeCount: employeeCount
+              },
+              requiresConfirmation: true,
+              icon: 'send'
+            },
+            response: `✅ **Período confirmado:** ${matchedPeriod.periodo}
+
+🚀 **Envío masivo listo:** Procederé a enviar desprendibles a **${employeeCount} empleados activos**.
+
+📧 Los desprendibles se enviarán a los correos registrados de cada empleado.
+
+Haz clic en el botón para confirmar el envío masivo.`
+          };
+        } else {
+          return {
+            hasExecutableAction: false,
+            response: `❌ **Período no encontrado:** No pude encontrar un período que coincida con "${userMessage}".
+
+📅 **Períodos disponibles:**
+${richContext.payrollData?.periods?.slice(0, 5).map((p: any) => `• ${p.periodo}`).join('\n') || '• No hay períodos disponibles'}
+
+¿Podrías especificar uno de los períodos listados arriba?`
+          };
+        }
+      }
       
       // Enhanced email extraction with better sanitization
       const emailPattern = /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g;
