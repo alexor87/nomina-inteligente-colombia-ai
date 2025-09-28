@@ -40,7 +40,7 @@ serve(async (req) => {
 });
 
 async function executeSendVoucherAction(action: any) {
-  const { employeeId, employeeName, email } = action.parameters;
+  const { employeeId, employeeName, email, periodId } = action.parameters;
   
   if (!employeeId) {
     throw new Error('Employee ID es requerido para ejecutar la acción');
@@ -59,17 +59,24 @@ async function executeSendVoucherAction(action: any) {
     throw new Error(`No se pudo encontrar el empleado: ${employeeError?.message}`);
   }
 
-  // Step 2: Get latest period data for this employee
-  const { data: payrollData, error: payrollError } = await supabase
+  // Step 2: Get period data for this employee (specific period or latest)
+  let payrollQuery = supabase
     .from('payrolls')
     .select(`
       *,
       payroll_periods_real!inner(*)
     `)
-    .eq('employee_id', employeeId)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
+    .eq('employee_id', employeeId);
+    
+  if (periodId) {
+    // Use specific period if provided
+    payrollQuery = payrollQuery.eq('period_id', periodId);
+  } else {
+    // Use latest period if no specific period provided
+    payrollQuery = payrollQuery.order('created_at', { ascending: false }).limit(1);
+  }
+  
+  const { data: payrollData, error: payrollError } = await payrollQuery.single();
 
   if (payrollError || !payrollData) {
     throw new Error(`No se encontraron datos de nómina para ${employeeName}: ${payrollError?.message}`);

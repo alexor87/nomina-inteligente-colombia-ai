@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ExecutableAction, ActionExecutionResult } from '../types/ExecutableAction';
 import { VoucherSendDialog } from '@/components/payroll/modals/VoucherSendDialog';
+import { PeriodConfirmationDialog } from './PeriodConfirmationDialog';
 import { PayrollEmployee } from '@/types/payroll';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -26,6 +27,14 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
     employee: null,
     period: null
   });
+  
+  const [periodConfirmationDialog, setPeriodConfirmationDialog] = useState<{
+    isOpen: boolean;
+    action: ExecutableAction | null;
+  }>({
+    isOpen: false,
+    action: null
+  });
   const { toast } = useToast();
 
   const getActionIcon = (type: string) => {
@@ -43,6 +52,13 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
     
     try {
       let result: ActionExecutionResult;
+      
+      // If action requires period confirmation, show confirmation dialog
+      if (action.requiresConfirmation && action.type === 'send_voucher') {
+        setPeriodConfirmationDialog({ isOpen: true, action });
+        setIsExecuting(null);
+        return;
+      }
       
       // If action doesn't require confirmation, execute automatically
       if (!action.requiresConfirmation && action.type === 'send_voucher') {
@@ -84,11 +100,20 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
     }
   };
 
-  const executeAutomatically = async (action: ExecutableAction): Promise<ActionExecutionResult> => {
+  const executeAutomatically = async (action: ExecutableAction, periodId?: string): Promise<ActionExecutionResult> => {
     console.log('🤖 Executing action automatically:', action);
     
+    // Include specific periodId if provided
+    const actionToExecute = periodId ? {
+      ...action,
+      parameters: {
+        ...action.parameters,
+        periodId
+      }
+    } : action;
+    
     const { data, error } = await supabase.functions.invoke('execute-maya-action', {
-      body: { action }
+      body: { action: actionToExecute }
     });
 
     if (error) {
@@ -226,6 +251,48 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
     };
   };
 
+  const handlePeriodConfirmation = async (periodId: string) => {
+    const action = periodConfirmationDialog.action;
+    if (!action) return;
+    
+    setIsExecuting(action.id);
+    try {
+      const result = await executeAutomatically(action, periodId);
+      
+      if (result.success) {
+        toast({
+          title: "✅ Comprobante enviado",
+          description: result.message,
+          className: "border-green-200 bg-green-50"
+        });
+      } else {
+        toast({
+          title: "❌ Error enviando comprobante",
+          description: result.message,
+          variant: "destructive"
+        });
+      }
+
+      onActionExecuted?.(action, result);
+    } catch (error: any) {
+      const result: ActionExecutionResult = {
+        success: false,
+        message: error.message || 'Error desconocido'
+      };
+      
+      toast({
+        title: "❌ Error enviando comprobante",
+        description: result.message,
+        variant: "destructive"
+      });
+
+      onActionExecuted?.(action, result);
+    } finally {
+      setIsExecuting(null);
+      setPeriodConfirmationDialog({ isOpen: false, action: null });
+    }
+  };
+
   if (!Array.isArray(actions) || actions.length === 0) return null;
 
   return (
@@ -270,6 +337,13 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
         onClose={() => setVoucherDialog({ isOpen: false, employee: null, period: null })}
         employee={voucherDialog.employee}
         period={voucherDialog.period}
+      />
+
+      <PeriodConfirmationDialog
+        isOpen={periodConfirmationDialog.isOpen}
+        onClose={() => setPeriodConfirmationDialog({ isOpen: false, action: null })}
+        action={periodConfirmationDialog.action}
+        onConfirm={handlePeriodConfirmation}
       />
     </>
   );

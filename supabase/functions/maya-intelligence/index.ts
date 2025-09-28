@@ -1,5 +1,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,6 +8,11 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Max-Age': '3600',
 };
+
+const supabase = createClient(
+  Deno.env.get('SUPABASE_URL') ?? '',
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+);
 
 interface MayaRequest {
   context: string;
@@ -524,25 +530,48 @@ async function detectExecutableAction(userMessage: string, richContext: any, ope
         }
       }
       
-      // If we found an employee directly, create action
+      // If we found an employee directly, create action with period detection
       if (foundEmployee) {
         console.log(`[maya-intelligence] 🎯 Direct employee match found: ${foundEmployee.name}`);
+        
+        // Query latest period for confirmation
+        let latestPeriod = null;
+        try {
+          const { data: periodData } = await supabase
+            .from('payroll_periods_real')
+            .select('id, periodo, fecha_inicio, fecha_fin, estado')
+            .eq('company_id', richContext?.companyId)
+            .eq('estado', 'cerrado')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+          
+          latestPeriod = periodData;
+          console.log(`[maya-intelligence] 📅 Latest period detected: ${periodData?.periodo}`);
+        } catch (error) {
+          console.log(`[maya-intelligence] ⚠️ Could not fetch latest period: ${error}`);
+        }
+        
         return {
           hasExecutableAction: true,
           action: {
             id: `send_voucher_${Date.now()}`,
             type: 'send_voucher',
             label: `Enviar comprobante a ${foundEmployee.name}`,
-            description: sanitizedEmail ? `Al email: ${sanitizedEmail}` : 'Al email registrado del empleado',
+            description: latestPeriod ? `Período: ${latestPeriod.periodo}` : 'Período más reciente',
             parameters: {
               employeeId: foundEmployee.id,
               employeeName: foundEmployee.name,
-              email: sanitizedEmail
+              email: sanitizedEmail,
+              periodId: latestPeriod?.id,
+              periodName: latestPeriod?.periodo
             },
-            requiresConfirmation: false,
+            requiresConfirmation: true,
             icon: 'send'
           },
-          response: `¡Perfecto! Puedo ayudarte a enviar el comprobante de ${foundEmployee.name}${sanitizedEmail ? ` al email ${sanitizedEmail}` : ' a su email registrado'}. Haz clic en el botón de acción para proceder.`
+          response: latestPeriod 
+            ? `Detecté el período **${latestPeriod.periodo}** para ${foundEmployee.name}. ¿Confirmas el envío del comprobante${sanitizedEmail ? ` al email ${sanitizedEmail}` : ' a su email registrado'}?`
+            : `Puedo ayudarte a enviar el comprobante de ${foundEmployee.name}${sanitizedEmail ? ` al email ${sanitizedEmail}` : ' a su email registrado'}. ¿Confirmas el envío?`
         };
       }
       
@@ -613,22 +642,45 @@ RESPUESTA:`;
 
               if (employee) {
                 console.log(`[maya-intelligence] ✅ Employee found via AI: ${employee.name}`);
+                
+                // Query latest period for confirmation
+                let latestPeriod = null;
+                try {
+                  const { data: periodData } = await supabase
+                    .from('payroll_periods_real')
+                    .select('id, periodo, fecha_inicio, fecha_fin, estado')
+                    .eq('company_id', richContext?.companyId)
+                    .eq('estado', 'cerrado')
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .single();
+                  
+                  latestPeriod = periodData;
+                  console.log(`[maya-intelligence] 📅 Latest period detected: ${periodData?.periodo}`);
+                } catch (error) {
+                  console.log(`[maya-intelligence] ⚠️ Could not fetch latest period: ${error}`);
+                }
+                
                 return {
                   hasExecutableAction: true,
                   action: {
                     id: `send_voucher_${Date.now()}`,
                     type: 'send_voucher',
                     label: `Enviar comprobante a ${employee.name}`,
-                    description: sanitizedEmail ? `Al email: ${sanitizedEmail}` : 'Al email registrado del empleado',
+                    description: latestPeriod ? `Período: ${latestPeriod.periodo}` : 'Período más reciente',
                     parameters: {
                       employeeId: employee.id,
                       employeeName: employee.name,
-                      email: sanitizedEmail
+                      email: sanitizedEmail,
+                      periodId: latestPeriod?.id,
+                      periodName: latestPeriod?.periodo
                     },
-                    requiresConfirmation: false,
+                    requiresConfirmation: true,
                     icon: 'send'
                   },
-                  response: `¡Perfecto! Puedo ayudarte a enviar el comprobante de ${employee.name}${sanitizedEmail ? ` al email ${sanitizedEmail}` : ' a su email registrado'}. Haz clic en el botón de acción para proceder.`
+                  response: latestPeriod 
+                    ? `Detecté el período **${latestPeriod.periodo}** para ${employee.name}. ¿Confirmas el envío del comprobante${sanitizedEmail ? ` al email ${sanitizedEmail}` : ' a su email registrado'}?`
+                    : `Puedo ayudarte a enviar el comprobante de ${employee.name}${sanitizedEmail ? ` al email ${sanitizedEmail}` : ' a su email registrado'}. ¿Confirmas el envío?`
                 };
               } else {
                 console.log(`[maya-intelligence] ❌ AI extracted "${extractedName}" but no matching employee found`);
