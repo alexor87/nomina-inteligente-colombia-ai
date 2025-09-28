@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface ChatMessage {
   id: string;
@@ -14,10 +14,6 @@ export interface ChatConversation {
 
 export class MayaChatService {
   private static instance: MayaChatService;
-  private supabase = createClient(
-    'https://txviknqtzkjkjjefeqag.supabase.co',
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR4dmlrbmF0emtqa2pqZWZlcWFnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDEyNzc5OTIsImV4cCI6MjA1Njg1Mzk5Mn0.GRNGVAsccvtGmAjcOdJDZSD7ya4kNOlG_qIrwbzfGzA'
-  );
   private currentConversation: ChatConversation = {
     messages: [],
     sessionId: this.generateSessionId()
@@ -35,6 +31,8 @@ export class MayaChatService {
   }
 
   async sendMessage(userMessage: string, context?: any): Promise<ChatMessage> {
+    console.log('🤖 MAYA Chat: Sending message:', userMessage);
+    
     // Add user message to conversation
     const userChatMessage: ChatMessage = {
       id: `user_${Date.now()}`,
@@ -46,8 +44,10 @@ export class MayaChatService {
     this.currentConversation.messages.push(userChatMessage);
 
     try {
+      console.log('🤖 MAYA Chat: Calling maya-intelligence function...');
+      
       // Call MAYA intelligence with conversation history
-      const { data, error } = await this.supabase.functions.invoke('maya-intelligence', {
+      const { data, error } = await supabase.functions.invoke('maya-intelligence', {
         body: {
           message: userMessage,
           conversation: this.currentConversation.messages,
@@ -57,21 +57,28 @@ export class MayaChatService {
         }
       });
 
-      if (error) throw error;
+      console.log('🤖 MAYA Chat: Function response:', { data, error });
+
+      if (error) {
+        console.error('🤖 MAYA Chat: Function error:', error);
+        throw error;
+      }
 
       // Create assistant response
       const assistantMessage: ChatMessage = {
         id: `maya_${Date.now()}`,
         role: 'assistant',
-        content: data.message || "Disculpa, no pude procesar tu mensaje en este momento.",
+        content: data?.message || "Disculpa, no pude procesar tu mensaje en este momento.",
         timestamp: new Date().toISOString()
       };
+
+      console.log('🤖 MAYA Chat: Assistant response created:', assistantMessage);
 
       this.currentConversation.messages.push(assistantMessage);
       return assistantMessage;
 
     } catch (error) {
-      console.error('Error sending message to MAYA:', error);
+      console.error('🤖 MAYA Chat: Error sending message:', error);
       
       // Fallback response
       const fallbackMessage: ChatMessage = {
