@@ -408,39 +408,120 @@ async function detectExecutableAction(userMessage: string, richContext: any, ope
   response?: string;
 }> {
   try {
-    // Keywords and patterns that indicate executable actions
-    const voucherKeywords = ['envía', 'manda', 'enviar', 'mandar', 'comprobante', 'voucher', 'liquidación', 'email', 'correo'];
-    const searchKeywords = ['busca', 'encuentra', 'mostrar', 'ver', 'detalles de', 'información de'];
+    // Enhanced keywords for better detection
+    const voucherKeywords = [
+      'envía', 'manda', 'enviar', 'mandar', 'envia', 'enví', 'enviá',
+      'comprobante', 'voucher', 'liquidación', 'liquidacion', 'nomina', 'nómina',
+      'email', 'correo', 'mail', 'e-mail', 'electrónico', 'electronico'
+    ];
+    const searchKeywords = ['busca', 'encuentra', 'mostrar', 'ver', 'detalles de', 'información de', 'info de'];
     
     const messageWords = userMessage.toLowerCase();
     
+    // Helper function to normalize text (remove accents, clean)
+    const normalizeText = (text: string) => {
+      return text.toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '') // Remove accents
+        .replace(/[^\w\s]/g, ' ') // Replace punctuation with spaces
+        .replace(/\s+/g, ' ') // Multiple spaces to single
+        .trim();
+    };
+
     // 📧 Detect voucher sending intent
     if (voucherKeywords.some(keyword => messageWords.includes(keyword))) {
       console.log(`[maya-intelligence] 📧 Voucher intent detected in: "${userMessage}"`);
       
-      // Simple pattern matching first for common cases
-      const emailPattern = /(\S+@\S+\.\S+)/g;
+      // Enhanced email extraction with better sanitization
+      const emailPattern = /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g;
       const extractedEmail = userMessage.match(emailPattern)?.[0];
       
       // Sanitize email - remove trailing punctuation
       let sanitizedEmail = extractedEmail;
       if (extractedEmail) {
-        sanitizedEmail = extractedEmail.replace(/[?.!,;]+$/, '');
+        sanitizedEmail = extractedEmail.replace(/[?.!,;)\]]+$/, '').replace(/^[(\[]+/, '');
       }
       
-      // Try to find employee in message
+      // Debug logging
+      if (richContext?.employeeData?.allEmployees) {
+        console.log(`[maya-intelligence] 🔍 Available employees: ${richContext.employeeData.allEmployees.map((emp: any) => emp.name).join(', ')}`);
+        console.log(`[maya-intelligence] 🔍 Searching for employee in message: "${userMessage}"`);
+      }
+      
+      // Enhanced employee search with robust matching
       let foundEmployee = null;
       if (richContext?.employeeData?.allEmployees) {
+        const normalizedMessage = normalizeText(userMessage);
+        
+        // First pass: Direct name matching with normalization
         foundEmployee = richContext.employeeData.allEmployees.find((emp: any) => {
-          const empName = emp.name.toLowerCase();
-          const messageLower = messageWords;
+          const normalizedEmpName = normalizeText(emp.name);
           
-          // Check if employee name appears in message
-          const nameWords = empName.split(' ');
-          return nameWords.some((word: string) => 
-            word.length > 2 && messageLower.includes(word)
+          // Check if full name appears in message
+          if (normalizedMessage.includes(normalizedEmpName)) {
+            console.log(`[maya-intelligence] ✅ Full name match: "${emp.name}" found in message`);
+            return true;
+          }
+          
+          // Check individual words (first name, last name)
+          const nameWords = normalizedEmpName.split(' ').filter(word => word.length >= 2);
+          const messageWords = normalizedMessage.split(' ');
+          
+          // Look for at least 2 matching words for common names, or 1 for unique names
+          const matchingWords = nameWords.filter(nameWord => 
+            messageWords.some(msgWord => 
+              msgWord.includes(nameWord) || nameWord.includes(msgWord)
+            )
           );
+          
+          const hasMatch = matchingWords.length >= Math.min(2, nameWords.length);
+          if (hasMatch) {
+            console.log(`[maya-intelligence] ✅ Partial name match: "${emp.name}" (matched words: ${matchingWords.join(', ')})`);
+          }
+          
+          return hasMatch;
         });
+        
+        // Second pass: Fuzzy matching for single names or nicknames
+        if (!foundEmployee) {
+          foundEmployee = richContext.employeeData.allEmployees.find((emp: any) => {
+            const normalizedEmpName = normalizeText(emp.name);
+            const nameWords = normalizedEmpName.split(' ');
+            
+            // Check for single word matches (first names, nicknames)
+            return nameWords.some(nameWord => {
+              if (nameWord.length >= 3) {
+                // Check if message contains the name word
+                const isContained = normalizedMessage.includes(nameWord);
+                if (isContained) {
+                  console.log(`[maya-intelligence] ✅ Single word match: "${nameWord}" from "${emp.name}"`);
+                  return true;
+                }
+                
+                // Check similarity for common variations (edit distance of 1)
+                const messageWords = normalizedMessage.split(' ');
+                const similarWord = messageWords.find(msgWord => {
+                  if (Math.abs(msgWord.length - nameWord.length) <= 1) {
+                    let differences = 0;
+                    const maxLen = Math.max(msgWord.length, nameWord.length);
+                    for (let i = 0; i < maxLen; i++) {
+                      if (msgWord[i] !== nameWord[i]) differences++;
+                      if (differences > 1) break;
+                    }
+                    return differences <= 1;
+                  }
+                  return false;
+                });
+                
+                if (similarWord) {
+                  console.log(`[maya-intelligence] ✅ Fuzzy match: "${similarWord}" ≈ "${nameWord}" from "${emp.name}"`);
+                  return true;
+                }
+              }
+              return false;
+            });
+          });
+        }
       }
       
       // If we found an employee directly, create action
@@ -465,71 +546,105 @@ async function detectExecutableAction(userMessage: string, richContext: any, ope
         };
       }
       
-      // If no direct match, use AI extraction as fallback
-      const extractionPrompt = `Extrae SOLO el nombre del empleado de este mensaje:
-"${userMessage}"
+      // If no direct match, use AI extraction as enhanced fallback
+      if (richContext?.employeeData?.allEmployees?.length > 0) {
+        console.log(`[maya-intelligence] 🤖 No direct match found, trying AI extraction...`);
+        
+        const extractionPrompt = `Analiza este mensaje y extrae EXACTAMENTE el nombre del empleado mencionado:
 
-Empleados disponibles: ${richContext?.employeeData?.allEmployees?.map((emp: any) => emp.name).join(', ') || 'No disponible'}
+MENSAJE: "${userMessage}"
 
-Responde SOLO con el nombre exacto del empleado mencionado o "NO_ENCONTRADO" si no hay coincidencia clara.`;
+EMPLEADOS DISPONIBLES:
+${richContext.employeeData.allEmployees.map((emp: any, idx: number) => `${idx + 1}. ${emp.name}`).join('\n')}
 
-      try {
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${openaiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'gpt-4o-mini',
-            messages: [{ role: 'user', content: extractionPrompt }],
-            max_tokens: 50,
-            temperature: 0.1,
-          }),
-        });
+INSTRUCCIONES:
+- Si encuentras una coincidencia clara, responde con el nombre EXACTO de la lista
+- Si no hay coincidencia clara, responde "NO_ENCONTRADO"
+- Considera variaciones, apodos y nombres parciales
+- Solo responde con el nombre, nada más
 
-        if (response.ok) {
-          const aiData = await response.json();
-          const extractedName = aiData.choices[0]?.message?.content?.trim();
-          
-          if (extractedName && extractedName !== 'NO_ENCONTRADO') {
-            console.log(`[maya-intelligence] 🤖 AI extracted name: "${extractedName}"`);
+RESPUESTA:`;
+
+        try {
+          const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${openaiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'gpt-4o-mini',
+              messages: [{ role: 'user', content: extractionPrompt }],
+              max_tokens: 100,
+              temperature: 0.1,
+            }),
+          });
+
+          if (response.ok) {
+            const aiData = await response.json();
+            const extractedName = aiData.choices[0]?.message?.content?.trim();
             
-            // Find employee by AI extracted name
-            const employee = richContext?.employeeData?.allEmployees?.find((emp: any) => 
-              emp.name.toLowerCase().includes(extractedName.toLowerCase()) ||
-              extractedName.toLowerCase().includes(emp.name.toLowerCase())
-            );
+            if (extractedName && extractedName !== 'NO_ENCONTRADO') {
+              console.log(`[maya-intelligence] 🤖 AI extracted name: "${extractedName}"`);
+              
+              // Enhanced matching after AI extraction
+              const employee = richContext.employeeData.allEmployees.find((emp: any) => {
+                const normalizedEmpName = normalizeText(emp.name);
+                const normalizedExtracted = normalizeText(extractedName);
+                
+                // Exact match
+                if (normalizedEmpName === normalizedExtracted) return true;
+                
+                // Partial match (either direction)
+                if (normalizedEmpName.includes(normalizedExtracted) || 
+                    normalizedExtracted.includes(normalizedEmpName)) return true;
+                
+                // Word-by-word matching
+                const empWords = normalizedEmpName.split(' ');
+                const extractedWords = normalizedExtracted.split(' ');
+                
+                return empWords.some(empWord => 
+                  extractedWords.some(extWord => 
+                    (empWord.length >= 3 && extWord.length >= 3) &&
+                    (empWord.includes(extWord) || extWord.includes(empWord))
+                  )
+                );
+              });
 
-            if (employee) {
-              console.log(`[maya-intelligence] ✅ Employee found via AI: ${employee.name}`);
-              return {
-                hasExecutableAction: true,
-                action: {
-                  id: `send_voucher_${Date.now()}`,
-                  type: 'send_voucher',
-                  label: `Enviar comprobante a ${employee.name}`,
-                  description: extractedEmail ? `Al email: ${extractedEmail}` : 'Al email registrado del empleado',
-                  parameters: {
-                    employeeId: employee.id,
-                    employeeName: employee.name,
-                    email: extractedEmail
+              if (employee) {
+                console.log(`[maya-intelligence] ✅ Employee found via AI: ${employee.name}`);
+                return {
+                  hasExecutableAction: true,
+                  action: {
+                    id: `send_voucher_${Date.now()}`,
+                    type: 'send_voucher',
+                    label: `Enviar comprobante a ${employee.name}`,
+                    description: sanitizedEmail ? `Al email: ${sanitizedEmail}` : 'Al email registrado del empleado',
+                    parameters: {
+                      employeeId: employee.id,
+                      employeeName: employee.name,
+                      email: sanitizedEmail
+                    },
+                    requiresConfirmation: false,
+                    icon: 'send'
                   },
-                  requiresConfirmation: false,
-                  icon: 'send'
-                },
-                response: `¡Perfecto! Puedo ayudarte a enviar el comprobante de ${employee.name}${extractedEmail ? ` al email ${extractedEmail}` : ' a su email registrado'}. Haz clic en el botón de acción para proceder.`
-              };
+                  response: `¡Perfecto! Puedo ayudarte a enviar el comprobante de ${employee.name}${sanitizedEmail ? ` al email ${sanitizedEmail}` : ' a su email registrado'}. Haz clic en el botón de acción para proceder.`
+                };
+              } else {
+                console.log(`[maya-intelligence] ❌ AI extracted "${extractedName}" but no matching employee found`);
+              }
+            } else {
+              console.log(`[maya-intelligence] 🤖 AI could not extract employee name from message`);
             }
           }
+        } catch (e) {
+          console.error('[maya-intelligence] AI extraction error:', e);
         }
-      } catch (e) {
-        console.error('[maya-intelligence] AI extraction error:', e);
       }
       
-      // Fallback: If voucher keywords found but no specific employee, offer generic action
+      // Enhanced fallback: If voucher keywords found but no specific employee, offer generic action
       if (richContext?.employeeData?.allEmployees?.length > 0) {
-        console.log('[maya-intelligence] 📤 Generic voucher action fallback');
+        console.log('[maya-intelligence] 📤 Generic voucher action fallback (no specific employee found)');
         return {
           hasExecutableAction: true,
           action: {
@@ -538,13 +653,15 @@ Responde SOLO con el nombre exacto del empleado mencionado o "NO_ENCONTRADO" si 
             label: 'Enviar comprobante de nómina',
             description: 'Seleccionar empleado y proceder con el envío',
             parameters: {
-              email: extractedEmail
+              email: sanitizedEmail
             },
             requiresConfirmation: true,
             icon: 'send'
           },
-          response: `Puedo ayudarte a enviar un comprobante de nómina${extractedEmail ? ` al email ${extractedEmail}` : ''}. Haz clic en el botón para seleccionar el empleado.`
+          response: `Puedo ayudarte a enviar un comprobante de nómina${sanitizedEmail ? ` al email ${sanitizedEmail}` : ''}. Haz clic en el botón para seleccionar el empleado.`
         };
+      } else {
+        console.log('[maya-intelligence] ❌ No employees available for voucher action');
       }
     }
 
