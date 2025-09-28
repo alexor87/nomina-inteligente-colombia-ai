@@ -13,6 +13,17 @@ export interface ChatConversation {
   sessionId: string;
 }
 
+export interface RichContext {
+  currentPage: string;
+  pageType: string;
+  companyId?: string;
+  timestamp: string;
+  isLoading: boolean;
+  dashboardData?: any;
+  employeeData?: any;
+  payrollData?: any;
+}
+
 export class MayaChatService {
   private static instance: MayaChatService;
   private currentConversation: ChatConversation = {
@@ -31,7 +42,7 @@ export class MayaChatService {
     return `maya_chat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  async sendMessage(userMessage: string, context?: any): Promise<ChatMessage> {
+  async sendMessage(userMessage: string, context?: RichContext): Promise<ChatMessage> {
     console.log('🤖 MAYA Chat: Sending message:', userMessage);
     
     // Add user message to conversation
@@ -53,12 +64,13 @@ export class MayaChatService {
         content: msg.content
       }));
 
-      // Call MAYA intelligence with conversation history
+      // Call MAYA intelligence with conversation history and rich context
       const { data, error } = await supabase.functions.invoke('maya-intelligence', {
         body: {
           message: userMessage,
           conversation: filteredConversation,
           context: context || 'chat_conversation',
+          richContext: context, // Pass the rich contextual data
           phase: 'interactive_chat',
           sessionId: this.currentConversation.sessionId,
           debug: true

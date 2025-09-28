@@ -1,7 +1,11 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { MayaEngine } from './MayaEngine';
 import { MayaChatService, type ChatMessage } from './services/MayaChatService';
 import type { MayaMessage, MayaContext as MayaContextType, PayrollPhase } from './types';
+import { useDashboard } from '@/hooks/useDashboard';
+import { useEmployeeData } from '@/hooks/useEmployeeData';
+import { useCurrentCompany } from '@/hooks/useCurrentCompany';
 
 interface MayaProviderValue {
   currentMessage: MayaMessage | null;
@@ -37,6 +41,11 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
   children, 
   autoShow = true 
 }) => {
+  const location = useLocation();
+  const { metrics, recentEmployees, recentActivity, payrollTrends, efficiencyMetrics, loading: dashboardLoading } = useDashboard();
+  const { employees, isLoading: employeesLoading } = useEmployeeData();
+  const { companyId } = useCurrentCompany();
+  
   const [currentMessage, setCurrentMessage] = useState<MayaMessage | null>(null);
   const [isVisible, setIsVisible] = useState(autoShow);
   const [isChatMode, setIsChatMode] = useState(false);
@@ -82,12 +91,102 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
     }
   }, [chatService]);
 
+  // Generate rich contextual data based on current page and available data
+  const generatePageContext = useCallback(() => {
+    const currentPath = location.pathname;
+    const pageContext = {
+      currentPage: currentPath,
+      pageType: 'unknown',
+      companyId,
+      timestamp: new Date().toISOString(),
+      isLoading: dashboardLoading || employeesLoading
+    };
+
+    // Dashboard context
+    if (currentPath.includes('/dashboard')) {
+      return {
+        ...pageContext,
+        pageType: 'dashboard',
+        dashboardData: {
+          metrics: metrics ? {
+            totalEmployees: metrics.totalEmployees,
+            activeEmployees: metrics.activeEmployees,
+            monthlyPayroll: metrics.monthlyPayrollTotal,
+            pendingPayroll: metrics.pendingPayrolls
+          } : null,
+          recentEmployees: recentEmployees?.slice(0, 5).map(emp => ({
+            id: emp.id,
+            name: emp.name,
+            position: emp.position,
+            hireDate: emp.dateAdded,
+            status: emp.status
+          })),
+          recentActivity: recentActivity?.slice(0, 3).map(activity => ({
+            type: activity.type,
+            action: activity.action,
+            user: activity.user,
+            timestamp: activity.timestamp
+          })),
+          payrollTrends: payrollTrends?.slice(0, 6).map(trend => ({
+            month: trend.month,
+            total: trend.totalNeto,
+            employeeCount: trend.employeesCount
+          })),
+          efficiencyMetrics: efficiencyMetrics?.map(metric => ({
+            metric: metric.metric,
+            value: metric.value,
+            change: metric.change,
+            unit: metric.unit
+          }))
+        }
+      };
+    }
+
+    // Employees page context
+    if (currentPath.includes('/employees')) {
+      return {
+        ...pageContext,
+        pageType: 'employees',
+        employeeData: {
+          totalCount: employees?.length || 0,
+          activeCount: employees?.filter(e => e.estado === 'activo').length || 0,
+          inactiveCount: employees?.filter(e => e.estado === 'inactivo').length || 0,
+          recentHires: employees?.filter(e => e.estado === 'activo')
+            .slice(0, 5)
+            .map(emp => ({
+              id: emp.id,
+              name: `${emp.nombre} ${emp.apellido}`,
+              position: emp.cargo,
+              salary: emp.salarioBase,
+              hireDate: emp.fechaIngreso
+            }))
+        }
+      };
+    }
+
+    // Payroll context
+    if (currentPath.includes('/payroll')) {
+      return {
+        ...pageContext,
+        pageType: 'payroll',
+        payrollData: {
+          employeeCount: employees?.length || 0,
+          totalSalaryBase: employees?.reduce((sum, emp) => sum + (emp.salarioBase || 0), 0) || 0,
+          avgSalary: employees?.length ? 
+            (employees.reduce((sum, emp) => sum + (emp.salarioBase || 0), 0) / employees.length) : 0
+        }
+      };
+    }
+
+    return pageContext;
+  }, [location.pathname, companyId, dashboardLoading, employeesLoading, metrics, recentEmployees, recentActivity, payrollTrends, efficiencyMetrics, employees]);
+
   const sendMessage = useCallback(async (message: string) => {
     try {
-      const response = await chatService.sendMessage(message, {
-        currentPage: window.location.pathname,
-        timestamp: new Date().toISOString()
-      });
+      // Generate rich contextual data
+      const richContext = generatePageContext();
+      
+      const response = await chatService.sendMessage(message, richContext);
       
       // Update chat history
       setChatHistory([...chatService.getConversation().messages]);
@@ -107,7 +206,7 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
       console.error('Error sending message to MAYA:', error);
       throw error;
     }
-  }, [chatService]);
+  }, [chatService, generatePageContext]);
 
   const performIntelligentValidation = useCallback(async (
     companyId: string,

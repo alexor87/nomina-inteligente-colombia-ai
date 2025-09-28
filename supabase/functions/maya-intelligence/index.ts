@@ -16,6 +16,7 @@ interface MayaRequest {
   message?: string;
   conversation?: Array<{role: string, content: string}>;
   sessionId?: string;
+  richContext?: any; // Rich contextual data from the app
 }
 
 serve(async (req) => {
@@ -42,27 +43,78 @@ const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
       }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const { context, phase, data, message: userMessage, conversation, sessionId, debug: debugBody }: MayaRequest & { debug?: boolean } = await req.json();
+    const { context, phase, data, message: userMessage, conversation, sessionId, debug: debugBody, richContext }: MayaRequest & { debug?: boolean } = await req.json();
     const debugMode = debug || debugBody;
 
     // Handle interactive chat mode
     if (phase === 'interactive_chat' && userMessage && conversation) {
+      // Build contextual information from richContext
+      let contextualInfo = '';
+      
+      if (richContext) {
+        const { pageType, dashboardData, employeeData, payrollData } = richContext;
+        
+        if (pageType === 'dashboard' && dashboardData) {
+          const { metrics, recentEmployees, payrollTrends } = dashboardData;
+          contextualInfo = `
+📊 DATOS DE LA EMPRESA:
+- Total empleados: ${metrics?.totalEmployees || 'No disponible'}
+- Empleados activos: ${metrics?.activeEmployees || 'No disponible'}  
+- Nómina mensual: $${metrics?.monthlyPayroll?.toLocaleString() || 'No disponible'}
+- Nóminas pendientes: ${metrics?.pendingPayroll || 'No disponible'}
+
+👥 EMPLEADOS RECIENTES:
+${recentEmployees?.map((emp: any) => `- ${emp.name} (${emp.position || 'Sin cargo'}) - ${emp.status}`).join('\n') || 'No hay empleados recientes'}
+
+📈 TENDENCIAS DE NÓMINA:
+${payrollTrends?.map((trend: any) => `- ${trend.month}: $${trend.total?.toLocaleString()} (${trend.employeeCount} empleados)`).join('\n') || 'No hay datos de tendencias'}`;
+        }
+        
+        if (pageType === 'employees' && employeeData) {
+          contextualInfo = `
+👥 INFORMACIÓN DE EMPLEADOS:
+- Total empleados: ${employeeData.totalCount}
+- Empleados activos: ${employeeData.activeCount}
+- Empleados inactivos: ${employeeData.inactiveCount}
+- Salario base total: $${employeeData.totalSalaryBase?.toLocaleString()}
+- Salario promedio: $${employeeData.avgSalary?.toLocaleString()}
+
+👥 EMPLEADOS RECIENTES:
+${employeeData.recentHires?.map((emp: any) => `- ${emp.name} (${emp.position || 'Sin cargo'}) - $${emp.salary?.toLocaleString()}`).join('\n') || 'No hay empleados recientes'}`;
+        }
+        
+        if (pageType === 'payroll' && payrollData) {
+          contextualInfo = `
+💰 DATOS DE NÓMINA:
+- Empleados para liquidar: ${payrollData.employeeCount}
+- Total salarios base: $${payrollData.totalSalaryBase?.toLocaleString()}
+- Salario promedio: $${payrollData.avgSalary?.toLocaleString()}`;
+        }
+      }
+
       const conversationalPrompt = `Eres MAYA, una asistente de nómina profesional y amigable para pequeñas empresas colombianas. 
 
 Tu personalidad es:
 - Profesional pero cálida y conversacional
 - Experta en nómina, liquidación, empleados, y procesos de RRHH
-- Ayudas con preguntas específicas del usuario
-- Respondes de manera natural y útil
+- Ayudas con preguntas específicas del usuario usando datos reales de su empresa
+- Respondes de manera natural y útil con información precisa
 - Puedes mantener conversaciones fluidas
 - Usas emojis ocasionalmente
+
+${contextualInfo ? `
+DATOS ACTUALES DE LA EMPRESA:
+${contextualInfo}
+
+Usa esta información para responder preguntas específicas sobre empleados, nómina, tendencias, etc. con datos reales y precisos.
+` : ''}
 
 Contexto de la conversación:
 - Página actual: ${context}
 - Empresa colombiana
 - Sistema de nómina
 
-Responde de manera natural a la pregunta del usuario. Si no sabes algo específico, sé honesta pero siempre trata de ser útil.`;
+Responde de manera natural a la pregunta del usuario usando los datos reales disponibles. Si no tienes datos específicos, sé honesta pero siempre trata de ser útil.`;
 
       // Filter conversation to only role and content for OpenAI
       const filteredConversation = conversation.slice(-10).map(msg => ({
