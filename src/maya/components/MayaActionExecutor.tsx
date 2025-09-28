@@ -31,6 +31,7 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
   const [periodConfirmationDialog, setPeriodConfirmationDialog] = useState<{
     isOpen: boolean;
     action: ExecutableAction | null;
+    startWithAlternatives?: boolean;
   }>({
     isOpen: false,
     action: null
@@ -259,23 +260,14 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
 
   const showPeriodAlternatives = async (action: ExecutableAction): Promise<ActionExecutionResult> => {
     try {
-      // Get recent closed periods
-      const { data: periods, error } = await supabase
-        .from('payroll_periods_real')
-        .select('id, periodo, fecha_inicio, fecha_fin, estado')
-        .eq('estado', 'cerrado')
-        .order('created_at', { ascending: false })
-        .limit(5);
-
-      if (error) throw error;
-
       setPeriodConfirmationDialog({ 
         isOpen: true, 
         action: {
           ...action,
           type: 'send_voucher', // Convert back to send_voucher for the dialog
           requiresConfirmation: true
-        }
+        },
+        startWithAlternatives: true
       });
 
       return {
@@ -389,6 +381,7 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
         onClose={() => setPeriodConfirmationDialog({ isOpen: false, action: null })}
         action={periodConfirmationDialog.action}
         onConfirm={handlePeriodConfirmation}
+        startWithAlternatives={periodConfirmationDialog.startWithAlternatives}
       />
     </>
   );

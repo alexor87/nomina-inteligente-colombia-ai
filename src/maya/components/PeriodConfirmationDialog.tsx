@@ -27,15 +27,17 @@ interface PeriodConfirmationDialogProps {
   onClose: () => void;
   action: ExecutableAction | null;
   onConfirm: (periodId: string) => void;
+  startWithAlternatives?: boolean;
 }
 
 export const PeriodConfirmationDialog: React.FC<PeriodConfirmationDialogProps> = ({
   isOpen,
   onClose,
   action,
-  onConfirm
+  onConfirm,
+  startWithAlternatives = false
 }) => {
-  const [showAlternatives, setShowAlternatives] = useState(false);
+  const [showAlternatives, setShowAlternatives] = useState(startWithAlternatives);
   const [alternativePeriods, setAlternativePeriods] = useState<Period[]>([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -43,6 +45,13 @@ export const PeriodConfirmationDialog: React.FC<PeriodConfirmationDialogProps> =
   const detectedPeriod = action?.parameters?.periodName;
   const detectedPeriodId = action?.parameters?.periodId;
   const employeeName = action?.parameters?.employeeName;
+
+  // Auto-load alternatives if starting with alternatives
+  React.useEffect(() => {
+    if (startWithAlternatives && isOpen && !loading && alternativePeriods.length === 0) {
+      handleShowAlternatives();
+    }
+  }, [startWithAlternatives, isOpen]);
 
   const handleConfirm = () => {
     if (detectedPeriodId) {
