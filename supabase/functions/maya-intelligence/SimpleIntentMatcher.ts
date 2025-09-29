@@ -110,9 +110,11 @@ export class SimpleIntentMatcher {
     }
 
     // Employee paid total queries - HIGH PRIORITY (before general payroll)
-    if (/(?:cuánto|cuanto|qué|que)\s+(?:se\s+le\s+ha\s+)?(?:pagado|pago|pagamos)\s+(?:a|para)\s+([a-záéíóúñ\s]+)/i.test(text)) {
-      const nameMatch = text.match(/(?:cuánto|cuanto|qué|que)\s+(?:se\s+le\s+ha\s+)?(?:pagado|pago|pagamos)\s+(?:a|para)\s+([a-záéíóúñ\s]+)/i);
+    if (/(?:cuánto|cuanto|qué|que)\s+(?:se\s+le\s+ha\s+)?(?:pagado|pago|pagamos)\s+(?:a|para)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*?)(?:\s+(?:este|en|durante|\d{4}|enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)|$)/i.test(text)) {
+      const nameMatch = text.match(/(?:cuánto|cuanto|qué|que)\s+(?:se\s+le\s+ha\s+)?(?:pagado|pago|pagamos)\s+(?:a|para)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*?)(?:\s+(?:este|en|durante|\d{4}|enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)|$)/i);
       const name = nameMatch?.[1]?.trim().replace(/[?.,!]+$/, '') || '';
+      
+      console.log('🎯 [EMPLOYEE_PAID_TOTAL] Name extracted:', name);
       
       // Extract timeframe
       let year = null;
@@ -136,6 +138,8 @@ export class SimpleIntentMatcher {
       if (!year && !month) {
         year = new Date().getFullYear();
       }
+
+      console.log('📅 [EMPLOYEE_PAID_TOTAL] Timeframe extracted:', { name, year, month });
       
       return {
         type: 'EMPLOYEE_PAID_TOTAL',
