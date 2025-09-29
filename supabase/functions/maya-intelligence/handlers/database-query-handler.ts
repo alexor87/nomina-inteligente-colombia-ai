@@ -136,41 +136,432 @@ Responde SOLO con el SQL optimizado, sin explicaciones:`;
   private generateBasicSQL(context: QueryContext): string {
     const { userMessage, companyId, entities } = context;
     const message = userMessage.toLowerCase();
+    
+    this.logger.info('[DatabaseQueryHandler] Generating SQL for query', {
+      message: message,
+      entities: entities,
+      context: context.intent
+    });
 
-    // Patterns for common queries
-    if (message.includes('nómina') && (message.includes('total') || message.includes('gasto') || message.includes('cuánto'))) {
-      return `SELECT 
-        COALESCE(SUM(total_devengado), 0) as total_nomina,
-        COUNT(*) as empleados_pagados,
-        COALESCE(AVG(total_devengado), 0) as promedio_por_empleado
-      FROM payrolls 
-      WHERE company_id = '${companyId}' AND estado = 'procesada'
-      ORDER BY created_at DESC LIMIT 50`;
+    // 🔍 PHASE 1: ENTITY DETECTION
+    const detectedEntities = this.detectEntities(message, entities);
+    const { employeeNames, years, months, dateRanges, tables, metrics } = detectedEntities;
+
+    this.logger.info('[DatabaseQueryHandler] Detected entities', detectedEntities);
+
+    // 🚀 PHASE 2: DOMAIN-SPECIFIC QUERY GENERATION
+
+    // ==================== EMPLOYEE QUERIES ====================
+    if (this.isEmployeeQuery(message)) {
+      return this.generateEmployeeSQL(message, companyId, employeeNames, years);
     }
 
-    if (message.includes('empleados') && (message.includes('mejor') || message.includes('mayor') || message.includes('más'))) {
-      return `SELECT 
-        nombre, apellido, salario_base, cargo
-      FROM employees 
-      WHERE company_id = '${companyId}' AND estado = 'activo' 
-      ORDER BY salario_base DESC LIMIT 10`;
+    // ==================== PAYROLL QUERIES ====================
+    if (this.isPayrollQuery(message)) {
+      return this.generatePayrollSQL(message, companyId, employeeNames, years, months);
     }
 
-    if (message.includes('empleados') && message.includes('cuántos')) {
-      return `SELECT 
-        COUNT(*) as total_empleados,
-        SUM(CASE WHEN estado = 'activo' THEN 1 ELSE 0 END) as empleados_activos,
-        SUM(CASE WHEN estado = 'inactivo' THEN 1 ELSE 0 END) as empleados_inactivos
-      FROM employees 
-      WHERE company_id = '${companyId}'`;
+    // ==================== VOUCHER QUERIES ====================
+    if (this.isVoucherQuery(message)) {
+      return this.generateVoucherSQL(message, companyId, employeeNames, years, months);
     }
 
-    // Default: recent employee activity
+    // ==================== VACATION QUERIES ====================
+    if (this.isVacationQuery(message)) {
+      return this.generateVacationSQL(message, companyId, employeeNames, years);
+    }
+
+    // ==================== NOVELTY QUERIES ====================
+    if (this.isNoveltyQuery(message)) {
+      return this.generateNoveltySQL(message, companyId, employeeNames, years);
+    }
+
+    // ==================== DASHBOARD & ALERTS ====================
+    if (this.isDashboardQuery(message)) {
+      return this.generateDashboardSQL(message, companyId);
+    }
+
+    // ==================== PERIOD QUERIES ====================
+    if (this.isPeriodQuery(message)) {
+      return this.generatePeriodSQL(message, companyId, years, months);
+    }
+
+    // ==================== ANALYTICS & METRICS ====================
+    if (this.isAnalyticsQuery(message)) {
+      return this.generateAnalyticsSQL(message, companyId, metrics, years);
+    }
+
+    // ==================== COMPANY INFO ====================
+    if (this.isCompanyQuery(message)) {
+      return this.generateCompanySQL(message, companyId);
+    }
+
+    // 🎯 DEFAULT: INTELLIGENT FALLBACK
+    return this.generateIntelligentFallback(message, companyId, detectedEntities);
+  }
+
+  // 🔍 ENTITY DETECTION SYSTEM
+  private detectEntities(message: string, entities: any[]) {
+    const employeeNames = this.detectEmployeeNames(message);
+    const years = this.detectYears(message);
+    const months = this.detectMonths(message);
+    const dateRanges = this.detectDateRanges(message);
+    const tables = this.detectTableReferences(message);
+    const metrics = this.detectMetrics(message);
+
+    return { employeeNames, years, months, dateRanges, tables, metrics };
+  }
+
+  private detectEmployeeNames(message: string): string[] {
+    // Common Colombian names patterns
+    const namePatterns = [
+      'eliana', 'alicia', 'joahana', 'carlos', 'maria', 'juan', 'ana', 'luis', 
+      'sofia', 'diego', 'andrea', 'miguel', 'carolina', 'fernando', 'patricia'
+    ];
+    
+    const detected = namePatterns.filter(name => 
+      message.toLowerCase().includes(name.toLowerCase())
+    );
+    
+    this.logger.info('[DatabaseQueryHandler] Employee names detected', detected);
+    return detected;
+  }
+
+  private detectYears(message: string): number[] {
+    const yearMatches = message.match(/\b(20\d{2})\b/g) || [];
+    return yearMatches.map(y => parseInt(y));
+  }
+
+  private detectMonths(message: string): string[] {
+    const monthMap: Record<string, string> = {
+      'enero': '01', 'febrero': '02', 'marzo': '03', 'abril': '04',
+      'mayo': '05', 'junio': '06', 'julio': '07', 'agosto': '08',
+      'septiembre': '09', 'octubre': '10', 'noviembre': '11', 'diciembre': '12'
+    };
+    
+    return Object.keys(monthMap).filter(month => message.includes(month));
+  }
+
+  private detectDateRanges(message: string): any[] {
+    const ranges = [];
+    if (message.includes('trimestre')) ranges.push({ type: 'quarter' });
+    if (message.includes('semestre')) ranges.push({ type: 'semester' });
+    if (message.includes('año') || message.includes('anual')) ranges.push({ type: 'year' });
+    return ranges;
+  }
+
+  private detectTableReferences(message: string): string[] {
+    const tableKeywords = {
+      'vouchers': ['voucher', 'comprobante', 'desprendible'],
+      'vacations': ['vacacion', 'descanso', 'licencia'],
+      'novedades': ['novedad', 'ajuste', 'descuento', 'bono'],
+      'alerts': ['alerta', 'notificacion', 'aviso']
+    };
+    
+    const detected = [];
+    for (const [table, keywords] of Object.entries(tableKeywords)) {
+      if (keywords.some(keyword => message.includes(keyword))) {
+        detected.push(table);
+      }
+    }
+    return detected;
+  }
+
+  private detectMetrics(message: string): string[] {
+    const metrics = [];
+    if (message.includes('total') || message.includes('suma')) metrics.push('sum');
+    if (message.includes('promedio') || message.includes('media')) metrics.push('avg');
+    if (message.includes('mayor') || message.includes('máximo')) metrics.push('max');
+    if (message.includes('menor') || message.includes('mínimo')) metrics.push('min');
+    if (message.includes('cuántos') || message.includes('cantidad')) metrics.push('count');
+    return metrics;
+  }
+
+  // 🎯 DOMAIN QUERY CLASSIFIERS
+  private isEmployeeQuery(message: string): boolean {
+    const keywords = ['empleado', 'trabajador', 'personal', 'staff', 'quien', 'quienes'];
+    return keywords.some(k => message.includes(k));
+  }
+
+  private isPayrollQuery(message: string): boolean {
+    const keywords = ['nómina', 'nomina', 'salario', 'sueldo', 'pago', 'devengado', 'liquidación'];
+    return keywords.some(k => message.includes(k));
+  }
+
+  private isVoucherQuery(message: string): boolean {
+    const keywords = ['voucher', 'comprobante', 'desprendible', 'recibo'];
+    return keywords.some(k => message.includes(k));
+  }
+
+  private isVacationQuery(message: string): boolean {
+    const keywords = ['vacacion', 'descanso', 'licencia', 'ausencia', 'permisos'];
+    return keywords.some(k => message.includes(k));
+  }
+
+  private isNoveltyQuery(message: string): boolean {
+    const keywords = ['novedad', 'ajuste', 'descuento', 'bono', 'deduccion', 'extra'];
+    return keywords.some(k => message.includes(k));
+  }
+
+  private isDashboardQuery(message: string): boolean {
+    const keywords = ['dashboard', 'alerta', 'notificacion', 'panel', 'resumen'];
+    return keywords.some(k => message.includes(k));
+  }
+
+  private isPeriodQuery(message: string): boolean {
+    const keywords = ['periodo', 'período', 'mes', 'trimestre', 'semestre', 'quincenal'];
+    return keywords.some(k => message.includes(k));
+  }
+
+  private isAnalyticsQuery(message: string): boolean {
+    const keywords = ['análisis', 'tendencia', 'comparar', 'estadística', 'reporte', 'kpi'];
+    return keywords.some(k => message.includes(k));
+  }
+
+  private isCompanyQuery(message: string): boolean {
+    const keywords = ['empresa', 'compañía', 'organización', 'información'];
+    return keywords.some(k => message.includes(k));
+  }
+
+  // 📊 SPECIALIZED SQL GENERATORS
+  private generateEmployeeSQL(message: string, companyId: string, names: string[], years: number[]): string {
+    let sql = `SELECT e.nombre, e.apellido, e.cargo, e.salario_base, e.estado, e.fecha_ingreso`;
+    
+    // Add payroll data if requested
+    if (message.includes('nómina') || message.includes('pago') || message.includes('salario')) {
+      sql = `SELECT e.nombre, e.apellido, e.cargo, e.salario_base, 
+             COALESCE(SUM(p.total_devengado), 0) as total_pagado,
+             COUNT(p.id) as nominas_procesadas`;
+    }
+    
+    sql += ` FROM employees e`;
+    
+    if (message.includes('nómina') || message.includes('pago')) {
+      sql += ` LEFT JOIN payrolls p ON e.id = p.employee_id AND p.company_id = e.company_id`;
+    }
+    
+    sql += ` WHERE e.company_id = '${companyId}'`;
+    
+    // Filter by employee names
+    if (names.length > 0) {
+      const nameConditions = names.map(name => 
+        `(LOWER(e.nombre) LIKE '%${name.toLowerCase()}%' OR LOWER(e.apellido) LIKE '%${name.toLowerCase()}%')`
+      ).join(' OR ');
+      sql += ` AND (${nameConditions})`;
+    }
+    
+    // Filter by years
+    if (years.length > 0 && message.includes('nómina')) {
+      const yearConditions = years.map(year => `EXTRACT(YEAR FROM p.created_at) = ${year}`).join(' OR ');
+      sql += ` AND (${yearConditions})`;
+    }
+    
+    // Add grouping if aggregating
+    if (message.includes('nómina') || message.includes('pago')) {
+      sql += ` GROUP BY e.id, e.nombre, e.apellido, e.cargo, e.salario_base`;
+    }
+    
+    sql += ` ORDER BY e.salario_base DESC LIMIT 25`;
+    
+    return sql;
+  }
+
+  private generatePayrollSQL(message: string, companyId: string, names: string[], years: number[], months: string[]): string {
+    let sql = `SELECT `;
+    
+    if (message.includes('total') || message.includes('cuánto') || message.includes('suma')) {
+      sql += `COALESCE(SUM(p.total_devengado), 0) as total_nomina,
+              COUNT(*) as empleados_pagados,
+              COALESCE(AVG(p.total_devengado), 0) as promedio_empleado`;
+    } else {
+      sql += `e.nombre, e.apellido, p.periodo, p.total_devengado, p.total_deducciones, p.neto_pagado`;
+    }
+    
+    sql += ` FROM payrolls p 
+             JOIN employees e ON p.employee_id = e.id`;
+    
+    sql += ` WHERE p.company_id = '${companyId}' AND p.estado = 'procesada'`;
+    
+    // Filter by employee names
+    if (names.length > 0) {
+      const nameConditions = names.map(name => 
+        `(LOWER(e.nombre) LIKE '%${name.toLowerCase()}%' OR LOWER(e.apellido) LIKE '%${name.toLowerCase()}%')`
+      ).join(' OR ');
+      sql += ` AND (${nameConditions})`;
+    }
+    
+    // Filter by years
+    if (years.length > 0) {
+      const yearConditions = years.map(year => `EXTRACT(YEAR FROM p.created_at) = ${year}`).join(' OR ');
+      sql += ` AND (${yearConditions})`;
+    }
+    
+    // Filter by months
+    if (months.length > 0) {
+      const monthConditions = months.map(month => `LOWER(p.periodo) LIKE '%${month}%'`).join(' OR ');
+      sql += ` AND (${monthConditions})`;
+    }
+    
+    if (!message.includes('total')) {
+      sql += ` ORDER BY p.created_at DESC`;
+    }
+    
+    sql += ` LIMIT 50`;
+    
+    return sql;
+  }
+
+  private generateVoucherSQL(message: string, companyId: string, names: string[], years: number[], months: string[]): string {
+    let sql = `SELECT v.periodo, e.nombre, e.apellido, v.net_pay, v.voucher_status, v.sent_date
+               FROM payroll_vouchers v 
+               JOIN employees e ON v.employee_id = e.id
+               WHERE v.company_id = '${companyId}'`;
+    
+    if (names.length > 0) {
+      const nameConditions = names.map(name => 
+        `(LOWER(e.nombre) LIKE '%${name.toLowerCase()}%' OR LOWER(e.apellido) LIKE '%${name.toLowerCase()}%')`
+      ).join(' OR ');
+      sql += ` AND (${nameConditions})`;
+    }
+    
+    if (years.length > 0) {
+      const yearConditions = years.map(year => `EXTRACT(YEAR FROM v.created_at) = ${year}`).join(' OR ');
+      sql += ` AND (${yearConditions})`;
+    }
+    
+    sql += ` ORDER BY v.created_at DESC LIMIT 30`;
+    return sql;
+  }
+
+  private generateVacationSQL(message: string, companyId: string, names: string[], years: number[]): string {
+    let sql = `SELECT e.nombre, e.apellido, evp.type, evp.start_date, evp.end_date, 
+               evp.days_count, evp.status
+               FROM employee_vacation_periods evp
+               JOIN employees e ON evp.employee_id = e.id
+               WHERE evp.company_id = '${companyId}'`;
+    
+    if (names.length > 0) {
+      const nameConditions = names.map(name => 
+        `(LOWER(e.nombre) LIKE '%${name.toLowerCase()}%' OR LOWER(e.apellido) LIKE '%${name.toLowerCase()}%')`
+      ).join(' OR ');
+      sql += ` AND (${nameConditions})`;
+    }
+    
+    if (years.length > 0) {
+      const yearConditions = years.map(year => `EXTRACT(YEAR FROM evp.start_date) = ${year}`).join(' OR ');
+      sql += ` AND (${yearConditions})`;
+    }
+    
+    sql += ` ORDER BY evp.start_date DESC LIMIT 25`;
+    return sql;
+  }
+
+  private generateNoveltySQL(message: string, companyId: string, names: string[], years: number[]): string {
+    let sql = `SELECT e.nombre, e.apellido, pn.tipo_novedad, pn.valor, pn.dias, 
+               pn.fecha_inicio, pn.fecha_fin, pn.observacion
+               FROM payroll_novedades pn
+               JOIN employees e ON pn.empleado_id = e.id
+               WHERE pn.company_id = '${companyId}'`;
+    
+    if (names.length > 0) {
+      const nameConditions = names.map(name => 
+        `(LOWER(e.nombre) LIKE '%${name.toLowerCase()}%' OR LOWER(e.apellido) LIKE '%${name.toLowerCase()}%')`
+      ).join(' OR ');
+      sql += ` AND (${nameConditions})`;
+    }
+    
+    if (years.length > 0) {
+      const yearConditions = years.map(year => `EXTRACT(YEAR FROM pn.created_at) = ${year}`).join(' OR ');
+      sql += ` AND (${yearConditions})`;
+    }
+    
+    sql += ` ORDER BY pn.created_at DESC LIMIT 30`;
+    return sql;
+  }
+
+  private generateDashboardSQL(message: string, companyId: string): string {
+    return `SELECT type, title, description, priority, action_required, due_date, dismissed
+            FROM dashboard_alerts 
+            WHERE company_id = '${companyId}' AND dismissed = false
+            ORDER BY 
+              CASE priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END,
+              created_at DESC 
+            LIMIT 15`;
+  }
+
+  private generatePeriodSQL(message: string, companyId: string, years: number[], months: string[]): string {
+    let sql = `SELECT periodo, tipo_periodo, fecha_inicio, fecha_fin, estado, 
+               empleados_count, total_devengado, total_neto
+               FROM payroll_periods_real 
+               WHERE company_id = '${companyId}'`;
+    
+    if (years.length > 0) {
+      const yearConditions = years.map(year => `EXTRACT(YEAR FROM fecha_inicio) = ${year}`).join(' OR ');
+      sql += ` AND (${yearConditions})`;
+    }
+    
+    if (months.length > 0) {
+      const monthConditions = months.map(month => `LOWER(periodo) LIKE '%${month}%'`).join(' OR ');
+      sql += ` AND (${monthConditions})`;
+    }
+    
+    sql += ` ORDER BY fecha_inicio DESC LIMIT 20`;
+    return sql;
+  }
+
+  private generateAnalyticsSQL(message: string, companyId: string, metrics: string[], years: number[]): string {
+    let sql = `SELECT 
+               COUNT(DISTINCT e.id) as total_empleados,
+               COALESCE(SUM(p.total_devengado), 0) as total_nomina,
+               COALESCE(AVG(p.total_devengado), 0) as promedio_nomina,
+               COUNT(DISTINCT p.periodo) as periodos_procesados
+               FROM employees e 
+               LEFT JOIN payrolls p ON e.id = p.employee_id AND e.company_id = p.company_id
+               WHERE e.company_id = '${companyId}'`;
+    
+    if (years.length > 0) {
+      const yearConditions = years.map(year => `EXTRACT(YEAR FROM p.created_at) = ${year}`).join(' OR ');
+      sql += ` AND (${yearConditions})`;
+    }
+    
+    return sql;
+  }
+
+  private generateCompanySQL(message: string, companyId: string): string {
+    return `SELECT razon_social, nit, email, ciudad, departamento, plan, estado
+            FROM companies 
+            WHERE id = '${companyId}'`;
+  }
+
+  private generateIntelligentFallback(message: string, companyId: string, entities: any): string {
+    // If no specific domain detected, provide a comprehensive overview
+    if (entities.employeeNames.length > 0) {
+      return this.generateEmployeeSQL(message, companyId, entities.employeeNames, entities.years);
+    }
+    
+    if (entities.years.length > 0) {
+      return this.generatePayrollSQL(message, companyId, [], entities.years, []);
+    }
+    
+    // Default comprehensive query
     return `SELECT 
-      nombre, apellido, cargo, fecha_ingreso, estado
-    FROM employees 
-    WHERE company_id = '${companyId}' 
-    ORDER BY created_at DESC LIMIT 20`;
+              'Empleados Activos' as categoria,
+              COUNT(*) as cantidad
+            FROM employees 
+            WHERE company_id = '${companyId}' AND estado = 'activo'
+            UNION ALL
+            SELECT 
+              'Períodos de Nómina' as categoria,
+              COUNT(*) as cantidad
+            FROM payroll_periods_real 
+            WHERE company_id = '${companyId}'
+            UNION ALL
+            SELECT 
+              'Vouchers Generados' as categoria,
+              COUNT(*) as cantidad
+            FROM payroll_vouchers 
+            WHERE company_id = '${companyId}'
+            ORDER BY categoria`;
   }
 
   private async executeSafeQuery(sql: string, companyId: string): Promise<DatabaseQueryResult> {
