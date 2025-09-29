@@ -587,10 +587,16 @@ Responde SOLO con el SQL optimizado, sin explicaciones:`;
     const startTime = Date.now();
 
     try {
-      this.logger.info('[DatabaseQueryHandler] Executing SQL', { sql: sql.substring(0, 200) });
+      // Additional client-side sanitization for redundancy
+      const sanitizedSql = sql.trim().replace(/;+\s*$/, '');
+      
+      this.logger.info('[DatabaseQueryHandler] Executing SQL', { 
+        sql: sanitizedSql.substring(0, 200),
+        sql_sanitized_preview: sanitizedSql.substring(0, 100)
+      });
       
       const { data, error } = await this.supabaseClient.rpc('execute_safe_query', {
-        query_sql: sql,
+        query_sql: sanitizedSql,
         company_id_param: companyId
       });
 
@@ -652,6 +658,9 @@ Responde SOLO con el SQL optimizado, sin explicaciones:`;
       .replace(/^SQL:\s*/i, '')
       .replace(/^Query:\s*/i, '')
       .trim();
+
+    // Remove trailing semicolons to prevent syntax errors
+    sql = sql.replace(/;+\s*$/, '');
 
     // Basic validation
     if (!sql.toUpperCase().startsWith('SELECT')) {
