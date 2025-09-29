@@ -69,12 +69,6 @@ serve(async (req) => {
     // Initialize handler registry
     const handlerRegistry = new HandlerRegistry(logger, OPENAI_API_KEY);
 
-    // 📅 Handle expand periods response (2027 UX Pattern)
-    if (userMessage === 'expand_periods_response') {
-      console.log('[MAYA] Handling expand_periods_response with data:', data);
-      return handleExpandPeriodsResponse(data || {});
-    }
-
     // 🔄 Interactive Chat Mode (Main mode for new architecture)
     if (phase === 'interactive_chat') {
       if (!conversation || !Array.isArray(conversation)) {
@@ -544,42 +538,4 @@ function handleExpandPeriodsResponse(data: any): Response {
   }
   
   return null;
-}
-
-// 📅 Handle expand periods response (2027 Conversational UX)
-function handleExpandPeriodsResponse(data: any): Response {
-  const { employeeId, employeeName, periods } = data;
-  
-  if (!periods || periods.length === 0) {
-    return new Response(JSON.stringify({
-      message: `No hay períodos adicionales disponibles para ${employeeName}`,
-      response: `No hay períodos adicionales disponibles para ${employeeName}`,
-      executableActions: [],
-      emotionalState: 'neutral'
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  }
-
-  // Create period actions for each available period
-  const periodActions = periods.slice(0, 6).map((period: any) => 
-    ResponseBuilder.createInlinePeriodAction(
-      employeeId,
-      employeeName,
-      period.id,
-      period.periodo,
-      false
-    )
-  );
-
-  const response = ResponseBuilder.buildSmartExpansionResponse(employeeName, periodActions);
-
-  return new Response(JSON.stringify({
-    message: response.response,
-    response: response.response,
-    executableActions: response.actions,
-    emotionalState: response.emotionalState
-  }), {
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
 }

@@ -17,6 +17,7 @@ interface MayaProviderValue {
   showMessage: () => void;
   setChatMode: (enabled: boolean) => void;
   sendMessage: (message: string) => Promise<void>;
+  addActionMessage: (message: string, executableActions: any[]) => void;
   setPhase: (phase: PayrollPhase, additionalData?: Partial<MayaContextType>) => Promise<void>;
   performIntelligentValidation: (companyId: string, periodId?: string, employees?: any[]) => Promise<any>;
   setErrorContext: (errorType: string, errorDetails: any) => Promise<void>;
@@ -264,6 +265,37 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
     }
   }, [chatService, generatePageContext]);
 
+  const addActionMessage = useCallback((message: string, executableActions: any[]) => {
+    const actionMessage: ChatMessage = {
+      id: Date.now().toString(),
+      role: 'assistant',
+      content: message,
+      timestamp: new Date().toISOString(),
+      executableActions: executableActions || []
+    };
+    
+    chatService.addSystemMessage(message);
+    // Add the executable actions to the last message
+    const conversation = chatService.getConversation();
+    const lastMessage = conversation.messages[conversation.messages.length - 1];
+    if (lastMessage) {
+      lastMessage.executableActions = executableActions || [];
+    }
+    
+    setChatHistory([...chatService.getConversation().messages]);
+    
+    // Also update current message for info mode
+    setCurrentMessage({
+      id: actionMessage.id,
+      message: actionMessage.content,
+      emotionalState: 'encouraging',
+      contextualActions: [],
+      executableActions: executableActions || [],
+      timestamp: actionMessage.timestamp,
+      isVisible: true
+    });
+  }, [chatService]);
+
   const performIntelligentValidation = useCallback(async (
     companyId: string,
     periodId?: string,
@@ -336,6 +368,7 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
     showMessage,
     setChatMode,
     sendMessage,
+    addActionMessage,
     setPhase,
     performIntelligentValidation,
     setErrorContext
