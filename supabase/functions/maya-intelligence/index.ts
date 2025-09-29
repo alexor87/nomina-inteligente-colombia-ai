@@ -78,7 +78,7 @@ serve(async (req) => {
     const intent = SimpleIntentMatcher.match(lastMessage);
     console.log(`[MAYA-KISS] Intent: ${intent.type} (${intent.confidence})`);
 
-    // Safety Override: If classified as general payroll but looks like employee salary query
+    // Safety Override 1: If classified as general payroll but looks like employee salary query
     if (intent.method === 'getPayrollTotals' && intent.type !== 'EMPLOYEE_SALARY') {
       const possibleName = extractNameFromSalaryQuery(lastMessage);
       if (possibleName) {
@@ -86,6 +86,40 @@ serve(async (req) => {
         intent.method = 'getEmployeeSalary';
         intent.params = { name: possibleName };
         intent.type = 'EMPLOYEE_SALARY';
+      }
+    }
+
+    // Safety Override 2: If classified as general payroll but looks like employee paid total query
+    if (intent.method === 'getPayrollTotals' && intent.type !== 'EMPLOYEE_PAID_TOTAL') {
+      const paidToMatch = lastMessage.match(/(?:cuánto|cuanto|qué|que)\s+(?:se\s+le\s+ha\s+)?(?:pagado|pago|pagamos)\s+(?:a|para)\s+([a-záéíóúñ\s]+)/i);
+      if (paidToMatch && !/(?:todas|todos|empresa|total|general)/i.test(lastMessage)) {
+        const name = paidToMatch[1]?.trim().replace(/[?.,!]+$/, '') || '';
+        
+        // Extract timeframe from original message
+        let year = null;
+        let month = null;
+        
+        const yearMatch = lastMessage.match(/(\d{4})/);
+        if (yearMatch) {
+          year = parseInt(yearMatch[1]);
+        } else if (/este\s+año|en\s+el\s+año/i.test(lastMessage)) {
+          year = new Date().getFullYear();
+        }
+        
+        const monthMatch = lastMessage.match(/(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i);
+        if (monthMatch) {
+          month = monthMatch[1].toLowerCase();
+          if (!year) year = new Date().getFullYear();
+        }
+        
+        if (!year && !month) {
+          year = new Date().getFullYear();
+        }
+        
+        console.log(`[MAYA-KISS] 🔧 SAFETY OVERRIDE 2: Detected employee paid total query for "${name}" (${year}${month ? '-' + month : ''})`);
+        intent.method = 'getEmployeePaidTotal';
+        intent.params = { name, year, month };
+        intent.type = 'EMPLOYEE_PAID_TOTAL';
       }
     }
 
@@ -115,6 +149,10 @@ serve(async (req) => {
         
       case 'getEmployeeSalary':
         response = await getEmployeeSalary(userSupabase, intent.params?.name);
+        break;
+
+      case 'getEmployeePaidTotal':
+        response = await getEmployeePaidTotal(userSupabase, intent.params);
         break;
         
       case 'getPayrollTotals':
@@ -335,6 +373,108 @@ async function getEmployeeSalary(supabase: any, name: string) {
     console.error('[MAYA-KISS] Employee salary error:', error);
     return {
       message: `Error consultando el salario de "${name}".`,
+      emotionalState: 'concerned'
+    };
+  }
+}
+
+async function getEmployeePaidTotal(supabase: any, params: any) {
+  const { name, year, month } = params || {};
+  
+  if (!name) {
+    return {
+      message: '¿De qué empleado quieres saber el total pagado?',
+      emotionalState: 'neutral'
+    };
+  }
+  
+  try {
+    // First, find the employee
+    const { data: employees, error: employeeError } = await supabase
+      .from('employees')
+      .select('id, nombre, apellido')
+      .or(`nombre.ilike.%${name}%,apellido.ilike.%${name}%`)
+      .limit(3);
+      
+    if (employeeError) throw employeeError;
+    
+    if (employees.length === 0) {
+      return {
+        message: `No encontré un empleado llamado "${name}". ¿Podrías verificar la ortografía?`,
+        emotionalState: 'neutral'
+      };
+    }
+    
+    if (employees.length > 1) {
+      const employeeList = employees.map((emp: any) => `• **${emp.nombre} ${emp.apellido}**`).join('\n');
+      return {
+        message: `Encontré **${employees.length} empleados** con "${name}":\n\n${employeeList}\n\n¿Podrías ser más específico?`,
+        emotionalState: 'neutral'
+      };
+    }
+    
+    const employee = employees[0];
+    
+    // Build date filter
+    let startDate = '';
+    let endDate = '';
+    let timeframeText = '';
+    
+    if (month && year) {
+      // Specific month and year
+      const monthNames: Record<string, string> = {
+        'enero': '01', 'febrero': '02', 'marzo': '03', 'abril': '04',
+        'mayo': '05', 'junio': '06', 'julio': '07', 'agosto': '08',
+        'septiembre': '09', 'octubre': '10', 'noviembre': '11', 'diciembre': '12'
+      };
+      
+      const monthNum = monthNames[month];
+      
+      startDate = `${year}-${monthNum}-01`;
+      endDate = `${year}-${monthNum}-31`;
+      timeframeText = `en ${month} ${year}`;
+    } else if (year) {
+      // Entire year
+      startDate = `${year}-01-01`;
+      endDate = `${year}-12-31`;
+      timeframeText = year === new Date().getFullYear() ? 'este año' : `en ${year}`;
+    } else {
+      // Default to current year
+      const currentYear = new Date().getFullYear();
+      startDate = `${currentYear}-01-01`;
+      endDate = `${currentYear}-12-31`;
+      timeframeText = 'este año';
+    }
+    
+    // Query payrolls for this employee in the date range
+    const { data: payrolls, error: payrollError } = await supabase
+      .from('payrolls')
+      .select('periodo, neto_pagado, created_at')
+      .eq('employee_id', employee.id)
+      .eq('estado', 'procesada')
+      .gte('created_at', startDate)
+      .lte('created_at', endDate)
+      .order('created_at', { ascending: false });
+      
+    if (payrollError) throw payrollError;
+    
+    if (payrolls.length === 0) {
+      return {
+        message: `No hay nóminas procesadas para **${employee.nombre} ${employee.apellido}** ${timeframeText}.`,
+        emotionalState: 'neutral'
+      };
+    }
+    
+    const totalPaid = payrolls.reduce((sum: number, p: any) => sum + (p.neto_pagado || 0), 0);
+    
+    return {
+      message: `${timeframeText} le has pagado **$${totalPaid.toLocaleString()}** a **${employee.nombre} ${employee.apellido}** en **${payrolls.length} nóminas** procesadas.`,
+      emotionalState: 'neutral'
+    };
+  } catch (error) {
+    console.error('[MAYA-KISS] Employee paid total error:', error);
+    return {
+      message: `Error consultando el total pagado a "${name}".`,
       emotionalState: 'concerned'
     };
   }

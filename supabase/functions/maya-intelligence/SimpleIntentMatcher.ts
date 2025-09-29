@@ -109,6 +109,42 @@ export class SimpleIntentMatcher {
       };
     }
 
+    // Employee paid total queries - HIGH PRIORITY (before general payroll)
+    if (/(?:cuánto|cuanto|qué|que)\s+(?:se\s+le\s+ha\s+)?(?:pagado|pago|pagamos)\s+(?:a|para)\s+([a-záéíóúñ\s]+)/i.test(text)) {
+      const nameMatch = text.match(/(?:cuánto|cuanto|qué|que)\s+(?:se\s+le\s+ha\s+)?(?:pagado|pago|pagamos)\s+(?:a|para)\s+([a-záéíóúñ\s]+)/i);
+      const name = nameMatch?.[1]?.trim().replace(/[?.,!]+$/, '') || '';
+      
+      // Extract timeframe
+      let year = null;
+      let month = null;
+      
+      const yearMatch = text.match(/(\d{4})/);
+      if (yearMatch) {
+        year = parseInt(yearMatch[1]);
+      } else if (/este\s+año|en\s+el\s+año/i.test(text)) {
+        year = new Date().getFullYear();
+      }
+      
+      const monthMatch = text.match(/(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i);
+      if (monthMatch) {
+        month = monthMatch[1].toLowerCase();
+        // If month specified but no year, default to current year
+        if (!year) year = new Date().getFullYear();
+      }
+      
+      // Default to current year if no timeframe specified
+      if (!year && !month) {
+        year = new Date().getFullYear();
+      }
+      
+      return {
+        type: 'EMPLOYEE_PAID_TOTAL',
+        confidence: 0.95,
+        method: 'getEmployeePaidTotal',
+        params: { name, year, month }
+      };
+    }
+
     // Employee search
     if (/busca|encuentra|muestra|salario|sueldo/.test(text) && /empleado/.test(text)) {
       const nameMatch = text.match(/(?:busca|encuentra|muestra)\s+(?:el\s+empleado\s+|empleado\s+)?([a-záéíóúñ]+)/i);
@@ -162,7 +198,8 @@ export class SimpleIntentMatcher {
       }
       
       // No specific month - check if asking for totals/general info
-      if (/cuánto|cuanto|total|valor|cost|sum|gast/.test(text)) {
+      // BUT avoid classifying if it's an employee-specific query
+      if (/cuánto|cuanto|total|valor|cost|sum|gast/.test(text) && !/(?:pagado|pago|pagamos)\s+(?:a|para)\s+[a-záéíóúñ]/i.test(text)) {
         return {
           type: 'PAYROLL_TOTALS',
           confidence: 0.9,
