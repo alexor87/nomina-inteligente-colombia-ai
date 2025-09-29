@@ -169,10 +169,12 @@ export interface DatabaseQueryResult {
   success: boolean;
   data?: any[];
   metadata?: {
-    rowCount: number;
-    columns: string[];
+    rowCount?: number;
+    columns?: string[];
     executionTimeMs: number;
-    queryType: 'SELECT' | 'INSERT' | 'UPDATE' | 'DELETE' | 'AGGREGATE';
+    queryType: 'SELECT' | 'INSERT' | 'UPDATE' | 'DELETE' | 'AGGREGATE' | 'FAILED';
+    errorType?: string;
+    originalError?: string;
   };
   error?: string;
   visualHints?: {

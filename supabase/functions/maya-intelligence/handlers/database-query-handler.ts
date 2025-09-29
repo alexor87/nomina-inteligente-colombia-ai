@@ -600,32 +600,98 @@ Responde SOLO con el SQL optimizado, sin explicaciones:`;
         company_id_param: companyId
       });
 
-      const executionTime = Date.now() - startTime;
-
       if (error) {
         this.logger.error('[DatabaseQueryHandler] Query execution error', error);
+        
+        // Enhanced error categorization and messaging
+        let errorMessage = error.message;
+        let errorType = 'unknown';
+        
+        if (error.message.includes('Acceso no autorizado a datos de empresa')) {
+          errorType = 'unauthorized_company_access';
+          errorMessage = `🔒 Error de autorización: El usuario no tiene acceso a los datos de esta empresa. Verifique que esté autenticado correctamente y asignado a la empresa apropiada.`;
+        } else if (error.message.includes('Perfil de usuario no encontrado')) {
+          errorType = 'missing_user_profile';
+          errorMessage = `👤 Perfil faltante: No se encontró el perfil de usuario. Contacte al administrador para que configure su acceso.`;
+        } else if (error.message.includes('Usuario no autenticado')) {
+          errorType = 'authentication_required';
+          errorMessage = `🔑 Autenticación requerida: Su sesión ha expirado. Por favor, inicie sesión nuevamente.`;
+        } else if (error.message.includes('Solo se permiten consultas SELECT')) {
+          errorType = 'forbidden_operation';
+          errorMessage = `❌ Operación no permitida: MAYA solo puede ejecutar consultas de lectura (SELECT) por seguridad.`;
+        } else if (error.message.includes('Query no puede estar vacía')) {
+          errorType = 'empty_query';
+          errorMessage = `⚠️ Consulta vacía: No se puede ejecutar una consulta SQL vacía.`;
+        } else if (error.code === 'P0001') {
+          errorType = 'custom_exception';
+          errorMessage = `💾 Error de base de datos: ${error.message}`;
+        } else if (error.message.includes('permission denied')) {
+          errorType = 'permission_denied';
+          errorMessage = `🚫 Permisos insuficientes: El usuario no tiene permisos para acceder a estos datos.`;
+        }
+        
+        this.logger.error('[DatabaseQueryHandler] Categorized error', {
+          errorType,
+          originalMessage: error.message,
+          enhancedMessage: errorMessage,
+          companyId,
+          sqlPreview: sanitizedSql.substring(0, 100)
+        });
+
         return {
           success: false,
-          error: `Error de base de datos: ${error.message}`
+          error: errorMessage,
+          metadata: {
+            errorType,
+            originalError: error.message,
+            executionTimeMs: Date.now() - startTime,
+            queryType: 'FAILED'
+          }
         };
       }
 
+      const executionTime = Date.now() - startTime;
+      const results = data || [];
+      
+      this.logger.info('[DatabaseQueryHandler] Query executed successfully', {
+        rowCount: results.length,
+        executionTimeMs: executionTime,
+        companyId,
+        queryPreview: sanitizedSql.substring(0, 50)
+      });
+
+      const queryType = this.getQueryType(sql);
+      
       return {
         success: true,
-        data: Array.isArray(data) ? data : [data],
+        data: results,
         metadata: {
-          rowCount: Array.isArray(data) ? data.length : (data ? 1 : 0),
-          columns: data && data.length > 0 ? Object.keys(data[0]) : [],
+          rowCount: results.length,
+          columns: results.length > 0 ? Object.keys(results[0]) : [],
           executionTimeMs: executionTime,
-          queryType: this.getQueryType(sql)
+          queryType: queryType
         }
       };
 
     } catch (error) {
-      this.logger.error('[DatabaseQueryHandler] Query execution failed', error);
+      const executionTime = Date.now() - startTime;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.error('[DatabaseQueryHandler] Query execution exception', {
+        error: errorMessage,
+        executionTimeMs: executionTime,
+        companyId,
+        sqlPreview: sql.substring(0, 100)
+      });
+
       return {
         success: false,
-        error: 'Error ejecutando la consulta en la base de datos'
+        error: `💥 Error inesperado en la consulta: ${errorMessage}`,
+        metadata: {
+          errorType: 'exception',
+          originalError: errorMessage,
+          executionTimeMs: executionTime,
+          queryType: 'FAILED'
+        }
       };
     }
   }

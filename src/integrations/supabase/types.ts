@@ -2565,6 +2565,10 @@ export type Database = {
         Args: { p_company_id?: string }
         Returns: Json
       }
+      diagnose_maya_auth: {
+        Args: { p_company_id?: string }
+        Returns: Json
+      }
       ensure_admin_role_for_company_users: {
         Args: Record<PropertyKey, never>
         Returns: undefined

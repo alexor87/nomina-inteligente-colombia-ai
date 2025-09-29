@@ -143,7 +143,8 @@ serve(async (req) => {
           console.log('[MAYA Diagnostics] Query execution test successful');
         }
       } catch (testError) {
-        diagnostic.errors.push(`Query test exception: ${testError.message}`);
+        const error = testError instanceof Error ? testError : new Error(String(testError));
+        diagnostic.errors.push(`Query test exception: ${error.message}`);
       }
     }
 
@@ -177,9 +178,11 @@ serve(async (req) => {
   } catch (error) {
     console.error('[MAYA Diagnostics] Unexpected error:', error);
     
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    
     return new Response(JSON.stringify({
       success: false,
-      error: error.message,
+      error: errorMessage,
       timestamp: new Date().toISOString(),
       recommendations: ['Check server logs for detailed error information']
     }), {
