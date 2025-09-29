@@ -216,9 +216,9 @@ export class DatabaseQueryHandler extends BaseHandler {
 
       const { data, error } = await this.supabaseClient.rpc('maya_query_router', {
         query_type: structuredQuery.queryType,
-        target_company_id: companyId,
+        company_id: companyId,
         params: structuredQuery.params,
-        requesting_user_id: user.id
+        user_id: user.id
       });
 
       if (error) {
