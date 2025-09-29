@@ -55,11 +55,14 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
       }
 
       if (result.success) {
-        toast({
-          title: "✅ Acción ejecutada",
-          description: result.message,
-          className: "border-green-200 bg-green-50"
-        });
+        // Skip success toast for Maya expand_periods actions
+        if (action.type !== 'expand_periods') {
+          toast({
+            title: "✅ Acción ejecutada",
+            description: result.message,
+            className: "border-green-200 bg-green-50"
+          });
+        }
       } else {
         toast({
           title: "❌ Error ejecutando acción",
