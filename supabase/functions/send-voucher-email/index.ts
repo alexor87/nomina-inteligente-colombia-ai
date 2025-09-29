@@ -30,8 +30,13 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log('PDF attachment size (base64):', pdfBase64.length);
     
+    // Validate period data
+    if (!period.startDate || !period.endDate) {
+      throw new Error('Datos del período incompletos: se requieren startDate y endDate');
+    }
+
     const employeeName = `${employee.nombre} ${employee.apellido}`;
-    const periodText = `${period.fecha_inicio} - ${period.fecha_fin}`;
+    const periodText = `${period.startDate} - ${period.endDate}`;
     
     // Email HTML template - Generic version
     const emailHtml = `
@@ -153,7 +158,7 @@ const handler = async (req: Request): Promise<Response> => {
       html: emailHtml,
       attachments: [
         {
-          filename: `Comprobante_${employee.nombre}_${employee.apellido}_${period.fecha_inicio.replace(/-/g, '')}.pdf`,
+          filename: `Comprobante_${employee.nombre}_${employee.apellido}_${period.startDate.replace(/-/g, '')}.pdf`,
           content: pdfBase64
         },
       ],
