@@ -66,6 +66,12 @@ serve(async (req) => {
     const { context, phase, data, message: userMessage, conversation, sessionId, debug: debugBody, richContext }: MayaRequest & { debug?: boolean } = await req.json();
     const debugMode = debug || debugBody;
 
+    // 🎯 Special hook: button-driven expand periods response
+    if (userMessage === 'expand_periods_response') {
+      logger.info(`Expand periods request ${requestId}`, { employeeId: data?.employeeId, periods: data?.periods?.length || 0 });
+      return handleExpandPeriodsResponse(data || {});
+    }
+
     // Initialize handler registry
     const handlerRegistry = new HandlerRegistry(logger, OPENAI_API_KEY);
 
@@ -398,6 +404,77 @@ Genera una respuesta contextual apropiada para este momento del proceso de liqui
   }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
+}
+
+// 📅 Handle expand periods response (2027 Conversational UX) - top-level
+function handleExpandPeriodsResponse(data: any): Response {
+  try {
+    console.log('[MAYA] Processing expand periods with data:', data);
+    
+    const { employeeId, employeeName, periods } = data || {};
+    
+    if (!employeeId || !employeeName) {
+      console.log('[MAYA] Missing employee info:', { employeeId, employeeName });
+      return new Response(JSON.stringify({
+        message: 'Información del empleado requerida',
+        response: 'Información del empleado requerida',
+        executableActions: [],
+        emotionalState: 'neutral'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    
+    if (!periods || periods.length === 0) {
+      console.log('[MAYA] No periods available for expansion');
+      return new Response(JSON.stringify({
+        message: `No hay períodos adicionales disponibles para ${employeeName}`,
+        response: `No hay períodos adicionales disponibles para ${employeeName}`,
+        executableActions: [],
+        emotionalState: 'neutral'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    console.log('[MAYA] Creating actions for', periods.length, 'periods');
+
+    // Create period actions for each available period
+    const periodActions = periods.slice(0, 6).map((period: any) => 
+      ResponseBuilder.createInlinePeriodAction(
+        employeeId,
+        employeeName,
+        period.id,
+        period.periodo,
+        false
+      )
+    );
+
+    const response = ResponseBuilder.buildSmartExpansionResponse(employeeName, periodActions);
+
+    console.log('[MAYA] Generated', periodActions.length, 'period actions');
+
+    return new Response(JSON.stringify({
+      message: response.response,
+      response: response.response,
+      executableActions: response.actions,
+      emotionalState: response.emotionalState
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+    
+  } catch (error) {
+    console.error('[MAYA] Error in handleExpandPeriodsResponse:', error);
+    return new Response(JSON.stringify({
+      message: 'Error interno procesando períodos',
+      response: 'Error interno procesando períodos', 
+      executableActions: [],
+      emotionalState: 'neutral'
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 500
+    });
+  }
 }
 
 // Helper function to detect voucher flow continuity
