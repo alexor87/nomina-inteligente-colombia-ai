@@ -167,16 +167,31 @@ Responde SOLO con el nombre EXACTO del empleado que coincida, o "NINGUNO" si no 
   }
 
   private requestPeriodConfirmation(employee: any, context?: RichContext): HandlerResponse {
-    // Since we don't have direct access to period data in context,
-    // we'll create a simpler flow that asks the user to specify the period
-    const message = `Para generar el desprendible de **${employee.name}**, por favor especifica el período. 
-
-**Opciones:**
-- "período actual" o "último período"
-- Un mes específico como "enero 2024" o "diciembre 2023"
-- Una fecha de corte específica`;
-
-    return ResponseBuilder.buildClarificationResponse(message);
+    // Generate a default current period based on the current date
+    const now = new Date();
+    const currentMonth = now.toLocaleString('es-ES', { month: 'long', year: 'numeric' });
+    const currentPeriod = currentMonth.charAt(0).toUpperCase() + currentMonth.slice(1);
+    
+    const message = `Para generar el desprendible de **${employee.name}**, selecciona el período:`;
+    
+    // Create executable actions for period selection
+    const currentPeriodAction = ResponseBuilder.createPeriodConfirmationAction(
+      employee.id,
+      employee.name,
+      `current_${now.getFullYear()}_${now.getMonth() + 1}`, // Generate a period ID
+      currentPeriod
+    );
+    
+    const alternativesAction = ResponseBuilder.createPeriodAlternativesAction(
+      employee.id,
+      employee.name
+    );
+    
+    return ResponseBuilder.buildExecutableResponse(
+      message,
+      [currentPeriodAction, alternativesAction],
+      'encouraging'
+    );
   }
 
   private findLatestPeriod(context?: RichContext): { id: string, name: string } | null {
