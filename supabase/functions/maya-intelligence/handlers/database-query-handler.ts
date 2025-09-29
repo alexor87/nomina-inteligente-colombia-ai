@@ -590,14 +590,23 @@ Responde SOLO con el SQL optimizado, sin explicaciones:`;
       // Additional client-side sanitization for redundancy
       const sanitizedSql = sql.trim().replace(/;+\s*$/, '');
       
+      // Add diagnostic logging for troubleshooting
+      const firstToken = sanitizedSql.split(' ')[0] || '';
+      const encoder = new TextEncoder();
+      const headBytes = encoder.encode(sql.substring(0, 32));
+      const headHex = Array.from(headBytes, byte => byte.toString(16).padStart(2, '0')).join('');
+      
       this.logger.info('[DatabaseQueryHandler] Executing SQL', { 
         sql: sanitizedSql.substring(0, 200),
-        sql_sanitized_preview: sanitizedSql.substring(0, 100)
+        sql_sanitized_preview: sanitizedSql.substring(0, 100),
+        first_token: firstToken,
+        head_hex: headHex,
+        query_length: sql.length
       });
       
       const { data, error } = await this.supabaseClient.rpc('execute_safe_query', {
-        query_sql: sanitizedSql,
-        company_id_param: companyId
+        sql_query: sanitizedSql,
+        target_company_id: companyId
       });
 
       if (error) {
@@ -697,17 +706,35 @@ Responde SOLO con el SQL optimizado, sin explicaciones:`;
   }
 
   private isQuerySafe(sql: string): boolean {
-    const forbidden = [
-      'INSERT', 'UPDATE', 'DELETE', 'DROP', 'CREATE', 'ALTER', 
-      'TRUNCATE', 'GRANT', 'REVOKE', '--', '/*', 'xp_', 'sp_'
+    const trimmed = sql.trim().toLowerCase();
+    
+    // Allow SELECT statements and WITH (CTE) statements
+    if (!trimmed.startsWith('select') && !trimmed.startsWith('with')) {
+      return false;
+    }
+    
+    // Block dangerous keywords
+    const dangerousKeywords = [
+      'insert', 'update', 'delete', 'drop', 'create', 'alter', 
+      'truncate', 'grant', 'revoke', 'exec', 'execute', '--', '/*', 'xp_', 'sp_'
     ];
     
-    const upperSql = sql.toUpperCase();
-    return !forbidden.some(keyword => upperSql.includes(keyword));
+    const lowerSql = sql.toLowerCase();
+    return !dangerousKeywords.some(keyword => 
+      new RegExp(`\\b${keyword}\\b`, 'i').test(lowerSql)
+    );
   }
 
   private getQueryType(sql: string): 'SELECT' | 'INSERT' | 'UPDATE' | 'DELETE' | 'AGGREGATE' {
     const upperSql = sql.toUpperCase().trim();
+    
+    // Handle WITH queries (CTEs) - look for SELECT within them
+    if (upperSql.startsWith('WITH')) {
+      if (upperSql.includes('SUM(') || upperSql.includes('COUNT(') || upperSql.includes('AVG(') || upperSql.includes('GROUP BY')) {
+        return 'AGGREGATE';
+      }
+      return 'SELECT';
+    }
     
     if (upperSql.includes('SUM(') || upperSql.includes('COUNT(') || upperSql.includes('AVG(') || upperSql.includes('GROUP BY')) {
       return 'AGGREGATE';
@@ -728,8 +755,9 @@ Responde SOLO con el SQL optimizado, sin explicaciones:`;
     // Remove trailing semicolons to prevent syntax errors
     sql = sql.replace(/;+\s*$/, '');
 
-    // Basic validation
-    if (!sql.toUpperCase().startsWith('SELECT')) {
+    // Enhanced validation: Allow SELECT and WITH (CTEs)
+    const upperSql = sql.toUpperCase().trim();
+    if (!upperSql.startsWith('SELECT') && !upperSql.startsWith('WITH')) {
       return null;
     }
 

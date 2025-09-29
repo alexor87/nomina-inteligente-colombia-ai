@@ -2574,7 +2574,7 @@ export type Database = {
         Returns: undefined
       }
       execute_safe_query: {
-        Args: { company_id_param: string; query_sql: string }
+        Args: { sql_query: string; target_company_id: string }
         Returns: Json
       }
       fix_malformed_fragmented_absences: {
