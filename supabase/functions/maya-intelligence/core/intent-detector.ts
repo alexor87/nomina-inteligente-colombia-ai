@@ -362,5 +362,4 @@ Responde SOLO en formato JSON:
     
     return confirmationRequired.includes(intentType);
   }
-}
-}
+  }
