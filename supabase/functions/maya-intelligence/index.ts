@@ -7,6 +7,8 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { SimpleIntentMatcher } from './SimpleIntentMatcher.ts';
+import { liquidarNomina, registrarNovedad, calcularPrestacion, generarReporte } from './payroll-handlers.ts';
+import { buildStructuredResponse } from './structured-response-builder.ts';
 
 // ============================================================================
 // CONVERSATIONAL CONTEXT SYSTEM
@@ -388,6 +390,23 @@ serve(async (req) => {
       case 'getEmployeeCount':
         response = await getEmployeeCount(userSupabase);
         break;
+        
+      // NEW COLOMBIAN PAYROLL METHODS
+      case 'liquidarNomina':
+        response = await liquidarNomina(userSupabase, intent.params);
+        break;
+        
+      case 'registrarNovedad':
+        response = await registrarNovedad(userSupabase, intent.params);
+        break;
+        
+      case 'calcularPrestacion':
+        response = await calcularPrestacion(userSupabase, intent.params);
+        break;
+        
+      case 'generarReporte':
+        response = await generarReporte(userSupabase, intent.params);
+        break;
 
       case 'listAllEmployees':
         response = await listAllEmployees(userSupabase);
@@ -462,11 +481,31 @@ serve(async (req) => {
         response = await handleConversation(lastMessage, conversation);
     }
 
+    // ============================================================================
+    // STRUCTURED JSON RESPONSE FORMAT
+    // ============================================================================
+    
+    // Build structured response
+    const structuredResponse = buildStructuredResponse(intent, response, lastMessage);
+    
+    // Return enhanced JSON response with backward compatibility
     return new Response(JSON.stringify({
+      // STRUCTURED FIELDS (NEW)
+      accion: structuredResponse.accion,
+      periodo: structuredResponse.periodo,
+      empleados: structuredResponse.empleados,
+      conceptos: structuredResponse.conceptos,
+      parametros_extra: structuredResponse.parametros_extra,
+      observaciones: structuredResponse.observaciones,
+      incompleto: structuredResponse.incompleto,
+      
+      // ORIGINAL FIELDS (BACKWARD COMPATIBILITY)
       message: response.message,
+      respuesta_natural: response.message, // Natural language response
       emotionalState: response.emotionalState || 'neutral',
       sessionId,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      requestId: `maya-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });

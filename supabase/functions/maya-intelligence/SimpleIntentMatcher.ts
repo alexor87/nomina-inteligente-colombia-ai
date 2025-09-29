@@ -1,5 +1,5 @@
 // ============================================================================
-// Simple Intent Matcher - KISS Implementation
+// Simple Intent Matcher - KISS Implementation with Colombian Payroll Synonyms
 // ============================================================================
 // Replaces complex AI-based intent detection with fast regex patterns
 
@@ -8,6 +8,58 @@ export interface SimpleIntent {
   confidence: number;
   method: string;
   params?: any;
+}
+
+// ============================================================================
+// COLOMBIAN PAYROLL SYNONYMS DICTIONARY
+// ============================================================================
+const SYNONYMS = {
+  // Seguridad Social
+  "salud": ["eps", "seguridad social", "aportes salud", "cotizacion salud", "aporte a la eps"],
+  "pension": ["pensiones", "colpensiones", "proteccion", "fondo de pensiones", "ahorro pensional"],
+  "arl": ["riesgos laborales", "aseguradora arl", "colmena", "positiva arl", "mapfre arl"],
+
+  // Parafiscales
+  "caja_compensacion": ["caja", "compensación", "compensar", "colsubsidio", "cajacopi"],
+  "sena": ["sena aportes", "formación profesional", "aporte sena"],
+  "icbf": ["icbf aportes", "bienestar familiar", "aporte icbf"],
+
+  // Prestaciones Sociales
+  "cesantias": ["cesantía", "ahorro cesantías", "cesantia"],
+  "intereses_cesantias": ["intereses de cesantías", "intereses cesantia", "rendimientos cesantías"],
+  "prima": ["prima legal", "prima de junio", "prima de diciembre", "prima de servicios", "bonificación legal"],
+  "vacaciones": ["descanso remunerado", "vacación", "días de vacaciones", "salida vacaciones"],
+  "indemnizacion": ["indemnización", "pago por despido", "indemnizacion laboral"],
+
+  // Novedades
+  "incapacidad": ["incapacitado", "incapacidad médica", "sick leave", "incapacidad eps", "incapacidad laboral"],
+  "licencia_maternidad": ["licencia de maternidad", "postparto", "preparto", "maternidad"],
+  "licencia_paternidad": ["licencia de paternidad", "permiso de paternidad"],
+  "licencia_no_remunerada": ["licencia sin sueldo", "licencia no paga", "permiso no remunerado"],
+  
+  "horas_extra_diurna": ["hora extra diurna", "horas extra día", "hora adicional día"],
+  "horas_extra_nocturna": ["hora extra nocturna", "horas extra noche", "hora adicional noche"],
+  "horas_extra_dominical_diurna": ["hora extra domingo", "hora extra festivo día", "horas extra dominical diurna"],
+  "horas_extra_dominical_nocturna": ["hora extra domingo noche", "hora extra festivo nocturna", "horas extra dominical nocturna"],
+
+  // Otros Conceptos
+  "auxilio_transporte": ["auxilio transporte", "subsidio transporte", "subsidio de transporte", "auxilio de bus", "auxilio de movilización"],
+  "retencion_fuente": ["retención en la fuente", "retencion fuente", "impuesto renta", "descuento retencion"],
+  "dotacion": ["dotación", "uniformes", "ropa de trabajo", "entrega dotación"],
+  "bonificacion": ["bono", "bonificación", "bonificación extralegal", "bonificación especial"]
+};
+
+// Helper function to normalize terms using synonym dictionary
+function normalizePayrollTerm(text: string): string {
+  const lowerText = text.toLowerCase();
+  
+  for (const [standardTerm, synonyms] of Object.entries(SYNONYMS)) {
+    if (synonyms.some(synonym => lowerText.includes(synonym.toLowerCase()))) {
+      return standardTerm;
+    }
+  }
+  
+  return text;
 }
 
 // Helper function to extract employee names from salary queries
@@ -41,6 +93,105 @@ export class SimpleIntentMatcher {
   
   static match(message: string): SimpleIntent {
     const text = message.toLowerCase().trim();
+    
+    // ============================================================================
+    // NEW COLOMBIAN PAYROLL INTENTS
+    // ============================================================================
+    
+    // LIQUIDACIÓN DE NÓMINA
+    if (/(?:liquidar|procesar|calcular|generar)\s+(?:la\s+)?(?:nómin|nomin)/i.test(text)) {
+      // Extract period
+      const monthMatch = text.match(/(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i);
+      const yearMatch = text.match(/(\d{4})/);
+      const fortnightMatch = text.match(/(primera|segunda|1ra|2da|quincenal)/i);
+      
+      return {
+        type: 'LIQUIDAR_NOMINA',
+        confidence: 0.95,
+        method: 'liquidarNomina',
+        params: {
+          periodo: monthMatch ? `${monthMatch[1]} ${yearMatch ? yearMatch[1] : new Date().getFullYear()}` : 'actual',
+          quincena: fortnightMatch ? fortnightMatch[1] : null,
+          empleados: 'todos'
+        }
+      };
+    }
+
+    // REGISTRAR NOVEDADES
+    if (/(?:registrar|reportar|anotar|incluir)\s+(?:una?\s+)?(?:incapacidad|licencia|ausencia|horas?\s+extra|novedad)/i.test(text)) {
+      const employeeMatch = text.match(/(?:de|para|a)\s+([a-záéíóúñ\s]+)/i);
+      const daysMatch = text.match(/(\d+)\s+(?:días?|dia)/i);
+      const hoursMatch = text.match(/(\d+)\s+horas?/i);
+      
+      // Determine novedad type
+      let novedadType = 'incapacidad';
+      if (/licencia.*maternidad/i.test(text)) novedadType = 'licencia_maternidad';
+      else if (/licencia.*paternidad/i.test(text)) novedadType = 'licencia_paternidad';
+      else if (/horas?\s+extra/i.test(text)) novedadType = 'horas_extra_diurna';
+      
+      return {
+        type: 'REGISTRAR_NOVEDAD',
+        confidence: 0.93,
+        method: 'registrarNovedad',
+        params: {
+          empleado: employeeMatch ? employeeMatch[1].trim() : null,
+          tipo_novedad: novedadType,
+          dias: daysMatch ? parseInt(daysMatch[1]) : null,
+          horas: hoursMatch ? parseInt(hoursMatch[1]) : null
+        }
+      };
+    }
+
+    // CALCULAR PRESTACIONES
+    if (/(?:calcular|liquidar)\s+(?:las?\s+)?(?:cesantías?|prima|vacaciones|indemnizaci[oó]n)/i.test(text)) {
+      const employeeMatch = text.match(/(?:de|para|a)\s+([a-záéíóúñ\s]+)/i);
+      let prestationType = 'cesantias';
+      if (/prima/i.test(text)) prestationType = 'prima';
+      else if (/vacaciones/i.test(text)) prestationType = 'vacaciones';
+      else if (/indemnizaci[oó]n/i.test(text)) prestationType = 'indemnizacion';
+      
+      return {
+        type: 'CALCULAR_PRESTACION',
+        confidence: 0.94,
+        method: 'calcularPrestacion',
+        params: {
+          empleado: employeeMatch ? employeeMatch[1].trim() : 'todos',
+          tipo_prestacion: prestationType,
+          periodo: 'actual'
+        }
+      };
+    }
+
+    // GENERAR REPORTES (with normalization)
+    if (/(?:generar|crear|mostrar|dame)\s+(?:el\s+)?(?:reporte|informe)/i.test(text) || 
+        /(?:planilla|pila|seguridad\s+social|parafiscales)/i.test(text)) {
+      
+      const normalizedText = normalizePayrollTerm(text);
+      let reportType = 'general';
+      let conceptos = [];
+      
+      // Detect specific concepts
+      if (normalizedText.includes('salud') || /eps/i.test(text)) conceptos.push('salud');
+      if (normalizedText.includes('pension') || /pensiones/i.test(text)) conceptos.push('pension');
+      if (normalizedText.includes('arl') || /riesgos/i.test(text)) conceptos.push('arl');
+      if (normalizedText.includes('sena') || /formaci[oó]n/i.test(text)) conceptos.push('sena');
+      if (normalizedText.includes('icbf') || /bienestar/i.test(text)) conceptos.push('icbf');
+      if (normalizedText.includes('caja_compensacion') || /compensaci[oó]n/i.test(text)) conceptos.push('caja_compensacion');
+      
+      if (/planilla|pila/i.test(text)) reportType = 'planilla_pila';
+      else if (conceptos.length > 0) reportType = 'seguridad_social';
+      
+      return {
+        type: 'GENERAR_REPORTE',
+        confidence: 0.92,
+        method: 'generarReporte',
+        params: {
+          tipo_reporte: reportType,
+          conceptos: conceptos,
+          periodo: 'actual'
+        }
+      };
+    }
     
     // SECURITY: Block system-wide information queries (HIGHEST PRIORITY)
     if (/(?:cuántas?|cuantas?|cantidad|total)\s+(?:de\s+)?(?:empresas?|compañías?|organizaciones?)/i.test(text) ||
