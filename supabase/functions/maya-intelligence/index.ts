@@ -8,6 +8,143 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { SimpleIntentMatcher } from './SimpleIntentMatcher.ts';
 
+// ============================================================================
+// CONVERSATIONAL CONTEXT SYSTEM
+// ============================================================================
+
+// Detect follow-up queries like "y a [name]?", "y [name]?", etc.
+function detectFollowUpQuery(text: string): string | null {
+  const lowerText = text.toLowerCase().trim();
+  
+  // Pattern 1: "y a [name]?" / "y para [name]?"
+  const pattern1 = lowerText.match(/^(?:y\s+)?(?:a|para)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*)\s*\??$/i);
+  if (pattern1) {
+    return pattern1[1].trim();
+  }
+  
+  // Pattern 2: "y [name]?" / "también [name]?"
+  const pattern2 = lowerText.match(/^(?:y|también|tambien)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*)\s*\??$/i);
+  if (pattern2) {
+    return pattern2[1].trim();
+  }
+  
+  // Pattern 3: "qué tal [name]?" / "y de [name]?"
+  const pattern3 = lowerText.match(/^(?:qué\s+tal|que\s+tal|y\s+de|y\s+del|y\s+de\s+la)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*)\s*\??$/i);
+  if (pattern3) {
+    return pattern3[1].trim();
+  }
+  
+  return null;
+}
+
+// Analyze previous assistant responses to identify the last intent and extract parameters
+function analyzeConversationContext(conversation: any[]): { intentType: string | null; params: any } {
+  // Look at the last 3 assistant messages to find context
+  const assistantMessages = conversation
+    .filter(msg => msg.role === 'assistant')
+    .slice(-3);
+  
+  if (assistantMessages.length === 0) {
+    return { intentType: null, params: {} };
+  }
+  
+  const lastAssistantMessage = assistantMessages[assistantMessages.length - 1]?.content || '';
+  
+  // Detect EMPLOYEE_PAID_TOTAL context
+  if (/(?:le\s+has\s+pagado|total\s+pagado|pagado.*\*\*\$[\d,]+\*\*.*en\s+\*\*\d+\s+nóminas\*\*|este\s+año.*pagado)/i.test(lastAssistantMessage)) {
+    // Extract timeframe from the response
+    let year = null;
+    let month = null;
+    
+    // Look for "este año" or specific year
+    if (/este\s+año/i.test(lastAssistantMessage)) {
+      year = new Date().getFullYear();
+    } else {
+      const yearMatch = lastAssistantMessage.match(/en\s+(\d{4})/i);
+      if (yearMatch) {
+        year = parseInt(yearMatch[1]);
+      }
+    }
+    
+    // Look for specific month
+    const monthMatch = lastAssistantMessage.match(/en\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\s+(\d{4})?/i);
+    if (monthMatch) {
+      month = monthMatch[1].toLowerCase();
+      if (monthMatch[2]) {
+        year = parseInt(monthMatch[2]);
+      }
+    }
+    
+    console.log('🔍 [CONTEXT] Detected EMPLOYEE_PAID_TOTAL context:', { year, month });
+    return { 
+      intentType: 'EMPLOYEE_PAID_TOTAL', 
+      params: { year, month }
+    };
+  }
+  
+  // Detect EMPLOYEE_SALARY context
+  if (/(?:salario\s+base|💰\s+salario\s+base|cargo.*salario)/i.test(lastAssistantMessage)) {
+    console.log('🔍 [CONTEXT] Detected EMPLOYEE_SALARY context');
+    return { 
+      intentType: 'EMPLOYEE_SALARY', 
+      params: {}
+    };
+  }
+  
+  // Detect EMPLOYEE_SEARCH context
+  if (/encontré.*empleados|empleados.*encontré/i.test(lastAssistantMessage)) {
+    console.log('🔍 [CONTEXT] Detected EMPLOYEE_SEARCH context');
+    return { 
+      intentType: 'EMPLOYEE_SEARCH', 
+      params: {}
+    };
+  }
+  
+  return { intentType: null, params: {} };
+}
+
+// Infer intent based on follow-up query and context
+function inferIntentFromContext(followUpName: string, context: { intentType: string | null; params: any }): any {
+  if (!context.intentType) {
+    return null;
+  }
+  
+  console.log(`🧠 [INFERENCE] Follow-up for "${followUpName}" with context: ${context.intentType}`);
+  
+  switch (context.intentType) {
+    case 'EMPLOYEE_PAID_TOTAL':
+      return {
+        type: 'EMPLOYEE_PAID_TOTAL',
+        method: 'getEmployeePaidTotal',
+        params: {
+          name: followUpName,
+          year: context.params.year,
+          month: context.params.month
+        },
+        confidence: 0.95
+      };
+      
+    case 'EMPLOYEE_SALARY':
+      return {
+        type: 'EMPLOYEE_SALARY',
+        method: 'getEmployeeSalary',
+        params: { name: followUpName },
+        confidence: 0.95
+      };
+      
+    case 'EMPLOYEE_SEARCH':
+      return {
+        type: 'EMPLOYEE_SEARCH',
+        method: 'searchEmployee',
+        params: { name: followUpName },
+        confidence: 0.95
+      };
+      
+    default:
+      return null;
+  }
+}
+
 // Helper function to extract employee names from salary queries
 function extractNameFromSalaryQuery(text: string): string | null {
   const lowerText = text.toLowerCase().trim();
@@ -74,8 +211,40 @@ serve(async (req) => {
     const lastMessage = conversation[conversation.length - 1]?.content || '';
     console.log(`[MAYA-KISS] Processing: "${lastMessage}"`);
     
-    // Match intent using simple patterns
-    const intent = SimpleIntentMatcher.match(lastMessage);
+    // ============================================================================
+    // CONVERSATIONAL CONTEXT ANALYSIS - PRIORITY 1
+    // ============================================================================
+    
+    // First, check if this is a follow-up query like "y a [name]?"
+    const followUpName = detectFollowUpQuery(lastMessage);
+    let intent;
+    
+    if (followUpName) {
+      console.log(`🔄 [CONTEXT] Follow-up query detected for: "${followUpName}"`);
+      
+      // Analyze conversation context to infer intent
+      const context = analyzeConversationContext(conversation);
+      const inferredIntent = inferIntentFromContext(followUpName, context);
+      
+      if (inferredIntent) {
+        console.log(`✅ [CONTEXT] Intent inferred: ${inferredIntent.type} for "${followUpName}"`);
+        intent = inferredIntent;
+      } else {
+        console.log(`❓ [CONTEXT] No clear context found, asking for clarification`);
+        return new Response(JSON.stringify({
+          message: `¿Qué información necesitas sobre ${followUpName}? Por ejemplo:\n• Salario\n• Total pagado este año\n• Buscar datos del empleado`,
+          emotionalState: 'neutral',
+          sessionId,
+          timestamp: new Date().toISOString()
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    } else {
+      // No follow-up detected, use normal intent matching
+      intent = SimpleIntentMatcher.match(lastMessage);
+    }
+    
     console.log(`[MAYA-KISS] Intent: ${intent.type} (${intent.confidence})`);
 
     // Safety Override 1: If classified as general payroll but looks like employee salary query
