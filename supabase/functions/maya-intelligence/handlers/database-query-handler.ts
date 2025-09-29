@@ -805,9 +805,9 @@ Responde SOLO con el SQL optimizado, sin explicaciones:`;
       
       // Use the new MAYA-specific secure function
       const { data, error } = await this.supabaseClient.rpc('execute_maya_safe_query', {
-        sql_query: sanitizedSql,
+        query_sql: sanitizedSql,
         target_company_id: companyId,
-        requesting_user_id: userId
+        user_id: userId
       });
 
       if (error) {
