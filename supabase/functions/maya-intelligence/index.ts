@@ -104,6 +104,10 @@ serve(async (req) => {
       case 'getEmployeeCount':
         response = await getEmployeeCount(userSupabase);
         break;
+
+      case 'listAllEmployees':
+        response = await listAllEmployees(userSupabase);
+        break;
         
       case 'searchEmployee':
         response = await searchEmployee(userSupabase, intent.params?.name);
@@ -186,13 +190,48 @@ async function getEmployeeCount(supabase: any) {
     if (error) throw error;
     
     return {
-      message: `Tienes **${count} empleados activos** en tu empresa.`,
+      message: `Tienes **${count} empleados activos** en tu empresa. ${count > 0 ? '¿Te gustaría ver quiénes son?' : ''}`,
       emotionalState: 'neutral'
     };
   } catch (error) {
     console.error('[MAYA-KISS] Employee count error:', error);
     return {
       message: 'No pude obtener el conteo de empleados en este momento.',
+      emotionalState: 'concerned'
+    };
+  }
+}
+
+async function listAllEmployees(supabase: any) {
+  try {
+    const { data: employees, error } = await supabase
+      .from('employees')
+      .select('nombre, apellido, cargo')
+      .eq('estado', 'activo')
+      .order('nombre', { ascending: true });
+
+    if (error) throw error;
+
+    if (!employees || employees.length === 0) {
+      return {
+        message: 'No hay empleados activos registrados en tu empresa.',
+        emotionalState: 'neutral'
+      };
+    }
+
+    // Format employee list
+    const employeeList = employees.map((emp: any) => 
+      `• **${emp.nombre} ${emp.apellido}**${emp.cargo ? ` (${emp.cargo})` : ''}`
+    ).join('\n');
+
+    return {
+      message: `Estos son tus **${employees.length} empleados activos**:\n\n${employeeList}\n\n¿Necesitas información específica de algún empleado?`,
+      emotionalState: 'helpful'
+    };
+  } catch (error) {
+    console.error('[MAYA-KISS] Employee list error:', error);
+    return {
+      message: 'No pude obtener la lista de empleados en este momento.',
       emotionalState: 'concerned'
     };
   }

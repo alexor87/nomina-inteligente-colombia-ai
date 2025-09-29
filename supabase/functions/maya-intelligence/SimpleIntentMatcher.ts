@@ -60,6 +60,17 @@ export class SimpleIntentMatcher {
         method: 'getEmployeeCount'
       };
     }
+
+    // Employee list queries
+    if (/(?:dame|dime|muestra|lista|cuáles?\s+son|quiénes?\s+son)\s*(?:los\s*)?(?:nombres?|empleados?)/i.test(text) ||
+        /(?:lista|listado)\s+(?:de\s+)?empleados?/i.test(text) ||
+        /(?:quiénes?\s+trabajan|quiénes?\s+son\s+los\s+empleados?)/i.test(text)) {
+      return {
+        type: 'EMPLOYEE_LIST',
+        confidence: 0.92,
+        method: 'listAllEmployees'
+      };
+    }
     
     // Employee salary inquiry - HIGHEST PRIORITY for specific employee queries
     // Pattern 1: "cual es el salario de eliana"
