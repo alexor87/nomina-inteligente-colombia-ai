@@ -73,7 +73,7 @@ serve(async (req) => {
     }
 
     // Initialize handler registry
-    const handlerRegistry = new HandlerRegistry(logger, OPENAI_API_KEY);
+    const handlerRegistry = new HandlerRegistry(logger, OPENAI_API_KEY, supabase);
 
     // 🔄 Interactive Chat Mode (Main mode for new architecture)
     if (phase === 'interactive_chat') {
