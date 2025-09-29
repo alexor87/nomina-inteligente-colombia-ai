@@ -65,16 +65,12 @@ export class MayaChatService {
         content: msg.content
       }));
 
-      // Call MAYA intelligence with conversation history and rich context
+      // Call MAYA intelligence with simplified KISS architecture
       const { data, error } = await supabase.functions.invoke('maya-intelligence', {
         body: {
-          message: userMessage,
           conversation: filteredConversation,
-          context: context || 'chat_conversation',
-          richContext: context, // Pass the rich contextual data
-          phase: 'interactive_chat',
           sessionId: this.currentConversation.sessionId,
-          debug: true
+          richContext: context
         }
       });
 
