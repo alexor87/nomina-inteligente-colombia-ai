@@ -222,6 +222,35 @@ serve(async (req) => {
     if (followUpName) {
       console.log(`🔄 [CONTEXT] Follow-up query detected for: "${followUpName}"`);
       
+      // CRITICAL: Validate employee exists before proceeding with ANY query
+      const validation = await validateEmployeeExists(userSupabase, followUpName);
+      
+      if (!validation.exists) {
+        console.log(`🚫 [SECURITY] Employee "${followUpName}" does not exist - blocking potential hallucination`);
+        return new Response(JSON.stringify({
+          message: `No encontré un empleado llamado "${followUpName}" en tu empresa. ¿Podrías verificar la ortografía o el nombre completo?`,
+          emotionalState: 'neutral',
+          sessionId,
+          timestamp: new Date().toISOString()
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      
+      if (validation.multiple) {
+        const employeeList = Array.isArray(validation.employee) 
+          ? validation.employee.map((emp: any) => `• **${emp.nombre} ${emp.apellido}**`).join('\n')
+          : '';
+        return new Response(JSON.stringify({
+          message: `Encontré varios empleados con "${followUpName}":\n\n${employeeList}\n\n¿Podrías ser más específico?`,
+          emotionalState: 'neutral',
+          sessionId,
+          timestamp: new Date().toISOString()
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      
       // Analyze conversation context to infer intent
       const context = analyzeConversationContext(conversation);
       const inferredIntent = inferIntentFromContext(followUpName, context);
@@ -247,11 +276,49 @@ serve(async (req) => {
     
     console.log(`[MAYA-KISS] Intent: ${intent.type} (${intent.confidence})`);
 
+    // ============================================================================
+    // ENHANCED SAFETY OVERRIDES - ANTI-HALLUCINATION PROTECTION
+    // ============================================================================
+    
+    // Enhanced Safety Override: Detect ANY employee name in query and force validation
+    const detectedEmployeeName = detectEmployeeNameInQuery(lastMessage);
+    if (detectedEmployeeName && !['EMPLOYEE_SEARCH', 'EMPLOYEE_SALARY', 'EMPLOYEE_PAID_TOTAL'].includes(intent.type)) {
+      console.log(`🚨 [SECURITY] Employee name "${detectedEmployeeName}" detected in non-employee query - validating`);
+      
+      const validation = await validateEmployeeExists(userSupabase, detectedEmployeeName);
+      if (!validation.exists) {
+        console.log(`🚫 [SECURITY] Blocking potential hallucination - employee "${detectedEmployeeName}" not found`);
+        return new Response(JSON.stringify({
+          message: `No encontré un empleado llamado "${detectedEmployeeName}" en tu empresa. ¿Podrías verificar la ortografía?`,
+          emotionalState: 'neutral',
+          sessionId,
+          timestamp: new Date().toISOString()
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
     // Safety Override 1: If classified as general payroll but looks like employee salary query
     if (intent.method === 'getPayrollTotals' && intent.type !== 'EMPLOYEE_SALARY') {
       const possibleName = extractNameFromSalaryQuery(lastMessage);
       if (possibleName) {
         console.log(`[MAYA-KISS] 🔧 SAFETY OVERRIDE: Detected employee salary query for "${possibleName}"`);
+        
+        // Validate employee exists before changing intent
+        const validation = await validateEmployeeExists(userSupabase, possibleName);
+        if (!validation.exists) {
+          console.log(`🚫 [SECURITY] Blocking salary query for non-existent employee "${possibleName}"`);
+          return new Response(JSON.stringify({
+            message: `No encontré un empleado llamado "${possibleName}" en tu empresa. ¿Podrías verificar la ortografía?`,
+            emotionalState: 'neutral',
+            sessionId,
+            timestamp: new Date().toISOString()
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
         intent.method = 'getEmployeeSalary';
         intent.params = { name: possibleName };
         intent.type = 'EMPLOYEE_SALARY';
@@ -263,6 +330,20 @@ serve(async (req) => {
       const paidToMatch = lastMessage.match(/(?:cuánto|cuanto|qué|que)\s+(?:se\s+le\s+ha\s+)?(?:pagado|pago|pagamos)\s+(?:a|para)\s+([a-záéíóúñ\s]+)/i);
       if (paidToMatch && !/(?:todas|todos|empresa|total|general)/i.test(lastMessage)) {
         const name = paidToMatch[1]?.trim().replace(/[?.,!]+$/, '') || '';
+        
+        // Validate employee exists before changing intent
+        const validation = await validateEmployeeExists(userSupabase, name);
+        if (!validation.exists) {
+          console.log(`🚫 [SECURITY] Blocking payment query for non-existent employee "${name}"`);
+          return new Response(JSON.stringify({
+            message: `No encontré un empleado llamado "${name}" en tu empresa. ¿Podrías verificar la ortografía?`,
+            emotionalState: 'neutral',
+            sessionId,
+            timestamp: new Date().toISOString()
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
         
         // Extract timeframe from original message
         let year = null;
@@ -313,14 +394,47 @@ serve(async (req) => {
         break;
         
       case 'searchEmployee':
+        // Additional validation for employee search
+        if (intent.params?.name) {
+          const validation = await validateEmployeeExists(userSupabase, intent.params.name);
+          if (!validation.exists) {
+            response = {
+              message: `No encontré un empleado llamado "${intent.params.name}" en tu empresa. ¿Podrías verificar la ortografía?`,
+              emotionalState: 'neutral'
+            };
+            break;
+          }
+        }
         response = await searchEmployee(userSupabase, intent.params?.name);
         break;
         
       case 'getEmployeeSalary':
+        // Additional validation for employee salary
+        if (intent.params?.name) {
+          const validation = await validateEmployeeExists(userSupabase, intent.params.name);
+          if (!validation.exists) {
+            response = {
+              message: `No encontré un empleado llamado "${intent.params.name}" en tu empresa. ¿Podrías verificar la ortografía?`,
+              emotionalState: 'neutral'
+            };
+            break;
+          }
+        }
         response = await getEmployeeSalary(userSupabase, intent.params?.name);
         break;
 
       case 'getEmployeePaidTotal':
+        // Additional validation for employee paid total
+        if (intent.params?.name) {
+          const validation = await validateEmployeeExists(userSupabase, intent.params.name);
+          if (!validation.exists) {
+            response = {
+              message: `No encontré un empleado llamado "${intent.params.name}" en tu empresa. ¿Podrías verificar la ortografía?`,
+              emotionalState: 'neutral'  
+            };
+            break;
+          }
+        }
         response = await getEmployeePaidTotal(userSupabase, intent.params);
         break;
         
@@ -372,6 +486,85 @@ serve(async (req) => {
 // ============================================================================
 // Security Functions
 // ============================================================================
+
+async function validateEmployeeExists(supabase: any, name: string): Promise<{ exists: boolean; employee?: any; multiple?: boolean }> {
+  if (!name || typeof name !== 'string' || name.trim().length === 0) {
+    return { exists: false };
+  }
+  
+  try {
+    console.log(`🔍 [VALIDATION] Checking if employee "${name}" exists in current company`);
+    
+    const { data: employees, error } = await supabase
+      .from('employees')
+      .select('id, nombre, apellido, cargo, estado')
+      .or(`nombre.ilike.%${name.trim()}%,apellido.ilike.%${name.trim()}%`)
+      .limit(5);
+      
+    if (error) {
+      console.error('🚫 [VALIDATION] Database error:', error);
+      return { exists: false };
+    }
+    
+    if (!employees || employees.length === 0) {
+      console.log(`❌ [VALIDATION] Employee "${name}" NOT found in current company`);
+      return { exists: false };
+    }
+    
+    if (employees.length === 1) {
+      console.log(`✅ [VALIDATION] Employee "${name}" found: ${employees[0].nombre} ${employees[0].apellido}`);
+      return { exists: true, employee: employees[0] };
+    }
+    
+    console.log(`⚠️ [VALIDATION] Multiple employees found for "${name}": ${employees.length}`);
+    return { exists: true, multiple: true, employee: employees };
+    
+  } catch (error) {
+    console.error('🚫 [VALIDATION] Validation error:', error);
+    return { exists: false };
+  }
+}
+
+// Enhanced function to detect employee names in any query
+function detectEmployeeNameInQuery(text: string): string | null {
+  const lowerText = text.toLowerCase().trim();
+  
+  // Pattern 1: Follow-up queries "y a [name]?", "y [name]?", etc.
+  const followUpPatterns = [
+    /^(?:y\s+)?(?:a|para)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*)\s*\??$/i,
+    /^(?:y|también|tambien)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*)\s*\??$/i,
+    /^(?:qué\s+tal|que\s+tal|y\s+de|y\s+del|y\s+de\s+la)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*)\s*\??$/i
+  ];
+  
+  for (const pattern of followUpPatterns) {
+    const match = lowerText.match(pattern);
+    if (match) {
+      return match[1].trim();
+    }
+  }
+  
+  // Pattern 2: Salary queries
+  const salaryPatterns = [
+    /(?:cuál|cual|cuánto|cuanto|qué|que)\s+(?:es\s+el\s+)?(?:salario|sueldo|gana|cobra)\s+de\s+([a-záéíóúñ\s]+)/i,
+    /(?:salario|sueldo|gana|cobra)\s+(?:de|del|de\s+la)\s+([a-záéíóúñ\s]+)/i
+  ];
+  
+  for (const pattern of salaryPatterns) {
+    const match = lowerText.match(pattern);
+    if (match) {
+      return match[1].trim().replace(/[?.,!]+$/, '');
+    }
+  }
+  
+  // Pattern 3: Payment queries
+  const paymentPattern = /(?:cuánto|cuanto|qué|que)\s+(?:se\s+le\s+ha\s+)?(?:pagado|pago|pagamos)\s+(?:a|para)\s+([a-záéíóúñ\s]+)/i;
+  const paymentMatch = lowerText.match(paymentPattern);
+  if (paymentMatch) {
+    return paymentMatch[1].trim().replace(/[?.,!]+$/, '');
+  }
+  
+  return null;
+}
 
 async function blockSystemInfoQuery(): Promise<{ message: string; emotionalState: string }> {
   console.log('🚫 [SECURITY] System info query blocked');
