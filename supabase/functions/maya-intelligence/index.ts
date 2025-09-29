@@ -67,6 +67,14 @@ serve(async (req) => {
         response = await getPayrollTotals(userSupabase);
         break;
         
+      case 'getPayrollByMonth':
+        response = await getPayrollByMonth(userSupabase, intent.params?.month, intent.params?.year);
+        break;
+        
+      case 'getPayrollByFortnight':
+        response = await getPayrollByFortnight(userSupabase, intent.params?.month, intent.params?.year, intent.params?.fortnight);
+        break;
+        
       case 'getEmployeePayrollHistory':
         response = await getEmployeePayrollHistory(userSupabase, intent.params?.employeeName);
         break;
@@ -274,6 +282,129 @@ async function getRecentPeriods(supabase: any) {
     console.error('[MAYA-KISS] Recent periods error:', error);
     return {
       message: 'No pude obtener los períodos recientes.',
+      emotionalState: 'concerned'
+    };
+  }
+}
+
+async function getPayrollByMonth(supabase: any, month: string, year: number) {
+  try {
+    const monthNames = {
+      'enero': 'Enero', 'febrero': 'Febrero', 'marzo': 'Marzo', 'abril': 'Abril',
+      'mayo': 'Mayo', 'junio': 'Junio', 'julio': 'Julio', 'agosto': 'Agosto',
+      'septiembre': 'Septiembre', 'octubre': 'Octubre', 'noviembre': 'Noviembre', 'diciembre': 'Diciembre'
+    };
+    
+    const monthCapitalized = monthNames[month as keyof typeof monthNames];
+    if (!monthCapitalized) {
+      return {
+        message: `No reconozco el mes "${month}". Por favor usa nombres de meses válidos.`,
+        emotionalState: 'neutral'
+      };
+    }
+    
+    // Try different period name patterns
+    const periodPatterns = [
+      `${monthCapitalized} ${year}`,
+      `${monthCapitalized}`,
+      `${monthCapitalized.toLowerCase()} ${year}`,
+      `${monthCapitalized.toLowerCase()}`
+    ];
+    
+    let periodData = null;
+    let foundPattern = '';
+    
+    for (const pattern of periodPatterns) {
+      const { data } = await supabase
+        .from('payroll_periods_real')
+        .select('periodo, estado, empleados_count, total_devengado, total_deducciones, total_neto')
+        .ilike('periodo', `%${pattern}%`)
+        .limit(1);
+        
+      if (data && data.length > 0) {
+        periodData = data[0];
+        foundPattern = pattern;
+        break;
+      }
+    }
+    
+    if (!periodData) {
+      return {
+        message: `No encontré nómina para **${monthCapitalized} ${year}**. ¿Está seguro que existe ese período?`,
+        emotionalState: 'neutral'
+      };
+    }
+    
+    return {
+      message: `**${periodData.periodo}**: ${periodData.empleados_count} empleados, **$${periodData.total_neto?.toLocaleString() || 0}** pagados (${periodData.estado}).`,
+      emotionalState: 'neutral'
+    };
+  } catch (error) {
+    console.error('[MAYA-KISS] Payroll by month error:', error);
+    return {
+      message: 'No pude obtener la información de nómina para ese mes.',
+      emotionalState: 'concerned'
+    };
+  }
+}
+
+async function getPayrollByFortnight(supabase: any, month: string, year: number, fortnight: string) {
+  try {
+    const monthNames = {
+      'enero': 'Enero', 'febrero': 'Febrero', 'marzo': 'Marzo', 'abril': 'Abril',
+      'mayo': 'Mayo', 'junio': 'Junio', 'julio': 'Julio', 'agosto': 'Agosto',
+      'septiembre': 'Septiembre', 'octubre': 'Octubre', 'noviembre': 'Noviembre', 'diciembre': 'Diciembre'
+    };
+    
+    const monthCapitalized = monthNames[month as keyof typeof monthNames];
+    if (!monthCapitalized) {
+      return {
+        message: `No reconozco el mes "${month}". Por favor usa nombres de meses válidos.`,
+        emotionalState: 'neutral'
+      };
+    }
+    
+    // Build fortnight period patterns
+    const isFirstFortnight = fortnight === 'primera';
+    const fortnightRange = isFirstFortnight ? '1 - 15' : '16 - 30';  // Handle February separately in real implementation
+    
+    const periodPatterns = [
+      `${fortnightRange} ${monthCapitalized} ${year}`,
+      `${fortnightRange} ${monthCapitalized}`,
+      `${fortnightRange} ${monthCapitalized.toLowerCase()} ${year}`,
+      `${fortnightRange} ${monthCapitalized.toLowerCase()}`
+    ];
+    
+    let periodData = null;
+    
+    for (const pattern of periodPatterns) {
+      const { data } = await supabase
+        .from('payroll_periods_real')
+        .select('periodo, estado, empleados_count, total_devengado, total_deducciones, total_neto')
+        .ilike('periodo', `%${pattern}%`)
+        .limit(1);
+        
+      if (data && data.length > 0) {
+        periodData = data[0];
+        break;
+      }
+    }
+    
+    if (!periodData) {
+      return {
+        message: `No encontré la **${fortnight} quincena de ${monthCapitalized} ${year}**. ¿Está seguro que existe ese período?`,
+        emotionalState: 'neutral'
+      };
+    }
+    
+    return {
+      message: `**${periodData.periodo}**: ${periodData.empleados_count} empleados, **$${periodData.total_neto?.toLocaleString() || 0}** pagados (${periodData.estado}).`,
+      emotionalState: 'neutral'
+    };
+  } catch (error) {
+    console.error('[MAYA-KISS] Payroll by fortnight error:', error);
+    return {
+      message: 'No pude obtener la información de nómina para esa quincena.',
       emotionalState: 'concerned'
     };
   }

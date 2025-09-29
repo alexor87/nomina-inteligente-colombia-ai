@@ -200,4 +200,140 @@ export class MayaQueryService {
       };
     }
   }
+  /**
+   * Get payroll totals by specific month
+   */
+  static async getPayrollByMonth(month: string, year?: number): Promise<QueryResult> {
+    try {
+      const targetYear = year || new Date().getFullYear();
+      const monthNames = {
+        'enero': 'Enero', 'febrero': 'Febrero', 'marzo': 'Marzo', 'abril': 'Abril',
+        'mayo': 'Mayo', 'junio': 'Junio', 'julio': 'Julio', 'agosto': 'Agosto',
+        'septiembre': 'Septiembre', 'octubre': 'Octubre', 'noviembre': 'Noviembre', 'diciembre': 'Diciembre'
+      };
+      
+      const monthCapitalized = monthNames[month as keyof typeof monthNames];
+      if (!monthCapitalized) {
+        return {
+          success: false,
+          error: `Mes no válido: ${month}`
+        };
+      }
+      
+      // Try different period name patterns
+      const periodPatterns = [
+        `${monthCapitalized} ${targetYear}`,
+        `${monthCapitalized}`,
+        `${monthCapitalized.toLowerCase()} ${targetYear}`,
+        `${monthCapitalized.toLowerCase()}`
+      ];
+      
+      let periodData = null;
+      
+      for (const pattern of periodPatterns) {
+        const { data, error } = await supabase
+          .from('payroll_periods_real')
+          .select('periodo, estado, empleados_count, total_devengado, total_deducciones, total_neto')
+          .ilike('periodo', `%${pattern}%`)
+          .limit(1);
+          
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          periodData = data[0];
+          break;
+        }
+      }
+      
+      if (!periodData) {
+        return {
+          success: false,
+          error: `No se encontró el período para ${monthCapitalized} ${targetYear}`
+        };
+      }
+      
+      return {
+        success: true,
+        data: periodData,
+        visualization: 'metric',
+        title: `Nómina ${periodData.periodo}`,
+        message: `**${periodData.periodo}**: ${periodData.empleados_count} empleados, **$${periodData.total_neto?.toLocaleString() || 0}** pagados (${periodData.estado}).`
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Error desconocido'
+      };
+    }
+  }
+  
+  /**
+   * Get payroll totals by specific fortnight
+   */
+  static async getPayrollByFortnight(month: string, year?: number, fortnight?: string): Promise<QueryResult> {
+    try {
+      const targetYear = year || new Date().getFullYear();
+      const monthNames = {
+        'enero': 'Enero', 'febrero': 'Febrero', 'marzo': 'Marzo', 'abril': 'Abril',
+        'mayo': 'Mayo', 'junio': 'Junio', 'julio': 'Julio', 'agosto': 'Agosto',
+        'septiembre': 'Septiembre', 'octubre': 'Octubre', 'noviembre': 'Noviembre', 'diciembre': 'Diciembre'
+      };
+      
+      const monthCapitalized = monthNames[month as keyof typeof monthNames];
+      if (!monthCapitalized) {
+        return {
+          success: false,
+          error: `Mes no válido: ${month}`
+        };
+      }
+      
+      // Build fortnight period patterns
+      const isFirstFortnight = fortnight === 'primera';
+      const fortnightRange = isFirstFortnight ? '1 - 15' : '16 - 30';
+      
+      const periodPatterns = [
+        `${fortnightRange} ${monthCapitalized} ${targetYear}`,
+        `${fortnightRange} ${monthCapitalized}`,
+        `${fortnightRange} ${monthCapitalized.toLowerCase()} ${targetYear}`,
+        `${fortnightRange} ${monthCapitalized.toLowerCase()}`
+      ];
+      
+      let periodData = null;
+      
+      for (const pattern of periodPatterns) {
+        const { data, error } = await supabase
+          .from('payroll_periods_real')
+          .select('periodo, estado, empleados_count, total_devengado, total_deducciones, total_neto')
+          .ilike('periodo', `%${pattern}%`)
+          .limit(1);
+          
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          periodData = data[0];
+          break;
+        }
+      }
+      
+      if (!periodData) {
+        return {
+          success: false,
+          error: `No se encontró la ${fortnight} quincena de ${monthCapitalized} ${targetYear}`
+        };
+      }
+      
+      return {
+        success: true,
+        data: periodData,
+        visualization: 'metric',
+        title: `${periodData.periodo}`,
+        message: `**${periodData.periodo}**: ${periodData.empleados_count} empleados, **$${periodData.total_neto?.toLocaleString() || 0}** pagados (${periodData.estado}).`
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Error desconocido'
+      };
+    }
+  }
 }
