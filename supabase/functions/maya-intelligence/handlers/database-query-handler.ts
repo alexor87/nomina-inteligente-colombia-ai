@@ -587,6 +587,29 @@ Responde SOLO con el SQL optimizado, sin explicaciones:`;
     const startTime = Date.now();
 
     try {
+      // Extract user_id from the Supabase client's auth context
+      const { data: { user }, error: authError } = await this.supabaseClient.auth.getUser();
+      
+      if (authError || !user) {
+        this.logger.error('[DatabaseQueryHandler] Authentication failed', {
+          authError: authError?.message,
+          hasUser: !!user,
+          companyId
+        });
+        return {
+          success: false,
+          error: 'Usuario no autenticado para ejecutar consultas',
+          metadata: {
+            errorType: 'authentication_required',
+            originalError: authError?.message || 'No user found',
+            executionTimeMs: Date.now() - startTime,
+            queryType: 'FAILED'
+          }
+        };
+      }
+
+      const userId = user.id;
+
       // Additional client-side sanitization for redundancy
       const sanitizedSql = sql.trim().replace(/;+\s*$/, '');
       
@@ -596,39 +619,51 @@ Responde SOLO con el SQL optimizado, sin explicaciones:`;
       const headBytes = encoder.encode(sql.substring(0, 32));
       const headHex = Array.from(headBytes, byte => byte.toString(16).padStart(2, '0')).join('');
       
-      this.logger.info('[DatabaseQueryHandler] Executing SQL', { 
+      this.logger.info('[DatabaseQueryHandler] Executing MAYA secure query', { 
         sql: sanitizedSql.substring(0, 200),
         sql_sanitized_preview: sanitizedSql.substring(0, 100),
         first_token: firstToken,
         head_hex: headHex,
-        query_length: sql.length
+        query_length: sql.length,
+        userId: userId.substring(0, 8) + '...',
+        companyId: companyId.substring(0, 8) + '...'
       });
       
-      const { data, error } = await this.supabaseClient.rpc('execute_safe_query', {
+      // Use the new MAYA-specific secure function
+      const { data, error } = await this.supabaseClient.rpc('execute_maya_safe_query', {
         sql_query: sanitizedSql,
-        target_company_id: companyId
+        target_company_id: companyId,
+        requesting_user_id: userId
       });
 
       if (error) {
-        this.logger.error('[DatabaseQueryHandler] Query execution error', error);
+        this.logger.error('[DatabaseQueryHandler] MAYA query execution error', {
+          error: error.message,
+          code: error.code,
+          userId: userId.substring(0, 8) + '...',
+          companyId
+        });
         
         // Enhanced error categorization and messaging
         let errorMessage = error.message;
         let errorType = 'unknown';
         
-        if (error.message.includes('Acceso no autorizado a datos de empresa')) {
-          errorType = 'unauthorized_company_access';
-          errorMessage = `🔒 Error de autorización: El usuario no tiene acceso a los datos de esta empresa. Verifique que esté autenticado correctamente y asignado a la empresa apropiada.`;
-        } else if (error.message.includes('Perfil de usuario no encontrado')) {
-          errorType = 'missing_user_profile';
-          errorMessage = `👤 Perfil faltante: No se encontró el perfil de usuario. Contacte al administrador para que configure su acceso.`;
-        } else if (error.message.includes('Usuario no autenticado')) {
-          errorType = 'authentication_required';
-          errorMessage = `🔑 Autenticación requerida: Su sesión ha expirado. Por favor, inicie sesión nuevamente.`;
-        } else if (error.message.includes('Solo se permiten consultas SELECT')) {
+        if (error.message.includes('Acceso no autorizado a datos de otra empresa')) {
+          errorType = 'cross_company_access';
+          errorMessage = `🔒 Error de autorización: El usuario no tiene acceso a los datos de esta empresa.`;
+        } else if (error.message.includes('Usuario sin perfil de empresa')) {
+          errorType = 'missing_company_profile';
+          errorMessage = `👤 Perfil incompleto: No se encontró el perfil de empresa del usuario.`;
+        } else if (error.message.includes('Usuario no válido')) {
+          errorType = 'invalid_user';
+          errorMessage = `🔑 Usuario no válido: El usuario no existe en el sistema.`;
+        } else if (error.message.includes('Usuario no proporcionado')) {
+          errorType = 'missing_user_id';
+          errorMessage = `⚠️ Error interno: No se pudo identificar al usuario.`;
+        } else if (error.message.includes('Solo consultas SELECT y WITH están permitidas')) {
           errorType = 'forbidden_operation';
-          errorMessage = `❌ Operación no permitida: MAYA solo puede ejecutar consultas de lectura (SELECT) por seguridad.`;
-        } else if (error.message.includes('Query no puede estar vacía')) {
+          errorMessage = `❌ Operación no permitida: MAYA solo puede ejecutar consultas de lectura por seguridad.`;
+        } else if (error.message.includes('Consulta vacía no permitida')) {
           errorType = 'empty_query';
           errorMessage = `⚠️ Consulta vacía: No se puede ejecutar una consulta SQL vacía.`;
         } else if (error.code === 'P0001') {
@@ -639,11 +674,12 @@ Responde SOLO con el SQL optimizado, sin explicaciones:`;
           errorMessage = `🚫 Permisos insuficientes: El usuario no tiene permisos para acceder a estos datos.`;
         }
         
-        this.logger.error('[DatabaseQueryHandler] Categorized error', {
+        this.logger.error('[DatabaseQueryHandler] Categorized MAYA error', {
           errorType,
           originalMessage: error.message,
           enhancedMessage: errorMessage,
           companyId,
+          userId: userId.substring(0, 8) + '...',
           sqlPreview: sanitizedSql.substring(0, 100)
         });
 
@@ -660,24 +696,30 @@ Responde SOLO con el SQL optimizado, sin explicaciones:`;
       }
 
       const executionTime = Date.now() - startTime;
-      const results = data || [];
       
-      this.logger.info('[DatabaseQueryHandler] Query executed successfully', {
-        rowCount: results.length,
+      // Handle new MAYA response format
+      const mayaResponse = data || {};
+      const results = mayaResponse.data || [];
+      const queryType = mayaResponse.query_type || this.getQueryType(sql);
+      const serverExecutionTime = mayaResponse.execution_time_ms || 0;
+      
+      this.logger.info('[DatabaseQueryHandler] MAYA query executed successfully', {
+        rowCount: Array.isArray(results) ? results.length : 1,
         executionTimeMs: executionTime,
+        serverExecutionTimeMs: serverExecutionTime,
+        queryType,
         companyId,
+        userId: userId.substring(0, 8) + '...',
         queryPreview: sanitizedSql.substring(0, 50)
       });
-
-      const queryType = this.getQueryType(sql);
       
       return {
         success: true,
         data: results,
         metadata: {
-          rowCount: results.length,
-          columns: results.length > 0 ? Object.keys(results[0]) : [],
-          executionTimeMs: executionTime,
+          rowCount: Array.isArray(results) ? results.length : 1,
+          columns: Array.isArray(results) && results.length > 0 ? Object.keys(results[0]) : [],
+          executionTimeMs: Math.max(executionTime, serverExecutionTime),
           queryType: queryType
         }
       };
@@ -685,8 +727,9 @@ Responde SOLO con el SQL optimizado, sin explicaciones:`;
     } catch (error) {
       const executionTime = Date.now() - startTime;
       const errorMessage = error instanceof Error ? error.message : String(error);
-      this.logger.error('[DatabaseQueryHandler] Query execution exception', {
+      this.logger.error('[DatabaseQueryHandler] MAYA query execution exception', {
         error: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined,
         executionTimeMs: executionTime,
         companyId,
         sqlPreview: sql.substring(0, 100)
@@ -694,7 +737,7 @@ Responde SOLO con el SQL optimizado, sin explicaciones:`;
 
       return {
         success: false,
-        error: `💥 Error inesperado en la consulta: ${errorMessage}`,
+        error: `💥 Error inesperado en la consulta MAYA: ${errorMessage}`,
         metadata: {
           errorType: 'exception',
           originalError: errorMessage,

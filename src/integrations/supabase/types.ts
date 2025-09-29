@@ -2573,6 +2573,14 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      execute_maya_safe_query: {
+        Args: {
+          requesting_user_id: string
+          sql_query: string
+          target_company_id: string
+        }
+        Returns: Json
+      }
       execute_safe_query: {
         Args: { sql_query: string; target_company_id: string }
         Returns: Json
