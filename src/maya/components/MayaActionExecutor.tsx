@@ -43,7 +43,9 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
       case 'send_voucher': return Send;
       case 'send_voucher_all': return Send;
       case 'confirm_send_voucher': return Send;
+      case 'confirm_period_voucher': return Calendar;
       case 'show_period_alternatives': return Calendar;
+      case 'show_period_alternatives_voucher': return Calendar;
       case 'search_employee': return User;
       case 'view_details': return Eye;
       case 'generate_report': return FileText;
@@ -139,7 +141,11 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
         return await executeAutomatically(action);
       case 'confirm_send_voucher':
         return await executeAutomatically(action);
+      case 'confirm_period_voucher':
+        return await handlePeriodConfirmation(action);
       case 'show_period_alternatives':
+        return await showPeriodAlternatives(action);
+      case 'show_period_alternatives_voucher':
         return await showPeriodAlternatives(action);
       case 'search_employee':
         return await executeSearchEmployee(action);
@@ -285,7 +291,31 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
     }
   };
 
-  const handlePeriodConfirmation = async (periodId: string) => {
+  const handlePeriodConfirmation = async (action: ExecutableAction): Promise<ActionExecutionResult> => {
+    try {
+      setPeriodConfirmationDialog({ 
+        isOpen: true, 
+        action: {
+          ...action,
+          type: 'send_voucher', // Convert back to send_voucher for the dialog
+          requiresConfirmation: true
+        },
+        startWithAlternatives: false
+      });
+
+      return {
+        success: true,
+        message: `Confirmando período para ${action.parameters.employeeName}`
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: `Error confirmando período: ${error.message}`
+      };
+    }
+  };
+
+  const handlePeriodConfirmationDialog = async (periodId: string) => {
     const action = periodConfirmationDialog.action;
     if (!action) return;
     
@@ -344,13 +374,19 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
               key={action.id}
               onClick={() => executeAction(action)}
               disabled={isLoading}
-              variant={action.type === 'confirm_send_voucher' ? 'default' : action.type === 'show_period_alternatives' ? 'outline' : 'outline'}
+              variant={
+                action.type === 'confirm_send_voucher' || action.type === 'confirm_period_voucher' 
+                  ? 'default' 
+                  : action.type === 'show_period_alternatives' || action.type === 'show_period_alternatives_voucher'
+                  ? 'outline' 
+                  : 'outline'
+              }
               size="sm"
               className={`w-full justify-start text-left h-auto p-3 ${
-                action.type === 'confirm_send_voucher' 
+                action.type === 'confirm_send_voucher' || action.type === 'confirm_period_voucher'
                   ? 'hover:bg-green-500/10 border-green-500/30 text-green-700 dark:text-green-400' 
-                  : action.type === 'show_period_alternatives'
-                  ? 'hover:bg-red-500/10 border-red-500/30 text-red-700 dark:text-red-400'
+                  : action.type === 'show_period_alternatives' || action.type === 'show_period_alternatives_voucher'
+                  ? 'hover:bg-blue-500/10 border-blue-500/30 text-blue-700 dark:text-blue-400'
                   : 'hover:bg-primary/5 border-primary/20'
               }`}
             >
@@ -383,7 +419,7 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
         isOpen={periodConfirmationDialog.isOpen}
         onClose={() => setPeriodConfirmationDialog({ isOpen: false, action: null })}
         action={periodConfirmationDialog.action}
-        onConfirm={handlePeriodConfirmation}
+        onConfirm={handlePeriodConfirmationDialog}
         startWithAlternatives={periodConfirmationDialog.startWithAlternatives}
       />
     </>

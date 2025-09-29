@@ -92,8 +92,21 @@ serve(async (req) => {
       });
 
       try {
-        // 1. Detect user intent using the new system
-        const intent = await IntentDetector.detectIntent(lastUserMessage, richContext, OPENAI_API_KEY);
+        // 1. Check for voucher flow continuity first
+        const voucherContinuityIntent = detectVoucherContinuation(conversation, lastUserMessage, richContext);
+        let intent;
+        
+        if (voucherContinuityIntent) {
+          logger.info(`Voucher continuity detected for ${requestId}`, {
+            type: voucherContinuityIntent.type,
+            entityCount: voucherContinuityIntent.entities.length,
+            source: 'continuity'
+          });
+          intent = voucherContinuityIntent;
+        } else {
+          // 2. Fallback to normal intent detection
+          intent = await IntentDetector.detectIntent(lastUserMessage, richContext, OPENAI_API_KEY);
+        }
         
         logger.info(`Intent detected for ${requestId}`, {
           type: intent.type,
@@ -385,4 +398,73 @@ Genera una respuesta contextual apropiada para este momento del proceso de liqui
   }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
+}
+
+// Helper function to detect voucher flow continuity
+function detectVoucherContinuation(
+  conversation: Array<{role: string, content: string}>,
+  lastUserMessage: string,
+  richContext?: any
+): any | null {
+  if (!conversation || conversation.length < 2) return null;
+  
+  // Get the last assistant message
+  const lastAssistantMessage = [...conversation].reverse().find(msg => msg.role === 'assistant')?.content || '';
+  
+  logger.info('Checking voucher continuity', {
+    lastAssistantLength: lastAssistantMessage.length,
+    lastUserMessage: lastUserMessage.slice(0, 50),
+    hasVoucherKeywords: lastAssistantMessage.includes('desprendible')
+  });
+  
+  // Case 1: Assistant asked for employee name and user is providing it
+  if (lastAssistantMessage.includes('desprendible') && 
+      (lastAssistantMessage.includes('especifica el nombre') || lastAssistantMessage.includes('¿cuál empleado'))) {
+    
+    logger.info('Detected employee name continuation for voucher');
+    return {
+      type: 'VOUCHER_SEND',
+      confidence: 0.95,
+      entities: [{
+        type: 'employee',
+        value: lastUserMessage.trim(),
+        confidence: 0.9
+      }],
+      parameters: {},
+      requiresConfirmation: false
+    };
+  }
+  
+  // Case 2: Assistant asked for period and user is providing it
+  if (lastAssistantMessage.includes('desprendible') && 
+      (lastAssistantMessage.includes('período') || lastAssistantMessage.includes('periodo'))) {
+    
+    // Extract employee name from assistant message using regex
+    const employeeMatch = lastAssistantMessage.match(/desprendible de \*\*(.+?)\*\*/i);
+    const employeeName = employeeMatch ? employeeMatch[1] : null;
+    
+    if (employeeName) {
+      logger.info('Detected period continuation for voucher', { employeeName });
+      return {
+        type: 'VOUCHER_SEND',
+        confidence: 0.95,
+        entities: [
+          {
+            type: 'employee',
+            value: employeeName,
+            confidence: 0.9
+          },
+          {
+            type: 'period',
+            value: lastUserMessage.trim(),
+            confidence: 0.9
+          }
+        ],
+        parameters: {},
+        requiresConfirmation: false
+      };
+    }
+  }
+  
+  return null;
 }
