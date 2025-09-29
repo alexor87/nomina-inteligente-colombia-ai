@@ -35,9 +35,9 @@ export class SimpleIntentMatcher {
       };
     }
     
-    // Payroll by specific month or fortnight
-    if (/cuánto|cuanto|total|valor|cost/.test(text) && (/gast|pag|nómin|nomin/.test(text))) {
-      // Extract month
+    // Payroll queries - expanded patterns to be more inclusive
+    if (/nómin|nomin|sueldo|salario|pag|gast|cost|laboral|planilla/.test(text)) {
+      // Extract month first - if found, handle month/fortnight specific queries
       const monthMatch = text.match(/(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i);
       
       if (monthMatch) {
@@ -47,7 +47,7 @@ export class SimpleIntentMatcher {
         const yearMatch = text.match(/(\d{4})/);
         const year = yearMatch ? parseInt(yearMatch[1]) : new Date().getFullYear();
         
-        // Check for fortnight
+        // Check for fortnight indicators
         const fortnightMatch = text.match(/(primera|1ra|segunda|2da|del\s+1\s+al\s+15|del\s+16\s+al\s+30|del\s+16\s+al\s+31|1\s*-\s*15|16\s*-\s*30|16\s*-\s*31)/i);
         
         if (fortnightMatch) {
@@ -76,10 +76,19 @@ export class SimpleIntentMatcher {
         };
       }
       
-      // General payroll totals (no month specified)
+      // No specific month - check if asking for totals/general info
+      if (/cuánto|cuanto|total|valor|cost|sum|gast/.test(text)) {
+        return {
+          type: 'PAYROLL_TOTALS',
+          confidence: 0.9,
+          method: 'getPayrollTotals'
+        };
+      }
+      
+      // General payroll inquiry without specific question words
       return {
         type: 'PAYROLL_TOTALS',
-        confidence: 0.9,
+        confidence: 0.8,
         method: 'getPayrollTotals'
       };
     }
