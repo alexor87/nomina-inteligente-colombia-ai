@@ -7,6 +7,8 @@ import { BaseHandler } from '../handlers/base-handler.ts';
 import { VoucherHandler } from '../handlers/voucher-handler.ts';
 import { MassVoucherHandler } from '../handlers/mass-voucher-handler.ts';
 import { EmployeeHandler } from '../handlers/employee-handler.ts';
+import { EmployeeCrudHandler } from '../handlers/employee-crud-handler.ts';
+import { PayrollCrudHandler } from '../handlers/payroll-crud-handler.ts';
 import { DatabaseQueryHandler } from '../handlers/database-query-handler.ts';
 import { ResponseBuilder } from './response-builder.ts';
 
@@ -25,10 +27,10 @@ export class HandlerRegistry {
       new VoucherHandler(this.logger, openaiKey),
       new MassVoucherHandler(this.logger, openaiKey),
       new EmployeeHandler(this.logger, openaiKey),
+      new EmployeeCrudHandler(this.logger, openaiKey),
+      new PayrollCrudHandler(this.logger, openaiKey),
       new DatabaseQueryHandler(this.logger, openaiKey, supabaseClient),
-      // Future handlers will be added here:
-      // new PayrollHandler(this.logger, openaiKey),
-      // new VacationHandler(this.logger, openaiKey),
+      // Future handlers can be added here:
       // new ReportHandler(this.logger, openaiKey),
     ];
     
@@ -146,7 +148,9 @@ export class HandlerRegistry {
     const capabilities: Record<string, string[]> = {
       'VoucherHandler': ['VOUCHER_SEND'],
       'MassVoucherHandler': ['VOUCHER_MASS_SEND'],
-      'EmployeeHandler': ['EMPLOYEE_SEARCH', 'EMPLOYEE_CREATE', 'EMPLOYEE_UPDATE', 'EMPLOYEE_DELETE'],
+      'EmployeeHandler': ['EMPLOYEE_SEARCH'],
+      'EmployeeCrudHandler': ['EMPLOYEE_CREATE', 'EMPLOYEE_UPDATE', 'EMPLOYEE_DELETE'],
+      'PayrollCrudHandler': ['PAYROLL_LIQUIDATE', 'VACATION_REGISTER', 'ABSENCE_REGISTER'],
       'DatabaseQueryHandler': ['DATA_QUERY', 'ANALYTICS_REQUEST', 'REPORT_INSIGHTS', 'COMPARISON_ANALYSIS'],
     };
     

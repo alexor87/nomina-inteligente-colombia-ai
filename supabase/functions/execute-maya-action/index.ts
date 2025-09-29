@@ -20,12 +20,39 @@ serve(async (req) => {
     const { action } = await req.json();
     console.log(`[execute-maya-action] Executing action:`, action);
 
+    // Voucher actions
     if (action.type === 'send_voucher' || action.type === 'confirm_send_voucher') {
       return await executeSendVoucherAction(action);
     }
 
     if (action.type === 'send_voucher_all') {
       return await executeSendVoucherAllAction(action);
+    }
+
+    // Employee CRUD actions
+    if (action.type === 'create_employee') {
+      return await executeCreateEmployeeAction(action);
+    }
+
+    if (action.type === 'update_employee') {
+      return await executeUpdateEmployeeAction(action);
+    }
+
+    if (action.type === 'delete_employee') {
+      return await executeDeleteEmployeeAction(action);
+    }
+
+    // Payroll CRUD actions
+    if (action.type === 'liquidate_payroll') {
+      return await executeLiquidatePayrollAction(action);
+    }
+
+    if (action.type === 'register_vacation') {
+      return await executeRegisterVacationAction(action);
+    }
+
+    if (action.type === 'register_absence') {
+      return await executeRegisterAbsenceAction(action);
     }
 
     return new Response(
@@ -283,6 +310,304 @@ async function executeSendVoucherAllAction(action: any) {
         errorCount,
         period: period.periodo,
         results
+      }
+    }),
+    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  );
+}
+
+// ============================================================================
+// EMPLOYEE CRUD ACTIONS
+// ============================================================================
+
+async function executeCreateEmployeeAction(action: any) {
+  const { employeeName, basicInfo, companyId } = action.parameters;
+  
+  if (!employeeName || !companyId) {
+    throw new Error('Información incompleta para crear empleado');
+  }
+
+  console.log(`[execute-maya-action] Creating employee: ${employeeName}`, basicInfo);
+
+  // Get current user info for created_by field
+  const authHeader = Deno.env.get('AUTHORIZATION');
+  if (!authHeader) {
+    throw new Error('Usuario no autenticado');
+  }
+
+  // Use the existing EmployeeUnifiedService pattern - insert directly to employees table
+  const employeeData = {
+    company_id: companyId,
+    nombre: basicInfo.nombre || employeeName.split(' ')[0],
+    apellido: basicInfo.apellido || employeeName.split(' ').slice(1).join(' ') || '',
+    cedula: basicInfo.cedula || '0000000000', // Will need to be updated
+    salario_base: basicInfo.salario_base || 1000000, // Default minimum wage
+    cargo: basicInfo.cargo || 'Sin especificar',
+    email: basicInfo.email || null,
+    telefono: basicInfo.telefono || null,
+    estado: 'activo',
+    fecha_ingreso: new Date().toISOString().split('T')[0],
+    tipo_contrato: 'indefinido'
+  };
+
+  const { data: employee, error: employeeError } = await supabase
+    .from('employees')
+    .insert(employeeData)
+    .select()
+    .single();
+
+  if (employeeError) {
+    throw new Error(`Error creando empleado: ${employeeError.message}`);
+  }
+
+  console.log(`[execute-maya-action] ✅ Employee created successfully:`, employee.nombre);
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      message: `✅ Empleado ${employeeName} creado exitosamente. Ahora puedes completar información adicional desde la sección Empleados.`,
+      data: {
+        employeeId: employee.id,
+        employeeName: `${employee.nombre} ${employee.apellido}`,
+        needsCompletion: true
+      }
+    }),
+    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  );
+}
+
+async function executeUpdateEmployeeAction(action: any) {
+  const { employeeId, employeeName, updateInfo } = action.parameters;
+  
+  if (!employeeId || !updateInfo) {
+    throw new Error('Información incompleta para actualizar empleado');
+  }
+
+  console.log(`[execute-maya-action] Updating employee: ${employeeName}`, updateInfo);
+
+  const { data: employee, error: updateError } = await supabase
+    .from('employees')
+    .update(updateInfo)
+    .eq('id', employeeId)
+    .select()
+    .single();
+
+  if (updateError) {
+    throw new Error(`Error actualizando empleado: ${updateError.message}`);
+  }
+
+  console.log(`[execute-maya-action] ✅ Employee updated successfully:`, employee.nombre);
+
+  const updatedFields = Object.keys(updateInfo).map(key => {
+    let label = key;
+    if (key === 'salario_base') label = 'salario';
+    if (key === 'telefono') label = 'teléfono';
+    return `${label}: ${updateInfo[key]}`;
+  }).join(', ');
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      message: `✅ Información de ${employeeName} actualizada exitosamente. Cambios: ${updatedFields}`,
+      data: {
+        employeeId: employee.id,
+        employeeName: `${employee.nombre} ${employee.apellido}`,
+        updatedFields: Object.keys(updateInfo)
+      }
+    }),
+    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  );
+}
+
+async function executeDeleteEmployeeAction(action: any) {
+  const { employeeId, employeeName } = action.parameters;
+  
+  if (!employeeId) {
+    throw new Error('ID de empleado requerido para dar de baja');
+  }
+
+  console.log(`[execute-maya-action] Deactivating employee: ${employeeName}`);
+
+  // Instead of deleting, set status to inactive (safer approach)
+  const { data: employee, error: updateError } = await supabase
+    .from('employees')
+    .update({ 
+      estado: 'inactivo',
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', employeeId)
+    .select()
+    .single();
+
+  if (updateError) {
+    throw new Error(`Error dando de baja empleado: ${updateError.message}`);
+  }
+
+  console.log(`[execute-maya-action] ✅ Employee deactivated successfully:`, employee.nombre);
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      message: `✅ Empleado ${employeeName} dado de baja exitosamente. Su estado cambió a "inactivo" y se mantienen todos los registros históricos.`,
+      data: {
+        employeeId: employee.id,
+        employeeName: `${employee.nombre} ${employee.apellido}`,
+        newStatus: 'inactivo'
+      }
+    }),
+    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  );
+}
+
+// ============================================================================
+// PAYROLL CRUD ACTIONS
+// ============================================================================
+
+async function executeLiquidatePayrollAction(action: any) {
+  const { periodName, companyId } = action.parameters;
+  
+  if (!periodName || !companyId) {
+    throw new Error('Información incompleta para liquidar nómina');
+  }
+
+  console.log(`[execute-maya-action] Liquidating payroll for period: ${periodName}`);
+
+  // This is a complex operation that would normally involve:
+  // 1. Finding or creating the payroll period
+  // 2. Calculating payroll for all active employees
+  // 3. Applying deductions and benefits
+  // 4. Generating vouchers
+
+  // For now, return guidance to use the UI since this is a critical operation
+  return new Response(
+    JSON.stringify({
+      success: true,
+      message: `⚠️ La liquidación de nómina para "${periodName}" es una operación compleja que se debe realizar desde la sección de Nómina para garantizar todos los cálculos y validaciones.\n\n¿Te gustaría que te guíe en el proceso paso a paso?`,
+      data: {
+        periodName: periodName,
+        requiresUIGuidance: true,
+        suggestedPath: '/app/payroll'
+      }
+    }),
+    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  );
+}
+
+async function executeRegisterVacationAction(action: any) {
+  const { employeeId, employeeName, vacationInfo } = action.parameters;
+  
+  if (!employeeId) {
+    throw new Error('ID de empleado requerido para registrar vacaciones');
+  }
+
+  console.log(`[execute-maya-action] Registering vacation for: ${employeeName}`, vacationInfo);
+
+  // Get employee data first
+  const { data: employee, error: employeeError } = await supabase
+    .from('employees')
+    .select('company_id')
+    .eq('id', employeeId)
+    .single();
+
+  if (employeeError || !employee) {
+    throw new Error(`No se pudo encontrar el empleado: ${employeeError?.message}`);
+  }
+
+  // Create vacation record
+  const vacationData = {
+    employee_id: employeeId,
+    company_id: employee.company_id,
+    type: 'vacaciones',
+    start_date: vacationInfo.startDate || new Date().toISOString().split('T')[0],
+    end_date: vacationInfo.endDate || new Date().toISOString().split('T')[0],
+    days_count: vacationInfo.days || 1,
+    status: 'pendiente',
+    observations: `Vacaciones registradas por MAYA para ${employeeName}`
+  };
+
+  const { data: vacation, error: vacationError } = await supabase
+    .from('employee_vacation_periods')
+    .insert(vacationData)
+    .select()
+    .single();
+
+  if (vacationError) {
+    throw new Error(`Error registrando vacaciones: ${vacationError.message}`);
+  }
+
+  console.log(`[execute-maya-action] ✅ Vacation registered successfully for:`, employeeName);
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      message: `✅ Vacaciones registradas exitosamente para ${employeeName}. Las vacaciones se procesarán en la próxima liquidación de nómina.`,
+      data: {
+        vacationId: vacation.id,
+        employeeName: employeeName,
+        startDate: vacation.start_date,
+        endDate: vacation.end_date,
+        days: vacation.days_count
+      }
+    }),
+    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  );
+}
+
+async function executeRegisterAbsenceAction(action: any) {
+  const { employeeId, employeeName, absenceInfo } = action.parameters;
+  
+  if (!employeeId) {
+    throw new Error('ID de empleado requerido para registrar ausencia');
+  }
+
+  console.log(`[execute-maya-action] Registering absence for: ${employeeName}`, absenceInfo);
+
+  // Get employee data first
+  const { data: employee, error: employeeError } = await supabase
+    .from('employees')
+    .select('company_id')
+    .eq('id', employeeId)
+    .single();
+
+  if (employeeError || !employee) {
+    throw new Error(`No se pudo encontrar el empleado: ${employeeError?.message}`);
+  }
+
+  // Create absence record
+  const absenceData = {
+    employee_id: employeeId,
+    company_id: employee.company_id,
+    type: absenceInfo.type || 'ausencia',
+    start_date: absenceInfo.startDate || new Date().toISOString().split('T')[0],
+    end_date: absenceInfo.endDate || absenceInfo.startDate || new Date().toISOString().split('T')[0],
+    days_count: absenceInfo.days || 1,
+    status: 'pendiente',
+    observations: `Ausencia registrada por MAYA para ${employeeName}`
+  };
+
+  const { data: absence, error: absenceError } = await supabase
+    .from('employee_vacation_periods')
+    .insert(absenceData)
+    .select()
+    .single();
+
+  if (absenceError) {
+    throw new Error(`Error registrando ausencia: ${absenceError.message}`);
+  }
+
+  console.log(`[execute-maya-action] ✅ Absence registered successfully for:`, employeeName);
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      message: `✅ Ausencia registrada exitosamente para ${employeeName}. Se descontará automáticamente en la próxima liquidación de nómina.`,
+      data: {
+        absenceId: absence.id,
+        employeeName: employeeName,
+        absenceType: absence.type,
+        startDate: absence.start_date,
+        endDate: absence.end_date,
+        days: absence.days_count
       }
     }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
