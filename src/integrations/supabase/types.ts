@@ -2566,7 +2566,9 @@ export type Database = {
         Returns: Json
       }
       diagnose_maya_auth: {
-        Args: { p_company_id?: string }
+        Args:
+          | { p_company_id?: string }
+          | { p_requesting_user_id: string; p_target_company_id: string }
         Returns: Json
       }
       ensure_admin_role_for_company_users: {
@@ -2764,6 +2766,15 @@ export type Database = {
           p_violation_type: string
         }
         Returns: undefined
+      }
+      maya_query_router: {
+        Args: {
+          params: Json
+          query_type: string
+          requesting_user_id: string
+          target_company_id: string
+        }
+        Returns: Json
       }
       normalize_biweekly_period_labels: {
         Args: Record<PropertyKey, never>

@@ -20,52 +20,226 @@ export class DatabaseQueryHandler extends BaseHandler {
   }
 
   async handleIntent(intent: Intent, context?: RichContext): Promise<HandlerResponse> {
-    this.logger.info('[DatabaseQueryHandler] Processing database query', {
-      intentType: intent.type,
-      confidence: intent.confidence,
-      entitiesCount: intent.entities.length
-    });
+    try {
+      this.logger.info(`[DatabaseQueryHandler] Processing intent: ${intent.type}`, {
+        confidence: intent.confidence,
+        entities: intent.entities?.length || 0,
+        hasContext: !!context
+      });
 
-    const queryContext: QueryContext = {
+      const queryContext = this.buildQueryContext(intent, context);
+      this.logger.info(`[DatabaseQueryHandler] Processing database query`, {
+        intentType: intent.type,
+        confidence: intent.confidence,
+        entitiesCount: intent.entities?.length || 0
+      });
+
+      // Try structured query first (secure router)
+      const structuredQuery = this.buildStructuredQuery(queryContext);
+      if (structuredQuery) {
+        this.logger.info(`[DatabaseQueryHandler] Using structured query router`, {
+          queryType: structuredQuery.queryType,
+          params: structuredQuery.params
+        });
+
+        const result = await this.executeStructuredQuery(structuredQuery, queryContext.companyId);
+        if (result.success) {
+          const visualData = this.generateVisualResponseFromStructured(result, queryContext, structuredQuery.queryType);
+          
+          this.logger.info(`[DatabaseQueryHandler] Successfully processed structured intent`, {
+            hasAction: false
+          });
+
+          return this.buildDataVisualizationResponse(visualData, result);
+        } else {
+          // Log the structured query failure but continue to fallback
+          this.logger.warn(`[DatabaseQueryHandler] Structured query failed, trying fallback`, {
+            error: result.error
+          });
+        }
+      }
+
+      // Fallback to SQL generation (with enhanced security)
+      const sql = await this.generateIntelligentSQL(queryContext);
+      if (!sql) {
+        return {
+          hasExecutableAction: false,
+          response: "No se pudo generar una consulta válida para tu pregunta.",
+          emotionalState: 'concerned'
+        };
+      }
+
+      // Execute the query safely
+      const result = await this.executeSafeQuery(sql, queryContext.companyId);
+      
+      if (!result.success) {
+        return {
+          hasExecutableAction: false,
+          response: result.error || "Error ejecutando la consulta",
+          emotionalState: 'concerned'
+        };
+      }
+
+      // Generate visualization response
+      const visualData = this.generateVisualResponse(result, queryContext);
+      
+      this.logger.info(`[DatabaseQueryHandler] Successfully processed intent`, {
+        hasAction: false
+      });
+
+      return this.buildDataVisualizationResponse(visualData, result);
+    } catch (error) {
+      this.logger.error(`[DatabaseQueryHandler] Error handling intent:`, error);
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+      return {
+        hasExecutableAction: false,
+        response: `Error procesando consulta: ${errorMessage}`,
+        emotionalState: 'concerned'
+      };
+    }
+  }
+
+  private buildQueryContext(intent: Intent, context?: RichContext): QueryContext {
+    return {
       userMessage: intent.parameters.originalMessage || '',
       companyId: context?.companyId || '',
       intent: intent.type,
       entities: intent.entities,
       richContext: context
     };
+  }
 
+  /**
+   * Build structured query from detected entities for secure execution
+   */
+  private buildStructuredQuery(context: QueryContext): { queryType: string; params: any } | null {
+    const entities = context.entities;
+    const message = context.userMessage.toLowerCase();
+
+    // Employee neto annual query
+    const employeeNames = entities.filter(e => e.type === 'employee');
+    const years = entities.filter(e => e.type === 'date' && /\b20\d{2}\b/.test(e.value));
+    
+    if (employeeNames.length > 0 && (years.length > 0 || message.includes('total') || message.includes('anual'))) {
+      return {
+        queryType: 'EMPLOYEE_NETO_ANUAL',
+        params: {
+          name: employeeNames[0].value,
+          year: years.length > 0 ? parseInt(years[0].value.match(/\b20\d{2}\b/)?.[0] || '') : new Date().getFullYear()
+        }
+      };
+    }
+
+    // Employee last period neto
+    if (employeeNames.length > 0 && (message.includes('último') || message.includes('reciente'))) {
+      return {
+        queryType: 'EMPLOYEE_NETO_ULTIMO_PERIODO',
+        params: {
+          name: employeeNames[0].value
+        }
+      };
+    }
+
+    // Period totals
+    const periods = entities.filter(e => e.type === 'period');
+    if (periods.length > 0 || message.includes('periodo') || message.includes('mes')) {
+      return {
+        queryType: 'PERIOD_TOTALS',
+        params: {
+          period: periods.length > 0 ? periods[0].value : null,
+          year: years.length > 0 ? parseInt(years[0].value.match(/\b20\d{2}\b/)?.[0] || '') : null
+        }
+      };
+    }
+
+    // Top salaries
+    if (message.includes('mayor') && (message.includes('salario') || message.includes('sueldo'))) {
+      const limits = message.match(/(\d+)/);
+      return {
+        queryType: 'TOP_SALARIES',
+        params: {
+          limit: limits ? parseInt(limits[1]) : 5
+        }
+      };
+    }
+
+    // Employee history
+    if (employeeNames.length > 0 && (message.includes('historial') || message.includes('pagos'))) {
+      return {
+        queryType: 'EMPLOYEE_HISTORY',
+        params: {
+          name: employeeNames[0].value,
+          limit: 10
+        }
+      };
+    }
+
+    return null;
+  }
+
+  /**
+   * Execute structured query using the secure router
+   */
+  private async executeStructuredQuery(structuredQuery: { queryType: string; params: any }, companyId: string): Promise<DatabaseQueryResult> {
     try {
-      // Generate intelligent SQL based on natural language
-      const sqlQuery = await this.generateIntelligentSQL(queryContext);
-      
-      if (!sqlQuery) {
-        return ResponseBuilder.buildErrorResponse(
-          'No pude generar una consulta SQL válida para tu pregunta',
-          'Intenta reformular tu pregunta de forma más específica'
-        );
+      if (!this.supabaseClient) {
+        throw new Error('Supabase client not initialized');
       }
 
-      // Execute the query safely
-      const result = await this.executeSafeQuery(sqlQuery, queryContext.companyId);
-      
-      if (!result.success) {
-        return ResponseBuilder.buildErrorResponse(
-          'Error ejecutando la consulta',
-          result.error
-        );
+      // Get user ID from auth context
+      const { data: { user } } = await this.supabaseClient.auth.getUser();
+      if (!user) {
+        return {
+          success: false,
+          error: "Usuario no autenticado"
+        };
       }
 
-      // Generate visual response
-      const visualResponse = this.generateVisualResponse(result, queryContext);
-      
-      return this.buildDataVisualizationResponse(visualResponse, result);
+      this.logger.info(`[DatabaseQueryHandler] Executing structured query`, {
+        queryType: structuredQuery.queryType,
+        userId: user.id,
+        companyId: companyId
+      });
+
+      const { data, error } = await this.supabaseClient.rpc('maya_query_router', {
+        query_type: structuredQuery.queryType,
+        target_company_id: companyId,
+        params: structuredQuery.params,
+        requesting_user_id: user.id
+      });
+
+      if (error) {
+        this.logger.error(`[DatabaseQueryHandler] Structured query failed:`, error);
+        return {
+          success: false,
+          error: `Error en consulta estructurada: ${error.message}`
+        };
+      }
+
+      if (!data?.success) {
+        return {
+          success: false,
+          error: data?.error || "Error ejecutando consulta estructurada"
+        };
+      }
+
+      return {
+        success: true,
+        data: data.data || [],
+        metadata: {
+          executionTimeMs: data.execution_time_ms || 0,
+          rowCount: Array.isArray(data.data) ? data.data.length : 0,
+          queryType: 'SELECT'
+        }
+      };
 
     } catch (error) {
-      this.logger.error('[DatabaseQueryHandler] Query execution failed', error);
-      return ResponseBuilder.buildErrorResponse(
-        'Ocurrió un error procesando tu consulta',
-        'Por favor intenta de nuevo con una pregunta más específica'
-      );
+      this.logger.error(`[DatabaseQueryHandler] Structured query execution error:`, error);
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+      return {
+        success: false,
+        error: `Error ejecutando consulta estructurada: ${errorMessage}`
+      };
     }
   }
 
@@ -805,6 +979,113 @@ Responde SOLO con el SQL optimizado, sin explicaciones:`;
     }
 
     return sql;
+  }
+
+  /**
+   * Generate visual response for structured queries
+   */
+  private generateVisualResponseFromStructured(result: DatabaseQueryResult, context: QueryContext, queryType: string): VisualDataResponse {
+    const data = result.data as any;
+    
+    if (!data || (Array.isArray(data) && data.length === 0)) {
+      return {
+        type: 'metric',
+        title: 'Sin resultados',
+        data: { message: 'No se encontraron datos para tu consulta.' }
+      };
+    }
+
+    switch (queryType) {
+      case 'EMPLOYEE_NETO_ANUAL':
+        if (!Array.isArray(data) && data.total_neto > 0) {
+          return {
+            type: 'metric',
+            title: `Neto total de ${data.employee_name} en ${data.year}`,
+            data: data,
+            format: { 
+              metrics: [{
+                label: 'Neto Total Anual',
+                value: `$${data.total_neto?.toLocaleString()}`,
+                unit: 'COP'
+              }]
+            }
+          };
+        }
+        break;
+
+      case 'EMPLOYEE_NETO_ULTIMO_PERIODO':
+        if (!Array.isArray(data) && data.neto_pagado > 0) {
+          return {
+            type: 'metric',
+            title: `Último pago de ${data.employee_name}`,
+            data: data,
+            format: { 
+              metrics: [{
+                label: 'Último Neto Pagado',
+                value: `$${data.neto_pagado?.toLocaleString()}`,
+                unit: 'COP'
+              }]
+            }
+          };
+        }
+        break;
+
+      case 'TOP_SALARIES':
+        if (Array.isArray(data) && data.length > 0) {
+          return {
+            type: 'table',
+            title: `Los ${data.length} mayores salarios`,
+            data: data.map((emp: any) => ({
+              'Empleado': emp.employee_name,
+              'Salario Base': `$${emp.salario_base?.toLocaleString()}`,
+              'Cargo': emp.cargo || 'No especificado'
+            }))
+          };
+        }
+        break;
+
+      case 'EMPLOYEE_HISTORY':
+        if (Array.isArray(data) && data.length > 0) {
+          return {
+            type: 'table',
+            title: 'Historial de pagos',
+            data: data.map((payment: any) => ({
+              'Período': payment.periodo,
+              'Neto Pagado': `$${payment.neto_pagado?.toLocaleString()}`,
+              'Total Devengado': `$${payment.total_devengado?.toLocaleString()}`,
+              'Deducciones': `$${payment.total_deducciones?.toLocaleString()}`
+            }))
+          };
+        }
+        break;
+
+      case 'PERIOD_TOTALS':
+        if (!Array.isArray(data) && data.total_neto > 0) {
+          return {
+            type: 'metric',
+            title: 'Totales del período',
+            data: data,
+            format: { 
+              metrics: [{
+                label: 'Total Neto',
+                value: `$${data.total_neto?.toLocaleString()}`,
+                unit: 'COP'
+              }, {
+                label: 'Total Devengado',
+                value: `$${data.total_devengado?.toLocaleString()}`,
+                unit: 'COP'
+              }]
+            }
+          };
+        }
+        break;
+    }
+
+    return {
+      type: 'metric',
+      title: 'Sin resultados',
+      data: { message: 'No se encontraron datos para tu consulta.' }
+    };
   }
 
   private generateVisualResponse(result: DatabaseQueryResult, context: QueryContext): VisualDataResponse {
