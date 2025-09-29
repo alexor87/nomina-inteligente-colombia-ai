@@ -19,7 +19,7 @@ export class DatabaseQueryHandler extends BaseHandler {
     return queryIntents.includes(intent.type);
   }
 
-  protected async handleIntent(intent: Intent, context?: RichContext): Promise<HandlerResponse> {
+  async handleIntent(intent: Intent, context?: RichContext): Promise<HandlerResponse> {
     this.logger.info('[DatabaseQueryHandler] Processing database query', {
       intentType: intent.type,
       confidence: intent.confidence,

@@ -2569,6 +2569,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      execute_safe_query: {
+        Args: { company_id_param: string; query_sql: string }
+        Returns: Json
+      }
       fix_malformed_fragmented_absences: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -2615,6 +2619,7 @@ export type Database = {
           cedula: string
           employee_id: string
           nombre: string
+          tipo_documento: string
         }[]
       }
       get_employee_identity_for_period_v2: {
