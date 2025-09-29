@@ -8,6 +8,33 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { SimpleIntentMatcher } from './SimpleIntentMatcher.ts';
 
+// Helper function to extract employee names from salary queries
+function extractNameFromSalaryQuery(text: string): string | null {
+  const lowerText = text.toLowerCase().trim();
+  
+  // Pattern 1: "cual es el salario de eliana"
+  const pattern1Match = lowerText.match(/(?:cuál|cual|cuánto|cuanto|qué|que)\s+(?:es\s+el\s+)?(?:salario|sueldo|gana|cobra)\s+de\s+([a-záéíóúñ\s]+)/i);
+  if (pattern1Match) {
+    return pattern1Match[1]?.trim().replace(/[?.,!]+$/, '') || null;
+  }
+  
+  // Pattern 2: "salario de eliana"
+  const pattern2Match = lowerText.match(/(?:salario|sueldo|gana|cobra)\s+(?:de|del|de\s+la)\s+([a-záéíóúñ\s]+)/i);
+  if (pattern2Match) {
+    return pattern2Match[1]?.trim().replace(/[?.,!]+$/, '') || null;
+  }
+  
+  // Pattern 3: "sueldo eliana" (without preposition, avoid general terms)
+  if (!/nomina|total|cuanto|mes|año|periodo/i.test(lowerText)) {
+    const pattern3Match = lowerText.match(/(?:salario|sueldo)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)/i);
+    if (pattern3Match) {
+      return pattern3Match[1]?.trim().replace(/[?.,!]+$/, '') || null;
+    }
+  }
+  
+  return null;
+}
+
 // CORS headers
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -50,6 +77,21 @@ serve(async (req) => {
     // Match intent using simple patterns
     const intent = SimpleIntentMatcher.match(lastMessage);
     console.log(`[MAYA-KISS] Intent: ${intent.type} (${intent.confidence})`);
+
+    // Safety Override: If classified as general payroll but looks like employee salary query
+    if (intent.method === 'getPayrollTotals' && intent.type !== 'EMPLOYEE_SALARY') {
+      const possibleName = extractNameFromSalaryQuery(lastMessage);
+      if (possibleName) {
+        console.log(`[MAYA-KISS] 🔧 SAFETY OVERRIDE: Detected employee salary query for "${possibleName}"`);
+        intent.method = 'getEmployeeSalary';
+        intent.params = { name: possibleName };
+        intent.type = 'EMPLOYEE_SALARY';
+      }
+    }
+
+    if (intent.type === 'EMPLOYEE_SALARY') {
+      console.log(`[MAYA-KISS] 👤 Employee salary query detected for: "${intent.params?.name}"`);
+    }
     
     let response;
 

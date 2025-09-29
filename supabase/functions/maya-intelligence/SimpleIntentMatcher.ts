@@ -10,6 +10,33 @@ export interface SimpleIntent {
   params?: any;
 }
 
+// Helper function to extract employee names from salary queries
+function extractNameFromSalaryQuery(text: string): string | null {
+  const lowerText = text.toLowerCase().trim();
+  
+  // Pattern 1: "cual es el salario de eliana"
+  const pattern1Match = lowerText.match(/(?:cuál|cual|cuánto|cuanto|qué|que)\s+(?:es\s+el\s+)?(?:salario|sueldo|gana|cobra)\s+de\s+([a-záéíóúñ\s]+)/i);
+  if (pattern1Match) {
+    return pattern1Match[1]?.trim().replace(/[?.,!]+$/, '') || null;
+  }
+  
+  // Pattern 2: "salario de eliana"
+  const pattern2Match = lowerText.match(/(?:salario|sueldo|gana|cobra)\s+(?:de|del|de\s+la)\s+([a-záéíóúñ\s]+)/i);
+  if (pattern2Match) {
+    return pattern2Match[1]?.trim().replace(/[?.,!]+$/, '') || null;
+  }
+  
+  // Pattern 3: "sueldo eliana" (without preposition, avoid general terms)
+  if (!/nomina|total|cuanto|mes|año|periodo/i.test(lowerText)) {
+    const pattern3Match = lowerText.match(/(?:salario|sueldo)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)/i);
+    if (pattern3Match) {
+      return pattern3Match[1]?.trim().replace(/[?.,!]+$/, '') || null;
+    }
+  }
+  
+  return null;
+}
+
 export class SimpleIntentMatcher {
   
   static match(message: string): SimpleIntent {
@@ -25,13 +52,39 @@ export class SimpleIntentMatcher {
     }
     
     // Employee salary inquiry - HIGHEST PRIORITY for specific employee queries
-    if (/(?:cuál|cual|cuánto|cuanto|qué|que)\s+(?:es\s+el\s+)?(?:salario|sueldo|gana|cobra)\s+de\s+([a-záéíóúñ]+)/i.test(text)) {
-      const nameMatch = text.match(/(?:cuál|cual|cuánto|cuanto|qué|que)\s+(?:es\s+el\s+)?(?:salario|sueldo|gana|cobra)\s+de\s+([a-záéíóúñ]+)/i);
+    // Pattern 1: "cual es el salario de eliana"
+    if (/(?:cuál|cual|cuánto|cuanto|qué|que)\s+(?:es\s+el\s+)?(?:salario|sueldo|gana|cobra)\s+de\s+([a-záéíóúñ\s]+)/i.test(text)) {
+      const nameMatch = text.match(/(?:cuál|cual|cuánto|cuanto|qué|que)\s+(?:es\s+el\s+)?(?:salario|sueldo|gana|cobra)\s+de\s+([a-záéíóúñ\s]+)/i);
+      const extractedName = nameMatch?.[1]?.trim().replace(/[?.,!]+$/, '') || '';
       return {
         type: 'EMPLOYEE_SALARY',
         confidence: 0.95,
         method: 'getEmployeeSalary',
-        params: { name: nameMatch?.[2] || '' }
+        params: { name: extractedName }
+      };
+    }
+
+    // Pattern 2: "salario de eliana" or "sueldo de maria"
+    if (/(?:salario|sueldo|gana|cobra)\s+(?:de|del|de\s+la)\s+([a-záéíóúñ\s]+)/i.test(text)) {
+      const nameMatch = text.match(/(?:salario|sueldo|gana|cobra)\s+(?:de|del|de\s+la)\s+([a-záéíóúñ\s]+)/i);
+      const extractedName = nameMatch?.[1]?.trim().replace(/[?.,!]+$/, '') || '';
+      return {
+        type: 'EMPLOYEE_SALARY',
+        confidence: 0.9,
+        method: 'getEmployeeSalary',
+        params: { name: extractedName }
+      };
+    }
+
+    // Pattern 3: "sueldo eliana" (without preposition)
+    if (/(?:salario|sueldo)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)/i.test(text) && !/nomina|total|cuanto|mes|año/i.test(text)) {
+      const nameMatch = text.match(/(?:salario|sueldo)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)/i);
+      const extractedName = nameMatch?.[1]?.trim().replace(/[?.,!]+$/, '') || '';
+      return {
+        type: 'EMPLOYEE_SALARY',
+        confidence: 0.85,
+        method: 'getEmployeeSalary',
+        params: { name: extractedName }
       };
     }
 
