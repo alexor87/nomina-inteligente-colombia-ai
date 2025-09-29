@@ -142,25 +142,46 @@ Responde SOLO con el nombre EXACTO del empleado que coincida, o "NINGUNO" si no 
   }
   
   private createVoucherAction(employee: any, intent: Intent, context?: RichContext): HandlerResponse {
-    // Extract period if specified
+    // Extract period if specified in user message
     const periodEntity = intent.entities.find(e => e.type === 'period');
-    const periodName = periodEntity?.value;
+    const explicitPeriod = periodEntity?.value;
     
-    const action = ResponseBuilder.createVoucherAction(
-      employee.id,
-      employee.name,
-      undefined, // periodId will be resolved by executor
-      periodName
-    );
+    if (explicitPeriod) {
+      // User specified a period, create direct voucher action
+      const action = ResponseBuilder.createVoucherAction(
+        employee.id,
+        employee.name,
+        undefined, // periodId will be resolved by executor
+        explicitPeriod
+      );
+      
+      return ResponseBuilder.buildExecutableResponse(
+        `Perfecto! Voy a generar el desprendible de ${employee.name} para ${explicitPeriod}.`,
+        [action],
+        'encouraging'
+      );
+    }
     
-    const message = periodName 
-      ? `Perfecto! Voy a generar el desprendible de ${employee.name} para el ${periodName}.`
-      : `Perfecto! Voy a generar el desprendible de ${employee.name} para el período actual.`;
-    
-    return ResponseBuilder.buildExecutableResponse(
-      message,
-      [action],
-      'encouraging'
-    );
+    // No period specified, request period confirmation
+    return this.requestPeriodConfirmation(employee, context);
+  }
+
+  private requestPeriodConfirmation(employee: any, context?: RichContext): HandlerResponse {
+    // Since we don't have direct access to period data in context,
+    // we'll create a simpler flow that asks the user to specify the period
+    const message = `Para generar el desprendible de **${employee.name}**, por favor especifica el período. 
+
+**Opciones:**
+- "período actual" o "último período"
+- Un mes específico como "enero 2024" o "diciembre 2023"
+- Una fecha de corte específica`;
+
+    return ResponseBuilder.buildClarificationResponse(message);
+  }
+
+  private findLatestPeriod(context?: RichContext): { id: string, name: string } | null {
+    // For now, return null to trigger period selection request
+    // This could be enhanced later when period data is available in context
+    return null;
   }
 }

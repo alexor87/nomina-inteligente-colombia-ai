@@ -189,7 +189,15 @@ Responde SOLO en formato JSON:
       
       if (response.ok) {
         const data = await response.json();
-        const result = JSON.parse(data.choices[0].message.content);
+        // Clean markdown formatting from AI response before parsing
+        let content = data.choices[0].message.content.trim();
+        if (content.includes('```json')) {
+          content = content.replace(/```json\s*/g, '').replace(/```\s*$/g, '');
+        }
+        if (content.includes('```')) {
+          content = content.replace(/```/g, '');
+        }
+        const result = JSON.parse(content);
         
         return {
           type: result.type as IntentType,
