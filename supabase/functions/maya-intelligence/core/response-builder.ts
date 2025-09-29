@@ -1,0 +1,205 @@
+// ============================================================================
+// MAYA Response Builder - Professional Architecture
+// ============================================================================
+
+import { HandlerResponse, EmotionalState, ExecutableAction } from './types.ts';
+
+export class ResponseBuilder {
+  
+  static buildExecutableResponse(
+    message: string, 
+    actions: ExecutableAction[], 
+    emotionalState: EmotionalState = 'neutral'
+  ): HandlerResponse {
+    return {
+      hasExecutableAction: true,
+      response: this.formatMessage(message),
+      actions,
+      emotionalState,
+      requiresFollowUp: false
+    };
+  }
+  
+  static buildConversationalResponse(
+    message: string, 
+    emotionalState: EmotionalState = 'neutral'
+  ): HandlerResponse {
+    return {
+      hasExecutableAction: false,
+      response: this.formatMessage(message),
+      emotionalState,
+      requiresFollowUp: false
+    };
+  }
+  
+  static buildErrorResponse(
+    message: string, 
+    suggestion?: string
+  ): HandlerResponse {
+    let fullMessage = `❌ **ERROR:** ${message}`;
+    if (suggestion) {
+      fullMessage += `\n\n💡 **SUGERENCIA:** ${suggestion}`;
+    }
+    
+    return {
+      hasExecutableAction: false,
+      response: this.formatMessage(fullMessage),
+      emotionalState: 'concerned',
+      requiresFollowUp: true
+    };
+  }
+  
+  static buildClarificationResponse(
+    question: string, 
+    options?: string[]
+  ): HandlerResponse {
+    let message = `🤔 ${question}`;
+    
+    if (options && options.length > 0) {
+      message += '\n\n**Opciones disponibles:**';
+      options.forEach((option, index) => {
+        message += `\n${index + 1}. ${option}`;
+      });
+    }
+    
+    return {
+      hasExecutableAction: false,
+      response: this.formatMessage(message),
+      emotionalState: 'thinking',
+      requiresFollowUp: true
+    };
+  }
+  
+  static buildSuccessResponse(
+    message: string, 
+    nextSteps?: string[]
+  ): HandlerResponse {
+    let fullMessage = `✅ ${message}`;
+    
+    if (nextSteps && nextSteps.length > 0) {
+      fullMessage += '\n\n**Siguientes pasos:**';
+      nextSteps.forEach((step, index) => {
+        fullMessage += `\n${index + 1}. ${step}`;
+      });
+    }
+    
+    return {
+      hasExecutableAction: false,
+      response: this.formatMessage(fullMessage),
+      emotionalState: 'celebrating',
+      requiresFollowUp: false
+    };
+  }
+  
+  static buildProgressResponse(
+    message: string, 
+    progress?: number
+  ): HandlerResponse {
+    let fullMessage = `⏳ ${message}`;
+    
+    if (progress !== undefined) {
+      const progressBar = this.createProgressBar(progress);
+      fullMessage += `\n\n${progressBar} ${Math.round(progress)}%`;
+    }
+    
+    return {
+      hasExecutableAction: false,
+      response: this.formatMessage(fullMessage),
+      emotionalState: 'analyzing',
+      requiresFollowUp: false
+    };
+  }
+  
+  private static formatMessage(message: string): string {
+    // Ensure proper spacing and formatting
+    return message
+      .replace(/\n{3,}/g, '\n\n') // Remove excessive line breaks
+      .replace(/\s{2,}/g, ' ') // Remove excessive spaces
+      .trim();
+  }
+  
+  private static createProgressBar(progress: number): string {
+    const total = 10;
+    const filled = Math.round((progress / 100) * total);
+    const empty = total - filled;
+    
+    return '█'.repeat(filled) + '░'.repeat(empty);
+  }
+  
+  // Template Messages
+  static readonly Messages = {
+    EMPLOYEE_NOT_FOUND: (query: string) => 
+      `No pude encontrar ningún empleado con "${query}". ¿Podrías verificar el nombre?`,
+    
+    MULTIPLE_EMPLOYEES_FOUND: (employees: string[]) => 
+      `Encontré varios empleados. ¿Te refieres a alguno de estos?\n${employees.map((name, i) => `${i + 1}. ${name}`).join('\n')}`,
+    
+    PERIOD_NOT_SPECIFIED: () => 
+      '¿Para qué período necesitas el desprendible? Por ejemplo: "enero 2024" o "período actual"',
+    
+    CONFIRMATION_REQUIRED: (action: string) => 
+      `⚠️ Esta acción ${action} es irreversible. ¿Estás seguro de continuar?`,
+    
+    PROCESSING_STARTED: (action: string) => 
+      `🚀 Iniciando ${action}... Te notificaré cuando termine.`,
+    
+    INSUFFICIENT_DATA: (missing: string[]) => 
+      `Necesito más información para continuar:\n${missing.map(item => `• ${item}`).join('\n')}`,
+    
+    FEATURE_NOT_AVAILABLE: (feature: string) => 
+      `La funcionalidad "${feature}" aún no está disponible. ¿Hay algo más en lo que pueda ayudarte?`,
+    
+    GENERIC_ERROR: () => 
+      'Disculpa, ocurrió un error inesperado. Por favor intenta de nuevo o contacta soporte técnico.'
+  };
+  
+  // Common Action Builders
+  static createVoucherAction(employeeId: string, employeeName: string, periodId?: string, periodName?: string): ExecutableAction {
+    return {
+      id: `send_voucher_${employeeId}_${Date.now()}`,
+      type: 'send_voucher',
+      label: `Enviar desprendible a ${employeeName}`,
+      description: `Generar y enviar desprendible de nómina${periodName ? ` del ${periodName}` : ''}`,
+      parameters: {
+        employeeId,
+        employeeName,
+        email: undefined, // Will be filled by executor
+        periodId,
+        periodName
+      },
+      requiresConfirmation: false,
+      icon: '📄'
+    };
+  }
+  
+  static createMassVoucherAction(employeeCount: number, periodId?: string, periodName?: string): ExecutableAction {
+    return {
+      id: `send_voucher_all_${Date.now()}`,
+      type: 'send_voucher_all',
+      label: `Enviar desprendibles masivos (${employeeCount} empleados)`,
+      description: `Generar y enviar desprendibles a todos los empleados${periodName ? ` del ${periodName}` : ''}`,
+      parameters: {
+        periodId,
+        periodName,
+        employeeCount
+      },
+      requiresConfirmation: true,
+      icon: '📧'
+    };
+  }
+  
+  static createSearchAction(query: string, filter?: string): ExecutableAction {
+    return {
+      id: `search_employee_${Date.now()}`,
+      type: 'search_employee',
+      label: `Buscar empleado: "${query}"`,
+      description: `Buscar información de empleado${filter ? ` por ${filter}` : ''}`,
+      parameters: {
+        query,
+        filter: filter || 'name'
+      },
+      requiresConfirmation: false,
+      icon: '🔍'
+    };
+  }
+}
