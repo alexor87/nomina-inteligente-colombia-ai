@@ -167,12 +167,15 @@ export class SimpleIntentMatcher {
       };
     }
 
-    // Employee paid total queries - HIGH PRIORITY (before general payroll)
-    if (/(?:cuánto|cuanto|qué|que)\s+(?:se\s+le\s+ha\s+)?(?:pagado|pago|pagamos)\s+(?:a|para)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*?)(?:\s+(?:este|en|durante|\d{4}|enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)|$)/i.test(text)) {
-      const nameMatch = text.match(/(?:cuánto|cuanto|qué|que)\s+(?:se\s+le\s+ha\s+)?(?:pagado|pago|pagamos)\s+(?:a|para)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*?)(?:\s+(?:este|en|durante|\d{4}|enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)|$)/i);
+    // Employee paid total queries - HIGHEST PRIORITY (before general payroll)
+    
+    // DIRECT COLOMBIAN PATTERNS FOR EMPLOYEE PAYMENTS (NO INTERROGATIVE)
+    // Pattern 1: "pagos a eliana en 2025" - Most common direct request
+    if (/(?:pagos?|total\s+pagado|lo\s+pagado|dinero\s+pagado)\s+(?:a|para)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*?)(?:\s+(?:este|en|durante|\d{4}|enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)|$)/i.test(text)) {
+      const nameMatch = text.match(/(?:pagos?|total\s+pagado|lo\s+pagado|dinero\s+pagado)\s+(?:a|para)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*?)(?:\s+(?:este|en|durante|\d{4}|enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)|$)/i);
       const name = nameMatch?.[1]?.trim().replace(/[?.,!]+$/, '') || '';
       
-      console.log('🎯 [EMPLOYEE_PAID_TOTAL] Name extracted:', name);
+      console.log('💰 [EMPLOYEE_PAID_DIRECT] Pattern matched for:', name);
       
       // Extract timeframe
       let year = null;
@@ -197,7 +200,86 @@ export class SimpleIntentMatcher {
         year = new Date().getFullYear();
       }
 
-      console.log('📅 [EMPLOYEE_PAID_TOTAL] Timeframe extracted:', { name, year, month });
+      console.log('📅 [EMPLOYEE_PAID_DIRECT] Timeframe extracted:', { name, year, month });
+      
+      return {
+        type: 'EMPLOYEE_PAID_TOTAL',
+        confidence: 0.98,
+        method: 'getEmployeePaidTotal',
+        params: { name, year, month }
+      };
+    }
+
+    // Pattern 2: "lo que recibió eliana" - Alternative Colombian expression
+    if (/(?:lo\s+que\s+(?:recibió|ha\s+recibido)|dinero\s+que\s+recibió)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*?)(?:\s+(?:este|en|durante|\d{4}|enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)|$)/i.test(text)) {
+      const nameMatch = text.match(/(?:lo\s+que\s+(?:recibió|ha\s+recibido)|dinero\s+que\s+recibió)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*?)(?:\s+(?:este|en|durante|\d{4}|enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)|$)/i);
+      const name = nameMatch?.[1]?.trim().replace(/[?.,!]+$/, '') || '';
+      
+      console.log('💰 [EMPLOYEE_RECEIVED] Pattern matched for:', name);
+      
+      // Extract timeframe (same logic as above)
+      let year = null;
+      let month = null;
+      
+      const yearMatch = text.match(/(\d{4})/);
+      if (yearMatch) {
+        year = parseInt(yearMatch[1]);
+      } else if (/este\s+año|en\s+el\s+año/i.test(text)) {
+        year = new Date().getFullYear();
+      }
+      
+      const monthMatch = text.match(/(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i);
+      if (monthMatch) {
+        month = monthMatch[1].toLowerCase();
+        if (!year) year = new Date().getFullYear();
+      }
+      
+      if (!year && !month) {
+        year = new Date().getFullYear();
+      }
+
+      console.log('📅 [EMPLOYEE_RECEIVED] Timeframe extracted:', { name, year, month });
+      
+      return {
+        type: 'EMPLOYEE_PAID_TOTAL',
+        confidence: 0.97,
+        method: 'getEmployeePaidTotal',
+        params: { name, year, month }
+      };
+    }
+
+    // INTERROGATIVE PATTERNS (LOWER PRIORITY)
+    // Pattern 3: "¿cuánto se le ha pagado a eliana?" - Traditional interrogative
+    if (/(?:cuánto|cuanto|qué|que)\s+(?:se\s+le\s+ha\s+)?(?:pagado|pago|pagamos)\s+(?:a|para)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*?)(?:\s+(?:este|en|durante|\d{4}|enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)|$)/i.test(text)) {
+      const nameMatch = text.match(/(?:cuánto|cuanto|qué|que)\s+(?:se\s+le\s+ha\s+)?(?:pagado|pago|pagamos)\s+(?:a|para)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*?)(?:\s+(?:este|en|durante|\d{4}|enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)|$)/i);
+      const name = nameMatch?.[1]?.trim().replace(/[?.,!]+$/, '') || '';
+      
+      console.log('🎯 [EMPLOYEE_PAID_INTERROGATIVE] Pattern matched for:', name);
+      
+      // Extract timeframe
+      let year = null;
+      let month = null;
+      
+      const yearMatch = text.match(/(\d{4})/);
+      if (yearMatch) {
+        year = parseInt(yearMatch[1]);
+      } else if (/este\s+año|en\s+el\s+año/i.test(text)) {
+        year = new Date().getFullYear();
+      }
+      
+      const monthMatch = text.match(/(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i);
+      if (monthMatch) {
+        month = monthMatch[1].toLowerCase();
+        // If month specified but no year, default to current year
+        if (!year) year = new Date().getFullYear();
+      }
+      
+      // Default to current year if no timeframe specified
+      if (!year && !month) {
+        year = new Date().getFullYear();
+      }
+
+      console.log('📅 [EMPLOYEE_PAID_INTERROGATIVE] Timeframe extracted:', { name, year, month });
       
       return {
         type: 'EMPLOYEE_PAID_TOTAL',
@@ -260,8 +342,9 @@ export class SimpleIntentMatcher {
       }
       
       // No specific month - check if asking for totals/general info
-      // BUT avoid classifying if it's an employee-specific query
-      if (/cuánto|cuanto|total|valor|cost|sum|gast/.test(text) && !/(?:pagado|pago|pagamos)\s+(?:a|para)\s+[a-záéíóúñ]/i.test(text)) {
+      // BUT avoid classifying if it's an employee-specific query (IMPROVED SAFETY CHECK)
+      if (/cuánto|cuanto|total|valor|cost|sum|gast/.test(text) && !/(?:pagados?|pagos?|pagamos)\s+(?:a|para)\s+[a-záéíóúñ]/i.test(text)) {
+        console.log('📊 [PAYROLL_TOTALS] General totals query detected (no employee specified)');
         return {
           type: 'PAYROLL_TOTALS',
           confidence: 0.9,
@@ -270,6 +353,7 @@ export class SimpleIntentMatcher {
       }
       
       // General payroll inquiry without specific question words
+      console.log('📊 [PAYROLL_TOTALS] General payroll inquiry detected');
       return {
         type: 'PAYROLL_TOTALS',
         confidence: 0.8,
