@@ -63,6 +63,10 @@ serve(async (req) => {
         response = await searchEmployee(userSupabase, intent.params?.name);
         break;
         
+      case 'getEmployeeSalary':
+        response = await getEmployeeSalary(userSupabase, intent.params?.name);
+        break;
+        
       case 'getPayrollTotals':
         response = await getPayrollTotals(userSupabase);
         break;
@@ -172,6 +176,63 @@ async function searchEmployee(supabase: any, name: string) {
     console.error('[MAYA-KISS] Employee search error:', error);
     return {
       message: `No pude buscar empleados en este momento.`,
+      emotionalState: 'concerned'
+    };
+  }
+}
+
+async function getEmployeeSalary(supabase: any, name: string) {
+  if (!name) {
+    return {
+      message: '¿De qué empleado quieres saber el salario?',
+      emotionalState: 'neutral'
+    };
+  }
+  
+  try {
+    const { data, error } = await supabase
+      .from('employees')
+      .select('nombre, apellido, cargo, salario_base, fecha_ingreso, estado')
+      .or(`nombre.ilike.%${name}%,apellido.ilike.%${name}%`)
+      .limit(3);
+      
+    if (error) throw error;
+    
+    if (data.length === 0) {
+      return {
+        message: `No encontré un empleado llamado "${name}". ¿Podrías verificar la ortografía?`,
+        emotionalState: 'neutral'
+      };
+    }
+    
+    if (data.length === 1) {
+      const emp = data[0];
+      const yearsWorked = emp.fecha_ingreso ? 
+        Math.floor((new Date().getTime() - new Date(emp.fecha_ingreso).getTime()) / (1000 * 60 * 60 * 24 * 365)) : 0;
+      
+      return {
+        message: `**${emp.nombre} ${emp.apellido}**\n` +
+                `💼 Cargo: ${emp.cargo || 'No especificado'}\n` +
+                `💰 Salario base: **$${emp.salario_base?.toLocaleString() || 'No registrado'}**\n` +
+                `📅 Antigüedad: ${yearsWorked > 0 ? yearsWorked + ' años' : 'Menos de 1 año'}\n` +
+                `📊 Estado: ${emp.estado === 'activo' ? '✅ Activo' : '❌ Inactivo'}`,
+        emotionalState: 'neutral'
+      };
+    }
+    
+    // Multiple matches - show options
+    const employeeList = data.map((emp: any) => 
+      `• **${emp.nombre} ${emp.apellido}** - ${emp.cargo} - $${emp.salario_base?.toLocaleString() || 'N/A'}`
+    ).join('\n');
+    
+    return {
+      message: `Encontré **${data.length} empleados** con "${name}":\n\n${employeeList}\n\n¿Podrías ser más específico?`,
+      emotionalState: 'neutral'
+    };
+  } catch (error) {
+    console.error('[MAYA-KISS] Employee salary error:', error);
+    return {
+      message: `Error consultando el salario de "${name}".`,
       emotionalState: 'concerned'
     };
   }

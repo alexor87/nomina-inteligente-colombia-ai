@@ -24,8 +24,19 @@ export class SimpleIntentMatcher {
       };
     }
     
+    // Employee salary inquiry - HIGHEST PRIORITY for specific employee queries
+    if (/(?:cuál|cual|cuánto|cuanto|qué|que)\s+(?:es\s+el\s+)?(?:salario|sueldo|gana|cobra)\s+de\s+([a-záéíóúñ]+)/i.test(text)) {
+      const nameMatch = text.match(/(?:cuál|cual|cuánto|cuanto|qué|que)\s+(?:es\s+el\s+)?(?:salario|sueldo|gana|cobra)\s+de\s+([a-záéíóúñ]+)/i);
+      return {
+        type: 'EMPLOYEE_SALARY',
+        confidence: 0.95,
+        method: 'getEmployeeSalary',
+        params: { name: nameMatch?.[2] || '' }
+      };
+    }
+
     // Employee search
-    if (/busca|encuentra|muestra/.test(text) && /empleado/.test(text)) {
+    if (/busca|encuentra|muestra|salario|sueldo/.test(text) && /empleado/.test(text)) {
       const nameMatch = text.match(/(?:busca|encuentra|muestra)\s+(?:el\s+empleado\s+|empleado\s+)?([a-záéíóúñ]+)/i);
       return {
         type: 'EMPLOYEE_SEARCH', 
@@ -35,7 +46,7 @@ export class SimpleIntentMatcher {
       };
     }
     
-    // Payroll queries - expanded patterns to be more inclusive
+    // Payroll queries - expanded patterns to be more inclusive (LOWER PRIORITY than employee-specific)
     if (/nómin|nomin|sueldo|salario|pag|gast|cost|laboral|planilla/.test(text)) {
       // Extract month first - if found, handle month/fortnight specific queries
       const monthMatch = text.match(/(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i);
