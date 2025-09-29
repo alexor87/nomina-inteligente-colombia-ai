@@ -248,15 +248,18 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
     const { employeeId, employeeName } = action.parameters;
     
     try {
-      // Fetch additional periods from database
+      // Fetch additional periods from database with company filter
       const { data: periods, error } = await supabase
         .from('payroll_periods_real')
-        .select('id, periodo, fecha_inicio, fecha_fin, estado')
-        .eq('estado', 'cerrado')
-        .order('created_at', { ascending: false })
+        .select('id, periodo, fecha_inicio, fecha_fin, estado, company_id')
+        .ilike('estado', '%cerrado%')
+        .order('fecha_fin', { ascending: false })
         .limit(6);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching periods:', error);
+        throw error;
+      }
 
       if (!periods || periods.length === 0) {
         return {
@@ -265,11 +268,11 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
         };
       }
 
-      // Call Maya Intelligence to generate new period buttons
+      // Call Maya Intelligence with correct structure
       const { data, error: mayaError } = await supabase.functions.invoke('maya-intelligence', {
         body: {
           message: 'expand_periods_response',
-          context: {
+          data: {
             employeeId,
             employeeName,
             periods
@@ -277,7 +280,12 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
         }
       });
 
-      if (mayaError) throw mayaError;
+      if (mayaError) {
+        console.error('Maya intelligence error:', mayaError);
+        throw mayaError;
+      }
+
+      console.log('Maya intelligence response:', data);
 
       return {
         success: true,
@@ -285,9 +293,10 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
         data
       };
     } catch (error: any) {
+      console.error('Error in handleExpandPeriods:', error);
       return {
         success: false,
-        message: `Error cargando períodos: ${error.message}`
+        message: `Error cargando períodos: ${error.message || 'Desconocido'}`
       };
     }
   };
