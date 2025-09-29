@@ -73,10 +73,52 @@ export class SimpleIntentMatcher {
     }
     
     // Employee salary inquiry - HIGHEST PRIORITY for specific employee queries
-    // Pattern 1: "cual es el salario de eliana"
-    if (/(?:cuál|cual|cuánto|cuanto|qué|que)\s+(?:es\s+el\s+)?(?:salario|sueldo|gana|cobra)\s+de\s+([a-záéíóúñ\s]+)/i.test(text)) {
-      const nameMatch = text.match(/(?:cuál|cual|cuánto|cuanto|qué|que)\s+(?:es\s+el\s+)?(?:salario|sueldo|gana|cobra)\s+de\s+([a-záéíóúñ\s]+)/i);
+    
+    // COLOMBIAN PATTERNS - DIRECT (HIGHEST PRIORITY)
+    // Pattern 1: "¿Cuánto gana eliana?" - Most common Colombian expression
+    if (/(?:cuánto|cuanto|qué|que)\s+(?:gana|cobra|se\s+gana|se\s+lleva|percibe)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)/i.test(text) && !/nomina|total|mes|año/i.test(text)) {
+      const nameMatch = text.match(/(?:cuánto|cuanto|qué|que)\s+(?:gana|cobra|se\s+gana|se\s+lleva|percibe)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)/i);
       const extractedName = nameMatch?.[1]?.trim().replace(/[?.,!]+$/, '') || '';
+      console.log('🇨🇴 [COLOMBIAN DIRECT] Pattern matched for:', extractedName);
+      return {
+        type: 'EMPLOYEE_SALARY',
+        confidence: 0.98,
+        method: 'getEmployeeSalary',
+        params: { name: extractedName }
+      };
+    }
+
+    // Pattern 2: "¿Cuánto le pagan a eliana?" - Colombian formal
+    if (/(?:cuánto|cuanto|qué|que)\s+(?:le\s+)?(?:pagan|pago|pagamos)\s+(?:a|para)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)/i.test(text)) {
+      const nameMatch = text.match(/(?:cuánto|cuanto|qué|que)\s+(?:le\s+)?(?:pagan|pago|pagamos)\s+(?:a|para)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)/i);
+      const extractedName = nameMatch?.[1]?.trim().replace(/[?.,!]+$/, '') || '';
+      console.log('🇨🇴 [COLOMBIAN FORMAL] Pattern matched for:', extractedName);
+      return {
+        type: 'EMPLOYEE_SALARY',
+        confidence: 0.97,
+        method: 'getEmployeeSalary',
+        params: { name: extractedName }
+      };
+    }
+
+    // Pattern 3: "¿A cuánto está eliana?" - Very Colombian regional
+    if (/(?:a\s+cuánto|a\s+cuanto)\s+(?:está|esta)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)/i.test(text)) {
+      const nameMatch = text.match(/(?:a\s+cuánto|a\s+cuanto)\s+(?:está|esta)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)/i);
+      const extractedName = nameMatch?.[1]?.trim().replace(/[?.,!]+$/, '') || '';
+      console.log('🇨🇴 [COLOMBIAN REGIONAL] Pattern matched for:', extractedName);
+      return {
+        type: 'EMPLOYEE_SALARY',
+        confidence: 0.96,
+        method: 'getEmployeeSalary',
+        params: { name: extractedName }
+      };
+    }
+
+    // Pattern 4: "¿El sueldo de eliana?" - Short Colombian
+    if (/(?:el\s+)?(?:salario|sueldo)\s+(?:de|del|de\s+la)\s+([a-záéíóúñ\s]+)/i.test(text) && text.length < 30) {
+      const nameMatch = text.match(/(?:el\s+)?(?:salario|sueldo)\s+(?:de|del|de\s+la)\s+([a-záéíóúñ\s]+)/i);
+      const extractedName = nameMatch?.[1]?.trim().replace(/[?.,!]+$/, '') || '';
+      console.log('🇨🇴 [COLOMBIAN SHORT] Pattern matched for:', extractedName);
       return {
         type: 'EMPLOYEE_SALARY',
         confidence: 0.95,
@@ -85,10 +127,25 @@ export class SimpleIntentMatcher {
       };
     }
 
-    // Pattern 2: "salario de eliana" or "sueldo de maria"
+    // TRADITIONAL PATTERNS (LOWER PRIORITY)
+    // Pattern 5: "cual es el salario de eliana" - Traditional formal
+    if (/(?:cuál|cual|cuánto|cuanto|qué|que)\s+(?:es\s+el\s+)?(?:salario|sueldo|gana|cobra)\s+de\s+([a-záéíóúñ\s]+)/i.test(text)) {
+      const nameMatch = text.match(/(?:cuál|cual|cuánto|cuanto|qué|que)\s+(?:es\s+el\s+)?(?:salario|sueldo|gana|cobra)\s+de\s+([a-záéíóúñ\s]+)/i);
+      const extractedName = nameMatch?.[1]?.trim().replace(/[?.,!]+$/, '') || '';
+      console.log('📝 [TRADITIONAL FORMAL] Pattern matched for:', extractedName);
+      return {
+        type: 'EMPLOYEE_SALARY',
+        confidence: 0.92,
+        method: 'getEmployeeSalary',
+        params: { name: extractedName }
+      };
+    }
+
+    // Pattern 6: "salario de eliana" or "sueldo de maria"
     if (/(?:salario|sueldo|gana|cobra)\s+(?:de|del|de\s+la)\s+([a-záéíóúñ\s]+)/i.test(text)) {
       const nameMatch = text.match(/(?:salario|sueldo|gana|cobra)\s+(?:de|del|de\s+la)\s+([a-záéíóúñ\s]+)/i);
       const extractedName = nameMatch?.[1]?.trim().replace(/[?.,!]+$/, '') || '';
+      console.log('📝 [TRADITIONAL SIMPLE] Pattern matched for:', extractedName);
       return {
         type: 'EMPLOYEE_SALARY',
         confidence: 0.9,
@@ -97,10 +154,11 @@ export class SimpleIntentMatcher {
       };
     }
 
-    // Pattern 3: "sueldo eliana" (without preposition)
+    // Pattern 7: "sueldo eliana" (without preposition)
     if (/(?:salario|sueldo)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)/i.test(text) && !/nomina|total|cuanto|mes|año/i.test(text)) {
       const nameMatch = text.match(/(?:salario|sueldo)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)/i);
       const extractedName = nameMatch?.[1]?.trim().replace(/[?.,!]+$/, '') || '';
+      console.log('📝 [TRADITIONAL BASIC] Pattern matched for:', extractedName);
       return {
         type: 'EMPLOYEE_SALARY',
         confidence: 0.85,
