@@ -118,6 +118,56 @@ export class IntentDetector {
         ],
         type: 'REPORT_GENERATE' as IntentType,
         confidence: 0.8
+      },
+
+      // Database Query Patterns - WOW Experience
+      {
+        patterns: [
+          /(?:cuánto|cuanto).+(?:gastamos|gastó|costo|costó|pagamos|pagó)/i,
+          /(?:total|suma).+(?:nómina|nomina|sueldos|salarios|pagos)/i,
+          /(?:cuál|cual).+(?:gasto|costo|total|suma)/i,
+          /(?:mostrar|ver|dame).+(?:datos|información|números)/i
+        ],
+        type: 'DATA_QUERY' as IntentType,
+        confidence: 0.9
+      },
+
+      // Analytics Patterns 
+      {
+        patterns: [
+          /(?:analizar|análisis|estadísticas|métricas)/i,
+          /(?:tendencia|evolución|comportamiento)/i,
+          /(?:promedio|media|máximo|mínimo)/i,
+          /(?:comparar|comparación|versus|vs)/i,
+          /(?:ranking|top|mejor|peor|mayor|menor)/i
+        ],
+        type: 'ANALYTICS_REQUEST' as IntentType,
+        confidence: 0.85
+      },
+
+      // Insights Patterns
+      {
+        patterns: [
+          /(?:insights|perspectivas|conclusiones)/i,
+          /(?:qué|que).+(?:significa|indica|muestra|refleja)/i,
+          /(?:por qué|porque).+(?:subió|bajó|aumentó|disminuyó)/i,
+          /(?:cómo|como).+(?:ha cambiado|evolucionado)/i
+        ],
+        type: 'REPORT_INSIGHTS' as IntentType,
+        confidence: 0.8
+      },
+
+      // Comparison Patterns
+      {
+        patterns: [
+          /(?:comparar|comparación).+(?:con|versus|vs)/i,
+          /(?:diferencia|diferencias).+(?:entre|del|de)/i,
+          /(?:este mes|año).+(?:anterior|pasado|previo)/i,
+          /(?:antes|después).+(?:de|del)/i,
+          /(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre).+(?:vs|versus|comparado)/i
+        ],
+        type: 'COMPARISON_ANALYSIS' as IntentType,
+        confidence: 0.9
       }
     ];
     
@@ -163,6 +213,10 @@ INTENCIONES POSIBLES:
 - VACATION_REGISTER: Registrar vacaciones
 - ABSENCE_REGISTER: Registrar ausencia/incapacidad
 - REPORT_GENERATE: Generar reportes
+- DATA_QUERY: Consultar datos empresariales
+- ANALYTICS_REQUEST: Solicitar análisis y métricas
+- REPORT_INSIGHTS: Obtener insights de datos
+- COMPARISON_ANALYSIS: Análisis comparativo
 - CONVERSATION: Conversación general
 
 Responde SOLO en formato JSON:
@@ -235,6 +289,42 @@ Responde SOLO en formato JSON:
         });
       });
     }
+
+    // Extract metrics and KPIs for analytics
+    const metricMatches = message.match(/(?:total|promedio|máximo|mínimo|suma|cantidad|número|count)/gi);
+    if (metricMatches && ['DATA_QUERY', 'ANALYTICS_REQUEST'].includes(intentType)) {
+      metricMatches.forEach(match => {
+        entities.push({
+          type: 'metric',
+          value: match.toLowerCase(),
+          confidence: 0.9
+        });
+      });
+    }
+
+    // Extract comparison indicators
+    const comparisonMatches = message.match(/(?:comparar|vs|versus|diferencia|antes|después|mayor|menor)/gi);
+    if (comparisonMatches && intentType === 'COMPARISON_ANALYSIS') {
+      comparisonMatches.forEach(match => {
+        entities.push({
+          type: 'comparison',
+          value: match.toLowerCase(),
+          confidence: 0.85
+        });
+      });
+    }
+
+    // Extract timeframes
+    const timeMatches = message.match(/(?:este|el|la|del)\s+(?:mes|año|semana|día)|(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)|(?:\d{4})/gi);
+    if (timeMatches && ['ANALYTICS_REQUEST', 'COMPARISON_ANALYSIS', 'REPORT_INSIGHTS'].includes(intentType)) {
+      timeMatches.forEach(match => {
+        entities.push({
+          type: 'timeframe',
+          value: match.toLowerCase(),
+          confidence: 0.9
+        });
+      });
+    }
     
     // Extract periods/months
     const periodMatches = message.match(/(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre|\d{1,2}\/\d{4})/gi);
@@ -272,4 +362,5 @@ Responde SOLO en formato JSON:
     
     return confirmationRequired.includes(intentType);
   }
+}
 }

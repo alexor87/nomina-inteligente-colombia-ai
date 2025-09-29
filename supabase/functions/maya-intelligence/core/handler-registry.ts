@@ -7,23 +7,25 @@ import { BaseHandler } from '../handlers/base-handler.ts';
 import { VoucherHandler } from '../handlers/voucher-handler.ts';
 import { MassVoucherHandler } from '../handlers/mass-voucher-handler.ts';
 import { EmployeeHandler } from '../handlers/employee-handler.ts';
+import { DatabaseQueryHandler } from '../handlers/database-query-handler.ts';
 import { ResponseBuilder } from './response-builder.ts';
 
 export class HandlerRegistry {
   private handlers: BaseHandler[] = [];
   private logger: MayaLogger;
   
-  constructor(logger: MayaLogger, openaiKey?: string) {
+  constructor(logger: MayaLogger, openaiKey?: string, supabaseClient?: any) {
     this.logger = logger;
-    this.initializeHandlers(openaiKey);
+    this.initializeHandlers(openaiKey, supabaseClient);
   }
   
-  private initializeHandlers(openaiKey?: string): void {
+  private initializeHandlers(openaiKey?: string, supabaseClient?: any): void {
     // Register all available handlers
     this.handlers = [
       new VoucherHandler(this.logger, openaiKey),
       new MassVoucherHandler(this.logger, openaiKey),
       new EmployeeHandler(this.logger, openaiKey),
+      new DatabaseQueryHandler(this.logger, openaiKey, supabaseClient),
       // Future handlers will be added here:
       // new PayrollHandler(this.logger, openaiKey),
       // new VacationHandler(this.logger, openaiKey),
@@ -144,6 +146,7 @@ export class HandlerRegistry {
       'VoucherHandler': ['VOUCHER_SEND'],
       'MassVoucherHandler': ['VOUCHER_MASS_SEND'],
       'EmployeeHandler': ['EMPLOYEE_SEARCH', 'EMPLOYEE_CREATE', 'EMPLOYEE_UPDATE', 'EMPLOYEE_DELETE'],
+      'DatabaseQueryHandler': ['DATA_QUERY', 'ANALYTICS_REQUEST', 'REPORT_INSIGHTS', 'COMPARISON_ANALYSIS'],
     };
     
     return capabilities[handler.constructor.name] || [];

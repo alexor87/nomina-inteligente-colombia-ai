@@ -94,6 +94,10 @@ export type IntentType =
   | 'VACATION_REGISTER'
   | 'ABSENCE_REGISTER'
   | 'REPORT_GENERATE'
+  | 'DATA_QUERY'
+  | 'ANALYTICS_REQUEST'
+  | 'REPORT_INSIGHTS'
+  | 'COMPARISON_ANALYSIS'
   | 'CONVERSATION'
   | 'UNKNOWN';
 
@@ -106,7 +110,7 @@ export interface Intent {
 }
 
 export interface ExtractedEntity {
-  type: 'employee' | 'period' | 'amount' | 'date' | 'department' | 'report_type';
+  type: 'employee' | 'period' | 'amount' | 'date' | 'department' | 'report_type' | 'metric' | 'comparison' | 'timeframe' | 'table';
   value: string;
   confidence: number;
   resolved?: any;
@@ -158,4 +162,43 @@ export interface MayaLogger {
   info(message: string, data?: any): void;
   error(message: string, error?: any): void;
   warn(message: string, data?: any): void;
+}
+
+// Database Query Types
+export interface DatabaseQueryResult {
+  success: boolean;
+  data?: any[];
+  metadata?: {
+    rowCount: number;
+    columns: string[];
+    executionTimeMs: number;
+    queryType: 'SELECT' | 'INSERT' | 'UPDATE' | 'DELETE' | 'AGGREGATE';
+  };
+  error?: string;
+  visualHints?: {
+    chartType?: 'bar' | 'line' | 'pie' | 'table' | 'metric' | 'trend';
+    xAxis?: string;
+    yAxis?: string;
+    groupBy?: string;
+    timeField?: string;
+  };
+}
+
+export interface QueryContext {
+  userMessage: string;
+  companyId: string;
+  intent: IntentType;
+  entities: ExtractedEntity[];
+  richContext?: RichContext;
+}
+
+export interface VisualDataResponse {
+  type: 'chart' | 'table' | 'metric' | 'list' | 'comparison';
+  title: string;
+  data: any;
+  format?: {
+    chartType?: string;
+    columns?: Array<{key: string, label: string, type?: string}>;
+    metrics?: Array<{label: string, value: any, unit?: string, change?: number}>;
+  };
 }

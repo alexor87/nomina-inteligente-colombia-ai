@@ -150,7 +150,19 @@ export class ResponseBuilder {
       `La funcionalidad "${feature}" aún no está disponible. ¿Hay algo más en lo que pueda ayudarte?`,
     
     GENERIC_ERROR: () => 
-      'Disculpa, ocurrió un error inesperado. Por favor intenta de nuevo o contacta soporte técnico.'
+      'Disculpa, ocurrió un error inesperado. Por favor intenta de nuevo o contacta soporte técnico.',
+
+    DATA_INSIGHTS_INTRO: (metric: string) =>
+      `📊 Analicemos ${metric} de tu empresa...`,
+
+    QUERY_EXECUTING: () =>
+      '🔍 Consultando la base de datos...',
+
+    NO_DATA_FOUND: (query: string) =>
+      `No encontré datos para "${query}". ¿Quieres que ajuste los criterios de búsqueda?`,
+
+    VISUAL_DATA_READY: (recordCount: number) =>
+      `✨ Encontré ${recordCount} registros. Aquí tienes el análisis visual:`
   };
   
   // Common Action Builders
@@ -244,6 +256,82 @@ export class ResponseBuilder {
       response: this.formatMessage(message),
       actions: periodActions,
       emotionalState: 'helpful',
+      requiresFollowUp: false
+    };
+  }
+
+  // Advanced Data Visualization Response Builders
+  static buildDataAnalysisResponse(
+    title: string,
+    insights: string[],
+    visualData?: any,
+    emotionalState: EmotionalState = 'analyzing'
+  ): HandlerResponse {
+    let message = `📊 **${title}**\n\n`;
+    
+    insights.forEach((insight, index) => {
+      message += `${index + 1}. ${insight}\n`;
+    });
+
+    if (visualData) {
+      message += '\n🎯 **Datos clave encontrados** - ver visualización abajo';
+    }
+
+    return {
+      hasExecutableAction: false,
+      response: this.formatMessage(message),
+      emotionalState,
+      requiresFollowUp: false
+    };
+  }
+
+  static buildMetricsResponse(
+    title: string,
+    metrics: Array<{label: string, value: any, unit?: string, change?: number}>,
+    emotionalState: EmotionalState = 'celebrating'
+  ): HandlerResponse {
+    let message = `📈 **${title}**\n\n`;
+
+    metrics.forEach(metric => {
+      const changeIcon = metric.change ? (metric.change > 0 ? '📈' : '📉') : '';
+      const changeText = metric.change ? ` (${metric.change > 0 ? '+' : ''}${metric.change.toFixed(1)}%)` : '';
+      const unit = metric.unit ? ` ${metric.unit}` : '';
+      
+      message += `▶️ **${metric.label}:** ${metric.value}${unit} ${changeIcon}${changeText}\n`;
+    });
+
+    return {
+      hasExecutableAction: false,
+      response: this.formatMessage(message),
+      emotionalState,
+      requiresFollowUp: false
+    };
+  }
+
+  static buildChartResponse(
+    title: string, 
+    description: string,
+    chartType: 'bar' | 'line' | 'pie' = 'bar',
+    emotionalState: EmotionalState = 'helpful'
+  ): HandlerResponse {
+    const chartIcon = chartType === 'pie' ? '🥧' : chartType === 'line' ? '📈' : '📊';
+    const message = `${chartIcon} **${title}**\n\n${description}`;
+
+    return {
+      hasExecutableAction: false,
+      response: this.formatMessage(message),
+      emotionalState,
+      requiresFollowUp: false
+    };
+  }
+
+  static buildQueryProcessingResponse(queryType: string): HandlerResponse {
+    const message = `🔍 Analizando ${queryType}... un momento por favor`;
+
+    return {
+      hasExecutableAction: false,
+      response: message,
+      emotionalState: 'analyzing',
       requiresFollowUp: false
     };
   }
