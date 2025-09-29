@@ -69,6 +69,11 @@ serve(async (req) => {
     // Initialize handler registry
     const handlerRegistry = new HandlerRegistry(logger, OPENAI_API_KEY);
 
+    // 📅 Handle expand periods response (2027 UX Pattern)
+    if (userMessage === 'expand_periods_response' && data?.employeeId && data?.periods) {
+      return handleExpandPeriodsResponse(data);
+    }
+
     // 🔄 Interactive Chat Mode (Main mode for new architecture)
     if (phase === 'interactive_chat') {
       if (!conversation || !Array.isArray(conversation)) {
@@ -415,7 +420,45 @@ function detectVoucherContinuation(
     lastAssistantLength: lastAssistantMessage.length,
     lastUserMessage: lastUserMessage.slice(0, 50),
     hasVoucherKeywords: lastAssistantMessage.includes('desprendible')
+});
+
+// 📅 Handle expand periods response (2027 Conversational UX)
+function handleExpandPeriodsResponse(context: any): Response {
+  const { employeeId, employeeName, periods } = context;
+  
+  if (!periods || periods.length === 0) {
+    return new Response(JSON.stringify({
+      message: `No hay períodos adicionales disponibles para ${employeeName}`,
+      response: `No hay períodos adicionales disponibles para ${employeeName}`,
+      executableActions: [],
+      emotionalState: 'neutral'
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Create period actions for each available period
+  const periodActions = periods.slice(0, 6).map((period: any) => 
+    ResponseBuilder.createInlinePeriodAction(
+      employeeId,
+      employeeName,
+      period.id,
+      period.periodo,
+      false
+    )
+  );
+
+  const response = ResponseBuilder.buildSmartExpansionResponse(employeeName, periodActions);
+
+  return new Response(JSON.stringify({
+    message: response.response,
+    response: response.response,
+    executableActions: response.actions,
+    emotionalState: response.emotionalState
+  }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
+}
   
   // Case 1: Assistant asked for employee name and user is providing it
   if (lastAssistantMessage.includes('desprendible') && 
@@ -467,4 +510,42 @@ function detectVoucherContinuation(
   }
   
   return null;
+}
+
+// 📅 Handle expand periods response (2027 Conversational UX)
+function handleExpandPeriodsResponse(data: any): Response {
+  const { employeeId, employeeName, periods } = data;
+  
+  if (!periods || periods.length === 0) {
+    return new Response(JSON.stringify({
+      message: `No hay períodos adicionales disponibles para ${employeeName}`,
+      response: `No hay períodos adicionales disponibles para ${employeeName}`,
+      executableActions: [],
+      emotionalState: 'neutral'
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Create period actions for each available period
+  const periodActions = periods.slice(0, 6).map((period: any) => 
+    ResponseBuilder.createInlinePeriodAction(
+      employeeId,
+      employeeName,
+      period.id,
+      period.periodo,
+      false
+    )
+  );
+
+  const response = ResponseBuilder.buildSmartExpansionResponse(employeeName, periodActions);
+
+  return new Response(JSON.stringify({
+    message: response.response,
+    response: response.response,
+    executableActions: response.actions,
+    emotionalState: response.emotionalState
+  }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
 }

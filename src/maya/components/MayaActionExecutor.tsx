@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ExecutableAction, ActionExecutionResult } from '../types/ExecutableAction';
 import { VoucherSendDialog } from '@/components/payroll/modals/VoucherSendDialog';
-import { PeriodConfirmationDialog } from './PeriodConfirmationDialog';
 import { PayrollEmployee } from '@/types/payroll';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -27,15 +26,6 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
     employee: null,
     period: null
   });
-  
-  const [periodConfirmationDialog, setPeriodConfirmationDialog] = useState<{
-    isOpen: boolean;
-    action: ExecutableAction | null;
-    startWithAlternatives?: boolean;
-  }>({
-    isOpen: false,
-    action: null
-  });
   const { toast } = useToast();
 
   const getActionIcon = (type: string) => {
@@ -43,9 +33,7 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
       case 'send_voucher': return Send;
       case 'send_voucher_all': return Send;
       case 'confirm_send_voucher': return Send;
-      case 'confirm_period_voucher': return Calendar;
-      case 'show_period_alternatives': return Calendar;
-      case 'show_period_alternatives_voucher': return Calendar;
+      case 'expand_periods': return Calendar;
       case 'search_employee': return User;
       case 'view_details': return Eye;
       case 'generate_report': return FileText;
@@ -59,15 +47,8 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
     try {
       let result: ActionExecutionResult;
       
-      // If action requires period confirmation, show confirmation dialog
+      // If action requires period confirmation, use new conversational flow
       if (action.requiresConfirmation && action.type === 'send_voucher') {
-        setPeriodConfirmationDialog({ isOpen: true, action });
-        setIsExecuting(null);
-        return;
-      }
-      
-      // If action doesn't require confirmation, execute automatically
-      if (!action.requiresConfirmation && action.type === 'send_voucher') {
         result = await executeAutomatically(action);
       } else {
         result = await handleAction(action);
@@ -141,12 +122,8 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
         return await executeAutomatically(action);
       case 'confirm_send_voucher':
         return await executeAutomatically(action);
-      case 'confirm_period_voucher':
-        return await handlePeriodConfirmation(action);
-      case 'show_period_alternatives':
-        return await showPeriodAlternatives(action);
-      case 'show_period_alternatives_voucher':
-        return await showPeriodAlternatives(action);
+      case 'expand_periods':
+        return await handleExpandPeriods(action);
       case 'search_employee':
         return await executeSearchEmployee(action);
       case 'view_details':
@@ -267,94 +244,57 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
     };
   };
 
-  const showPeriodAlternatives = async (action: ExecutableAction): Promise<ActionExecutionResult> => {
+  const handleExpandPeriods = async (action: ExecutableAction): Promise<ActionExecutionResult> => {
+    const { employeeId, employeeName } = action.parameters;
+    
     try {
-      setPeriodConfirmationDialog({ 
-        isOpen: true, 
-        action: {
-          ...action,
-          type: 'send_voucher', // Convert back to send_voucher for the dialog
-          requiresConfirmation: true
-        },
-        startWithAlternatives: true
+      // Fetch additional periods from database
+      const { data: periods, error } = await supabase
+        .from('payroll_periods_real')
+        .select('id, periodo, fecha_inicio, fecha_fin, estado')
+        .eq('estado', 'cerrado')
+        .order('created_at', { ascending: false })
+        .limit(6);
+
+      if (error) throw error;
+
+      if (!periods || periods.length === 0) {
+        return {
+          success: false,
+          message: 'No hay períodos adicionales disponibles'
+        };
+      }
+
+      // Call Maya Intelligence to generate new period buttons
+      const { data, error: mayaError } = await supabase.functions.invoke('maya-intelligence', {
+        body: {
+          message: 'expand_periods_response',
+          context: {
+            employeeId,
+            employeeName,
+            periods
+          }
+        }
       });
+
+      if (mayaError) throw mayaError;
 
       return {
         success: true,
-        message: `Mostrando períodos alternativos para ${action.parameters.employeeName}`
+        message: `Períodos adicionales cargados para ${employeeName}`,
+        data
       };
     } catch (error: any) {
       return {
         success: false,
-        message: `Error cargando períodos alternativos: ${error.message}`
-      };
-    }
-  };
-
-  const handlePeriodConfirmation = async (action: ExecutableAction): Promise<ActionExecutionResult> => {
-    try {
-      setPeriodConfirmationDialog({ 
-        isOpen: true, 
-        action: {
-          ...action,
-          type: 'send_voucher', // Convert back to send_voucher for the dialog
-          requiresConfirmation: true
-        },
-        startWithAlternatives: false
-      });
-
-      return {
-        success: true,
-        message: `Confirmando período para ${action.parameters.employeeName}`
-      };
-    } catch (error: any) {
-      return {
-        success: false,
-        message: `Error confirmando período: ${error.message}`
+        message: `Error cargando períodos: ${error.message}`
       };
     }
   };
 
   const handlePeriodConfirmationDialog = async (periodId: string) => {
-    const action = periodConfirmationDialog.action;
-    if (!action) return;
-    
-    setIsExecuting(action.id);
-    try {
-      const result = await executeAutomatically(action, periodId);
-      
-      if (result.success) {
-        toast({
-          title: "✅ Comprobante enviado",
-          description: result.message,
-          className: "border-green-200 bg-green-50"
-        });
-      } else {
-        toast({
-          title: "❌ Error enviando comprobante",
-          description: result.message,
-          variant: "destructive"
-        });
-      }
-
-      onActionExecuted?.(action, result);
-    } catch (error: any) {
-      const result: ActionExecutionResult = {
-        success: false,
-        message: error.message || 'Error desconocido'
-      };
-      
-      toast({
-        title: "❌ Error enviando comprobante",
-        description: result.message,
-        variant: "destructive"
-      });
-
-      onActionExecuted?.(action, result);
-    } finally {
-      setIsExecuting(null);
-      setPeriodConfirmationDialog({ isOpen: false, action: null });
-    }
+    // This function is no longer needed with conversational UI
+    console.warn('handlePeriodConfirmationDialog called but modal is deprecated');
   };
 
   if (!Array.isArray(actions) || actions.length === 0) return null;
@@ -375,17 +315,17 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
               onClick={() => executeAction(action)}
               disabled={isLoading}
               variant={
-                action.type === 'confirm_send_voucher' || action.type === 'confirm_period_voucher' 
+                action.type === 'confirm_send_voucher'
                   ? 'default' 
-                  : action.type === 'show_period_alternatives' || action.type === 'show_period_alternatives_voucher'
+                  : action.type === 'expand_periods'
                   ? 'outline' 
                   : 'outline'
               }
               size="sm"
               className={`w-full justify-start text-left h-auto p-3 ${
-                action.type === 'confirm_send_voucher' || action.type === 'confirm_period_voucher'
+                action.type === 'confirm_send_voucher'
                   ? 'hover:bg-green-500/10 border-green-500/30 text-green-700 dark:text-green-400' 
-                  : action.type === 'show_period_alternatives' || action.type === 'show_period_alternatives_voucher'
+                  : action.type === 'expand_periods'
                   ? 'hover:bg-blue-500/10 border-blue-500/30 text-blue-700 dark:text-blue-400'
                   : 'hover:bg-primary/5 border-primary/20'
               }`}
@@ -413,14 +353,6 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
         onClose={() => setVoucherDialog({ isOpen: false, employee: null, period: null })}
         employee={voucherDialog.employee}
         period={voucherDialog.period}
-      />
-
-      <PeriodConfirmationDialog
-        isOpen={periodConfirmationDialog.isOpen}
-        onClose={() => setPeriodConfirmationDialog({ isOpen: false, action: null })}
-        action={periodConfirmationDialog.action}
-        onConfirm={handlePeriodConfirmationDialog}
-        startWithAlternatives={periodConfirmationDialog.startWithAlternatives}
       />
     </>
   );

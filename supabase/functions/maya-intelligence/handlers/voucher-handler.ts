@@ -167,29 +167,31 @@ Responde SOLO con el nombre EXACTO del empleado que coincida, o "NINGUNO" si no 
   }
 
   private requestPeriodConfirmation(employee: any, context?: RichContext): HandlerResponse {
-    // Generate a default current period based on the current date
-    const now = new Date();
-    const currentMonth = now.toLocaleString('es-ES', { month: 'long', year: 'numeric' });
-    const currentPeriod = currentMonth.charAt(0).toUpperCase() + currentMonth.slice(1);
+    return this.createConversationalPeriodSelection(employee, context);
+  }
+
+  private createConversationalPeriodSelection(employee: any, context?: RichContext): HandlerResponse {
+    // Generate conversational message
+    const message = `Para el desprendible de **${employee.name}**, te sugiero:`;
     
-    const message = `Para generar el desprendible de **${employee.name}**, selecciona el período:`;
-    
-    // Create executable actions for period selection
-    const currentPeriodAction = ResponseBuilder.createPeriodConfirmationAction(
+    // Create suggested period action (most recent closed period)
+    const suggestedPeriodAction = ResponseBuilder.createInlinePeriodAction(
       employee.id,
       employee.name,
-      `current_${now.getFullYear()}_${now.getMonth() + 1}`, // Generate a period ID
-      currentPeriod
+      'latest', // Will be resolved to actual latest period ID
+      'Período más reciente',
+      true // isPrimary
     );
     
-    const alternativesAction = ResponseBuilder.createPeriodAlternativesAction(
+    // Create expansion action
+    const expandAction = ResponseBuilder.createExpandPeriodsAction(
       employee.id,
       employee.name
     );
     
     return ResponseBuilder.buildExecutableResponse(
       message,
-      [currentPeriodAction, alternativesAction],
+      [suggestedPeriodAction, expandAction],
       'encouraging'
     );
   }

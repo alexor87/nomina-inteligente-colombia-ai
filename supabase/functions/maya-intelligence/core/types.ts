@@ -138,7 +138,8 @@ export type EmotionalState =
   | 'celebrating'
   | 'concerned'
   | 'encouraging'
-  | 'thinking';
+  | 'thinking'
+  | 'helpful';
 
 // Service Integration Types
 export interface ServiceCall {

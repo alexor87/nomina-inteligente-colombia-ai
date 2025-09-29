@@ -203,12 +203,13 @@ export class ResponseBuilder {
     };
   }
 
-  static createPeriodConfirmationAction(employeeId: string, employeeName: string, periodId: string, periodName: string): ExecutableAction {
+  // New 2027 Conversational UI Action Creators
+  static createInlinePeriodAction(employeeId: string, employeeName: string, periodId: string, periodName: string, isPrimary: boolean = false): ExecutableAction {
     return {
-      id: `confirm_period_voucher_${employeeId}_${Date.now()}`,
-      type: 'confirm_period_voucher',
-      label: `Confirmar período: ${periodName}`,
-      description: `Enviar desprendible de ${employeeName} para ${periodName}`,
+      id: `send_voucher_${employeeId}_${periodId}_${Date.now()}`,
+      type: 'send_voucher',
+      label: isPrimary ? `📄 ${periodName} (sugerido)` : `📄 ${periodName}`,
+      description: `Generar desprendible para ${periodName}`,
       parameters: {
         employeeId,
         employeeName,
@@ -216,22 +217,34 @@ export class ResponseBuilder {
         periodName
       },
       requiresConfirmation: false,
-      icon: '✅'
+      icon: '📄'
     };
   }
 
-  static createPeriodAlternativesAction(employeeId: string, employeeName: string): ExecutableAction {
+  static createExpandPeriodsAction(employeeId: string, employeeName: string): ExecutableAction {
     return {
-      id: `show_period_alternatives_${employeeId}_${Date.now()}`,
-      type: 'show_period_alternatives_voucher',
-      label: 'Ver otros períodos',
-      description: `Mostrar períodos alternativos para ${employeeName}`,
+      id: `expand_periods_${employeeId}_${Date.now()}`,
+      type: 'expand_periods',
+      label: '📅 Ver más períodos',
+      description: `Mostrar períodos adicionales para ${employeeName}`,
       parameters: {
         employeeId,
         employeeName
       },
       requiresConfirmation: false,
       icon: '📅'
+    };
+  }
+
+  static buildSmartExpansionResponse(employeeName: string, periodActions: ExecutableAction[]): HandlerResponse {
+    const message = `Aquí tienes más opciones para **${employeeName}**:`;
+    
+    return {
+      hasExecutableAction: true,
+      response: this.formatMessage(message),
+      actions: periodActions,
+      emotionalState: 'helpful',
+      requiresFollowUp: false
     };
   }
 }
