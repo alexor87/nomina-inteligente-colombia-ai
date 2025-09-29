@@ -47,12 +47,28 @@ export class IntentDetector {
         confidence: 0.95
       },
       
-      // Employee Search
+      // Database Query Patterns - HIGH PRIORITY (specific numerical queries)
       {
         patterns: [
-          /(?:busca|encuentra|muestra|lista).+(?:empleado|trabajador|colaborador)/i,
-          /(?:empleado|trabajador).+(?:llamado|de nombre|que se llama)/i,
-          /(?:quién|quien|cuál|cual).+(?:empleado|trabajador)/i
+          /(?:cuánto|cuanto).+(?:gastamos|gastó|costo|costó|pagamos|pagó)/i,
+          /(?:total|suma).+(?:nómina|nomina|sueldos|salarios|pagos)/i,
+          /(?:cuál|cual).+(?:gasto|costo|total|suma)/i,
+          /(?:mostrar|ver|dame).+(?:datos|información|números)/i,
+          /(?:cuántas|cuantas|cuántos|cuantos).+(?:nóminas|nominas|desprendibles|colillas|vouchers|recibos|pagos)/i,
+          /(?:cuántas|cuantas).+(?:veces|pagos).+(?:pagado|liquidado)/i,
+          /(?:cuántas|cuantas).+(?:se\s+le\s+han\s+pagado|han\s+pagado|le\s+pagaron|le\s+han\s+liquidado)/i
+        ],
+        type: 'DATA_QUERY' as IntentType,
+        confidence: 0.95
+      },
+
+      // Employee Search - MORE RESTRICTIVE (explicit search commands only)
+      {
+        patterns: [
+          /(?:busca|encuentra|muestra|lista)\s+(?:el\s+)?(?:empleado|trabajador|colaborador)/i,
+          /(?:buscar|encontrar|mostrar)\s+(?:información\s+de|datos\s+de|el\s+perfil\s+de)/i,
+          /(?:quién\s+es|quien\s+es|cuál\s+es|cual\s+es)\s+(?:el\s+empleado|la\s+empleada)/i,
+          /(?:perfil|información|datos)\s+(?:del\s+empleado|de\s+empleado|personal)/i
         ],
         type: 'EMPLOYEE_SEARCH' as IntentType,
         confidence: 0.85
@@ -118,20 +134,6 @@ export class IntentDetector {
         ],
         type: 'REPORT_GENERATE' as IntentType,
         confidence: 0.8
-      },
-
-      // Database Query Patterns - WOW Experience
-      {
-        patterns: [
-          /(?:cuánto|cuanto).+(?:gastamos|gastó|costo|costó|pagamos|pagó)/i,
-          /(?:total|suma).+(?:nómina|nomina|sueldos|salarios|pagos)/i,
-          /(?:cuál|cual).+(?:gasto|costo|total|suma)/i,
-          /(?:mostrar|ver|dame).+(?:datos|información|números)/i,
-          /(?:cuántas|cuantas|cuántos|cuantos).+(?:nóminas|nominas|desprendibles|colillas|vouchers|recibos|pagos)/i,
-          /(?:cuántas|cuantas).+(?:veces|pagos).+(?:pagado|liquidado)/i
-        ],
-        type: 'DATA_QUERY' as IntentType,
-        confidence: 0.9
       },
 
       // Analytics Patterns 
