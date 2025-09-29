@@ -478,7 +478,34 @@ serve(async (req) => {
         break;
         
       default:
-        response = await handleConversation(lastMessage, conversation);
+        // 🚫 CRITICAL: Never send employee-specific queries to OpenAI - prevents hallucination
+        const hasEmployeeName = intent.params?.name || detectEmployeeNameInQuery(lastMessage);
+        if (hasEmployeeName) {
+          console.log('🚫 [SECURITY] Blocking employee query from going to OpenAI - using direct response');
+          response = {
+            message: `Para consultas específicas de empleados, usa términos como "salario de [nombre]" o "buscar [nombre]".`,
+            emotionalState: 'neutral'
+          };
+        } else {
+          response = await handleConversation(lastMessage, conversation);
+        }
+    }
+
+    // ============================================================================
+    // 🚫 ANTI-HALLUCINATION FINAL SAFETY CHECK
+    // ============================================================================
+    
+    // CRITICAL: If we have a valid response with real employee data, NEVER override it
+    const hasRealEmployeeData = response && response.message && (
+      intent.method === 'getEmployeeSalary' ||
+      intent.method === 'getEmployeePaidTotal' ||
+      intent.method === 'searchEmployee' ||
+      (response.message.includes('**$') && response.message.includes('Salario base')) ||
+      (response.message.includes('💰') && response.message.includes('Cargo:'))
+    );
+    
+    if (hasRealEmployeeData) {
+      console.log('✅ [SECURITY] Using real employee data directly - protected from OpenAI override');
     }
 
     // ============================================================================
