@@ -42,6 +42,16 @@ export class SimpleIntentMatcher {
   static match(message: string): SimpleIntent {
     const text = message.toLowerCase().trim();
     
+    // SECURITY: Block system-wide information queries (HIGHEST PRIORITY)
+    if (/(?:cuántas?|cuantas?|cantidad|total)\s+(?:de\s+)?(?:empresas?|compañías?|organizaciones?)/i.test(text) ||
+        /(?:base\s+de\s+datos|sistema|software|plataforma)/i.test(text) && /(?:empresas?|compañías?|datos|información)/i.test(text)) {
+      return {
+        type: 'SYSTEM_INFO_BLOCKED',
+        confidence: 0.98,
+        method: 'blockSystemInfoQuery'
+      };
+    }
+    
     // Employee count queries
     if (/cuántos?|cuantos?/.test(text) && /empleado/.test(text)) {
       return {

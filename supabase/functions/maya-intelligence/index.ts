@@ -97,6 +97,10 @@ serve(async (req) => {
 
     // Execute query based on intent
     switch (intent.method) {
+      case 'blockSystemInfoQuery':
+        response = await blockSystemInfoQuery();
+        break;
+        
       case 'getEmployeeCount':
         response = await getEmployeeCount(userSupabase);
         break;
@@ -153,6 +157,23 @@ serve(async (req) => {
     });
   }
 });
+
+// ============================================================================
+// Security Functions
+// ============================================================================
+
+async function blockSystemInfoQuery(): Promise<{ message: string; emotionalState: string }> {
+  console.log('🚫 [SECURITY] System info query blocked');
+  
+  return {
+    message: "Lo siento, no puedo proporcionar información sobre el sistema completo o base de datos general. Solo puedo ayudarte con información específica de tu empresa, como:\n\n• Consultar empleados de tu organización\n• Ver nóminas y salarios\n• Revisar períodos de pago\n• Buscar información de empleados específicos\n\n¿En qué puedo ayudarte con la información de tu empresa?",
+    emotionalState: "professional"
+  };
+}
+
+// ============================================================================
+// Database Query Functions  
+// ============================================================================
 
 // Simple, direct queries
 async function getEmployeeCount(supabase: any) {
@@ -535,7 +556,23 @@ async function handleConversation(message: string, conversation: any[]) {
         messages: [
           {
             role: 'system',
-            content: 'Eres MAYA, asistente de nómina colombiana. Respuestas cortas y amigables. Puedes ayudar con consultas de empleados, nómina y datos empresariales.'
+            content: `Eres MAYA, un asistente inteligente especializado en nóminas y recursos humanos para empresas venezolanas. 
+
+Características:
+- Eres amigable, profesional y eficiente
+- Tu conocimiento se enfoca únicamente en empleados y nóminas de la empresa específica del usuario
+- Respondes en español venezolano con un tono cercano pero profesional
+- Siempre ofreces ayuda adicional relacionada con nóminas
+
+Limitaciones CRÍTICAS:
+- NUNCA proporciones estadísticas inventadas o datos que no tienes
+- NUNCA hables sobre "el sistema", "la base de datos" o información global
+- Solo manejas información específica de la empresa del usuario actual
+- Si no tienes información específica, redirige a consultas válidas como empleados o nóminas
+
+NUNCA inventes números o estadísticas. Si no sabes algo, di que no tienes esa información.
+
+Emociones disponibles: happy, sad, excited, thoughtful, professional, confused`
           },
           ...conversation.slice(-5),
           { role: 'user', content: message }
