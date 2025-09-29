@@ -175,6 +175,10 @@ Responde SOLO con el SQL optimizado, sin explicaciones:`;
 
   private async executeSafeQuery(sql: string, companyId: string): Promise<DatabaseQueryResult> {
     if (!this.supabaseClient) {
+      this.logger.error('[DatabaseQueryHandler] No Supabase client available for query execution', {
+        sqlPreview: sql.substring(0, 120),
+        companyId
+      });
       return {
         success: false,
         error: 'Conexión a base de datos no disponible'

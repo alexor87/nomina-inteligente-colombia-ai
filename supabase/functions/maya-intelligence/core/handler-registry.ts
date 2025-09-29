@@ -34,7 +34,8 @@ export class HandlerRegistry {
     
     this.logger.info('[HandlerRegistry] Initialized with handlers:', {
       handlerCount: this.handlers.length,
-      handlerTypes: this.handlers.map(h => h.constructor.name)
+      handlerTypes: this.handlers.map(h => h.constructor.name),
+      supabaseClientProvided: !!supabaseClient
     });
   }
   

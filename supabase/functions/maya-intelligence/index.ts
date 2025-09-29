@@ -72,8 +72,17 @@ serve(async (req) => {
       return handleExpandPeriodsResponse(data || {});
     }
 
+    // Prepare user-scoped Supabase client when available
+    const authHeader = req.headers.get('Authorization') || '';
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? 'https://xrmorlkakwujyozgmilf.supabase.co';
+    const supabaseAnon = Deno.env.get('SUPABASE_ANON_KEY') ?? 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhybW9ybGtha3d1anlvemdtaWxmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA1NzMxNDYsImV4cCI6MjA2NjE0OTE0Nn0.JSKbniDUkbNEAVCxCkrG_J5NQTt0yHc7W5PPheJ8X_U';
+    const supabaseUser = authHeader && supabaseUrl && supabaseAnon
+      ? createClient(supabaseUrl, supabaseAnon, { global: { headers: { Authorization: authHeader } } })
+      : null;
+    logger.info(`[MAYA] Supabase client mode: ${supabaseUser ? 'user' : 'service'}`);
+
     // Initialize handler registry
-    const handlerRegistry = new HandlerRegistry(logger, OPENAI_API_KEY, supabase);
+    const handlerRegistry = new HandlerRegistry(logger, OPENAI_API_KEY, supabaseUser || supabase);
 
     // 🔄 Interactive Chat Mode (Main mode for new architecture)
     if (phase === 'interactive_chat') {
