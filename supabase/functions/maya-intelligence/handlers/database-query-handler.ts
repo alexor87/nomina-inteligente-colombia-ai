@@ -130,6 +130,19 @@ export class DatabaseQueryHandler extends BaseHandler {
       };
     }
 
+    // Employee payroll count query
+    if (employeeNames.length > 0 && (message.includes('cuántas') || message.includes('cuantas') || message.includes('cuántos') || message.includes('cuantos')) && 
+        (message.includes('nómina') || message.includes('nomina') || message.includes('desprendible') || message.includes('voucher') || message.includes('pago'))) {
+      const yearMatch = message.match(/\b(20\d{2})\b/);
+      return {
+        queryType: 'EMPLOYEE_PAYROLL_COUNT',
+        params: {
+          name: employeeNames[0].value,
+          year: yearMatch ? parseInt(yearMatch[1]) : undefined
+        }
+      };
+    }
+
     // Employee last period neto
     if (employeeNames.length > 0 && (message.includes('último') || message.includes('reciente'))) {
       return {
@@ -805,9 +818,9 @@ Responde SOLO con el SQL optimizado, sin explicaciones:`;
       
       // Use the new MAYA-specific secure function
       const { data, error } = await this.supabaseClient.rpc('execute_maya_safe_query', {
-        query_sql: sanitizedSql,
+        sql_query: sanitizedSql,
         target_company_id: companyId,
-        user_id: userId
+        requesting_user_id: userId
       });
 
       if (error) {
@@ -1024,6 +1037,30 @@ Responde SOLO con el SQL optimizado, sin explicaciones:`;
                 label: 'Último Neto Pagado',
                 value: `$${data.neto_pagado?.toLocaleString()}`,
                 unit: 'COP'
+              }]
+            }
+          };
+        }
+        break;
+
+      case 'EMPLOYEE_PAYROLL_COUNT':
+        if (!Array.isArray(data)) {
+          if (data.error) {
+            return {
+              type: 'metric',
+              title: 'Error en consulta',
+              data: { message: data.error, subtitle: `Empleado buscado: ${data.employee_searched || 'N/A'}` }
+            };
+          }
+          return {
+            type: 'metric',
+            title: `Nóminas pagadas - ${data.employee_name}`,
+            data: data,
+            format: { 
+              metrics: [{
+                label: 'Total Nóminas',
+                value: `${data.payroll_count || 0}`,
+                unit: 'nóminas'
               }]
             }
           };
@@ -1254,12 +1291,24 @@ Responde SOLO con el SQL optimizado, sin explicaciones:`;
   private buildDataVisualizationResponse(visualData: VisualDataResponse, queryResult: DatabaseQueryResult): HandlerResponse {
     let message = `📊 **${visualData.title}**\n\n`;
 
-    if (visualData.type === 'metric' && visualData.format?.metrics) {
-      // Format metrics display
-      visualData.format.metrics.forEach(metric => {
-        const value = metric.unit ? `${metric.value} ${metric.unit}` : metric.value;
-        message += `▶️ **${metric.label}:** ${value}\n`;
-      });
+    if (visualData.type === 'metric') {
+      if (visualData.format?.metrics) {
+        // Format metrics display
+        visualData.format.metrics.forEach(metric => {
+          const value = metric.unit ? `${metric.value} ${metric.unit}` : metric.value;
+          message += `▶️ **${metric.label}:** ${value}\n`;
+        });
+      } else if (visualData.data?.message) {
+        // Handle error messages
+        if (visualData.data.message.includes('Error') || visualData.data.message.includes('no encontr')) {
+          message += `❌ ${visualData.data.message}\n`;
+          if (visualData.data.subtitle) {
+            message += `🔍 ${visualData.data.subtitle}\n`;
+          }
+        } else {
+          message += `📊 ${visualData.data.message}\n`;
+        }
+      }
     } else if (visualData.type === 'table' && Array.isArray(visualData.data)) {
       // Format table display (show first few rows)
       const rows = visualData.data.slice(0, 5);

@@ -129,6 +129,14 @@ serve(async (req) => {
           entityCount: intent.entities.length
         });
 
+        // Inject original message for structured queries
+        intent.parameters.originalMessage = lastUserMessage;
+        
+        logger.info(`[DatabaseQueryHandler] Original message injected`, {
+          messagePreview: lastUserMessage.slice(0, 50) + (lastUserMessage.length > 50 ? '...' : ''),
+          intentType: intent.type
+        });
+
         // 2. Process intent with appropriate handler
         if (intent.type !== 'CONVERSATION' || intent.confidence > 0.7) {
           const handlerResponse = await handlerRegistry.processIntent(intent, richContext);

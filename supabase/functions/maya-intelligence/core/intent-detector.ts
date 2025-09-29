@@ -126,7 +126,9 @@ export class IntentDetector {
           /(?:cuánto|cuanto).+(?:gastamos|gastó|costo|costó|pagamos|pagó)/i,
           /(?:total|suma).+(?:nómina|nomina|sueldos|salarios|pagos)/i,
           /(?:cuál|cual).+(?:gasto|costo|total|suma)/i,
-          /(?:mostrar|ver|dame).+(?:datos|información|números)/i
+          /(?:mostrar|ver|dame).+(?:datos|información|números)/i,
+          /(?:cuántas|cuantas|cuántos|cuantos).+(?:nóminas|nominas|desprendibles|colillas|vouchers|recibos|pagos)/i,
+          /(?:cuántas|cuantas).+(?:veces|pagos).+(?:pagado|liquidado)/i
         ],
         type: 'DATA_QUERY' as IntentType,
         confidence: 0.9
@@ -278,9 +280,20 @@ Responde SOLO en formato JSON:
   private static extractEntities(message: string, intentType: IntentType): ExtractedEntity[] {
     const entities: ExtractedEntity[] = [];
     
-    // Extract employee names (proper case words)
-    const employeeMatches = message.match(/[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)*/g);
-    if (employeeMatches && (intentType === 'VOUCHER_SEND' || intentType === 'EMPLOYEE_SEARCH')) {
+    // Extract employee names (proper case words + lowercase variants)
+    const employeeMatches: string[] = message.match(/[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)*/g) || [];
+    const lowercaseEmployeeMatches = message.match(/(?:a |de |para )([a-záéíóúñ]+)(?:\s|$)/gi);
+    
+    if (lowercaseEmployeeMatches) {
+      lowercaseEmployeeMatches.forEach(match => {
+        const name = match.replace(/^(?:a |de |para )/i, '').trim();
+        if (name.length > 2) {
+          employeeMatches.push(name.charAt(0).toUpperCase() + name.slice(1).toLowerCase());
+        }
+      });
+    }
+    
+    if (employeeMatches.length > 0 && ['VOUCHER_SEND', 'EMPLOYEE_SEARCH', 'DATA_QUERY', 'ANALYTICS_REQUEST', 'REPORT_INSIGHTS', 'COMPARISON_ANALYSIS'].includes(intentType)) {
       employeeMatches.forEach(match => {
         entities.push({
           type: 'employee',

@@ -2768,12 +2768,19 @@ export type Database = {
         Returns: undefined
       }
       maya_query_router: {
-        Args: {
-          params: Json
-          query_type: string
-          requesting_user_id: string
-          target_company_id: string
-        }
+        Args:
+          | {
+              company_id: string
+              params: Json
+              query_type: string
+              user_id: string
+            }
+          | {
+              params: Json
+              query_type: string
+              requesting_user_id: string
+              target_company_id: string
+            }
         Returns: Json
       }
       normalize_biweekly_period_labels: {
