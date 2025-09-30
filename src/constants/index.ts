@@ -27,7 +27,7 @@ export const RECARGOS = {
   NOCTURNO: 0.35, // 35%
   EXTRA_DIURNA: 0.25, // 25%
   EXTRA_NOCTURNA: 0.75, // 75%
-  DOMINICAL: 0.75, // 75% - ⚠️ DINÁMICO: Ver RecargosCalculationService para factores por fecha
+  DOMINICAL: 0.75, // 75% - ⚠️ ELIMINADO: RecargosCalculationService (solo backend)
   FESTIVO: 0.75, // 75%
 };
 

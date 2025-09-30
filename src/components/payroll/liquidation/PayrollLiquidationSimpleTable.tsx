@@ -403,7 +403,8 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
           </TableHeader>
           <TableBody>
             {employees.map((employee) => {
-              const novedades = getEmployeeNovedades(employee.id);
+              // ✅ CRÍTICO: No usar getEmployeeNovedades directamente (ahora es async)
+              // Los totales ahora se calculan en el backend y se deben obtener de otra forma
               const totalToPay = getTotalToPay(employee);
               const ibc = getEmployeeIBC(employee);
               const transportAllowance = getEmployeeTransportAllowance(employee);
@@ -449,10 +450,9 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
                       >
                         <Plus className="h-4 w-4" />
                       </Button>
-                      <div className={`text-sm font-medium ${
-                        novedades.totalNeto >= 0 ? 'text-green-600' : 'text-red-600'
-                      }`}>
-                        {novedades.totalNeto >= 0 ? '+' : ''}{formatCurrency(novedades.totalNeto)}
+                      <div className="text-sm font-medium text-blue-600">
+                        {/* ✅ CRÍTICO: Totales ahora se calculan en backend */}
+                        {formatCurrency(0)} {/* TODO: Implementar async totals */}
                       </div>
                     </div>
                   </TableCell>

@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { NovedadesEnhancedService, CreateNovedadData } from '@/services/NovedadesEnhancedService';
+import { NovedadesCalculationService } from '@/services/NovedadesCalculationService';
 import { PayrollNovedad } from '@/types/novedades-enhanced';
 import { useToast } from '@/hooks/use-toast';
 import { useEmployeeNovedadesCacheStore } from '@/stores/employeeNovedadesCacheStore';
@@ -25,7 +26,7 @@ export interface UsePayrollNovedadesUnifiedReturn {
   isDeleting: boolean;
   refetch: () => void;
   loadNovedadesTotals: (employeeIds: string[]) => void;
-  getEmployeeNovedades: (employeeId: string) => { totalNeto: number; devengos: number; deducciones: number };
+  getEmployeeNovedades: (employeeId: string) => Promise<{ totalNeto: number; devengos: number; deducciones: number }>;
   refreshEmployeeNovedades: (employeeId: string) => Promise<void>;
   lastRefreshTime: number;
   getEmployeeNovedadesList: (employeeId: string) => Promise<PayrollNovedad[]>;
@@ -131,33 +132,37 @@ export const usePayrollNovedadesUnified = (
     updateEmployeeNovedades(updates);
   }, [periodId, updateEmployeeNovedades]);
 
-  // ✅ RESTORED: Get employee novedades totals usando store global
-  const getEmployeeNovedades = useCallback((employeeId: string) => {
-    const employeeNovedadesList = employeeNovedadesCache[employeeId] || [];
+  // ✅ CRÍTICO: Get employee novedades totals usando BACKEND CALCULATION SERVICE
+  const getEmployeeNovedades = useCallback(async (employeeId: string) => {
+    // ❌ ELIMINADO: Manual summing of novedad.valor (líneas 141-148)
+    // ✅ USAR: Backend calculated totals
     
-    let devengos = 0;
-    let deducciones = 0;
-    
-    employeeNovedadesList.forEach(novedad => {
-      const valor = Number(novedad.valor || 0);
-      if (valor >= 0) {
-        devengos += valor;
-      } else {
-        deducciones += Math.abs(valor);
-      }
-    });
-    
-    const totalNeto = devengos - deducciones;
-    
-    console.log('🧮 Global Store: Calculando totales para empleado:', employeeId, {
-      novedadesCount: employeeNovedadesList.length,
-      devengos,
-      deducciones,
-      totalNeto
-    });
-    
-    return { totalNeto, devengos, deducciones };
-  }, [employeeNovedadesCache]);
+    if (!periodId) {
+      console.warn('⚠️ No periodId available for backend calculation');
+      return { totalNeto: 0, devengos: 0, deducciones: 0 };
+    }
+
+    try {
+      // ✅ USAR SERVICIO BACKEND PARA OBTENER TOTALES CALCULADOS
+      const backendTotals = await NovedadesCalculationService.calculateEmployeeNovedadesTotals(employeeId, periodId);
+      
+      console.log('✅ Backend calculated totals for employee:', employeeId, {
+        totalDevengos: backendTotals.totalDevengos,
+        totalDeducciones: backendTotals.totalDeducciones,
+        totalNeto: backendTotals.totalNeto,
+        hasNovedades: backendTotals.hasNovedades
+      });
+      
+      return { 
+        totalNeto: backendTotals.totalNeto, 
+        devengos: backendTotals.totalDevengos, 
+        deducciones: backendTotals.totalDeducciones 
+      };
+    } catch (error) {
+      console.error('❌ Error getting backend calculated totals:', error);
+      return { totalNeto: 0, devengos: 0, deducciones: 0 };
+    }
+  }, [periodId]);
 
   // ✅ RESTORED: Refresh employee novedades usando store global
   const refreshEmployeeNovedades = useCallback(async (employeeId: string) => {
@@ -424,7 +429,7 @@ export const usePayrollNovedadesUnified = (
     isDeleting,
     refetch,
     loadNovedadesTotals,
-    getEmployeeNovedades,
+    getEmployeeNovedades: async (employeeId: string) => await getEmployeeNovedades(employeeId),
     refreshEmployeeNovedades,
     lastRefreshTime, // ✅ NUEVO: Viene del store global
     getEmployeeNovedadesList

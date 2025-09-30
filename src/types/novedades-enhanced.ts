@@ -276,43 +276,11 @@ export const HORAS_EXTRA_FACTORS = {
 } as const;
 
 /**
- * ⚠️ FUNCIÓN MARCADA COMO OBSOLETA - MIGRACIÓN A BACKEND
- * @deprecated Usar useNovedadBackendCalculation hook en su lugar
- * Todos los cálculos de novedades ahora se realizan en el backend para mayor consistencia
+ * ⚠️ FUNCIONES COMPLETAMENTE ELIMINADAS - SOLO BACKEND
+ * @deprecated Todos los cálculos se realizan exclusivamente en el backend
+ * @removed Funciones calcularValorNovedadEnhanced y calcularValorNovedad eliminadas
+ * 
+ * ✅ USAR: useNovedadBackendCalculation hook
+ * ✅ BACKEND: supabase/functions/payroll-calculations
+ * ✅ SERVICIO: NovedadesCalculationService
  */
-export const calcularValorNovedadEnhanced = (
-  tipoNovedad: NovedadType,
-  subtipo: string | undefined,
-  salarioBase: number,
-  dias?: number,
-  horas?: number,
-  fechaPeriodo?: Date
-): { valor: number; baseCalculo: BaseCalculoData } => {
-  console.warn('⚠️ calcularValorNovedadEnhanced está obsoleto. Usar useNovedadBackendCalculation hook');
-  console.warn('⚠️ Los cálculos ahora se realizan en el backend con jornada legal dinámica');
-  
-  // Retornar valor básico para evitar errores durante la migración
-  return {
-    valor: 0,
-    baseCalculo: {
-      salario_base: salarioBase,
-      factor_calculo: 0,
-      detalle_calculo: 'Migrado a backend calculation service - usar useNovedadBackendCalculation hook'
-    }
-  };
-};
-
-/**
- * ⚠️ FUNCIÓN MARCADA COMO OBSOLETA - MIGRACIÓN A BACKEND
- * @deprecated Usar useNovedadBackendCalculation hook en su lugar
- */
-export const calcularValorNovedad = (
-  tipoNovedad: NovedadType,
-  subtipo: string | undefined,
-  salarioBase: number,
-  dias?: number,
-  horas?: number
-): { valor: number; baseCalculo: BaseCalculoData } => {
-  console.warn('⚠️ calcularValorNovedad está obsoleto. Usar calcularValorNovedadEnhanced o mejor aún useNovedadBackendCalculation hook');
-  return calcularValorNovedadEnhanced(tipoNovedad, subtipo, salarioBase, dias, horas);
-};

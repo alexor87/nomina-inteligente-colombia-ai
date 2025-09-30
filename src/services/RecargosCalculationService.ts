@@ -1,12 +1,11 @@
-
 /**
- * ✅ KISS: Servicio simplificado para cálculo de recargos
- * - Eliminado cache compartido problemático
- * - Factores totales directos
- * - Sin dependencias cruzadas
+ * ⚠️ SERVICIO COMPLETAMENTE ELIMINADO - SOLO BACKEND
+ * @deprecated Todos los cálculos de recargos se realizan exclusivamente en el backend
+ * @removed RecargosCalculationService completo eliminado
+ * 
+ * ✅ USAR: useNovedadBackendCalculation hook
+ * ✅ BACKEND: supabase/functions/payroll-calculations
  */
-
-import { getHourlyDivisorForRecargos } from '../utils/jornadaLegal';
 
 export interface RecargoCalculationInput {
   salarioBase: number;
@@ -35,147 +34,15 @@ export interface RecargoCalculationResult {
 }
 
 export class RecargosCalculationService {
-  /**
-   * ✅ KISS: Factores totales directos sin cache
-   */
-  private static getFactorRecargoTotal(tipoRecargo: string, fechaPeriodo: Date): {
-    factorTotal: number;
-    porcentaje: string;
-    normativa: string;
-  } {
-    const fecha = fechaPeriodo || new Date();
-    
-    switch (tipoRecargo) {
-      case 'nocturno':
-        return {
-          factorTotal: 0.35,
-          porcentaje: '35%',
-          normativa: 'CST Art. 168 - Recargo nocturno ordinario (35% total)'
-        };
-        
-      case 'dominical':
-        if (fecha < new Date('2025-07-01')) {
-          return {
-            factorTotal: 0.75,
-            porcentaje: '75%',
-            normativa: 'Ley 789/2002 Art. 3 - Vigente hasta 30-jun-2025 (75% total)'
-          };
-        } else if (fecha < new Date('2026-07-01')) {
-          return {
-            factorTotal: 0.80,
-            porcentaje: '80%',
-            normativa: 'Ley 2466/2025 - Vigente 01-jul-2025 a 30-jun-2026 (80% total)'
-          };
-        } else if (fecha < new Date('2027-07-01')) {
-          return {
-            factorTotal: 0.90,
-            porcentaje: '90%',
-            normativa: 'Ley 2466/2025 - Vigente 01-jul-2026 a 30-jun-2027 (90% total)'
-          };
-        } else {
-          return {
-            factorTotal: 1.00,
-            porcentaje: '100%',
-            normativa: 'Ley 2466/2025 - Vigente desde 01-jul-2027 (100% total)'
-          };
-        }
-        
-      case 'nocturno_dominical':
-        // ✅ CORRECCIÓN: Nocturno (35%) + Dominical vigente = 110% máximo
-        const factorDominical = fecha < new Date('2025-07-01') ? 0.75 : 
-                                fecha < new Date('2026-07-01') ? 0.80 :
-                                fecha < new Date('2027-07-01') ? 0.90 : 1.00;
-        return {
-          factorTotal: 0.35 + factorDominical, // Nocturno + Dominical vigente
-          porcentaje: `${Math.round((0.35 + factorDominical) * 100)}%`,
-          normativa: `CST Art. 168 + Ley 2466/2025 - Nocturno (35%) + Dominical vigente (${Math.round(factorDominical * 100)}%)`
-        };
-        
-      default:
-        return {
-          factorTotal: 0.0,
-          porcentaje: '0%',
-          normativa: 'Tipo no válido'
-        };
-    }
+  static calcularRecargo(): never {
+    throw new Error('🚫 RecargosCalculationService eliminado - usar solo backend calculations');
   }
 
-  /**
-   * ✅ KISS: Cálculo directo sin cache
-   */
-  static calcularRecargo(input: RecargoCalculationInput): RecargoCalculationResult {
-    const { salarioBase, tipoRecargo, horas, fechaPeriodo = new Date() } = input;
-    
-    const factorInfo = this.getFactorRecargoTotal(tipoRecargo, fechaPeriodo);
-    
-    if (factorInfo.factorTotal <= 0) {
-      throw new Error(`Error calculando factor para tipo de recargo: ${tipoRecargo}`);
-    }
-    
-    // ✅ CORRECCIÓN CRÍTICA: Usar divisor horario dinámico según jornada legal
-    const divisorDinamico = getHourlyDivisorForRecargos(fechaPeriodo);
-    
-    const valorRecargo = Math.round((salarioBase * factorInfo.factorTotal * horas) / divisorDinamico);
-    const valorHora = salarioBase / divisorDinamico;
-    const detalleCalculo = `${tipoRecargo}: (${salarioBase.toLocaleString()} × ${factorInfo.factorTotal} × ${horas}h) ÷ ${divisorDinamico} = ${valorRecargo.toLocaleString()}`;
-    
-    return {
-      valorHora: Math.round(valorHora),
-      factorRecargo: factorInfo.factorTotal,
-      valorRecargo,
-      detalleCalculo,
-      jornadaInfo: {
-        horasSemanales: 44, // ✅ Mantener referencia, pero usar divisor dinámico
-        horasMensuales: divisorDinamico,
-        divisorHorario: divisorDinamico,
-        fechaVigencia: fechaPeriodo
-      },
-      factorInfo: {
-        fechaVigencia: fechaPeriodo,
-        normativaAplicable: factorInfo.normativa,
-        factorOriginal: factorInfo.factorTotal,
-        porcentajeDisplay: factorInfo.porcentaje
-      }
-    };
+  static getTiposRecargo(): never {
+    throw new Error('🚫 RecargosCalculationService eliminado - usar solo backend calculations');
   }
 
-  /**
-   * ✅ KISS: Solo 3 tipos de recargo
-   */
-  static getTiposRecargo(fechaPeriodo: Date = new Date()): Array<{
-    tipo: string;
-    factor: number;
-    porcentaje: string;
-    descripcion: string;
-    normativa: string;
-  }> {
-    return [
-      {
-        tipo: 'nocturno',
-        ...this.getFactorRecargoTotal('nocturno', fechaPeriodo),
-        descripcion: 'Recargo nocturno (9:00 PM - 6:00 AM)'
-      },
-      {
-        tipo: 'dominical',
-        ...this.getFactorRecargoTotal('dominical', fechaPeriodo),
-        descripcion: 'Recargo dominical (trabajo en domingo)'
-      },
-      {
-        tipo: 'nocturno_dominical',
-        ...this.getFactorRecargoTotal('nocturno_dominical', fechaPeriodo),
-        descripcion: 'Recargo nocturno dominical (domingo 9:00 PM - 6:00 AM)'
-      }
-    ].map(item => ({
-      tipo: item.tipo,
-      factor: item.factorTotal,
-      porcentaje: item.porcentaje,
-      descripcion: item.descripcion,
-      normativa: item.normativa
-    }));
-  }
-
-  static getFactorRecargoByDate(tipoRecargo: string, fechaPeriodo: Date = new Date()): number {
-    const factorInfo = this.getFactorRecargoTotal(tipoRecargo, fechaPeriodo);
-    return factorInfo.factorTotal;
+  static getFactorRecargoByDate(): never {
+    throw new Error('🚫 RecargosCalculationService eliminado - usar solo backend calculations');
   }
 }

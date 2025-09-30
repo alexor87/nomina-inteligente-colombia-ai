@@ -181,22 +181,15 @@ export const calcularValorHoraParaRecargos = (salarioMensual: number, fecha: Dat
 };
 
 /**
- * Calcula el valor de la hora para horas extra con la fórmula correcta
- * Fórmula: (Salario ÷ 30 días) ÷ horas por día
- * Esta es la fórmula específica para horas extra según la legislación colombiana
+ * ⚠️ FUNCIÓN COMPLETAMENTE ELIMINADA - SOLO BACKEND
+ * @deprecated Todos los cálculos de horas extra se realizan exclusivamente en el backend
+ * @removed calcularValorHoraExtra eliminada
+ * 
+ * ✅ USAR: useNovedadBackendCalculation hook
+ * ✅ BACKEND: supabase/functions/payroll-calculations
  */
-export const calcularValorHoraExtra = (salarioMensual: number, fecha: Date = new Date()): number => {
-  const horasPorDia = getDailyHours(fecha);
-  const valorDiario = salarioMensual / 30;
-  const valorHoraExtra = valorDiario / horasPorDia;
-  
-  console.log(`💰 Cálculo valor hora extra:`);
-  console.log(`   Salario mensual: $${salarioMensual.toLocaleString()}`);
-  console.log(`   Valor diario: $${Math.round(valorDiario).toLocaleString()} (salario ÷ 30)`);
-  console.log(`   Horas por día: ${horasPorDia.toFixed(3)}`);
-  console.log(`   Valor hora extra: $${Math.round(valorHoraExtra).toLocaleString()} (valor diario ÷ horas por día)`);
-  
-  return valorHoraExtra;
+export const calcularValorHoraExtra = (): never => {
+  throw new Error('🚫 calcularValorHoraExtra eliminada - usar solo backend calculations');
 };
 
 export const getProximoCambioJornada = (fechaActual: Date = new Date()): JornadaLegalInfo | null => {

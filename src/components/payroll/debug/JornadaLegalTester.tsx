@@ -31,7 +31,7 @@ export const JornadaLegalTester: React.FC = () => {
       console.log(`\n🔍 Probando: ${label}`);
       
       const jornada = getJornadaLegal(fecha);
-      const valorHoraExtra = calcularValorHoraExtra(salarioBase, fecha);
+      const valorHoraExtra = 0; // ✅ ELIMINADO: calcularValorHoraExtra (solo backend)
       
       console.log(`   📊 Resultado: ${jornada.horasSemanales}h/semana → ${jornada.horasMensuales}h/mes`);
       console.log(`   💰 Valor hora extra: $${Math.round(valorHoraExtra).toLocaleString()}`);

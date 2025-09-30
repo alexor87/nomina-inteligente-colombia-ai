@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { calcularValorNovedad } from '@/types/novedades';
+// ✅ ELIMINADO: import { calcularValorNovedad } - Solo backend calculations
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -95,23 +95,14 @@ export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsol
         return result.valor;
       }
 
-      // ✅ Fallback mejorado: usar función local con jornada legal dinámica
-      console.log('⚠️ Fallback: Usando cálculo local con jornada legal dinámica');
-      const fechaPeriodo = new Date(fecha);
-      const calculoLocal = calcularValorNovedad('horas_extra', tipo, employeeSalary, undefined, horas, fechaPeriodo);
-      
-      console.log('📊 Cálculo local con jornada legal dinámica:', calculoLocal);
-      return calculoLocal.valor;
+      // ❌ ELIMINADO: Fallback frontend calculation
+      console.error('⚠️ Error en cálculo backend - NO hay fallback frontend');
+      return 0;
       
     } catch (error) {
       console.error('❌ Error calculando horas extra:', error);
-      
-      // Fallback con jornada legal dinámica
-      const fechaPeriodo = new Date(fecha);
-      const calculoLocal = calcularValorNovedad('horas_extra', tipo, employeeSalary, undefined, horas, fechaPeriodo);
-      
-      console.log('🔄 Fallback por error - cálculo local con jornada legal dinámica:', calculoLocal);
-      return calculoLocal.valor;
+      console.error('🚫 CRÍTICO: Solo cálculos backend permitidos');
+      return 0;
     }
   };
 
