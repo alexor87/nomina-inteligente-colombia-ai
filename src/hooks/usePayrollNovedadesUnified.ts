@@ -252,6 +252,11 @@ export const usePayrollNovedadesUnified = (
         // ✅ CRÍTICO: Invalidar caché antes de refrescar
         NovedadesCalculationService.invalidateCache(newNovedad.empleado_id, periodId);
         refreshEmployeeNovedades(newNovedad.empleado_id);
+        
+        // ✅ CRÍTICO: Actualizar lastRefreshTime para disparar recálculo
+        const newRefreshTime = Date.now();
+        setLastRefreshTime(newRefreshTime);
+        console.log('⏰ lastRefreshTime actualizado:', newRefreshTime);
       }
       
       queryClient.invalidateQueries({ 
