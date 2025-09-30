@@ -1,6 +1,34 @@
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollNovedad } from '@/types/novedades-enhanced';
 
+// ✅ Helper: Calculate inclusive days between two dates (16-19 = 4 days)
+const diffDaysInclusive = (start?: string, end?: string): number | undefined => {
+  if (!start || !end) return undefined;
+  try {
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) return undefined;
+    const diffMs = endDate.getTime() - startDate.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    return diffDays + 1; // Inclusive count
+  } catch {
+    return undefined;
+  }
+};
+
+// ✅ Helper: Normalize incapacity subtypes
+const normalizeIncapacitySubtype = (subtipo?: string): 'general' | 'laboral' | undefined => {
+  if (!subtipo) return undefined;
+  const s = subtipo.toLowerCase().trim();
+  if (['comun', 'común', 'enfermedad_general', 'eg', 'general'].includes(s)) {
+    return 'general';
+  }
+  if (['laboral', 'arl', 'accidente_laboral', 'riesgo_laboral', 'at'].includes(s)) {
+    return 'laboral';
+  }
+  return undefined;
+};
+
 export interface NovedadesTotals {
   totalDevengos: number;
   totalDeducciones: number;
@@ -128,14 +156,36 @@ class NovedadesCalculationServiceClass {
       const backendInput: BackendNovedadesTotalsInput = {
         salarioBase: employeeSalary,
         fechaPeriodo,
-        novedades: novedades.map(novedad => ({
-          tipo_novedad: novedad.tipo_novedad,
-          subtipo: novedad.subtipo,
-          valor: novedad.valor,
-          dias: (novedad as any).dias,
-          horas: (novedad as any).horas,
-          constitutivo_salario: novedad.tipo_novedad === 'horas_extra' || novedad.tipo_novedad === 'recargo_nocturno'
-        }))
+        novedades: novedades.map(novedad => {
+          // ✅ DERIVAR DÍAS: Si no viene dias, inferir desde fecha_inicio/fecha_fin o base_calculo
+          const daysFromRange = diffDaysInclusive((novedad as any).fecha_inicio, (novedad as any).fecha_fin);
+          const daysFromBase = (novedad as any).base_calculo?.dias_periodo 
+            ?? (novedad as any).base_calculo?.policy_snapshot?.days_used
+            ?? (novedad as any).base_calculo?.days;
+          const safeDays = (novedad as any).dias ?? daysFromRange ?? daysFromBase ?? undefined;
+          
+          // ✅ NORMALIZAR subtipo de incapacidad
+          const normalizedSubtype = novedad.tipo_novedad === 'incapacidad'
+            ? normalizeIncapacitySubtype(novedad.subtipo) ?? novedad.subtipo
+            : novedad.subtipo;
+
+          console.log('🔍 Preparando novedad para backend (totals):', {
+            tipo: novedad.tipo_novedad,
+            diasOriginal: (novedad as any).dias,
+            diasDerivado: safeDays,
+            subtipoOriginal: novedad.subtipo,
+            subtipoNormalizado: normalizedSubtype
+          });
+
+          return {
+            tipo_novedad: novedad.tipo_novedad,
+            subtipo: normalizedSubtype,
+            valor: novedad.valor,
+            dias: safeDays,
+            horas: (novedad as any).horas,
+            constitutivo_salario: novedad.tipo_novedad === 'horas_extra' || novedad.tipo_novedad === 'recargo_nocturno'
+          };
+        })
       };
 
       console.log('📞 BACKEND CALL: Calling professional calculation service with breakdown:', {
@@ -225,14 +275,28 @@ class NovedadesCalculationServiceClass {
       const backendInput: BackendNovedadesTotalsInput = {
         salarioBase: employeeSalary,
         fechaPeriodo,
-        novedades: novedades.map(novedad => ({
-          tipo_novedad: novedad.tipo_novedad,
-          subtipo: novedad.subtipo,
-          valor: novedad.valor,
-          dias: (novedad as any).dias,
-          horas: (novedad as any).horas,
-          constitutivo_salario: novedad.tipo_novedad === 'horas_extra' || novedad.tipo_novedad === 'recargo_nocturno'
-        }))
+        novedades: novedades.map(novedad => {
+          // ✅ DERIVAR DÍAS: Si no viene dias, inferir desde fecha_inicio/fecha_fin o base_calculo
+          const daysFromRange = diffDaysInclusive((novedad as any).fecha_inicio, (novedad as any).fecha_fin);
+          const daysFromBase = (novedad as any).base_calculo?.dias_periodo 
+            ?? (novedad as any).base_calculo?.policy_snapshot?.days_used
+            ?? (novedad as any).base_calculo?.days;
+          const safeDays = (novedad as any).dias ?? daysFromRange ?? daysFromBase ?? undefined;
+          
+          // ✅ NORMALIZAR subtipo de incapacidad
+          const normalizedSubtype = novedad.tipo_novedad === 'incapacidad'
+            ? normalizeIncapacitySubtype(novedad.subtipo) ?? novedad.subtipo
+            : novedad.subtipo;
+
+          return {
+            tipo_novedad: novedad.tipo_novedad,
+            subtipo: normalizedSubtype,
+            valor: novedad.valor,
+            dias: safeDays,
+            horas: (novedad as any).horas,
+            constitutivo_salario: novedad.tipo_novedad === 'horas_extra' || novedad.tipo_novedad === 'recargo_nocturno'
+          };
+        })
       };
 
       const { data: backendResponse } = await supabase.functions.invoke('payroll-calculations', {

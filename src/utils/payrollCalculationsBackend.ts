@@ -3,6 +3,21 @@ import { PayrollCalculationBackendService, PayrollCalculationInput } from '@/ser
 import { PayrollEmployee, BaseEmployeeData, PayrollSummary, NovedadForIBC } from '@/types/payroll';
 import { NOVEDAD_CATEGORIES } from '@/types/novedades-enhanced';
 
+// ✅ Helper: Calculate inclusive days between two dates (16-19 = 4 days)
+const diffDaysInclusive = (start?: string, end?: string): number | undefined => {
+  if (!start || !end) return undefined;
+  try {
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) return undefined;
+    const diffMs = endDate.getTime() - startDate.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    return diffDays + 1; // Inclusive count
+  } catch {
+    return undefined;
+  }
+};
+
 export const calculateEmployeeBackend = async (
   baseEmployee: BaseEmployeeData, 
   periodType: 'quincenal' | 'mensual'
@@ -165,12 +180,20 @@ export const convertNovedadesToIBC = (novedades: any[]): NovedadForIBC[] => {
       ? normalizeIncapacitySubtype(novedad.subtipo) ?? novedad.subtipo
       : novedad.subtipo;
 
+    // ✅ DERIVAR DÍAS: Si no viene novedad.dias, inferir desde fecha_inicio/fecha_fin o base_calculo
+    const daysFromRange = diffDaysInclusive(novedad.fecha_inicio, novedad.fecha_fin);
+    const daysFromBase = novedad.base_calculo?.dias_periodo 
+      ?? novedad.base_calculo?.policy_snapshot?.days_used
+      ?? novedad.base_calculo?.days;
+    const safeDays = novedad.dias ?? daysFromRange ?? daysFromBase ?? undefined;
+
     console.log('🔍 Aplicando constitutividad y normalización de incapacidad (IBC automático):', {
       tipo: novedad.tipo_novedad,
       valorOriginal: novedad.constitutivo_salario,
       constitutivo,
       valor: novedad.valor,
-      dias: novedad.dias,
+      diasOriginal: novedad.dias,
+      diasDerivado: safeDays,
       subtipoOriginal: novedad.subtipo,
       subtipoNormalizado: normalizedSubtype
     });
@@ -180,7 +203,7 @@ export const convertNovedadesToIBC = (novedades: any[]): NovedadForIBC[] => {
       constitutivo_salario: constitutivo,
       tipo_novedad: novedad.tipo_novedad || 'otros',
       // ✅ Pasar detalles necesarios para incapacidades y otros cálculos en backend
-      dias: typeof novedad.dias === 'number' ? novedad.dias : (novedad.dias ? Number(novedad.dias) : undefined),
+      dias: safeDays,
       subtipo: normalizedSubtype || undefined
     };
 

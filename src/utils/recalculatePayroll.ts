@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollRecalculationService } from '@/services/PayrollRecalculationService';
 import { toast } from 'sonner';
+import { useEmployeeNovedadesCacheStore } from '@/stores/employeeNovedadesCacheStore';
 
 export const recalculateCurrentPeriod = async (periodId: string) => {
   try {
@@ -30,8 +31,9 @@ export const recalculateCurrentPeriod = async (periodId: string) => {
         { id: 'recalc', duration: 5000 }
       );
       
-      // Refresh the page to show updated values
-      window.location.reload();
+      // ✅ REACTIVE: Trigger recalculation via store instead of full page reload
+      useEmployeeNovedadesCacheStore.getState().setLastRefreshTime(Date.now());
+      console.log('⏰ Recálculo completado, lastRefreshTime actualizado para disparar UI refresh');
     } else {
       throw new Error(result.error || 'Error en recálculo');
     }
