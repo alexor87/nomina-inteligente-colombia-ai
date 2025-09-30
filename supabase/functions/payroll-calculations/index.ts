@@ -260,14 +260,19 @@ async function calculatePayroll(supabase: any, data: any) {
       );
       totalIncapacityValue += incapacityValue;
       totalIncapacityDays += novedad.dias || 0;
+      // ✅ NO sumar novedad.valor aquí - ya está calculado en totalIncapacityValue
     } else if (novedad.constitutivo_salario) {
       // Other constitutive novedades
       totalConstitutiveNovedades += novedad.valor || 0;
+      extraPay += novedad.valor || 0;  // ✅ Solo para novedades NO-incapacidades
+    } else {
+      // ✅ Otras novedades (bonificaciones, etc.)
+      extraPay += novedad.valor || 0;
     }
-    
-    // Add to extraPay for gross calculation
-    extraPay += novedad.valor || 0;
   }
+
+  // ✅ Agregar valor calculado de incapacidades DESPUÉS del loop (una sola vez)
+  extraPay += totalIncapacityValue;
 
   // ✅ AUXILIO DE TRANSPORTE PRORRATEADO: Solo si salario ≤ 2 SMMLV y según días trabajados
   const transportLimit = getTransportAssistanceLimit(year);
