@@ -3,6 +3,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { EmployeeCompositionService, CompositionChange } from '@/services/EmployeeCompositionService';
 import { PayrollVersionService } from '@/services/PayrollVersionService';
 import { useToast } from '@/hooks/use-toast';
+import { PayrollCalculationBackendService, PayrollCalculationInput } from '@/services/PayrollCalculationBackendService';
+import { PayrollCalculationService } from '@/services/PayrollCalculationService';
+import { convertNovedadesToIBC } from '@/utils/payrollCalculationsBackend';
 
 interface EditModeState {
   isActive: boolean;
@@ -253,6 +256,15 @@ export const PayrollEditProvider: React.FC<PayrollEditProviderProps> = ({ childr
     }
   }, [editMode.sessionId]);
 
+  const calculateDiasTrabajados = (period: any): number => {
+    const daysInfo = PayrollCalculationService.getDaysInfo({
+      tipo_periodo: period.tipo_periodo as 'quincenal' | 'mensual' | 'semanal',
+      fecha_inicio: period.fecha_inicio,
+      fecha_fin: period.fecha_fin
+    });
+    return daysInfo.legalDays;
+  };
+
   const applyChanges = useCallback(async (changesSummary: string) => {
     if (!editMode.sessionId || !editMode.periodId || !editMode.companyId) {
       throw new Error('Edit mode not active');
@@ -261,6 +273,196 @@ export const PayrollEditProvider: React.FC<PayrollEditProviderProps> = ({ childr
     try {
       setEditMode(prev => ({ ...prev, isLoading: true }));
       console.log('💾 Applying changes...');
+
+      // ========== PROCESAR CAMBIOS DE COMPOSICIÓN (SNAPSHOTS) ==========
+      console.log('🔍 Procesando snapshots de composición...');
+
+      // 1. Leer snapshots de la sesión
+      const { data: snapshots, error: snapshotsError } = await supabase
+        .from('period_edit_snapshots')
+        .select('*')
+        .eq('session_id', editMode.sessionId);
+
+      if (snapshotsError) {
+        console.error('Error loading snapshots:', snapshotsError);
+        throw snapshotsError;
+      }
+
+      if (snapshots && snapshots.length > 0) {
+        console.log(`📊 Found ${snapshots.length} composition changes to apply`);
+        
+        // 2. Procesar ADICIONES (is_added = true)
+        const addedSnapshots = (snapshots as any[]).filter((s: any) => s.is_added);
+        for (const snapshot of addedSnapshots) {
+          try {
+            const employeeId = (snapshot as any).employee_id;
+            const modifiedData = (snapshot as any).modified_data;
+            
+            console.log(`➕ Processing added employee: ${employeeId}`);
+            
+            // Cargar datos completos del empleado
+            const { data: employee, error: empError } = await supabase
+              .from('employees')
+              .select('*')
+              .eq('id', employeeId)
+              .single();
+            
+            if (empError || !employee) {
+              console.error(`Error loading employee ${employeeId}:`, empError);
+              continue;
+            }
+            
+            // Cargar datos del período
+            const { data: period, error: periodError } = await supabase
+              .from('payroll_periods_real')
+              .select('*')
+              .eq('id', editMode.periodId)
+              .single();
+            
+            if (periodError || !period) {
+              console.error('Error loading period:', periodError);
+              continue;
+            }
+            
+            // Calcular días trabajados
+            const diasTrabajados = calculateDiasTrabajados(period);
+            
+            // Cargar novedades del empleado para este período
+            const { data: novedades, error: novedadesError } = await supabase
+              .from('payroll_novedades')
+              .select('*')
+              .eq('periodo_id', editMode.periodId)
+              .eq('empleado_id', employeeId);
+            
+            if (novedadesError) {
+              console.warn('Warning loading novedades:', novedadesError);
+            }
+            
+            // Convertir novedades al formato del backend
+            const novedadesForIBC = convertNovedadesToIBC(novedades || []);
+            
+            // Calcular valores con backend
+            const calculationInput: PayrollCalculationInput = {
+              baseSalary: employee.salario_base,
+              workedDays: diasTrabajados,
+              extraHours: 0,
+              disabilities: 0,
+              bonuses: 0,
+              absences: 0,
+              periodType: period.tipo_periodo === 'quincenal' ? 'quincenal' : 'mensual',
+              novedades: novedadesForIBC,
+              year: new Date(period.fecha_inicio).getFullYear().toString()
+            };
+            
+            const result = await PayrollCalculationBackendService.calculatePayroll(calculationInput);
+            
+            console.log(`✅ Calculated payroll for ${employee.nombre} ${employee.apellido}:`, {
+              grossPay: result.grossPay,
+              netPay: result.netPay,
+              ibc: result.ibc
+            });
+            
+            // Insertar en tabla payrolls
+            const { error: insertError } = await supabase
+              .from('payrolls')
+              .insert({
+                company_id: editMode.companyId,
+                period_id: editMode.periodId,
+                employee_id: employeeId,
+                periodo: period.periodo,
+                salario_base: employee.salario_base,
+                dias_trabajados: diasTrabajados,
+                total_devengado: result.grossPay,
+                total_deducciones: result.totalDeductions,
+                neto_pagado: result.netPay,
+                auxilio_transporte: result.transportAllowance,
+                salud_empleado: result.healthDeduction,
+                pension_empleado: result.pensionDeduction,
+                ibc: result.ibc,
+                estado: period.estado,
+                created_at: new Date().toISOString()
+              });
+            
+            if (insertError) {
+              console.error(`Error inserting payroll for ${employeeId}:`, insertError);
+              throw insertError;
+            }
+            
+            console.log(`✅ Employee ${employee.nombre} ${employee.apellido} added to payrolls`);
+          } catch (error) {
+            console.error('Error processing added employee:', error);
+            throw error;
+          }
+        }
+        
+        // 3. Procesar ELIMINACIONES (is_removed = true)
+        const removedSnapshots = (snapshots as any[]).filter((s: any) => s.is_removed);
+        for (const snapshot of removedSnapshots) {
+          const employeeId = (snapshot as any).employee_id;
+          console.log(`➖ Processing removed employee: ${employeeId}`);
+          
+          const { error: deleteError } = await supabase
+            .from('payrolls')
+            .delete()
+            .eq('period_id', editMode.periodId)
+            .eq('employee_id', employeeId);
+          
+          if (deleteError) {
+            console.error(`Error deleting payroll for ${employeeId}:`, deleteError);
+            throw deleteError;
+          }
+          
+          console.log(`✅ Employee ${employeeId} removed from payrolls`);
+        }
+        
+        // 4. Actualizar totales del período
+        const { data: allPayrolls, error: totalsError } = await supabase
+          .from('payrolls')
+          .select('total_devengado, total_deducciones, neto_pagado')
+          .eq('period_id', editMode.periodId);
+        
+        if (totalsError) {
+          console.error('Error calculating totals:', totalsError);
+          throw totalsError;
+        }
+        
+        const totals = (allPayrolls || []).reduce((acc, p) => ({
+          devengado: acc.devengado + (p.total_devengado || 0),
+          deducciones: acc.deducciones + (p.total_deducciones || 0),
+          neto: acc.neto + (p.neto_pagado || 0)
+        }), { devengado: 0, deducciones: 0, neto: 0 });
+        
+        const { error: updateTotalsError } = await supabase
+          .from('payroll_periods_real')
+          .update({
+            empleados_count: allPayrolls.length,
+            total_devengado: totals.devengado,
+            total_deducciones: totals.deducciones,
+            total_neto: totals.neto,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', editMode.periodId);
+        
+        if (updateTotalsError) {
+          console.error('Error updating period totals:', updateTotalsError);
+          throw updateTotalsError;
+        }
+        
+        console.log(`✅ Period totals updated: ${allPayrolls.length} employees`);
+        
+        // 5. Limpiar snapshots procesados
+        const { error: cleanupError } = await supabase
+          .from('period_edit_snapshots')
+          .delete()
+          .eq('session_id', editMode.sessionId);
+        
+        if (cleanupError) {
+          console.warn('Warning cleaning up snapshots:', cleanupError);
+        } else {
+          console.log('✅ Snapshots cleaned up');
+        }
+      }
+      // ========== FIN PROCESAMIENTO DE SNAPSHOTS ==========
 
       // Get updated payroll data for new snapshot
       const { data: updatedPayrolls, error: payrollError } = await supabase
