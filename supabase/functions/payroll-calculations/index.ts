@@ -239,7 +239,7 @@ async function calculatePayroll(supabase: any, data: any) {
   } = data;
 
   const dailySalary = baseSalary / 30;
-  const regularPay = (dailySalary * workedDays) - absences;
+  let regularPay = 0; // ✅ Se calculará después de procesar novedades
   let extraPay = bonuses; // Legacy field compatibility
 
   // ✅ PROCESAR NOVEDADES CON POLÍTICAS
@@ -271,14 +271,26 @@ async function calculatePayroll(supabase: any, data: any) {
     }
   }
 
+  // ✅ CÁLCULO NORMATIVO: Días efectivamente trabajados (sin incapacidades)
+  const effectiveWorkedDays = Math.max(0, Math.min(workedDays - totalIncapacityDays, 30));
+  
+  // ✅ REGULARPY: Salario solo por días efectivamente trabajados
+  regularPay = (dailySalary * effectiveWorkedDays) - absences;
+  
+  console.log('📊 Días trabajados:', { 
+    workedDays, 
+    totalIncapacityDays, 
+    effectiveWorkedDays,
+    regularPay: Math.round(regularPay)
+  });
+
   // ✅ Agregar valor calculado de incapacidades DESPUÉS del loop (una sola vez)
   extraPay += totalIncapacityValue;
 
-  // ✅ AUXILIO DE TRANSPORTE PRORRATEADO: Solo si salario ≤ 2 SMMLV y según días trabajados
+  // ✅ AUXILIO DE TRANSPORTE PRORRATEADO: Solo si salario ≤ 2 SMMLV y según días EFECTIVAMENTE TRABAJADOS
   const transportLimit = getTransportAssistanceLimit(year);
   const eligibleForTransport = baseSalary <= transportLimit;
-  const workedDaysCapped = Math.max(0, Math.min(Number(workedDays) || 0, 30));
-  const transportAllowance = eligibleForTransport ? Math.round((config.auxilioTransporte / 30) * workedDaysCapped) : 0;
+  const transportAllowance = eligibleForTransport ? Math.round((config.auxilioTransporte / 30) * effectiveWorkedDays) : 0;
 
   console.log('🚍 Auxilio Transporte:', {
     baseSalary,
@@ -293,17 +305,19 @@ async function calculatePayroll(supabase: any, data: any) {
   // ✅ BACKEND AUTHORITATIVE FIX: Include prorated transport allowance in grossPay
   const grossPay = regularPay + extraPay + transportAllowance;
 
-  // ✅ IBC SIEMPRE PROPORCIONAL (Ley 100/1993 Art. 204)
-  const effectiveWorkedDays = Math.min(workedDays, 30);
-  const ibcSalud = Math.round((baseSalary / 30) * effectiveWorkedDays + totalConstitutiveNovedades);
-  const ibcMode = 'proportional';
+  // ✅ IBC SALUD/PENSIÓN: Incluye salario días trabajados + constitutivas + INCAPACIDADES (Decreto 1406/1999)
+  const ibcSalud = Math.round((baseSalary / 30) * effectiveWorkedDays + totalConstitutiveNovedades + totalIncapacityValue);
   
-  console.log('🧮 IBC proporcional (Ley 100/1993):', { 
-    ibcSalud, 
+  // ✅ IBC PARAFISCALES: Solo salario días trabajados + constitutivas (SIN incapacidades)
+  const ibcParafiscales = Math.round((baseSalary / 30) * effectiveWorkedDays + totalConstitutiveNovedades);
+  
+  console.log('🧮 IBC dual (Decreto 1406/1999 + Ley 100/1993):', { 
+    ibcSalud,
+    ibcParafiscales,
     effectiveWorkedDays, 
     totalIncapacityDays,
     totalIncapacityValue,
-    note: 'IBC siempre proporcional al salario, independiente de incapacidades'
+    note: 'IBC Salud incluye incapacidades, IBC Parafiscales NO'
   });
 
   const healthDeduction = Math.round(ibcSalud * 0.04);
@@ -313,13 +327,13 @@ async function calculatePayroll(supabase: any, data: any) {
   // ✅ netPay now correctly calculated: grossPay (with transport) - deductions
   const netPay = grossPay - totalDeductions;
 
-  // Employer contributions (not affected by IBC mode)
+  // ✅ Employer contributions: Salud/Pensión/ARL usan ibcSalud, Parafiscales usan ibcParafiscales
   const employerHealth = Math.round(ibcSalud * 0.085);
   const employerPension = Math.round(ibcSalud * 0.12);
   const employerArl = Math.round(ibcSalud * 0.00522);
-  const employerCaja = Math.round(ibcSalud * 0.04);
-  const employerIcbf = Math.round(ibcSalud * 0.03);
-  const employerSena = Math.round(ibcSalud * 0.02);
+  const employerCaja = Math.round(ibcParafiscales * 0.04);
+  const employerIcbf = Math.round(ibcParafiscales * 0.03);
+  const employerSena = Math.round(ibcParafiscales * 0.02);
 
   const employerContributions = employerHealth + employerPension + employerArl + 
                                employerCaja + employerIcbf + employerSena;
@@ -345,12 +359,13 @@ async function calculatePayroll(supabase: any, data: any) {
     ibc: ibcSalud
   };
 
-  console.log('✅ Calculation (automatic IBC) result:', {
+  console.log('✅ Calculation (normative IBC) result:', {
     policy,
     totalIncapacityDays,
     totalIncapacityValue,
-    ibcMode,
+    effectiveWorkedDays,
     ibcSalud,
+    ibcParafiscales,
     healthDeduction,
     pensionDeduction,
     transportAllowance,
