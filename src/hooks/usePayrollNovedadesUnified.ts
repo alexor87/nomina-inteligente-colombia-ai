@@ -249,6 +249,8 @@ export const usePayrollNovedadesUnified = (
       
       // ✅ NUEVO: Update global store
       if (newNovedad.empleado_id) {
+        // ✅ CRÍTICO: Invalidar caché antes de refrescar
+        NovedadesCalculationService.invalidateCache(newNovedad.empleado_id, periodId);
         refreshEmployeeNovedades(newNovedad.empleado_id);
       }
       
@@ -309,6 +311,8 @@ export const usePayrollNovedadesUnified = (
       
       // ✅ NUEVO: Update global store
       if (updatedNovedad.empleado_id) {
+        // ✅ CRÍTICO: Invalidar caché antes de refrescar
+        NovedadesCalculationService.invalidateCache(updatedNovedad.empleado_id, periodId);
         refreshEmployeeNovedades(updatedNovedad.empleado_id);
       }
       
@@ -368,6 +372,8 @@ export const usePayrollNovedadesUnified = (
       // ✅ CRÍTICO: Si conocemos el empleado afectado, refrescar su cache específicamente
       if (employeeId) {
         console.log('🔄 Refrescando cache específico del empleado en store global:', employeeId);
+        // ✅ CRÍTICO: Invalidar caché antes de refrescar
+        NovedadesCalculationService.invalidateCache(employeeId, periodId);
         refreshEmployeeNovedades(employeeId).then(() => {
           console.log('✅ Cache del empleado actualizado exitosamente en store global');
         }).catch(err => {
