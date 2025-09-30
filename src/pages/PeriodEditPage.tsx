@@ -3,11 +3,13 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Save, X, Calculator } from 'lucide-react';
+import { ArrowLeft, Save, X, Calculator, Edit2, UserPlus } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { formatCurrency } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { HistoryAddEmployeeModal } from '@/components/payroll/modals/HistoryAddEmployeeModal';
+import { PayrollCalculationBackendService } from '@/services/PayrollCalculationBackendService';
 
 /**
  * ✅ PÁGINA DE EDICIÓN DE PERÍODO - FASE 3 CRÍTICA
@@ -23,6 +25,9 @@ export const PeriodEditPage = () => {
   const [period, setPeriod] = useState<any>(null);
   const [employees, setEmployees] = useState<any[]>([]);
   const [editedValues, setEditedValues] = useState<Record<string, any>>({});
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false);
+  const [isAddingEmployees, setIsAddingEmployees] = useState(false);
 
   useEffect(() => {
     if (periodId) {
@@ -182,6 +187,142 @@ export const PeriodEditPage = () => {
     }
   };
 
+  const calculateDiasTrabajados = (period: any): number => {
+    switch (period.tipo_periodo) {
+      case 'quincenal':
+        return 15;
+      case 'semanal':
+        return 7;
+      case 'mensual':
+      case 'personalizado':
+        const start = new Date(period.fecha_inicio);
+        const end = new Date(period.fecha_fin);
+        const diffTime = Math.abs(end.getTime() - start.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return diffDays + 1;
+      default:
+        return 30;
+    }
+  };
+
+  const handleAddEmployees = async (selectedEmployeeIds: string[]) => {
+    if (!selectedEmployeeIds || selectedEmployeeIds.length === 0) return;
+
+    try {
+      setIsAddingEmployees(true);
+      
+      // 1. Cargar datos de empleados
+      const { data: employeesData, error: employeesError } = await supabase
+        .from('employees')
+        .select('*')
+        .in('id', selectedEmployeeIds)
+        .eq('estado', 'activo');
+
+      if (employeesError) throw employeesError;
+
+      // 2. Calcular días trabajados
+      const diasTrabajados = calculateDiasTrabajados(period);
+
+      // 3. Procesar cada empleado
+      for (const emp of employeesData || []) {
+        // 3.1: Cargar novedades del período
+        const { data: novedades } = await supabase
+          .from('payroll_novedades')
+          .select('*')
+          .eq('periodo_id', periodId)
+          .eq('empleado_id', emp.id);
+
+        // 3.2: Formatear novedades para backend
+        const novedadesForBackend = (novedades || []).map(n => ({
+          valor: n.valor,
+          constitutivo_salario: n.constitutivo_salario || false,
+          tipo_novedad: n.tipo_novedad,
+          dias: n.dias || 0,
+          subtipo: n.subtipo
+        }));
+
+        // 3.3: Llamar backend para calcular
+        const result = await PayrollCalculationBackendService.calculatePayroll({
+          baseSalary: emp.salario_base,
+          workedDays: diasTrabajados,
+          extraHours: 0,
+          disabilities: 0,
+          bonuses: 0,
+          absences: 0,
+          periodType: period.tipo_periodo === 'quincenal' ? 'quincenal' : 'mensual',
+          novedades: novedadesForBackend,
+          year: new Date(period.fecha_inicio).getFullYear().toString()
+        });
+
+        // 3.4: Insertar en payrolls con valores calculados
+        const { error: insertError } = await supabase
+          .from('payrolls')
+          .insert({
+            company_id: period.company_id,
+            period_id: periodId,
+            employee_id: emp.id,
+            periodo: period.periodo,
+            salario_base: emp.salario_base,
+            dias_trabajados: diasTrabajados,
+            total_devengado: result.grossPay,
+            total_deducciones: result.totalDeductions,
+            neto_pagado: result.netPay,
+            auxilio_transporte: result.transportAllowance,
+            salud_empleado: result.healthDeduction,
+            pension_empleado: result.pensionDeduction,
+            estado: period.estado, // Heredar estado del período
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+
+        if (insertError) throw insertError;
+      }
+
+      // 4. Actualizar totales del período
+      const { data: allPayrolls } = await supabase
+        .from('payrolls')
+        .select('total_devengado, total_deducciones, neto_pagado')
+        .eq('period_id', periodId);
+
+      const totals = (allPayrolls || []).reduce((acc, p) => ({
+        devengado: acc.devengado + (p.total_devengado || 0),
+        deducciones: acc.deducciones + (p.total_deducciones || 0),
+        neto: acc.neto + (p.neto_pagado || 0)
+      }), { devengado: 0, deducciones: 0, neto: 0 });
+
+      await supabase
+        .from('payroll_periods_real')
+        .update({
+          empleados_count: allPayrolls?.length || 0,
+          total_devengado: totals.devengado,
+          total_deducciones: totals.deducciones,
+          total_neto: totals.neto,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', periodId);
+
+      // 5. Recargar UI
+      await loadPeriodData();
+      setShowAddEmployeeModal(false);
+      
+      toast({
+        title: "✅ Empleados agregados",
+        description: `Se agregaron ${selectedEmployeeIds.length} empleado(s) con cálculos completos`,
+        className: "border-green-200 bg-green-50"
+      });
+
+    } catch (error) {
+      console.error('Error agregando empleados:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron agregar los empleados",
+        variant: "destructive"
+      });
+    } finally {
+      setIsAddingEmployees(false);
+    }
+  };
+
   const handleBack = () => {
     navigate('/app/dashboard');
   };
@@ -222,31 +363,56 @@ export const PeriodEditPage = () => {
           </Button>
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
-              Editar Período
+              {isEditMode ? 'Editando Período' : 'Detalle del Período'}
             </h1>
             <p className="text-gray-600">{period.periodo}</p>
           </div>
         </div>
         
         <div className="flex items-center gap-2">
-          {hasChanges && (
+          {!isEditMode ? (
             <Button 
-              variant="outline" 
               size="sm" 
-              onClick={() => setEditedValues({})}
+              onClick={() => setIsEditMode(true)}
+              variant="outline"
             >
-              <X className="h-4 w-4 mr-2" />
-              Cancelar cambios
+              <Edit2 className="h-4 w-4 mr-2" />
+              Editar Período
             </Button>
+          ) : (
+            <>
+              <Button 
+                size="sm" 
+                onClick={() => setShowAddEmployeeModal(true)}
+                variant="outline"
+                disabled={isAddingEmployees}
+              >
+                <UserPlus className="h-4 w-4 mr-2" />
+                Agregar Empleados
+              </Button>
+              {hasChanges && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => {
+                    setEditedValues({});
+                    setIsEditMode(false);
+                  }}
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Cancelar
+                </Button>
+              )}
+              <Button 
+                size="sm" 
+                onClick={handleSave}
+                disabled={!hasChanges || isSaving}
+              >
+                <Save className="h-4 w-4 mr-2" />
+                {isSaving ? 'Guardando...' : 'Guardar cambios'}
+              </Button>
+            </>
           )}
-          <Button 
-            size="sm" 
-            onClick={handleSave}
-            disabled={!hasChanges || isSaving}
-          >
-            <Save className="h-4 w-4 mr-2" />
-            {isSaving ? 'Guardando...' : 'Guardar cambios'}
-          </Button>
         </div>
       </div>
 
@@ -323,6 +489,7 @@ export const PeriodEditPage = () => {
                             className="w-20 text-right border rounded px-1 py-0.5 text-xs"
                             value={editedValues[`${employee.id}_salario_base`] ?? employee.salario_base}
                             onChange={(e) => handleValueChange(employee.id, 'salario_base', Number(e.target.value))}
+                            disabled={!isEditMode}
                           />
                         </td>
                         <td className="p-2 text-right">
@@ -331,6 +498,7 @@ export const PeriodEditPage = () => {
                             className="w-20 text-right border rounded px-1 py-0.5 text-xs"
                             value={editedValues[`${employee.id}_horas_extra`] ?? employee.horas_extra ?? 0}
                             onChange={(e) => handleValueChange(employee.id, 'horas_extra', Number(e.target.value))}
+                            disabled={!isEditMode}
                           />
                         </td>
                         <td className="p-2 text-right">
@@ -339,6 +507,7 @@ export const PeriodEditPage = () => {
                             className="w-20 text-right border rounded px-1 py-0.5 text-xs"
                             value={editedValues[`${employee.id}_bonificaciones`] ?? employee.bonificaciones ?? 0}
                             onChange={(e) => handleValueChange(employee.id, 'bonificaciones', Number(e.target.value))}
+                            disabled={!isEditMode}
                           />
                         </td>
                         <td className="p-2 text-right">
@@ -347,6 +516,7 @@ export const PeriodEditPage = () => {
                             className="w-20 text-right border rounded px-1 py-0.5 text-xs"
                             value={editedValues[`${employee.id}_total_deducciones`] ?? employee.total_deducciones ?? 0}
                             onChange={(e) => handleValueChange(employee.id, 'total_deducciones', Number(e.target.value))}
+                            disabled={!isEditMode}
                           />
                         </td>
                         <td className="p-2 text-right font-medium text-green-600">
@@ -370,6 +540,16 @@ export const PeriodEditPage = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Modal para agregar empleados */}
+      <HistoryAddEmployeeModal
+        isOpen={showAddEmployeeModal}
+        onClose={() => setShowAddEmployeeModal(false)}
+        periodId={periodId || ''}
+        companyId={period?.company_id || ''}
+        currentEmployeeIds={employees.map(e => e.employee_id)}
+        onEmployeesAdded={handleAddEmployees}
+      />
     </div>
   );
 };
