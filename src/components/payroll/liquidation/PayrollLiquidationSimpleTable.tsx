@@ -335,8 +335,15 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
       });
       
       if (result) {
-        console.log('✅ Novedad creada exitosamente - marcando cambio para evitar recarga duplicada');
+        console.log('✅ Novedad creada exitosamente');
         novedadChangedRef.current = true;
+        
+        // ✅ CRÍTICO: Refrescar las novedades del empleado
+        await refreshEmployeeNovedades(selectedEmployee.id);
+        
+        // ✅ CRÍTICO: Notificar cambio al componente padre
+        await onEmployeeNovedadesChange(selectedEmployee.id);
+        
         handleCloseNovedadModal();
       }
     } catch (error) {
