@@ -185,7 +185,7 @@ export const convertNovedadesToIBC = (novedades: any[]): NovedadForIBC[] => {
     const daysFromBase = novedad.base_calculo?.dias_periodo 
       ?? novedad.base_calculo?.policy_snapshot?.days_used
       ?? novedad.base_calculo?.days;
-    const safeDays = novedad.dias ?? daysFromRange ?? daysFromBase ?? undefined;
+    const safeDays = (novedad.dias && novedad.dias > 0) ? novedad.dias : (daysFromRange ?? daysFromBase ?? undefined);
 
     console.log('🔍 Aplicando constitutividad y normalización de incapacidad (IBC automático):', {
       tipo: novedad.tipo_novedad,

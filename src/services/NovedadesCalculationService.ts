@@ -162,7 +162,7 @@ class NovedadesCalculationServiceClass {
           const daysFromBase = (novedad as any).base_calculo?.dias_periodo 
             ?? (novedad as any).base_calculo?.policy_snapshot?.days_used
             ?? (novedad as any).base_calculo?.days;
-          const safeDays = (novedad as any).dias ?? daysFromRange ?? daysFromBase ?? undefined;
+          const safeDays = ((novedad as any).dias && (novedad as any).dias > 0) ? (novedad as any).dias : (daysFromRange ?? daysFromBase ?? undefined);
           
           // ✅ NORMALIZAR subtipo de incapacidad
           const normalizedSubtype = novedad.tipo_novedad === 'incapacidad'
@@ -281,7 +281,7 @@ class NovedadesCalculationServiceClass {
           const daysFromBase = (novedad as any).base_calculo?.dias_periodo 
             ?? (novedad as any).base_calculo?.policy_snapshot?.days_used
             ?? (novedad as any).base_calculo?.days;
-          const safeDays = (novedad as any).dias ?? daysFromRange ?? daysFromBase ?? undefined;
+          const safeDays = ((novedad as any).dias && (novedad as any).dias > 0) ? (novedad as any).dias : (daysFromRange ?? daysFromBase ?? undefined);
           
           // ✅ NORMALIZAR subtipo de incapacidad
           const normalizedSubtype = novedad.tipo_novedad === 'incapacidad'
