@@ -244,22 +244,36 @@ async function calculatePayroll(supabase: any, data: any) {
 
   // ✅ PROCESAR NOVEDADES CON POLÍTICAS
   console.log('📋 Processing novedades:', novedades.length);
+  console.log('📋 NOVEDADES RAW:', JSON.stringify(novedades, null, 2));
   
   let totalIncapacityValue = 0;
   let totalIncapacityDays = 0;
   let totalConstitutiveNovedades = 0;
 
   for (const novedad of novedades) {
+    console.log('🔍 Procesando novedad:', { 
+      tipo: novedad.tipo_novedad, 
+      dias: novedad.dias, 
+      valor: novedad.valor,
+      constitutivo: novedad.constitutivo_salario 
+    });
+    
     if (novedad.tipo_novedad === 'incapacidad') {
+      const incapacityDays = novedad.dias || 0;
+      console.log('🏥 INCAPACIDAD detectada - días:', incapacityDays);
+      
       const incapacityValue = await calculateIncapacityWithPolicy(
         baseSalary, 
-        novedad.dias || 0, 
+        incapacityDays, 
         novedad.subtipo, 
         policy,
         config.salarioMinimo
       );
+      
       totalIncapacityValue += incapacityValue;
-      totalIncapacityDays += novedad.dias || 0;
+      totalIncapacityDays += incapacityDays;
+      
+      console.log('🏥 SUMA ACUMULADA - totalIncapacityDays:', totalIncapacityDays, 'totalIncapacityValue:', totalIncapacityValue);
       // ✅ NO sumar novedad.valor aquí - ya está calculado en totalIncapacityValue
     } else if (novedad.constitutivo_salario) {
       // Other constitutive novedades
@@ -271,17 +285,26 @@ async function calculatePayroll(supabase: any, data: any) {
     }
   }
 
+  console.log('🔢 ANTES DE CALCULAR effectiveWorkedDays:', {
+    workedDays,
+    totalIncapacityDays,
+    'novedades.length': novedades.length
+  });
+  
   // ✅ CÁLCULO NORMATIVO: Días efectivamente trabajados (sin incapacidades)
   const effectiveWorkedDays = Math.max(0, Math.min(workedDays - totalIncapacityDays, 30));
   
   // ✅ REGULARPY: Salario solo por días efectivamente trabajados
-  regularPay = (dailySalary * effectiveWorkedDays) - absences;
+  regularPay = Math.round((dailySalary * effectiveWorkedDays) - absences);
   
-  console.log('📊 Días trabajados:', { 
+  console.log('📊 CÁLCULO FINAL - Días trabajados:', { 
     workedDays, 
     totalIncapacityDays, 
     effectiveWorkedDays,
-    regularPay: Math.round(regularPay)
+    baseSalary,
+    dailySalary: Math.round(dailySalary),
+    regularPay,
+    absences
   });
 
   // ✅ Agregar valor calculado de incapacidades DESPUÉS del loop (una sola vez)
@@ -306,17 +329,21 @@ async function calculatePayroll(supabase: any, data: any) {
   const grossPay = regularPay + extraPay + transportAllowance;
 
   // ✅ IBC SALUD/PENSIÓN: Incluye salario días trabajados + constitutivas + INCAPACIDADES (Decreto 1406/1999)
-  const ibcSalud = Math.round((baseSalary / 30) * effectiveWorkedDays + totalConstitutiveNovedades + totalIncapacityValue);
+  const salarioProporcionalIBC = Math.round((baseSalary / 30) * effectiveWorkedDays);
+  const ibcSalud = salarioProporcionalIBC + totalConstitutiveNovedades + totalIncapacityValue;
   
   // ✅ IBC PARAFISCALES: Solo salario días trabajados + constitutivas (SIN incapacidades)
-  const ibcParafiscales = Math.round((baseSalary / 30) * effectiveWorkedDays + totalConstitutiveNovedades);
+  const ibcParafiscales = salarioProporcionalIBC + totalConstitutiveNovedades;
   
-  console.log('🧮 IBC dual (Decreto 1406/1999 + Ley 100/1993):', { 
+  console.log('🧮 IBC DETALLADO (Decreto 1406/1999 + Ley 100/1993):', { 
+    salarioProporcionalIBC,
+    totalConstitutiveNovedades,
+    totalIncapacityValue,
     ibcSalud,
     ibcParafiscales,
     effectiveWorkedDays, 
     totalIncapacityDays,
-    totalIncapacityValue,
+    desglose: `${salarioProporcionalIBC} (salario) + ${totalConstitutiveNovedades} (constitutivas) + ${totalIncapacityValue} (incapacidad) = ${ibcSalud}`,
     note: 'IBC Salud incluye incapacidades, IBC Parafiscales NO'
   });
 

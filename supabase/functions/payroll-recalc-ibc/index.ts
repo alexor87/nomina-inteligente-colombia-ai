@@ -173,18 +173,41 @@ const getNovedadesTotals = async (supabase: any, employeeId: string, periodId: s
   }
 };
 
-// Nueva función que replica EXACTAMENTE la lógica de PayrollLiquidationService
+// Nueva función que replica EXACTAMENTE la lógica de PayrollLiquidationService CON DÍAS EFECTIVOS
 const calculatePayrollLiquidationStyle = async (supabase: any, employeeData: any, periodData: any, companyId: string) => {
   const year = new Date(periodData.fecha_inicio).getFullYear().toString();
   const salarioBase = Number(employeeData.salario_base) || 0;
-  const diasTrabajados = calculateWorkedDays(periodData.tipo_periodo);
+  const diasPeriodo = calculateWorkedDays(periodData.tipo_periodo);
   
-  console.log(`🧮 Calculando empleado ${employeeData.nombre} - Salario base: ${salarioBase}, Días: ${diasTrabajados}`);
+  console.log(`🧮 Calculando empleado ${employeeData.nombre} - Salario base: ${salarioBase}, Días período: ${diasPeriodo}`);
   
-  // FASE 1: Calcular salario proporcional (igual que PayrollLiquidationService línea 128)
-  const salarioProporcional = (salarioBase / 30) * diasTrabajados;
+  // ✅ OBTENER DÍAS DE INCAPACIDAD DEL PERÍODO
+  const { data: incapacidades, error: incapError } = await supabase
+    .from('payroll_novedades')
+    .select('dias, valor, tipo_novedad')
+    .eq('empleado_id', employeeData.id)
+    .eq('periodo_id', periodData.id)
+    .eq('tipo_novedad', 'incapacidad');
   
-  // FASE 2: Calcular auxilio de transporte prorrateado (igual que PayrollLiquidationService línea 129)
+  let totalIncapacityDays = 0;
+  let totalIncapacityValue = 0;
+  
+  if (!incapError && incapacidades && incapacidades.length > 0) {
+    incapacidades.forEach((inc: any) => {
+      totalIncapacityDays += inc.dias || 0;
+      totalIncapacityValue += parseFloat(inc.valor) || 0;
+    });
+  }
+  
+  // ✅ CALCULAR DÍAS EFECTIVAMENTE TRABAJADOS
+  const diasTrabajados = Math.max(0, diasPeriodo - totalIncapacityDays);
+  
+  console.log(`📊 Días detallados - Período: ${diasPeriodo}, Incapacidad: ${totalIncapacityDays}, Efectivos: ${diasTrabajados}, Valor incapacidad: ${totalIncapacityValue}`);
+  
+  // FASE 1: Calcular salario proporcional SOLO por días EFECTIVAMENTE TRABAJADOS
+  const salarioProporcional = Math.round((salarioBase / 30) * diasTrabajados);
+  
+  // FASE 2: Calcular auxilio de transporte prorrateado por días EFECTIVAMENTE TRABAJADOS
   const auxilioTransporte = calculateTransportAllowance(salarioBase, diasTrabajados, year);
   
   // FASE 3: Obtener devengos por novedades usando el servicio de cálculo
@@ -193,24 +216,33 @@ const calculatePayrollLiquidationStyle = async (supabase: any, employeeData: any
   // FASE 4: Total devengado = salario proporcional + auxilio transporte + devengos novedades
   const totalDevengado = salarioProporcional + auxilioTransporte + novedadesTotals.totalDevengos;
   
-  // FASE 5: Obtener novedades constitutivas y calcular deducciones (igual que módulo de liquidación)
+  // FASE 5: Obtener novedades constitutivas y calcular deducciones CON INCAPACIDADES EN IBC
   const constitutiveNovedades = await getConstitutiveNovedades(supabase, employeeData.id, periodData.id);
-  const deductionResult = calculateDeductions(salarioBase, diasTrabajados, constitutiveNovedades, year);
+  
+  // ✅ IBC INCLUYE: salario proporcional + constitutivas + INCAPACIDADES
+  const ibcBase = Math.round((salarioBase / 30) * diasTrabajados);
+  const ibcSalud = ibcBase + constitutiveNovedades + totalIncapacityValue;
+  
+  console.log(`🧮 IBC DETALLADO - Base: ${ibcBase}, Constitutivas: ${constitutiveNovedades}, Incapacidad: ${totalIncapacityValue}, Total: ${ibcSalud}`);
+  
+  const saludEmpleado = Math.round(ibcSalud * 0.04);
+  const pensionEmpleado = Math.round(ibcSalud * 0.04);
+  const deduccionesSS = saludEmpleado + pensionEmpleado;
   
   // FASE 6: Total deducciones = deducciones calculadas + deducciones por novedades
-  const totalDeducciones = deductionResult.totalDeducciones + novedadesTotals.totalDeducciones;
+  const totalDeducciones = deduccionesSS + novedadesTotals.totalDeducciones;
   
   // FASE 7: Neto pagado = total devengado - total deducciones
-  const netoPagado = totalDevengado - totalDeducciones;
+  const netoPagado = Math.round(totalDevengado - totalDeducciones);
   
-  console.log(`✅ ${employeeData.nombre}: Base=${salarioBase}, Días=${diasTrabajados}, Constitutivas=${constitutiveNovedades}, IBC=${deductionResult.ibc}, Salud=${deductionResult.saludEmpleado}, Pensión=${deductionResult.pensionEmpleado}, TotalDed=${totalDeducciones}, Neto=${netoPagado}`);
+  console.log(`✅ ${employeeData.nombre}: Base=${salarioBase}, DíasEfectivos=${diasTrabajados}, IBC=${ibcSalud}, Salud=${saludEmpleado}, Pensión=${pensionEmpleado}, TotalDed=${totalDeducciones}, Neto=${netoPagado}`);
   
   return {
-    totalDevengado,
+    totalDevengado: Math.round(totalDevengado),
     totalDeducciones,
-    saludEmpleado: deductionResult.saludEmpleado,
-    pensionEmpleado: deductionResult.pensionEmpleado,
-    ibc: deductionResult.ibc,
+    saludEmpleado,
+    pensionEmpleado,
+    ibc: ibcSalud,
     netoPagado,
     auxilioTransporte,
     salarioProporcional
