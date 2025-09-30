@@ -421,14 +421,9 @@ async function calculatePayroll(supabase: any, data: any) {
 
   const grossPay = regularPay + extraPay + transportAllowance
 
-  // Calculate IBC
-  let ibcSalud: number
-  if (totalIncapacityDays > 0) {
-    ibcSalud = totalIncapacityValue
-  } else {
-    const effectiveWorkedDays = Math.min(workedDays, 30)
-    ibcSalud = Math.round((baseSalary / 30) * effectiveWorkedDays + totalConstitutiveNovedades)
-  }
+  // ✅ IBC SIEMPRE PROPORCIONAL (Ley 100/1993 Art. 204)
+  const effectiveWorkedDays = Math.min(workedDays, 30)
+  const ibcSalud = Math.round((baseSalary / 30) * effectiveWorkedDays + totalConstitutiveNovedades)
 
   const healthDeduction = Math.round(ibcSalud * 0.04)
   const pensionDeduction = Math.round(ibcSalud * 0.04)

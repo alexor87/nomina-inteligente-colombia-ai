@@ -288,22 +288,18 @@ async function calculatePayroll(supabase: any, data: any) {
   // ✅ BACKEND AUTHORITATIVE FIX: Include prorated transport allowance in grossPay
   const grossPay = regularPay + extraPay + transportAllowance;
 
-  // ✅ IBC AUTOMÁTICO: Incapacidad vs Proporcional
-  let ibcSalud: number;
-  let ibcMode: string;
-
-  if (totalIncapacityDays > 0) {
-    // Con incapacidades: IBC = valor total de incapacidades
-    ibcSalud = totalIncapacityValue;
-    ibcMode = 'incapacity';
-    console.log('🧮 IBC automático (incapacidad):', { totalIncapacityValue, totalIncapacityDays });
-  } else {
-    // Sin incapacidades: IBC proporcional
-    const effectiveWorkedDays = Math.min(workedDays, 30);
-    ibcSalud = Math.round((baseSalary / 30) * effectiveWorkedDays + totalConstitutiveNovedades);
-    ibcMode = 'proportional';
-    console.log('🧮 IBC automático (proporcional):', { ibcSalud, effectiveWorkedDays });
-  }
+  // ✅ IBC SIEMPRE PROPORCIONAL (Ley 100/1993 Art. 204)
+  const effectiveWorkedDays = Math.min(workedDays, 30);
+  const ibcSalud = Math.round((baseSalary / 30) * effectiveWorkedDays + totalConstitutiveNovedades);
+  const ibcMode = 'proportional';
+  
+  console.log('🧮 IBC proporcional (Ley 100/1993):', { 
+    ibcSalud, 
+    effectiveWorkedDays, 
+    totalIncapacityDays,
+    totalIncapacityValue,
+    note: 'IBC siempre proporcional al salario, independiente de incapacidades'
+  });
 
   const healthDeduction = Math.round(ibcSalud * 0.04);
   const pensionDeduction = Math.round(ibcSalud * 0.04);
