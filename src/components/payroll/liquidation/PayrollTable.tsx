@@ -10,7 +10,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { NovedadUnifiedModal } from '@/components/payroll/novedades/NovedadUnifiedModal';
 import { JornadaLegalTester } from '@/components/payroll/debug/JornadaLegalTester';
 import { useNovedades } from '@/hooks/useNovedades';
-import { usePayrollNovedades } from '@/hooks/usePayrollNovedades';
+import { usePayrollNovedadesUnified } from '@/hooks/usePayrollNovedadesUnified';
 import { PayrollEmployee } from '@/types/payroll';
 import { CreateNovedadData } from '@/types/novedades-enhanced';
 
@@ -50,7 +50,7 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({
   const [showDebugMode, setShowDebugMode] = useState(false);
 
   const { createNovedad } = useNovedades(periodoId);
-  const { refreshEmployeeNovedades } = usePayrollNovedades(periodoId);
+  const { refreshEmployeeNovedades } = usePayrollNovedadesUnified(periodoId);
 
   const handleCreateNovedad = async (data: CreateNovedadData) => {
     if (!selectedEmployee) return;

@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { NovedadesEnhancedService, CreateNovedadData } from '@/services/NovedadesEnhancedService';
-import { NovedadesCalculationService } from '@/services/NovedadesCalculationService';
+import { NovedadesCalculationService, NovedadesTotals } from '@/services/NovedadesCalculationService';
 import { PayrollNovedad } from '@/types/novedades-enhanced';
 import { useToast } from '@/hooks/use-toast';
 import { useEmployeeNovedadesCacheStore } from '@/stores/employeeNovedadesCacheStore';
@@ -27,9 +27,11 @@ export interface UsePayrollNovedadesUnifiedReturn {
   refetch: () => void;
   loadNovedadesTotals: (employeeIds: string[]) => void;
   getEmployeeNovedades: (employeeId: string) => Promise<{ totalNeto: number; devengos: number; deducciones: number }>;
+  getEmployeeNovedadesSync: (employeeId: string) => NovedadesTotals;
   refreshEmployeeNovedades: (employeeId: string) => Promise<void>;
   lastRefreshTime: number;
   getEmployeeNovedadesList: (employeeId: string) => Promise<PayrollNovedad[]>;
+  novedadesTotals: Record<string, NovedadesTotals>;
 }
 
 // Helper function to transform PayrollNovedad to the expected format
@@ -68,6 +70,9 @@ export const usePayrollNovedadesUnified = (
   const [isCreating, setIsCreating] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  
+  // ✅ NUEVO: Estado síncrono para renderizado React
+  const [novedadesTotals, setNovedadesTotals] = useState<Record<string, NovedadesTotals>>({});
 
   // ✅ NUEVO: Usar store global en lugar de estado local
   const {
@@ -111,25 +116,34 @@ export const usePayrollNovedadesUnified = (
     refetchOnWindowFocus: false
   });
 
-  // ✅ RESTORED: Load novedades totals for multiple employees
+  // ✅ CONSOLIDADO: Load novedades totals for multiple employees
   const loadNovedadesTotals = useCallback(async (employeeIds: string[]) => {
     if (!periodId) return;
     
     console.log('📊 Loading novedades totals for employees:', employeeIds);
     
     const updates: Record<string, PayrollNovedad[]> = {};
+    const totalsMap: Record<string, NovedadesTotals> = {};
     
     for (const employeeId of employeeIds) {
       try {
         const employeeNovedades = await NovedadesEnhancedService.getNovedadesByEmployee(employeeId, periodId);
         updates[employeeId] = employeeNovedades;
+        
+        // ✅ NUEVO: Calcular totales con backend para estado síncrono
+        const backendTotals = await NovedadesCalculationService.calculateEmployeeNovedadesTotals(employeeId, periodId);
+        totalsMap[employeeId] = backendTotals;
       } catch (error) {
         console.error(`Error loading novedades for employee ${employeeId}:`, error);
       }
     }
     
-    // ✅ NUEVO: Actualizar store global de una vez
+    // ✅ Actualizar store global
     updateEmployeeNovedades(updates);
+    
+    // ✅ NUEVO: Actualizar estado síncrono
+    setNovedadesTotals(totalsMap);
+    console.log('✅ Totales síncronos actualizados:', totalsMap);
   }, [periodId, updateEmployeeNovedades]);
 
   // ✅ CRÍTICO: Get employee novedades totals usando BACKEND CALCULATION SERVICE
@@ -164,7 +178,7 @@ export const usePayrollNovedadesUnified = (
     }
   }, [periodId]);
 
-  // ✅ RESTORED: Refresh employee novedades usando store global
+  // ✅ CONSOLIDADO: Refresh employee novedades usando store global + estado síncrono
   const refreshEmployeeNovedades = useCallback(async (employeeId: string) => {
     if (!periodId) return;
     
@@ -172,10 +186,28 @@ export const usePayrollNovedadesUnified = (
       console.log('🔄 Refrescando novedades específicas del empleado:', employeeId);
       const employeeNovedades = await NovedadesEnhancedService.getNovedadesByEmployee(employeeId, periodId);
       setEmployeeNovedades(employeeId, employeeNovedades);
+      
+      // ✅ NUEVO: Actualizar también el estado síncrono
+      const backendTotals = await NovedadesCalculationService.calculateEmployeeNovedadesTotals(employeeId, periodId);
+      setNovedadesTotals(prev => ({
+        ...prev,
+        [employeeId]: backendTotals
+      }));
+      console.log('✅ Totales síncronos refrescados para empleado:', employeeId, backendTotals);
     } catch (error) {
       console.error(`Error refreshing novedades for employee ${employeeId}:`, error);
     }
   }, [periodId, setEmployeeNovedades]);
+
+  // ✅ NUEVO: Función síncrona para obtener totales (renderizado React)
+  const getEmployeeNovedadesSync = useCallback((employeeId: string): NovedadesTotals => {
+    return novedadesTotals[employeeId] || {
+      totalDevengos: 0,
+      totalDeducciones: 0,
+      totalNeto: 0,
+      hasNovedades: false
+    };
+  }, [novedadesTotals]);
 
   // ✅ RESTORED: Get employee novedades list
   const getEmployeeNovedadesList = useCallback(async (employeeId: string): Promise<PayrollNovedad[]> => {
@@ -430,8 +462,10 @@ export const usePayrollNovedadesUnified = (
     refetch,
     loadNovedadesTotals,
     getEmployeeNovedades: async (employeeId: string) => await getEmployeeNovedades(employeeId),
+    getEmployeeNovedadesSync, // ✅ NUEVO: Función síncrona para renderizado
     refreshEmployeeNovedades,
-    lastRefreshTime, // ✅ NUEVO: Viene del store global
-    getEmployeeNovedadesList
+    lastRefreshTime,
+    getEmployeeNovedadesList,
+    novedadesTotals // ✅ NUEVO: Estado síncrono directo
   };
 };

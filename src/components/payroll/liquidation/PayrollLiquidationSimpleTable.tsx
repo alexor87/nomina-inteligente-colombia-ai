@@ -82,6 +82,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
     loadNovedadesTotals,
     createNovedad,
     getEmployeeNovedades,
+    getEmployeeNovedadesSync,
     refreshEmployeeNovedades,
     isCreating,
     lastRefreshTime,
@@ -450,9 +451,16 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
                       >
                         <Plus className="h-4 w-4" />
                       </Button>
-                      <div className="text-sm font-medium text-blue-600">
-                        {/* ✅ CRÍTICO: Totales ahora se calculan en backend */}
-                        {formatCurrency(0)} {/* TODO: Implementar async totals */}
+                      <div className="flex flex-col items-center">
+                        <div className="text-sm font-semibold text-blue-600">
+                          {formatCurrency(getEmployeeNovedadesSync(employee.id).totalNeto)}
+                        </div>
+                        {getEmployeeNovedadesSync(employee.id).hasNovedades && (
+                          <div className="text-xs text-gray-500 space-y-0.5">
+                            <div>Dev: {formatCurrency(getEmployeeNovedadesSync(employee.id).totalDevengos)}</div>
+                            <div>Ded: {formatCurrency(getEmployeeNovedadesSync(employee.id).totalDeducciones)}</div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </TableCell>
