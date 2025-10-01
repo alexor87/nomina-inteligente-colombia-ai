@@ -51,11 +51,42 @@ export class EmployeeHandler extends BaseHandler {
       return this.handleNoSearchResults(query, context);
     }
     
-    if (results.length === 1) {
-      return this.displaySingleEmployee(results[0]);
+    // Get company ID from context for the search action
+    const companyId = context?.companyId || context?.employeeData?.allEmployees[0]?.companyId;
+    
+    if (!companyId) {
+      console.warn('[EmployeeHandler] No companyId found in context, returning conversational response');
+      // Fallback to conversational response
+      if (results.length === 1) {
+        return this.displaySingleEmployee(results[0]);
+      }
+      return this.displayMultipleEmployees(results, query);
     }
     
-    return this.displayMultipleEmployees(results, query);
+    // Generate executable search action with inline results
+    const searchAction = {
+      id: `search_employee_${Date.now()}`,
+      type: 'search_employee' as const,
+      label: `Buscar: "${query}"`,
+      description: `${results.length} empleado${results.length > 1 ? 's' : ''} encontrado${results.length > 1 ? 's' : ''}`,
+      parameters: {
+        query,
+        filter: 'all',
+        companyId
+      },
+      requiresConfirmation: false,
+      icon: '🔍'
+    };
+    
+    const message = results.length === 1
+      ? `Encontré **${results[0].name}** que coincide con tu búsqueda.`
+      : `Encontré **${results.length} empleados** que coinciden con "${query}".`;
+    
+    return ResponseBuilder.buildExecutableResponse(
+      message,
+      [searchAction],
+      'neutral'
+    );
   }
   
   private async handleCreate(intent: Intent, context?: RichContext): Promise<HandlerResponse> {

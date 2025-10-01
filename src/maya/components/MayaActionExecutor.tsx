@@ -6,6 +6,9 @@ import { PayrollEmployee } from '@/types/payroll';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Send, User, FileText, Eye, Loader2, Calendar } from 'lucide-react';
+import { InlineSearchResults } from './inline/InlineSearchResults';
+import { EmployeeWithStatus } from '@/types/employee-extended';
+import { EmployeeDetailsModal } from '@/components/employees/EmployeeDetailsModal';
 
 interface MayaActionExecutorProps {
   actions: ExecutableAction[];
@@ -26,6 +29,12 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
     employee: null,
     period: null
   });
+  const [searchResults, setSearchResults] = useState<{
+    employees: EmployeeWithStatus[];
+    query: string;
+  } | null>(null);
+  const [selectedEmployee, setSelectedEmployee] = useState<EmployeeWithStatus | null>(null);
+  const [showEmployeeDetails, setShowEmployeeDetails] = useState(false);
   const { toast } = useToast();
 
   const getActionIcon = (type: string) => {
@@ -55,8 +64,16 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
       }
 
       if (result.success) {
-        // Skip success toast for Maya expand_periods actions
-        if (action.type !== 'expand_periods') {
+        // Handle search results inline
+        if (action.type === 'search_employee' && result.data?.employees) {
+          setSearchResults({
+            employees: result.data.employees,
+            query: result.data.query
+          });
+        }
+        
+        // Skip success toast for Maya expand_periods and search actions
+        if (action.type !== 'expand_periods' && action.type !== 'search_employee') {
           toast({
             title: "✅ Acción ejecutada",
             description: result.message,
@@ -232,11 +249,48 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
   };
 
   const executeSearchEmployee = async (action: ExecutableAction): Promise<ActionExecutionResult> => {
-    // This would typically navigate or show results
-    return {
-      success: true,
-      message: `Búsqueda de empleados: "${action.parameters.query}"`
-    };
+    const { query } = action.parameters;
+    
+    try {
+      console.log('🔍 Executing employee search:', query);
+      
+      // Call the backend to search employees
+      const { data, error } = await supabase.functions.invoke('execute-maya-action', {
+        body: {
+          action: {
+            ...action,
+            type: 'search_employee'
+          }
+        }
+      });
+
+      if (error) {
+        console.error('❌ Error searching employees:', error);
+        throw error;
+      }
+
+      if (!data?.success) {
+        throw new Error(data?.message || 'Error al buscar empleados');
+      }
+
+      console.log('✅ Search results:', data.data);
+
+      // Return the results with employee data
+      return {
+        success: true,
+        message: `${data.data?.employees?.length || 0} empleados encontrados`,
+        data: {
+          employees: data.data?.employees || [],
+          query
+        }
+      };
+    } catch (error: any) {
+      console.error('❌ Search execution error:', error);
+      return {
+        success: false,
+        message: error.message || 'Error al buscar empleados'
+      };
+    }
   };
 
   const executeViewDetails = async (action: ExecutableAction): Promise<ActionExecutionResult> => {
@@ -311,8 +365,38 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
 
   if (!Array.isArray(actions) || actions.length === 0) return null;
 
+  const handleViewEmployeeDetails = (employee: EmployeeWithStatus) => {
+    setSelectedEmployee(employee);
+    setShowEmployeeDetails(true);
+  };
+
+  const handleEditEmployee = (employee: EmployeeWithStatus) => {
+    toast({
+      title: "🚧 Función en desarrollo",
+      description: "La edición de empleados estará disponible pronto",
+    });
+  };
+
+  const handleSendEmployeeVoucher = (employee: EmployeeWithStatus) => {
+    toast({
+      title: "🚧 Función en desarrollo",
+      description: "El envío de comprobantes desde búsqueda estará disponible pronto",
+    });
+  };
+
   return (
     <>
+      {/* Resultados de búsqueda inline */}
+      {searchResults && (
+        <InlineSearchResults
+          employees={searchResults.employees}
+          query={searchResults.query}
+          onViewDetails={handleViewEmployeeDetails}
+          onEdit={handleEditEmployee}
+          onSendVoucher={handleSendEmployeeVoucher}
+        />
+      )}
+
       <div className="space-y-2 mt-3">
         <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">
           Acciones disponibles:
@@ -365,6 +449,15 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
         onClose={() => setVoucherDialog({ isOpen: false, employee: null, period: null })}
         employee={voucherDialog.employee}
         period={voucherDialog.period}
+      />
+
+      <EmployeeDetailsModal
+        isOpen={showEmployeeDetails}
+        onClose={() => {
+          setShowEmployeeDetails(false);
+          setSelectedEmployee(null);
+        }}
+        employee={selectedEmployee}
       />
     </>
   );

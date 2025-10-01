@@ -42,6 +42,10 @@ serve(async (req) => {
       return await executeDeleteEmployeeAction(action);
     }
 
+    if (action.type === 'search_employee') {
+      return await executeSearchEmployeeAction(action);
+    }
+
     // Payroll CRUD actions
     if (action.type === 'liquidate_payroll') {
       return await executeLiquidatePayrollAction(action);
@@ -454,6 +458,89 @@ async function executeDeleteEmployeeAction(action: any) {
         employeeId: employee.id,
         employeeName: `${employee.nombre} ${employee.apellido}`,
         newStatus: 'inactivo'
+      }
+    }),
+    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  );
+}
+
+async function executeSearchEmployeeAction(action: any) {
+  const { query, filter, companyId } = action.parameters;
+  
+  if (!query) {
+    throw new Error('Query de búsqueda requerido');
+  }
+
+  if (!companyId) {
+    throw new Error('Company ID requerido para buscar empleados');
+  }
+
+  console.log(`[execute-maya-action] Searching employees with query: "${query}", filter: ${filter || 'all'} in company: ${companyId}`);
+
+  // Search employees in the specified company
+  let queryBuilder = supabase
+    .from('employees')
+    .select('*')
+    .eq('company_id', companyId);
+
+  // Apply search based on filter
+  const searchTerm = `%${query.toLowerCase()}%`;
+  
+  if (filter === 'name' || !filter) {
+    queryBuilder = queryBuilder.or(`nombre.ilike.${searchTerm},apellido.ilike.${searchTerm}`);
+  } else if (filter === 'position') {
+    queryBuilder = queryBuilder.ilike('cargo', searchTerm);
+  } else if (filter === 'department') {
+    queryBuilder = queryBuilder.ilike('departamento', searchTerm);
+  } else if (filter === 'cedula') {
+    queryBuilder = queryBuilder.ilike('cedula', searchTerm);
+  } else {
+    // Search across all text fields
+    queryBuilder = queryBuilder.or(`nombre.ilike.${searchTerm},apellido.ilike.${searchTerm},cedula.ilike.${searchTerm},cargo.ilike.${searchTerm},email.ilike.${searchTerm}`);
+  }
+
+  const { data: employees, error: searchError } = await queryBuilder
+    .order('nombre', { ascending: true })
+    .limit(20);
+
+  if (searchError) {
+    throw new Error(`Error buscando empleados: ${searchError.message}`);
+  }
+
+  console.log(`[execute-maya-action] ✅ Found ${employees?.length || 0} employees matching "${query}"`);
+
+  // Transform to EmployeeWithStatus format
+  const transformedEmployees = (employees || []).map(emp => ({
+    id: emp.id,
+    nombre: emp.nombre,
+    apellido: emp.apellido,
+    cedula: emp.cedula,
+    email: emp.email,
+    telefono: emp.telefono,
+    cargo: emp.cargo,
+    estado: emp.estado,
+    salarioBase: emp.salario_base,
+    fechaIngreso: emp.fecha_ingreso,
+    tipoContrato: emp.tipo_contrato,
+    eps: emp.eps,
+    afp: emp.afp,
+    arl: emp.arl,
+    cajaCompensacion: emp.caja_compensacion,
+    banco: emp.banco,
+    tipoCuenta: emp.tipo_cuenta,
+    numeroCuenta: emp.numero_cuenta,
+    companyId: emp.company_id
+  }));
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      message: `Se encontraron ${transformedEmployees.length} empleados`,
+      data: {
+        employees: transformedEmployees,
+        query,
+        filter: filter || 'all',
+        count: transformedEmployees.length
       }
     }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
