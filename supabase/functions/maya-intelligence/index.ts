@@ -102,6 +102,32 @@ function analyzeConversationContext(conversation: any[]): { intentType: string |
     };
   }
   
+  // Detect PENDING_EMAIL_FOR_VOUCHER context
+  if (/¿A\s+qué\s+email\s+deseas\s+enviar\s+el\s+comprobante\s+de\s+\*\*(.+?)\*\*\?/i.test(lastAssistantMessage)) {
+    const employeeMatch = lastAssistantMessage.match(/\*\*(.+?)\*\*/);
+    const employeeName = employeeMatch ? employeeMatch[1] : null;
+    
+    console.log('🔍 [CONTEXT] Detected PENDING_EMAIL_FOR_VOUCHER context:', { employeeName });
+    return { 
+      intentType: 'PENDING_EMAIL_FOR_VOUCHER', 
+      params: { employeeName }
+    };
+  }
+
+  // Detect PENDING_SAVE_EMAIL_CONFIRMATION context
+  if (/¿Deseas\s+guardar.*como\s+el\s+email\s+de\s+\*\*(.+?)\*\*\?/i.test(lastAssistantMessage)) {
+    const emailMatch = lastAssistantMessage.match(/guardar\s+([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i);
+    const email = emailMatch ? emailMatch[1] : null;
+    const employeeNameMatch = lastAssistantMessage.match(/de\s+\*\*(.+?)\*\*\?/);
+    const employeeName = employeeNameMatch ? employeeNameMatch[1] : null;
+    
+    console.log('🔍 [CONTEXT] Detected PENDING_SAVE_EMAIL_CONFIRMATION context:', { employeeName, email });
+    return { 
+      intentType: 'PENDING_SAVE_EMAIL_CONFIRMATION', 
+      params: { employeeName, email }
+    };
+  }
+  
   return { intentType: null, params: {} };
 }
 
@@ -277,6 +303,251 @@ serve(async (req) => {
     }
     
     console.log(`[MAYA-KISS] Intent: ${intent.type} (${intent.confidence})`);
+    
+    // ============================================================================
+    // HANDLE CONVERSATIONAL CONTEXTS (BEFORE SAFETY OVERRIDES)
+    // ============================================================================
+    
+    // Check for conversational contexts that need special handling
+    const conversationContext = analyzeConversationContext(conversation);
+    
+    // Handle PENDING_EMAIL_FOR_VOUCHER context
+    if (conversationContext.intentType === 'PENDING_EMAIL_FOR_VOUCHER') {
+      const { employeeName } = conversationContext.params;
+      
+      // Extract email from user message
+      const emailMatch = lastMessage.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+      const providedEmail = emailMatch ? emailMatch[1] : null;
+      
+      if (!providedEmail) {
+        return new Response(JSON.stringify({
+          message: "❌ No detecté un email válido. Por favor escríbelo en el formato correcto (ejemplo: nombre@ejemplo.com)",
+          emotionalState: 'concerned',
+          sessionId,
+          timestamp: new Date().toISOString()
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      
+      // Get company context
+      const { data: companyData } = await userSupabase
+        .from('profiles')
+        .select('company_id')
+        .eq('user_id', (await userSupabase.auth.getUser()).data.user?.id)
+        .single();
+      
+      if (!companyData?.company_id) {
+        return new Response(JSON.stringify({
+          message: "❌ No pude identificar tu empresa.",
+          emotionalState: 'concerned',
+          sessionId,
+          timestamp: new Date().toISOString()
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      
+      // Find employee
+      const { data: employees } = await userSupabase
+        .from('employees')
+        .select('id, nombre, apellido')
+        .eq('company_id', companyData.company_id)
+        .eq('estado', 'activo')
+        .ilike('nombre', `%${employeeName}%`);
+      
+      const employee = employees?.[0];
+      
+      if (!employee) {
+        return new Response(JSON.stringify({
+          message: `❌ No pude encontrar al empleado ${employeeName}. Por favor intenta de nuevo.`,
+          emotionalState: 'concerned',
+          sessionId,
+          timestamp: new Date().toISOString()
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      
+      // Execute send voucher immediately with provided email
+      try {
+        // Use admin client for action execution
+        const supabaseAdmin = createClient(
+          supabaseUrl,
+          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+          { auth: { persistSession: false } }
+        );
+        
+        const { data: actionResult, error: actionError } = await supabaseAdmin.functions.invoke('execute-maya-action', {
+          body: { 
+            action: {
+              type: 'confirm_send_voucher',
+              parameters: {
+                employeeId: employee.id,
+                employeeName: `${employee.nombre} ${employee.apellido}`,
+                email: providedEmail,
+                periodId: 'latest'
+              }
+            }
+          }
+        });
+        
+        if (actionError) {
+          console.error('❌ Error executing send voucher:', actionError);
+          return new Response(JSON.stringify({
+            message: `❌ Hubo un error al enviar el comprobante: ${actionError.message}`,
+            emotionalState: 'concerned',
+            sessionId,
+            timestamp: new Date().toISOString()
+          }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        
+        console.log('✅ Voucher sent successfully to temporary email');
+        
+        // Now ask if they want to save the email
+        const confirmMessage = `✅ Comprobante de **${employee.nombre} ${employee.apellido}** enviado a **${providedEmail}**
+
+¿Deseas guardar ${providedEmail} como el email de **${employee.nombre} ${employee.apellido}**?`;
+        
+        return new Response(JSON.stringify({
+          message: confirmMessage,
+          emotionalState: 'encouraging',
+          executableActions: [
+            {
+              id: `save_email_${employee.id}_${Date.now()}`,
+              type: 'confirm',
+              label: '✅ Sí, guardar',
+              description: 'Guardar email en perfil del empleado',
+              parameters: { employeeId: employee.id, email: providedEmail },
+              requiresConfirmation: false,
+              icon: '✅'
+            },
+            {
+              id: `cancel_save_${Date.now()}`,
+              type: 'cancel',
+              label: '❌ No, solo enviar',
+              description: 'No guardar el email',
+              parameters: {},
+              requiresConfirmation: false,
+              icon: '❌'
+            }
+          ],
+          executable_actions: [
+            {
+              id: `save_email_${employee.id}_${Date.now()}`,
+              type: 'confirm',
+              label: '✅ Sí, guardar',
+              description: 'Guardar email en perfil del empleado',
+              parameters: { employeeId: employee.id, email: providedEmail },
+              requiresConfirmation: false,
+              icon: '✅'
+            },
+            {
+              id: `cancel_save_${Date.now()}`,
+              type: 'cancel',
+              label: '❌ No, solo enviar',
+              description: 'No guardar el email',
+              parameters: {},
+              requiresConfirmation: false,
+              icon: '❌'
+            }
+          ],
+          sessionId,
+          timestamp: new Date().toISOString()
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        
+      } catch (error) {
+        console.error('❌ Error in PENDING_EMAIL_FOR_VOUCHER handler:', error);
+        return new Response(JSON.stringify({
+          message: `❌ Error al enviar el comprobante: ${error.message}`,
+          emotionalState: 'concerned',
+          sessionId,
+          timestamp: new Date().toISOString()
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+    }
+    
+    // Handle PENDING_SAVE_EMAIL_CONFIRMATION context
+    if (conversationContext.intentType === 'PENDING_SAVE_EMAIL_CONFIRMATION') {
+      const { employeeName, email } = conversationContext.params;
+      
+      // Detect affirmative response
+      const isAffirmative = /^(s[ií]|yes|ok|dale|claro|por\s+supuesto|confirmo)/i.test(lastMessage.trim());
+      
+      if (!isAffirmative) {
+        return new Response(JSON.stringify({
+          message: "👍 Entendido, el email no se guardará. ¿En qué más puedo ayudarte?",
+          emotionalState: 'neutral',
+          sessionId,
+          timestamp: new Date().toISOString()
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      
+      // Get company context
+      const { data: companyData } = await userSupabase
+        .from('profiles')
+        .select('company_id')
+        .eq('user_id', (await userSupabase.auth.getUser()).data.user?.id)
+        .single();
+      
+      if (!companyData?.company_id) {
+        return new Response(JSON.stringify({
+          message: "❌ No pude identificar tu empresa.",
+          emotionalState: 'concerned',
+          sessionId,
+          timestamp: new Date().toISOString()
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      
+      // Find employee
+      const { data: employees } = await userSupabase
+        .from('employees')
+        .select('id, nombre, apellido')
+        .eq('company_id', companyData.company_id)
+        .eq('estado', 'activo')
+        .ilike('nombre', `%${employeeName}%`);
+      
+      const employee = employees?.[0];
+      
+      if (!employee) {
+        return new Response(JSON.stringify({
+          message: `❌ No pude encontrar al empleado ${employeeName}.`,
+          emotionalState: 'concerned',
+          sessionId,
+          timestamp: new Date().toISOString()
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      
+      // Update employee email in database
+      try {
+        const { error: updateError } = await userSupabase
+          .from('employees')
+          .update({ email: email })
+          .eq('id', employee.id);
+        
+        if (updateError) {
+          console.error('❌ Error updating employee email:', updateError);
+          return new Response(JSON.stringify({
+            message: `❌ Hubo un error al guardar el email: ${updateError.message}`,
+            emotionalState: 'concerned',
+            sessionId,
+            timestamp: new Date().toISOString()
+          }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        
+        console.log(`✅ Email saved for employee: ${employee.nombre} ${employee.apellido} -> ${email}`);
+        
+        return new Response(JSON.stringify({
+          message: `✅ Email guardado exitosamente. **${employee.nombre} ${employee.apellido}** ahora tiene **${email}** registrado.`,
+          emotionalState: 'celebrating',
+          sessionId,
+          timestamp: new Date().toISOString()
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        
+      } catch (error) {
+        console.error('❌ Error in PENDING_SAVE_EMAIL_CONFIRMATION handler:', error);
+        return new Response(JSON.stringify({
+          message: `❌ Error al guardar el email: ${error.message}`,
+          emotionalState: 'concerned',
+          sessionId,
+          timestamp: new Date().toISOString()
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+    }
 
     // ============================================================================
     // ENHANCED SAFETY OVERRIDES - ANTI-HALLUCINATION PROTECTION

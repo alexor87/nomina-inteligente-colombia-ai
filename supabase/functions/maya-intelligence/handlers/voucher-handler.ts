@@ -142,28 +142,49 @@ Responde SOLO con el nombre EXACTO del empleado que coincida, o "NINGUNO" si no 
   }
   
   private createVoucherAction(employee: any, intent: Intent, context?: RichContext): HandlerResponse {
-    // Extract period if specified in user message
+    // Extract period if specified
     const periodEntity = intent.entities.find(e => e.type === 'period');
     const explicitPeriod = periodEntity?.value;
     
-    if (explicitPeriod) {
-      // User specified a period, create direct voucher action
-      const action = ResponseBuilder.createVoucherAction(
+    // 🎯 PRIORITY 1: Check for user-provided email in message
+    const emailEntity = intent.entities.find(e => e.type === 'email');
+    const userProvidedEmail = emailEntity?.value;
+    
+    // 🎯 PRIORITY 2: Check for registered email
+    const registeredEmail = employee.email;
+    
+    // 🎯 Determine target email
+    const targetEmail = userProvidedEmail || registeredEmail;
+    
+    // 🎯 CASE 1: We have an email (either provided or registered)
+    if (targetEmail) {
+      const isUserProvided = !!userProvidedEmail;
+      const emailSource = isUserProvided 
+        ? '\n\n_(Email especificado por ti en el mensaje)_' 
+        : '';
+      
+      const message = `¿Enviar comprobante de **${employee.name}** al email **${targetEmail}**?${emailSource}`;
+      
+      const confirmAction = ResponseBuilder.createConfirmVoucherAction(
         employee.id,
         employee.name,
-        undefined, // periodId will be resolved by executor
-        explicitPeriod
+        targetEmail,
+        explicitPeriod ? 'latest' : undefined,
+        explicitPeriod || 'Período más reciente'
       );
       
       return ResponseBuilder.buildExecutableResponse(
-        `Perfecto! Voy a generar el desprendible de ${employee.name} para ${explicitPeriod}.`,
-        [action],
+        message,
+        [confirmAction],
         'encouraging'
       );
     }
     
-    // No period specified, request period confirmation
-    return this.requestPeriodConfirmation(employee, context);
+    // 🎯 CASE 2: NO email available - Ask in chat (no modal)
+    return ResponseBuilder.buildClarificationResponse(
+      `¿A qué email deseas enviar el comprobante de **${employee.name}**?`,
+      [] // No options, just a question
+    );
   }
 
   private requestPeriodConfirmation(employee: any, context?: RichContext): HandlerResponse {

@@ -335,4 +335,29 @@ export class ResponseBuilder {
       requiresFollowUp: false
     };
   }
+
+  // Confirm Voucher Send with explicit email
+  static createConfirmVoucherAction(
+    employeeId: string, 
+    employeeName: string, 
+    email: string,
+    periodId?: string, 
+    periodName?: string
+  ): ExecutableAction {
+    return {
+      id: `confirm_send_voucher_${employeeId}_${Date.now()}`,
+      type: 'confirm_send_voucher',
+      label: `✅ Sí, enviar a ${email}`,
+      description: `Enviar comprobante${periodName ? ` del ${periodName}` : ''} al email ${email}`,
+      parameters: {
+        employeeId,
+        employeeName,
+        email,
+        periodId,
+        periodName
+      },
+      requiresConfirmation: false,
+      icon: '📧'
+    };
+  }
 }

@@ -365,6 +365,21 @@ Responde SOLO en formato JSON:
       });
     }
     
+    // Extract email addresses for VOUCHER_SEND intents
+    if (intentType === 'VOUCHER_SEND') {
+      const emailRegex = /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g;
+      const emailMatches = message.match(emailRegex);
+      
+      if (emailMatches && emailMatches.length > 0) {
+        entities.push({
+          type: 'email',
+          value: emailMatches[0],
+          confidence: 0.95
+        });
+        console.log('📧 [EMAIL] Detected explicit email in message:', emailMatches[0]);
+      }
+    }
+    
     return entities;
   }
   
