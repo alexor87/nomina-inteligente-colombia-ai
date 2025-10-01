@@ -181,9 +181,10 @@ async function executeSendVoucherAction(action: any) {
         periodo: payrollData.payroll_periods_real.periodo
       },
       period: {
-        periodo: payrollData.payroll_periods_real.periodo,
-        fecha_inicio: payrollData.payroll_periods_real.fecha_inicio,
-        fecha_fin: payrollData.payroll_periods_real.fecha_fin
+        startDate: payrollData.payroll_periods_real.fecha_inicio,
+        endDate: payrollData.payroll_periods_real.fecha_fin,
+        type: payrollData.payroll_periods_real.tipo_periodo,
+        periodo: payrollData.payroll_periods_real.periodo
       },
       companyInfo: {
         nombre: company.nombre,
