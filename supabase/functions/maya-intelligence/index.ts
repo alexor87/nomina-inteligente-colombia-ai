@@ -1084,13 +1084,8 @@ async function handleVoucherSend(supabase: any, params: any): Promise<{ message:
   // Step 6: First-time send - offer preview and confirmation
   console.log(`✅ [VOUCHER_SEND] Ready to send for period ${latestPeriod.periodo}`);
   
-  // Indicate email source for transparency
-  const emailSource = userProvidedEmail 
-    ? '\n\n_(Email especificado por ti en el mensaje)_' 
-    : '\n\n_(Email registrado del empleado)_';
-  
   return {
-    message: `**${employeeData.nombre} ${employeeData.apellido}**\n📧 Email: ${targetEmail}\n📅 Período: **${latestPeriod.periodo}**${emailSource}\n\n¿Quieres enviar el ${termUsed}?`,
+    message: `**${employeeData.nombre} ${employeeData.apellido}**\n📧 Email: ${targetEmail}\n📅 Período: **${latestPeriod.periodo}**\n\n¿Quieres enviar el ${termUsed}?`,
     emotionalState: 'helpful',
     actions: [
       {
