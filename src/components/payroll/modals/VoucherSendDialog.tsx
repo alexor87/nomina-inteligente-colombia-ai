@@ -7,6 +7,7 @@ import { PayrollEmployee } from '@/types/payroll';
 import { Send, X, Loader2, Mail } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useCompanyDetails } from '@/hooks/useCompanyDetails';
 
 interface VoucherSendDialogProps {
   isOpen: boolean;
@@ -29,6 +30,7 @@ export const VoucherSendDialog: React.FC<VoucherSendDialogProps> = ({
   const [isSending, setIsSending] = useState(false);
   const [isLoadingEmployeeEmail, setIsLoadingEmployeeEmail] = useState(false);
   const { toast } = useToast();
+  const { companyDetails, loading: companyLoading } = useCompanyDetails();
 
   // Cargar email del empleado desde la BD cuando se abre el diálogo
   useEffect(() => {
@@ -73,21 +75,20 @@ export const VoucherSendDialog: React.FC<VoucherSendDialogProps> = ({
       return;
     }
 
+    if (!companyDetails) {
+      toast({
+        title: "Error",
+        description: "No se pudo cargar la información de la empresa",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsSending(true);
     
     try {
       console.log('🚀 Iniciando envío de comprobantes...');
       
-      // Obtener información de la empresa
-      const { data: companyInfo, error: companyError } = await supabase
-        .from('companies')
-        .select('razon_social, nit, email, telefono')
-        .single();
-
-      if (companyError) {
-        throw new Error(`Error obteniendo información de empresa: ${companyError.message}`);
-      }
-
       // Obtener datos completos del empleado desde la BD
       const { data: employeeData, error: employeeError } = await supabase
         .from('employees')
@@ -134,7 +135,7 @@ export const VoucherSendDialog: React.FC<VoucherSendDialogProps> = ({
             type: period.type,
             periodo: `${period.startDate} - ${period.endDate}`
           },
-          companyInfo
+          companyInfo: companyDetails
         }
       });
 
@@ -159,7 +160,7 @@ export const VoucherSendDialog: React.FC<VoucherSendDialogProps> = ({
             type: period.type,
             periodo: `${period.startDate} - ${period.endDate}`
           },
-          companyInfo
+          companyInfo: companyDetails
         }
       });
 
@@ -246,7 +247,7 @@ export const VoucherSendDialog: React.FC<VoucherSendDialogProps> = ({
         </Button>
         <Button
           onClick={handleSendVoucher}
-          disabled={isSending || emails.length === 0 || isLoadingEmployeeEmail}
+          disabled={isSending || emails.length === 0 || isLoadingEmployeeEmail || companyLoading}
           className="w-full sm:w-auto"
         >
           {isSending ? (
