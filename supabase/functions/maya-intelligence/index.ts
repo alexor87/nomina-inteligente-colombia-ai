@@ -737,17 +737,18 @@ async function handleVoucherSend(supabase: any, params: any): Promise<{ message:
     };
   }
   
-  // Step 4: Get recent payroll periods
+  // Step 4: Get recent payroll periods (only closed ones)
   const { data: periods, error: periodsError } = await supabase
     .from('payroll_periods_real')
     .select('id, periodo, fecha_inicio, fecha_fin, estado')
+    .eq('estado', 'cerrado')  // 🎯 Only closed periods can have vouchers sent
     .order('fecha_fin', { ascending: false })
     .limit(5);
   
   if (periodsError || !periods || periods.length === 0) {
-    console.error('❌ [VOUCHER_SEND] Error fetching periods:', periodsError);
+    console.error('❌ [VOUCHER_SEND] No closed periods found:', periodsError);
     return {
-      message: `No encontré períodos de nómina disponibles. Por favor verifica que haya al menos un período cerrado.`,
+      message: `No hay períodos cerrados disponibles. Los comprobantes solo se pueden enviar para períodos que ya están cerrados. Por favor cierra un período primero.`,
       emotionalState: 'concerned'
     };
   }
