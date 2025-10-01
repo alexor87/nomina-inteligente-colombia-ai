@@ -209,10 +209,10 @@ export class SimpleIntentMatcher {
     ];
 
     for (const pattern of voucherIndividualPatterns) {
-      const match = lowerText.match(pattern);
+      const match = text.match(pattern);
       if (match) {
         const employeeName = match[1].trim();
-        const termUsed = lowerText.match(/(comprobante|colilla|desprendible|recibo|soporte|documento|pdf|planilla)/i)?.[1] || 'comprobante';
+        const termUsed = text.match(/(comprobante|colilla|desprendible|recibo|soporte|documento|pdf|planilla)/i)?.[1] || 'comprobante';
         
         console.log(`🎯 [VOUCHER_SEND] Detected: "${employeeName}" using term "${termUsed}"`);
         return {
@@ -238,7 +238,7 @@ export class SimpleIntentMatcher {
     ];
 
     for (const pattern of voucherMassPatterns) {
-      if (pattern.test(lowerText)) {
+      if (pattern.test(text)) {
         console.log(`🎯 [VOUCHER_MASS_SEND] Detected mass voucher request`);
         return {
           type: 'VOUCHER_MASS_SEND',
