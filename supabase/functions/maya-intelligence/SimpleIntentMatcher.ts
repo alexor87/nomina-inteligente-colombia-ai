@@ -532,15 +532,27 @@ export class SimpleIntentMatcher {
       };
     }
 
-    // Employee search
-    if (/busca|encuentra|muestra|salario|sueldo/.test(text) && /empleado/.test(text)) {
-      const nameMatch = text.match(/(?:busca|encuentra|muestra)\s+(?:el\s+empleado\s+|empleado\s+)?([a-záéíóúñ]+)/i);
-      return {
-        type: 'EMPLOYEE_SEARCH', 
-        confidence: 0.9,
-        method: 'searchEmployee',
-        params: { name: nameMatch?.[1] || '' }
-      };
+    // Employee search - Natural language patterns (HIGH PRIORITY)
+    // Supports: "busca a eliana", "busca eliana", "dame info de carlos", "quién es maria", etc.
+    const employeeSearchPattern = /(?:busca|encuentra|muestra|dame\s+(?:info|información)|quién\s+es|información\s+(?:de|sobre)|buscar|empleado)(?:\s+(?:a|al|el\s+empleado|empleado))?\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*)/i;
+    const employeeSearchMatch = text.match(employeeSearchPattern);
+    
+    if (employeeSearchMatch) {
+      let name = employeeSearchMatch[1].trim();
+      
+      // Remove common filler words that might have been captured
+      name = name.replace(/^(el|la|los|las|un|una)\s+/i, '').trim();
+      
+      // Validate that we have a reasonable name (at least 2 characters, not just numbers)
+      if (name.length >= 2 && /[a-záéíóúñ]/i.test(name)) {
+        console.log('🔍 [EMPLOYEE_SEARCH] Name extracted:', name);
+        return {
+          type: 'EMPLOYEE_SEARCH', 
+          confidence: 0.95,
+          method: 'searchEmployee',
+          params: { name }
+        };
+      }
     }
     
     // Payroll queries - expanded patterns to be more inclusive (LOWER PRIORITY than employee-specific)
