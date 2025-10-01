@@ -485,7 +485,7 @@ serve(async (req) => {
         break;
         
       case 'getRecentPeriods':
-        response = await getRecentPeriods(userSupabase);
+        response = await getRecentPeriods(userSupabase, intent.params?.statusFilter);
         break;
         
       default:
@@ -1278,17 +1278,44 @@ async function getEmployeePayrollHistory(supabase: any, employeeName: string) {
   }
 }
 
-async function getRecentPeriods(supabase: any) {
+async function getRecentPeriods(supabase: any, statusFilter?: string) {
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from('payroll_periods_real')
       .select('periodo, estado, empleados_count, total_neto')
-      .order('created_at', { ascending: false })
-      .limit(5);
+      .order('created_at', { ascending: false });
+    
+    // Apply status filter if specified
+    if (statusFilter) {
+      console.log(`🎯 [RECENT_PERIODS] Filtering by status: ${statusFilter}`);
+      query = query.eq('estado', statusFilter);
+    }
+    
+    query = query.limit(5);
+    
+    const { data, error } = await query;
       
     if (error) throw error;
     
     if (data.length === 0) {
+      // Provide specific message based on filter
+      if (statusFilter === 'cerrado') {
+        return {
+          message: 'No hay períodos cerrados aún. Los períodos en borrador no permiten enviar comprobantes.',
+          emotionalState: 'neutral'
+        };
+      } else if (statusFilter === 'borrador') {
+        return {
+          message: 'No hay períodos en borrador en este momento.',
+          emotionalState: 'neutral'
+        };
+      } else if (statusFilter === 'en_proceso') {
+        return {
+          message: 'No hay períodos en proceso en este momento.',
+          emotionalState: 'neutral'
+        };
+      }
+      
       return {
         message: 'No hay períodos de nómina registrados aún.',
         emotionalState: 'neutral'
@@ -1296,9 +1323,10 @@ async function getRecentPeriods(supabase: any) {
     }
     
     const periodsList = data.map((p: any) => `${p.periodo} (${p.estado})`).join(', ');
+    const filterText = statusFilter ? ` ${statusFilter === 'cerrado' ? 'cerrados' : statusFilter === 'borrador' ? 'en borrador' : 'en proceso'}` : '';
     
     return {
-      message: `Últimos períodos: ${periodsList}.`,
+      message: `Períodos${filterText}: ${periodsList}.`,
       emotionalState: 'neutral'
     };
   } catch (error) {

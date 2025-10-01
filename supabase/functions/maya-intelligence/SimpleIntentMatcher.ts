@@ -583,12 +583,25 @@ export class SimpleIntentMatcher {
       }
     }
     
-    // Recent periods
+    // Recent periods with status filtering
     if (/períodos?|periodo/.test(text) || (/últim|ultim/.test(text) && /nómin|nomin/.test(text))) {
+      // Detect status filter in user query
+      let statusFilter = null;
+      if (/cerrad[oa]s?|cerrar|finalizado|aprobado/i.test(text)) {
+        statusFilter = 'cerrado';
+      } else if (/borrador|draft|pendiente|sin\s+cerrar/i.test(text)) {
+        statusFilter = 'borrador';
+      } else if (/proces[oa]|activ[oa]s?|en\s+curso/i.test(text)) {
+        statusFilter = 'en_proceso';
+      }
+      
+      console.log(`📅 [RECENT_PERIODS] Status filter detected: ${statusFilter || 'none (all periods)'}`);
+      
       return {
         type: 'RECENT_PERIODS',
         confidence: 0.8,
-        method: 'getRecentPeriods'
+        method: 'getRecentPeriods',
+        params: { statusFilter }
       };
     }
     
