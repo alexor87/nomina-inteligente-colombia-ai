@@ -540,8 +540,8 @@ export class SimpleIntentMatcher {
     if (employeeSearchMatch) {
       let name = employeeSearchMatch[1].trim();
       
-      // Remove common filler words that might have been captured
-      name = name.replace(/^(el|la|los|las|un|una)\s+/i, '').trim();
+      // Remove common filler words and prepositions that might have been captured
+      name = name.replace(/^(el|la|los|las|un|una|de|sobre|del|al|a)\s+/i, '').trim();
       
       // Validate that we have a reasonable name (at least 2 characters, not just numbers)
       if (name.length >= 2 && /[a-záéíóúñ]/i.test(name)) {
