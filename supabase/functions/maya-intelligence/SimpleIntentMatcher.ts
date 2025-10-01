@@ -214,7 +214,16 @@ export class SimpleIntentMatcher {
         const employeeName = match[1].trim();
         const termUsed = text.match(/(comprobante|colilla|desprendible|recibo|soporte|documento|pdf|planilla)/i)?.[1] || 'comprobante';
         
-        console.log(`🎯 [VOUCHER_SEND] Detected: "${employeeName}" using term "${termUsed}"`);
+        // Extract email if provided in message (NEW)
+        const emailMatch = text.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+        const email = emailMatch ? emailMatch[1] : null;
+        
+        if (email) {
+          console.log(`🎯 [VOUCHER_SEND] Detected: "${employeeName}" using term "${termUsed}" with email "${email}"`);
+        } else {
+          console.log(`🎯 [VOUCHER_SEND] Detected: "${employeeName}" using term "${termUsed}"`);
+        }
+        
         return {
           type: 'VOUCHER_SEND',
           confidence: 0.98,
@@ -222,6 +231,7 @@ export class SimpleIntentMatcher {
           params: {
             employeeName,
             termUsed,
+            email, // Include email if provided
             originalQuery: text.trim()
           }
         };

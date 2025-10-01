@@ -993,25 +993,18 @@ async function handleVoucherSend(supabase: any, params: any): Promise<{ message:
     };
   }
   
-  // Step 3: Detect missing email - offer to add it
-  if (!employeeData.email || employeeData.email.trim() === '') {
-    console.log(`⚠️ [VOUCHER_SEND] Missing email for ${employeeData.nombre} ${employeeData.apellido}`);
+  // Step 3: Check for user-provided email in params (NEW)
+  const userProvidedEmail = params.email;
+  
+  // Step 3.1: Determine target email (priority: user-provided > registered)
+  const targetEmail = userProvidedEmail || employeeData.email;
+  
+  // Step 3.2: If no email available, ask conversationally (NEW)
+  if (!targetEmail || targetEmail.trim() === '') {
+    console.log(`⚠️ [VOUCHER_SEND] Missing email for ${employeeData.nombre} ${employeeData.apellido} - asking conversationally`);
     return {
-      message: `**${employeeData.nombre} ${employeeData.apellido}** no tiene un email registrado. \n\n¿Quieres agregarlo ahora? Puedo esperar mientras lo ingresas en la ficha del empleado, o puedes descargar el ${termUsed} en PDF para enviarlo manualmente.`,
-      emotionalState: 'helpful',
-      actions: [
-        {
-          id: 'add-email',
-          type: 'view_details',
-          label: '➕ Agregar Email',
-          description: 'Ir a la ficha del empleado',
-          parameters: {
-            entityType: 'employee',
-            entityId: employeeData.id,
-            entityName: `${employeeData.nombre} ${employeeData.apellido}`
-          }
-        }
-      ]
+      message: `¿A qué email deseas enviar el comprobante de **${employeeData.nombre} ${employeeData.apellido}**?`,
+      emotionalState: 'neutral'
     };
   }
   
@@ -1056,18 +1049,18 @@ async function handleVoucherSend(supabase: any, params: any): Promise<{ message:
     console.log(`⚠️ [VOUCHER_SEND] Already sent on ${sentDate} - requesting confirmation`);
     
     return {
-      message: `El ${termUsed} del período **${latestPeriod.periodo}** ya fue enviado a **${employeeData.nombre} ${employeeData.apellido}** (${employeeData.email}) el **${sentDate}**.\n\n¿Quieres volver a enviarlo?`,
+      message: `El ${termUsed} del período **${latestPeriod.periodo}** ya fue enviado a **${employeeData.nombre} ${employeeData.apellido}** (${targetEmail}) el **${sentDate}**.\n\n¿Quieres volver a enviarlo?`,
       emotionalState: 'neutral',
       actions: [
         {
           id: 'resend-voucher',
           type: 'send_voucher',
           label: '🔄 Reenviar',
-          description: `Reenviar ${termUsed} a ${employeeData.email}`,
+          description: `Reenviar ${termUsed} a ${targetEmail}`,
           parameters: {
             employeeId: employeeData.id,
             employeeName: `${employeeData.nombre} ${employeeData.apellido}`,
-            email: employeeData.email,
+            email: targetEmail,
             periodId: latestPeriod.id,
             periodName: latestPeriod.periodo
           },
@@ -1091,19 +1084,24 @@ async function handleVoucherSend(supabase: any, params: any): Promise<{ message:
   // Step 6: First-time send - offer preview and confirmation
   console.log(`✅ [VOUCHER_SEND] Ready to send for period ${latestPeriod.periodo}`);
   
+  // Indicate email source for transparency
+  const emailSource = userProvidedEmail 
+    ? '\n\n_(Email especificado por ti en el mensaje)_' 
+    : '\n\n_(Email registrado del empleado)_';
+  
   return {
-    message: `**${employeeData.nombre} ${employeeData.apellido}**\n📧 Email: ${employeeData.email}\n📅 Período: **${latestPeriod.periodo}**\n\n¿Quieres enviar el ${termUsed}?`,
+    message: `**${employeeData.nombre} ${employeeData.apellido}**\n📧 Email: ${targetEmail}\n📅 Período: **${latestPeriod.periodo}**${emailSource}\n\n¿Quieres enviar el ${termUsed}?`,
     emotionalState: 'helpful',
     actions: [
       {
         id: 'send-voucher',
         type: 'send_voucher',
         label: '📧 Enviar',
-        description: `Enviar ${termUsed} a ${employeeData.email}`,
+        description: `Enviar ${termUsed} a ${targetEmail}`,
         parameters: {
           employeeId: employeeData.id,
           employeeName: `${employeeData.nombre} ${employeeData.apellido}`,
-          email: employeeData.email,
+          email: targetEmail,
           periodId: latestPeriod.id,
           periodName: latestPeriod.periodo
         },
@@ -1243,7 +1241,7 @@ async function listAllEmployees(supabase: any) {
   try {
     const { data: employees, error } = await supabase
       .from('employees')
-      .select('nombre, apellido, cargo')
+      .select('id, nombre, apellido, cargo, email')
       .eq('estado', 'activo')
       .order('nombre', { ascending: true });
 
