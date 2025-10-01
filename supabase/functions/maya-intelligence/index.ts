@@ -383,6 +383,17 @@ serve(async (req) => {
 
     // Execute query based on intent
     switch (intent.method) {
+      // ============================================================================
+      // 🎯 VOUCHER HANDLERS - Contextual Intelligence
+      // ============================================================================
+      case 'handleVoucherSend':
+        response = await handleVoucherSend(userSupabase, intent.params);
+        break;
+        
+      case 'handleVoucherMassSend':
+        response = await handleVoucherMassSend(userSupabase, intent.params);
+        break;
+        
       case 'blockSystemInfoQuery':
         response = await blockSystemInfoQuery();
         break;
@@ -478,16 +489,41 @@ serve(async (req) => {
         break;
         
       default:
-        // 🚫 CRITICAL: Never send employee-specific queries to OpenAI - prevents hallucination
+        // ============================================================================
+        // 🤖 HYBRID SYSTEM: KISS (fast) + OpenAI (conversational fallback)
+        // ============================================================================
         const hasEmployeeName = intent.params?.name || detectEmployeeNameInQuery(lastMessage);
-        if (hasEmployeeName) {
-          console.log('🚫 [SECURITY] Blocking employee query from going to OpenAI - using direct response');
+        
+        // High confidence (≥0.8): Trust KISS completely
+        if (intent.confidence >= 0.8) {
+          console.log(`✅ [HYBRID] High confidence (${intent.confidence}) - using KISS direct response`);
           response = {
             message: `Para consultas específicas de empleados, usa términos como "salario de [nombre]" o "buscar [nombre]".`,
             emotionalState: 'neutral'
           };
-        } else {
-          response = await handleConversation(lastMessage, conversation);
+        }
+        // Low confidence (<0.7): Use OpenAI for conversational understanding
+        else if (intent.confidence < 0.7) {
+          console.log(`🤖 [HYBRID] Low confidence (${intent.confidence}) - using OpenAI conversational fallback`);
+          
+          // 🚫 CRITICAL: Block employee queries from OpenAI (anti-hallucination)
+          if (hasEmployeeName) {
+            console.log('🚫 [SECURITY] Blocking employee query from OpenAI - using direct response');
+            response = {
+              message: `Para consultas específicas de empleados, usa términos como "salario de [nombre]" o "buscar [nombre]".`,
+              emotionalState: 'neutral'
+            };
+          } else {
+            response = await handleConversation(lastMessage, conversation);
+          }
+        }
+        // Medium confidence (0.7-0.8): Still use KISS (proven reliable)
+        else {
+          console.log(`⚖️ [HYBRID] Medium confidence (${intent.confidence}) - using KISS with caution`);
+          response = {
+            message: `Para consultas específicas de empleados, usa términos como "salario de [nombre]" o "buscar [nombre]".`,
+            emotionalState: 'neutral'
+          };
         }
     }
 
@@ -630,6 +666,262 @@ function detectEmployeeNameInQuery(text: string): string | null {
   }
   
   return null;
+}
+
+// ============================================================================
+// 🎯 VOUCHER CONTEXTUAL INTELLIGENCE HANDLERS
+// ============================================================================
+
+async function handleVoucherSend(supabase: any, params: any): Promise<{ message: string; emotionalState: string; actions?: any[] }> {
+  const { employeeName, termUsed } = params;
+  
+  console.log(`🎯 [VOUCHER_SEND] Processing for: "${employeeName}"`);
+  
+  // Step 1: Validate employee exists
+  const validation = await validateEmployeeExists(supabase, employeeName);
+  
+  if (!validation.exists) {
+    console.log(`❌ [VOUCHER_SEND] Employee "${employeeName}" not found`);
+    return {
+      message: `No encontré un empleado llamado "${employeeName}" en tu empresa. ¿Podrías verificar la ortografía o el nombre completo?`,
+      emotionalState: 'neutral'
+    };
+  }
+  
+  if (validation.multiple) {
+    const employeeList = Array.isArray(validation.employee) 
+      ? validation.employee.map((emp: any) => `• **${emp.nombre} ${emp.apellido}** (${emp.cargo || 'Sin cargo'})`).join('\n')
+      : '';
+    return {
+      message: `Encontré varios empleados con "${employeeName}":\n\n${employeeList}\n\n¿Podrías ser más específico con el nombre completo?`,
+      emotionalState: 'neutral'
+    };
+  }
+  
+  const employee = validation.employee;
+  
+  // Step 2: Check if employee has email
+  const { data: employeeData, error: emailError } = await supabase
+    .from('employees')
+    .select('id, nombre, apellido, email, cargo')
+    .eq('id', employee.id)
+    .single();
+  
+  if (emailError || !employeeData) {
+    console.error('❌ [VOUCHER_SEND] Error fetching employee email:', emailError);
+    return {
+      message: `Error al consultar los datos de ${employee.nombre} ${employee.apellido}. Por favor intenta de nuevo.`,
+      emotionalState: 'concerned'
+    };
+  }
+  
+  // Step 3: Detect missing email - offer to add it
+  if (!employeeData.email || employeeData.email.trim() === '') {
+    console.log(`⚠️ [VOUCHER_SEND] Missing email for ${employeeData.nombre} ${employeeData.apellido}`);
+    return {
+      message: `**${employeeData.nombre} ${employeeData.apellido}** no tiene un email registrado. \n\n¿Quieres agregarlo ahora? Puedo esperar mientras lo ingresas en la ficha del empleado, o puedes descargar el ${termUsed} en PDF para enviarlo manualmente.`,
+      emotionalState: 'helpful',
+      actions: [
+        {
+          id: 'add-email',
+          type: 'view_details',
+          label: '➕ Agregar Email',
+          description: 'Ir a la ficha del empleado',
+          parameters: {
+            entityType: 'employee',
+            entityId: employeeData.id,
+            entityName: `${employeeData.nombre} ${employeeData.apellido}`
+          }
+        }
+      ]
+    };
+  }
+  
+  // Step 4: Get recent payroll periods
+  const { data: periods, error: periodsError } = await supabase
+    .from('payroll_periods_real')
+    .select('id, periodo, fecha_inicio, fecha_fin, estado')
+    .order('fecha_fin', { ascending: false })
+    .limit(5);
+  
+  if (periodsError || !periods || periods.length === 0) {
+    console.error('❌ [VOUCHER_SEND] Error fetching periods:', periodsError);
+    return {
+      message: `No encontré períodos de nómina disponibles. Por favor verifica que haya al menos un período cerrado.`,
+      emotionalState: 'concerned'
+    };
+  }
+  
+  // Step 5: Check if voucher was already sent for the most recent period
+  const latestPeriod = periods[0];
+  const { data: existingVouchers, error: voucherCheckError } = await supabase
+    .from('payroll_vouchers')
+    .select('id, sent_to_employee, sent_date')
+    .eq('employee_id', employeeData.id)
+    .eq('periodo', latestPeriod.periodo)
+    .order('created_at', { ascending: false })
+    .limit(1);
+  
+  if (voucherCheckError) {
+    console.error('⚠️ [VOUCHER_SEND] Error checking existing vouchers:', voucherCheckError);
+  }
+  
+  const alreadySent = existingVouchers && existingVouchers.length > 0 && existingVouchers[0].sent_to_employee;
+  
+  if (alreadySent) {
+    const sentDate = new Date(existingVouchers[0].sent_date).toLocaleDateString('es-CO', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+    console.log(`⚠️ [VOUCHER_SEND] Already sent on ${sentDate} - requesting confirmation`);
+    
+    return {
+      message: `El ${termUsed} del período **${latestPeriod.periodo}** ya fue enviado a **${employeeData.nombre} ${employeeData.apellido}** (${employeeData.email}) el **${sentDate}**.\n\n¿Quieres volver a enviarlo?`,
+      emotionalState: 'neutral',
+      actions: [
+        {
+          id: 'resend-voucher',
+          type: 'send_voucher',
+          label: '🔄 Reenviar',
+          description: `Reenviar ${termUsed} a ${employeeData.email}`,
+          parameters: {
+            employeeId: employeeData.id,
+            employeeName: `${employeeData.nombre} ${employeeData.apellido}`,
+            email: employeeData.email,
+            periodId: latestPeriod.id,
+            periodName: latestPeriod.periodo
+          },
+          requiresConfirmation: true
+        },
+        {
+          id: 'preview-voucher',
+          type: 'view_details',
+          label: '👁️ Vista Previa',
+          description: 'Ver antes de enviar',
+          parameters: {
+            entityType: 'voucher',
+            entityId: existingVouchers[0].id,
+            entityName: `${termUsed} - ${latestPeriod.periodo}`
+          }
+        }
+      ]
+    };
+  }
+  
+  // Step 6: First-time send - offer preview and confirmation
+  console.log(`✅ [VOUCHER_SEND] Ready to send for period ${latestPeriod.periodo}`);
+  
+  return {
+    message: `**${employeeData.nombre} ${employeeData.apellido}**\n📧 Email: ${employeeData.email}\n📅 Período: **${latestPeriod.periodo}**\n\n¿Quieres enviar el ${termUsed}?`,
+    emotionalState: 'helpful',
+    actions: [
+      {
+        id: 'send-voucher',
+        type: 'send_voucher',
+        label: '📧 Enviar',
+        description: `Enviar ${termUsed} a ${employeeData.email}`,
+        parameters: {
+          employeeId: employeeData.id,
+          employeeName: `${employeeData.nombre} ${employeeData.apellido}`,
+          email: employeeData.email,
+          periodId: latestPeriod.id,
+          periodName: latestPeriod.periodo
+        },
+        requiresConfirmation: false
+      },
+      {
+        id: 'preview-voucher',
+        type: 'view_details',
+        label: '👁️ Vista Previa',
+        description: 'Ver antes de enviar',
+        parameters: {
+          entityType: 'payroll',
+          entityId: employeeData.id,
+          periodId: latestPeriod.id,
+          entityName: `${termUsed} - ${latestPeriod.periodo}`
+        }
+      }
+    ]
+  };
+}
+
+async function handleVoucherMassSend(supabase: any, params: any): Promise<{ message: string; emotionalState: string; actions?: any[] }> {
+  console.log(`🎯 [VOUCHER_MASS_SEND] Processing mass voucher request`);
+  
+  // Step 1: Get all active employees
+  const { data: employees, error: employeesError } = await supabase
+    .from('employees')
+    .select('id, nombre, apellido, email, cargo')
+    .eq('estado', 'activo');
+  
+  if (employeesError || !employees || employees.length === 0) {
+    console.error('❌ [VOUCHER_MASS_SEND] Error fetching employees:', employeesError);
+    return {
+      message: `No encontré empleados activos en tu empresa.`,
+      emotionalState: 'concerned'
+    };
+  }
+  
+  // Step 2: Check how many have emails
+  const employeesWithEmail = employees.filter((emp: any) => emp.email && emp.email.trim() !== '');
+  const employeesWithoutEmail = employees.filter((emp: any) => !emp.email || emp.email.trim() === '');
+  
+  console.log(`📊 [VOUCHER_MASS_SEND] Total: ${employees.length}, With email: ${employeesWithEmail.length}, Without email: ${employeesWithoutEmail.length}`);
+  
+  // Step 3: Get latest payroll period
+  const { data: periods, error: periodsError } = await supabase
+    .from('payroll_periods_real')
+    .select('id, periodo, fecha_inicio, fecha_fin, estado')
+    .order('fecha_fin', { ascending: false })
+    .limit(1);
+  
+  if (periodsError || !periods || periods.length === 0) {
+    console.error('❌ [VOUCHER_MASS_SEND] Error fetching periods:', periodsError);
+    return {
+      message: `No encontré períodos de nómina disponibles.`,
+      emotionalState: 'concerned'
+    };
+  }
+  
+  const latestPeriod = periods[0];
+  
+  // Step 4: Build confirmation message
+  let message = `**Envío Masivo de Comprobantes**\n\n`;
+  message += `📅 Período: **${latestPeriod.periodo}**\n`;
+  message += `👥 Empleados activos: **${employees.length}**\n`;
+  message += `✅ Con email: **${employeesWithEmail.length}**\n`;
+  
+  if (employeesWithoutEmail.length > 0) {
+    message += `⚠️ Sin email: **${employeesWithoutEmail.length}**\n\n`;
+    message += `Los empleados sin email no recibirán el comprobante:\n`;
+    message += employeesWithoutEmail.slice(0, 5).map((emp: any) => `• ${emp.nombre} ${emp.apellido}`).join('\n');
+    if (employeesWithoutEmail.length > 5) {
+      message += `\n... y ${employeesWithoutEmail.length - 5} más`;
+    }
+    message += `\n\n`;
+  }
+  
+  message += `Se enviarán **${employeesWithEmail.length} comprobantes** por email.`;
+  
+  return {
+    message,
+    emotionalState: 'helpful',
+    actions: [
+      {
+        id: 'send-mass-vouchers',
+        type: 'send_voucher_all',
+        label: '📧 Enviar a Todos',
+        description: `Enviar ${employeesWithEmail.length} comprobantes`,
+        parameters: {
+          periodId: latestPeriod.id,
+          periodName: latestPeriod.periodo,
+          employeeCount: employeesWithEmail.length
+        },
+        requiresConfirmation: true
+      }
+    ]
+  };
 }
 
 async function blockSystemInfoQuery(): Promise<{ message: string; emotionalState: string }> {

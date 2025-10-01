@@ -193,6 +193,64 @@ export class SimpleIntentMatcher {
       };
     }
     
+    // ============================================================================
+    // 🎯 VOUCHER SEND (Individual) - Ultra-Robust Colombian Patterns
+    // ============================================================================
+    // Covers 15+ linguistic variants with employee name extraction
+    const voucherIndividualPatterns = [
+      // Standard Colombian terms
+      /(?:envi[aá]|mand[aá]|despach[aá]|hac[eé]|genera?|sac[aá])(?:r|me|le|la|lo)?\s+(?:el|la|un|una)?\s*(?:comprobante|colilla|desprendible|recibo|soporte|documento|pdf|planilla)\s+(?:de\s+(?:pago|n[oó]mina|salario|sueldo)\s+)?(?:de\s+|a\s+|para\s+)?([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)/i,
+      // Reverse patterns: "a [name] + action"
+      /(?:a|para)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)\s+(?:envi[aá]|mand[aá]|despach[aá]|hac[eé]|genera?|sac[aá])(?:r|me|le|la|lo)?\s+(?:el|la|su)?\s*(?:comprobante|colilla|desprendible|recibo|soporte|documento|pdf)/i,
+      // Informal Colombian: "tirar", "pasar", "compartir"
+      /(?:tir[aá]|pas[aá]|compart[eí])(?:r|me|le|la)?\s+(?:el|la)?\s*(?:comprobante|colilla|desprendible|recibo)\s+(?:a|de|para)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)/i,
+      // Direct action without preposition
+      /(?:comprobante|colilla|desprendible|recibo)\s+(?:de\s+)?([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)/i
+    ];
+
+    for (const pattern of voucherIndividualPatterns) {
+      const match = lowerText.match(pattern);
+      if (match) {
+        const employeeName = match[1].trim();
+        const termUsed = lowerText.match(/(comprobante|colilla|desprendible|recibo|soporte|documento|pdf|planilla)/i)?.[1] || 'comprobante';
+        
+        console.log(`🎯 [VOUCHER_SEND] Detected: "${employeeName}" using term "${termUsed}"`);
+        return {
+          type: 'VOUCHER_SEND',
+          confidence: 0.98,
+          method: 'handleVoucherSend',
+          params: {
+            employeeName,
+            termUsed,
+            originalQuery: text.trim()
+          }
+        };
+      }
+    }
+
+    // ============================================================================
+    // 🎯 VOUCHER MASS SEND - Ultra-Robust Colombian Patterns  
+    // ============================================================================
+    const voucherMassPatterns = [
+      /(?:envi[aá]|mand[aá]|despach[aá])(?:r|me)?\s+(?:todos?\s+)?(?:los?\s+)?(?:comprobantes?|colillas?|desprendibles?|recibos?)\s+(?:de\s+(?:pago|n[oó]mina|salario))?(?:\s+a\s+todos?)?(?:\s+masiv[oa])?/i,
+      /(?:comprobantes?|colillas?|desprendibles?)\s+(?:masiv[oa]s?|en\s+masa|para\s+todos?|a\s+todos?)/i,
+      /(?:envi[aá]|mand[aá])\s+(?:a\s+)?(?:todos?\s+)?(?:los?\s+)?(?:empleados?\s+)?(?:sus?\s+)?(?:comprobantes?|colillas?|desprendibles?)/i
+    ];
+
+    for (const pattern of voucherMassPatterns) {
+      if (pattern.test(lowerText)) {
+        console.log(`🎯 [VOUCHER_MASS_SEND] Detected mass voucher request`);
+        return {
+          type: 'VOUCHER_MASS_SEND',
+          confidence: 0.98,
+          method: 'handleVoucherMassSend',
+          params: {
+            originalQuery: text.trim()
+          }
+        };
+      }
+    }
+    
     // SECURITY: Block system-wide information queries (HIGHEST PRIORITY)
     if (/(?:cuántas?|cuantas?|cantidad|total)\s+(?:de\s+)?(?:empresas?|compañías?|organizaciones?)/i.test(text) ||
         /(?:base\s+de\s+datos|sistema|software|plataforma)/i.test(text) && /(?:empresas?|compañías?|datos|información)/i.test(text)) {
