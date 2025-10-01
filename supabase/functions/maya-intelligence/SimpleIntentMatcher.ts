@@ -62,6 +62,28 @@ function normalizePayrollTerm(text: string): string {
   return text;
 }
 
+// Helper function to sanitize employee names (remove prepositions)
+function sanitizeEmployeeName(name: string, fullText?: string): string {
+  let cleaned = name.trim();
+  
+  // Remove leading prepositions: "a juan", "para maria", "de carlos"
+  cleaned = cleaned.replace(/^(?:a|para|de)\s+/i, '');
+  
+  // Special handling: if fullText contains "name al email/correo", remove trailing "al"
+  if (fullText && /\b(?:correo|email)\b/i.test(fullText)) {
+    const escapedName = cleaned.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const alBeforeEmailPattern = new RegExp(`${escapedName}\\s+al\\s+(?:correo|email)\\b`, 'i');
+    if (alBeforeEmailPattern.test(fullText)) {
+      cleaned = cleaned.replace(/\s+al$/i, '');
+    }
+  }
+  
+  // Remove trailing prepositions: "juan al", "maria del", "carlos de", "ana la", "pedro el"
+  cleaned = cleaned.replace(/\s+(?:al|del|de|la|el)\s*$/i, '');
+  
+  return cleaned.trim();
+}
+
 // Helper function to extract employee names from salary queries
 function extractNameFromSalaryQuery(text: string): string | null {
   const lowerText = text.toLowerCase().trim();
@@ -211,17 +233,19 @@ export class SimpleIntentMatcher {
     for (const pattern of voucherIndividualPatterns) {
       const match = text.match(pattern);
       if (match) {
-        const employeeName = match[1].trim();
+        const rawEmployeeName = match[1].trim();
+        const cleanedEmployeeName = sanitizeEmployeeName(rawEmployeeName, text);
         const termUsed = text.match(/(comprobante|colilla|desprendible|recibo|soporte|documento|pdf|planilla)/i)?.[1] || 'comprobante';
         
         // Extract email if provided in message (NEW)
         const emailMatch = text.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
         const email = emailMatch ? emailMatch[1] : null;
         
+        console.log(`🧹 [VOUCHER_SEND] Normalized name: "${rawEmployeeName}" -> "${cleanedEmployeeName}"`);
         if (email) {
-          console.log(`🎯 [VOUCHER_SEND] Detected: "${employeeName}" using term "${termUsed}" with email "${email}"`);
+          console.log(`🎯 [VOUCHER_SEND] Detected: "${cleanedEmployeeName}" using term "${termUsed}" with email "${email}"`);
         } else {
-          console.log(`🎯 [VOUCHER_SEND] Detected: "${employeeName}" using term "${termUsed}"`);
+          console.log(`🎯 [VOUCHER_SEND] Detected: "${cleanedEmployeeName}" using term "${termUsed}"`);
         }
         
         return {
@@ -229,7 +253,7 @@ export class SimpleIntentMatcher {
           confidence: 0.98,
           method: 'handleVoucherSend',
           params: {
-            employeeName,
+            employeeName: cleanedEmployeeName,
             termUsed,
             email, // Include email if provided
             originalQuery: text.trim()

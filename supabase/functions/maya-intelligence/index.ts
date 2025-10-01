@@ -950,9 +950,25 @@ function detectEmployeeNameInQuery(text: string): string | null {
 // 🎯 VOUCHER CONTEXTUAL INTELLIGENCE HANDLERS
 // ============================================================================
 
-async function handleVoucherSend(supabase: any, params: any): Promise<{ message: string; emotionalState: string; actions?: any[] }> {
-  const { employeeName, termUsed } = params;
+// Helper function to sanitize employee names (remove prepositions)
+function sanitizeEmployeeName(name: string): string {
+  let cleaned = name.trim();
   
+  // Remove leading prepositions: "a juan", "para maria", "de carlos"
+  cleaned = cleaned.replace(/^(?:a|para|de)\s+/i, '');
+  
+  // Remove trailing prepositions: "juan al", "maria del", "carlos de", "ana la", "pedro el"
+  cleaned = cleaned.replace(/\s+(?:al|del|de|la|el)\s*$/i, '');
+  
+  return cleaned.trim();
+}
+
+async function handleVoucherSend(supabase: any, params: any): Promise<{ message: string; emotionalState: string; actions?: any[] }> {
+  const { employeeName: rawEmployeeName, termUsed } = params;
+  
+  // Sanitize employee name before processing
+  const employeeName = sanitizeEmployeeName(rawEmployeeName);
+  console.log(`🧹 [VOUCHER_SEND] Name cleanup: "${rawEmployeeName}" -> "${employeeName}"`);
   console.log(`🎯 [VOUCHER_SEND] Processing for: "${employeeName}"`);
   
   // Step 1: Validate employee exists
