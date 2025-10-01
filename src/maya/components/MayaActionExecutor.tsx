@@ -120,7 +120,7 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
   const handleAction = async (action: ExecutableAction): Promise<ActionExecutionResult> => {
     switch (action.type) {
       case 'send_voucher':
-        return await executeSendVoucher(action);
+        return await executeAutomatically(action);
       case 'send_voucher_all':
         return await executeAutomatically(action);
       case 'confirm_send_voucher':

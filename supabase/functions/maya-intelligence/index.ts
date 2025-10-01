@@ -1054,7 +1054,7 @@ async function handleVoucherSend(supabase: any, params: any): Promise<{ message:
       actions: [
         {
           id: 'resend-voucher',
-          type: 'send_voucher',
+          type: 'confirm_send_voucher',
           label: '🔄 Reenviar',
           description: `Reenviar ${termUsed} a ${targetEmail}`,
           parameters: {
@@ -1090,7 +1090,7 @@ async function handleVoucherSend(supabase: any, params: any): Promise<{ message:
     actions: [
       {
         id: 'send-voucher',
-        type: 'send_voucher',
+        type: 'confirm_send_voucher',
         label: '📧 Enviar',
         description: `Enviar ${termUsed} a ${targetEmail}`,
         parameters: {
