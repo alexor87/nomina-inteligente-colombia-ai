@@ -551,6 +551,9 @@ serve(async (req) => {
     // Build structured response
     const structuredResponse = buildStructuredResponse(intent, response, lastMessage);
     
+    // Log actions for debugging
+    console.log(`🎬 [ACTIONS] Response has ${(response.actions || []).length} actions`);
+    
     // Return enhanced JSON response with backward compatibility
     return new Response(JSON.stringify({
       // STRUCTURED FIELDS (NEW)
@@ -561,6 +564,10 @@ serve(async (req) => {
       parametros_extra: structuredResponse.parametros_extra,
       observaciones: structuredResponse.observaciones,
       incompleto: structuredResponse.incompleto,
+      
+      // EXECUTABLE ACTIONS (CRITICAL FOR UI)
+      executableActions: response.actions || [],
+      executable_actions: response.actions || [], // Backward compatibility
       
       // ORIGINAL FIELDS (BACKWARD COMPATIBILITY)
       message: response.message,
