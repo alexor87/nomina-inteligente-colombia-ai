@@ -315,8 +315,8 @@ export class SimpleIntentMatcher {
       };
     }
     
-    // VOUCHER SEND WITH ALTERNATIVE EMAIL - Fallback pattern
-    const alternativeEmailMatch = text.match(/(?:envia|manda|envia|envi[aá])(?:la|lo|me)?\s+(?:a|al)\s+(?:email|correo)?\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i);
+    // VOUCHER SEND WITH ALTERNATIVE EMAIL - Fallback pattern (strengthened)
+    const alternativeEmailMatch = text.match(/(?:envi(?:a|á|ar|arlo|arla|alo|ala|ame|amelo|ámelo)|mand(?:a|á|ar|alo|ala|ame|amelo|ámelo))(?:lo|la|me|melo)?\s+(?:a|al)\s+(?:email|correo)?\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i);
     if (alternativeEmailMatch) {
       const email = alternativeEmailMatch[1];
       console.log('📧 [VOUCHER_ALTERNATIVE_EMAIL] Pattern matched for email:', email);

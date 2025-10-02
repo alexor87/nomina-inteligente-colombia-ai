@@ -74,6 +74,15 @@ function analyzeConversationContext(conversation: any[]): { intentType: string |
     params.employeeName = context.entities.employeeName;
   }
   
+  if (context.contextType === 'VOUCHER_CONFIRMATION_PENDING' && context.entities) {
+    if (context.entities.employeeName) {
+      params.employeeName = context.entities.employeeName;
+    }
+    if (context.entities.employeeId) {
+      params.employeeId = context.entities.employeeId;
+    }
+  }
+  
   return {
     intentType: context.contextType,
     params
@@ -440,85 +449,96 @@ serve(async (req) => {
     // Check for conversational contexts that need special handling
     const conversationContext = analyzeConversationContext(conversation);
     
-    // Handle VOUCHER_EMAIL_OVERRIDE context (user provides alternative email after seeing buttons)
-    if (conversationContext.intentType === 'VOUCHER_EMAIL_OVERRIDE') {
-      const { employeeName } = conversationContext.params;
-      
-      // Extract email from user message
+    // Handle VOUCHER_CONFIRMATION_PENDING context (user provides alternative email after seeing buttons)
+    if (conversationContext.intentType === 'VOUCHER_CONFIRMATION_PENDING') {
+      // Check if user is providing an alternative email
       const emailMatch = lastMessage.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
-      const providedEmail = emailMatch ? emailMatch[1] : null;
       
-      if (!providedEmail) {
-        return new Response(JSON.stringify({
-          message: "❌ No detecté un email válido. Por favor escríbelo en el formato correcto (ejemplo: nombre@ejemplo.com)",
-          emotionalState: 'concerned',
-          sessionId,
-          timestamp: new Date().toISOString()
-        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-      }
-      
-      // Get company context
-      const { data: companyData } = await userSupabase
-        .from('profiles')
-        .select('company_id')
-        .eq('user_id', (await userSupabase.auth.getUser()).data.user?.id)
-        .single();
-      
-      if (!companyData?.company_id) {
-        return new Response(JSON.stringify({
-          message: "❌ No pude identificar tu empresa.",
-          emotionalState: 'concerned',
-          sessionId,
-          timestamp: new Date().toISOString()
-        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-      }
-      
-      // Find employee from context
-      const { data: employees } = await userSupabase
-        .from('employees')
-        .select('id, nombre, apellido, email')
-        .eq('company_id', companyData.company_id)
-        .eq('estado', 'activo')
-        .ilike('nombre', `%${employeeName}%`);
-      
-      const employee = employees?.[0];
-      
-      if (!employee) {
-        return new Response(JSON.stringify({
-          message: `❌ No pude encontrar al empleado ${employeeName}. Por favor intenta de nuevo.`,
-          emotionalState: 'concerned',
-          sessionId,
-          timestamp: new Date().toISOString()
-        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-      }
-      
-      // Show confirmation with alternative email
-      console.log(`✅ [VOUCHER_OVERRIDE] User wants to send to ${providedEmail} instead of ${employee.email || 'N/A'}`);
-      
-      return new Response(JSON.stringify({
-        message: `✅ Perfecto, enviaré el comprobante de **${employee.nombre} ${employee.apellido}** a **${providedEmail}**`,
-        emotionalState: 'encouraging',
-        executableActions: [
-          {
-            id: `confirm_send_voucher_${employee.id}_${Date.now()}`,
-            type: 'confirm_send_voucher',
-            label: '📧 Confirmar Envío',
-            description: `Enviar comprobante a ${providedEmail}`,
-            parameters: {
-              employeeId: employee.id,
-              employeeName: `${employee.nombre} ${employee.apellido}`,
-              email: providedEmail,
-              periodId: 'latest'
-            },
-            requiresConfirmation: false,
-            icon: '📧'
+      if (emailMatch) {
+        console.log(`📧 [CONTEXT_EMAIL_OVERRIDE] User providing alternative email in context`);
+        const { employeeName, employeeId } = conversationContext.params;
+        const providedEmail = emailMatch[1];
+        
+        if (!employeeName) {
+          return new Response(JSON.stringify({
+            message: "❌ No pude identificar para qué empleado quieres cambiar el email.",
+            emotionalState: 'concerned',
+            sessionId,
+            timestamp: new Date().toISOString()
+          }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        
+        // Get company context
+        const { data: companyData } = await userSupabase
+          .from('profiles')
+          .select('company_id')
+          .eq('user_id', (await userSupabase.auth.getUser()).data.user?.id)
+          .single();
+        
+        if (!companyData?.company_id) {
+          return new Response(JSON.stringify({
+            message: "❌ No pude identificar tu empresa.",
+            emotionalState: 'concerned',
+            sessionId,
+            timestamp: new Date().toISOString()
+          }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        
+        // Find employee if we don't have ID
+        let finalEmployeeId = employeeId;
+        let finalEmployeeName = employeeName;
+        
+        if (!finalEmployeeId) {
+          const { data: employees } = await userSupabase
+            .from('employees')
+            .select('id, nombre, apellido, email')
+            .eq('company_id', companyData.company_id)
+            .eq('estado', 'activo')
+            .ilike('nombre', `%${employeeName}%`);
+          
+          const employee = employees?.[0];
+          
+          if (!employee) {
+            return new Response(JSON.stringify({
+              message: `❌ No pude encontrar al empleado ${employeeName}. Por favor intenta de nuevo.`,
+              emotionalState: 'concerned',
+              sessionId,
+              timestamp: new Date().toISOString()
+            }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
           }
-        ],
-        sessionId,
-        timestamp: new Date().toISOString()
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+          
+          finalEmployeeId = employee.id;
+          finalEmployeeName = `${employee.nombre} ${employee.apellido}`;
+        }
+        
+        // Show confirmation with alternative email
+        console.log(`✅ [VOUCHER_OVERRIDE] User wants to send to ${providedEmail}`);
+        
+        return new Response(JSON.stringify({
+          message: `✅ Perfecto, enviaré el comprobante de **${finalEmployeeName}** a **${providedEmail}**`,
+          emotionalState: 'encouraging',
+          executableActions: [
+            {
+              id: `confirm_send_voucher_${finalEmployeeId}_${Date.now()}`,
+              type: 'confirm_send_voucher',
+              label: '📧 Confirmar Envío',
+              description: `Enviar comprobante a ${providedEmail}`,
+              parameters: {
+                employeeId: finalEmployeeId,
+                employeeName: finalEmployeeName,
+                email: providedEmail,
+                periodId: 'latest'
+              },
+              requiresConfirmation: false,
+              icon: '📧'
+            }
+          ],
+          sessionId,
+          timestamp: new Date().toISOString()
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
     }
     
     // Handle PENDING_EMAIL_FOR_VOUCHER context
@@ -873,6 +893,64 @@ serve(async (req) => {
         
       case 'handleVoucherMassSend':
         response = await handleVoucherMassSend(userSupabase, intent.params);
+        break;
+        
+      case 'handleVoucherEmailOverride':
+        console.log('📧 [VOUCHER_EMAIL_OVERRIDE] Handling email override via SimpleIntentMatcher');
+        const emailMatch = lastMessage.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+        
+        if (!emailMatch) {
+          response = {
+            message: "❌ No detecté un email válido. Por favor escríbelo en el formato correcto (ejemplo: nombre@ejemplo.com)",
+            emotionalState: 'concerned'
+          };
+          break;
+        }
+        
+        const alternativeEmail = emailMatch[1];
+        const employeeName = conversationContext.params?.employeeName || 
+                            extractLastEmployeeFromContext(conversation);
+        
+        if (!employeeName) {
+          response = {
+            message: "❌ No pude identificar para qué empleado quieres cambiar el email. ¿Podrías especificarlo?",
+            emotionalState: 'concerned'
+          };
+          break;
+        }
+        
+        // Find employee
+        const { data: employees } = await userSupabase
+          .from('employees')
+          .select('id, nombre, apellido, email')
+          .eq('estado', 'activo')
+          .ilike('nombre', `%${employeeName}%`);
+        
+        const employee = employees?.[0];
+        
+        if (!employee) {
+          response = {
+            message: `❌ No encontré al empleado "${employeeName}" en tu empresa.`,
+            emotionalState: 'concerned'
+          };
+          break;
+        }
+        
+        response = {
+          message: `✅ Perfecto, enviaré el comprobante de **${employee.nombre} ${employee.apellido}** al email:\n\n📧 **${alternativeEmail}**`,
+          emotionalState: 'encouraging',
+          actions: [{
+            id: `send-voucher-${employee.id}-alt`,
+            type: 'confirm_send_voucher',
+            label: '📧 Confirmar Envío',
+            description: `Enviar a ${alternativeEmail}`,
+            parameters: {
+              employeeId: employee.id,
+              employeeName: `${employee.nombre} ${employee.apellido}`,
+              email: alternativeEmail
+            }
+          }]
+        };
         break;
         
       case 'blockSystemInfoQuery':

@@ -48,6 +48,43 @@ export class ConversationContextAnalyzer {
 
     const responseText = lastAssistantMessage.content || '';
 
+    // Check if there are executable actions (buttons) - highest priority
+    const executableActions = (lastAssistantMessage as any).executableActions;
+    if (executableActions && Array.isArray(executableActions)) {
+      const hasVoucherAction = executableActions.some((action: any) => 
+        action.type === 'confirm_send_voucher' || 
+        action.type === 'send_voucher' ||
+        (action.label && /enviar|send/i.test(action.label))
+      );
+      
+      if (hasVoucherAction) {
+        const voucherAction = executableActions.find((action: any) => 
+          action.type === 'confirm_send_voucher' || action.type === 'send_voucher'
+        );
+        
+        const entities = this.extractEntities(responseText);
+        
+        // Extract employee info from action parameters
+        if (voucherAction?.parameters) {
+          if (voucherAction.parameters.employeeName) {
+            entities.employeeName = voucherAction.parameters.employeeName;
+          }
+          if (voucherAction.parameters.employeeId) {
+            entities.employeeId = voucherAction.parameters.employeeId;
+          }
+        }
+        
+        return {
+          contextType: 'VOUCHER_CONFIRMATION_PENDING',
+          responseStructure: 'confirmation_buttons',
+          entities,
+          confidence: 0.97,
+          lastResponseText: responseText,
+          detectedPatterns: ['EXECUTABLE_ACTIONS_VOUCHER']
+        };
+      }
+    }
+
     // Analyze response against all patterns
     const detectedContext = this.detectResponseType(responseText);
     
