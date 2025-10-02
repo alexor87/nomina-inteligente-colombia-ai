@@ -1503,17 +1503,6 @@ async function handleVoucherSend(supabase: any, params: any): Promise<{ message:
             periodName: latestPeriod.periodo
           },
           requiresConfirmation: true
-        },
-        {
-          id: 'preview-voucher',
-          type: 'view_details',
-          label: '👁️ Vista Previa',
-          description: 'Ver antes de enviar',
-          parameters: {
-            entityType: 'voucher',
-            entityId: existingVouchers[0].id,
-            entityName: `${termUsed} - ${latestPeriod.periodo}`
-          }
         }
       ]
     };
@@ -1539,18 +1528,6 @@ async function handleVoucherSend(supabase: any, params: any): Promise<{ message:
           periodName: latestPeriod.periodo
         },
         requiresConfirmation: false
-      },
-      {
-        id: 'preview-voucher',
-        type: 'view_details',
-        label: '👁️ Vista Previa',
-        description: 'Ver antes de enviar',
-        parameters: {
-          entityType: 'payroll',
-          entityId: employeeData.id,
-          periodId: latestPeriod.id,
-          entityName: `${termUsed} - ${latestPeriod.periodo}`
-        }
       }
     ]
   };
