@@ -838,6 +838,10 @@ serve(async (req) => {
         response = await searchEmployee(userSupabase, intent.params?.name);
         break;
         
+      case 'getSalaryReport':
+        response = await getSalaryReport(userSupabase);
+        break;
+        
       case 'getEmployeeSalary':
         // Additional validation for employee salary
         if (intent.params?.name) {
@@ -1495,6 +1499,45 @@ async function searchEmployee(supabase: any, name: string) {
     console.error('[MAYA-KISS] Employee search error:', error);
     return {
       message: `No pude buscar empleados en este momento.`,
+      emotionalState: 'concerned'
+    };
+  }
+}
+
+async function getSalaryReport(supabase: any) {
+  try {
+    const { data, error } = await supabase
+      .from('employees')
+      .select('nombre, apellido, cargo, salario_base')
+      .eq('estado', 'activo')
+      .order('salario_base', { ascending: false });
+      
+    if (error) throw error;
+    
+    if (!data || data.length === 0) {
+      return {
+        message: 'No encontré empleados activos en tu empresa.',
+        emotionalState: 'neutral'
+      };
+    }
+    
+    const totalSalaries = data.reduce((sum: number, emp: any) => sum + (emp.salario_base || 0), 0);
+    const employeeList = data.map((emp: any) => 
+      `• **${emp.nombre} ${emp.apellido}** - ${emp.cargo || 'Sin cargo'} - $${emp.salario_base?.toLocaleString() || 'N/A'}`
+    ).join('\n');
+    
+    return {
+      message: `📊 **Reporte de Salarios por Empleado**\n\n` +
+              `👥 Total empleados: **${data.length}**\n` +
+              `💰 Nómina total: **$${totalSalaries.toLocaleString()}**\n\n` +
+              `${employeeList}\n\n` +
+              `💡 ¿Necesitas ver detalles de algún empleado en particular?`,
+      emotionalState: 'neutral'
+    };
+  } catch (error) {
+    console.error('[MAYA] Salary report error:', error);
+    return {
+      message: 'Error al generar el reporte de salarios.',
       emotionalState: 'concerned'
     };
   }

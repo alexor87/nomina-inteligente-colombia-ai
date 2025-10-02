@@ -315,6 +315,20 @@ export class SimpleIntentMatcher {
       };
     }
     
+    // SALARY REPORT - General salary listing (BEFORE specific employee queries)
+    if (/(?:salario|sueldo)s?\s+(?:por|de|de\s+cada)\s+empleado/i.test(text) ||
+        /(?:listado|lista|reporte|informe)\s+de\s+salarios?/i.test(text) ||
+        /(?:cuánto|cuanto)\s+gana\s+cada\s+(?:uno|empleado)/i.test(text) ||
+        /(?:todos?\s+los?\s+)?salarios?(?:\s+de\s+(?:todos?|empleados?))?$/i.test(text)) {
+      console.log('📊 [SALARY_REPORT] Pattern matched - general salary report requested');
+      return {
+        type: 'SALARY_REPORT',
+        confidence: 0.96,
+        method: 'getSalaryReport',
+        params: { reportType: 'all_salaries' }
+      };
+    }
+    
     // Employee salary inquiry - HIGHEST PRIORITY for specific employee queries
     
     // COLOMBIAN PATTERNS - DIRECT (HIGHEST PRIORITY)
@@ -397,8 +411,9 @@ export class SimpleIntentMatcher {
       };
     }
 
-    // Pattern 7: "sueldo eliana" (without preposition)
-    if (/(?:salario|sueldo)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)/i.test(text) && !/nomina|total|cuanto|mes|año/i.test(text)) {
+    // Pattern 7: "sueldo eliana" (without preposition) - EXCLUDE report phrases
+    if (/(?:salario|sueldo)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)/i.test(text) && 
+        !/nomina|total|cuanto|mes|año|por\s+empleado|de\s+cada|de\s+todos|cada\s+uno/i.test(text)) {
       const nameMatch = text.match(/(?:salario|sueldo)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)/i);
       const extractedName = nameMatch?.[1]?.trim().replace(/[?.,!]+$/, '') || '';
       console.log('📝 [TRADITIONAL BASIC] Pattern matched for:', extractedName);
