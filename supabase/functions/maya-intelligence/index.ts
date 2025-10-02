@@ -378,6 +378,32 @@ serve(async (req) => {
       }
     }
     
+    // ============================================================================
+    // CHECK FOR PENDING CONTEXT (EMAIL_OVERRIDE waiting for employee name)
+    // ============================================================================
+    const lastAssistantMsg = conversation.filter(m => m.role === 'assistant').slice(-1)[0];
+    if (lastAssistantMsg?.metadata?.pendingAction === 'EMAIL_OVERRIDE') {
+      console.log('🔄 [PENDING_CONTEXT] Detected pending EMAIL_OVERRIDE, extracting employee name');
+      const pendingEmail = lastAssistantMsg.metadata.pendingEmail;
+      
+      // Extract employee name from user's message
+      const employeeNameMatch = lastMessage.match(/(?:para|de|a)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*)/i) ||
+                               lastMessage.match(/^([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*)$/i);
+      
+      if (employeeNameMatch) {
+        const extractedName = employeeNameMatch[1].trim();
+        console.log(`✅ [PENDING_CONTEXT] Extracted employee name: "${extractedName}"`);
+        
+        // Create continuation intent
+        intent = {
+          type: 'VOUCHER_EMAIL_OVERRIDE_CONTINUE',
+          method: 'handleVoucherEmailOverrideContinue',
+          params: { employeeName: extractedName, email: pendingEmail },
+          confidence: 0.95
+        };
+      }
+    }
+    
     // PRIORITY 2: Check if this is a follow-up query like "y a [name]?"
     if (!intent) {
       const followUpName = detectFollowUpQuery(lastMessage);
@@ -450,8 +476,8 @@ serve(async (req) => {
     const conversationContext = analyzeConversationContext(conversation);
     
     // Handle VOUCHER_CONFIRMATION_PENDING context (user provides alternative email after seeing buttons)
-    console.log(`🔍 [VOUCHER_CONTEXT] Checking VOUCHER_CONFIRMATION_PENDING: contextType=${conversationContext.contextType}`);
-    if (conversationContext.contextType === 'VOUCHER_CONFIRMATION_PENDING') {
+    console.log(`🔍 [VOUCHER_CONTEXT] Checking VOUCHER_CONFIRMATION_PENDING: intentType=${conversationContext.intentType}`);
+    if (conversationContext.intentType === 'VOUCHER_CONFIRMATION_PENDING') {
       // Check if user is providing an alternative email
       const emailMatch = lastMessage.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
       
@@ -543,7 +569,7 @@ serve(async (req) => {
     }
     
     // Handle PENDING_EMAIL_FOR_VOUCHER context
-    if (conversationContext.contextType === 'PENDING_EMAIL_FOR_VOUCHER') {
+    if (conversationContext.intentType === 'PENDING_EMAIL_FOR_VOUCHER') {
       const { employeeName } = conversationContext.params;
       
       // Extract email from user message
@@ -693,7 +719,7 @@ serve(async (req) => {
     }
     
     // Handle PENDING_SAVE_EMAIL_CONFIRMATION context
-    if (conversationContext.contextType === 'PENDING_SAVE_EMAIL_CONFIRMATION') {
+    if (conversationContext.intentType === 'PENDING_SAVE_EMAIL_CONFIRMATION') {
       const { employeeName, email } = conversationContext.params;
       
       // Detect affirmative response
@@ -930,9 +956,15 @@ serve(async (req) => {
         const employee = employees?.[0];
         
         if (!employee) {
+          console.log(`❌ [VOUCHER_EMAIL_OVERRIDE] Employee "${employeeName}" not found, preserving context`);
           response = {
-            message: `❌ No encontré al empleado "${employeeName}" en tu empresa.`,
-            emotionalState: 'concerned'
+            message: `❌ No pude identificar para qué empleado quieres enviar el comprobante a **${alternativeEmail}**.\n\n¿Para cuál empleado es?`,
+            emotionalState: 'concerned',
+            metadata: {
+              pendingAction: 'EMAIL_OVERRIDE',
+              pendingEmail: alternativeEmail,
+              awaitingEmployeeName: true
+            }
           };
           break;
         }
@@ -950,6 +982,59 @@ serve(async (req) => {
               employeeName: `${employee.nombre} ${employee.apellido}`,
               email: alternativeEmail
             }
+          }]
+        };
+        break;
+      }
+      
+      case 'handleVoucherEmailOverrideContinue': {
+        console.log('🔄 [VOUCHER_EMAIL_OVERRIDE_CONTINUE] Continuing with employee name and pending email');
+        const { employeeName, email } = intent.params;
+        
+        // Find employee
+        const { data: employees } = await userSupabase
+          .from('employees')
+          .select('id, nombre, apellido, email')
+          .eq('estado', 'activo')
+          .ilike('nombre', `%${employeeName}%`);
+        
+        const employee = employees?.[0];
+        
+        if (!employee) {
+          response = {
+            message: `❌ No encontré al empleado "${employeeName}" en tu empresa. ¿Podrías verificar el nombre?`,
+            emotionalState: 'concerned'
+          };
+          break;
+        }
+        
+        // Get latest period
+        const { data: periods } = await userSupabase
+          .from('payroll_periods_real')
+          .select('id, periodo')
+          .order('created_at', { ascending: false })
+          .limit(1);
+        
+        const period = periods?.[0];
+        
+        console.log(`✅ [VOUCHER_EMAIL_OVERRIDE_CONTINUE] Found employee: ${employee.nombre} ${employee.apellido}`);
+        
+        response = {
+          message: `✅ Perfecto, enviaré el comprobante de **${employee.nombre} ${employee.apellido}** a:\n📧 **${email}**`,
+          emotionalState: 'encouraging',
+          actions: [{
+            id: `send-voucher-${employee.id}-alt-${Date.now()}`,
+            type: 'confirm_send_voucher',
+            label: '📧 Confirmar Envío',
+            description: `Enviar a ${email}`,
+            parameters: {
+              employeeId: employee.id,
+              employeeName: `${employee.nombre} ${employee.apellido}`,
+              email: email,
+              periodId: period?.id,
+              periodName: period?.periodo
+            },
+            requiresConfirmation: true
           }]
         };
         break;
