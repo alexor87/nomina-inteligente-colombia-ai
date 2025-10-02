@@ -49,7 +49,10 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
   
   const [currentMessage, setCurrentMessage] = useState<MayaMessage | null>(null);
   const [isVisible, setIsVisible] = useState(autoShow);
-  const [isChatMode, setIsChatMode] = useState(false);
+  const [isChatMode, setIsChatMode] = useState(() => {
+    const persistedConversation = MayaChatService.getInstance().getConversation();
+    return persistedConversation.messages.length > 0;
+  });
   const [mayaEngine] = useState(() => MayaEngine.getInstance());
   const [chatService] = useState(() => MayaChatService.getInstance());
   
@@ -354,6 +357,7 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
     if (existingConversation.messages.length > 0) {
       console.log('🤖 MAYA Provider: Syncing with persisted conversation', { messageCount: existingConversation.messages.length });
       setChatHistory([...existingConversation.messages]);
+      setIsChatMode(true); // Auto-activate chat mode when history exists
       
       // Set current message to last assistant message if exists
       const lastAssistantMessage = [...existingConversation.messages].reverse().find(msg => msg.role === 'assistant');

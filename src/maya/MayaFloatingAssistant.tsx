@@ -284,21 +284,23 @@ export const MayaFloatingAssistant: React.FC = () => {
                     </>
                   )}
 
-                  {/* Chat Mode Suggestion */}
-                  <div className="mt-4 p-3 bg-primary/5 rounded-lg border border-primary/20">
-                    <p className="text-xs text-primary font-medium mb-2">💬 ¿Tienes preguntas?</p>
-                    <p className="text-xs text-gray-600 mb-2">
-                      Activa el modo chat para preguntarme directamente
-                    </p>
-                    <Button
-                      onClick={toggleChatMode}
-                      size="sm"
-                      variant="outline"
-                      className="text-xs h-7"
-                    >
-                      Iniciar Chat
-                    </Button>
-                  </div>
+                  {/* Chat Mode Suggestion - Only show if no chat history */}
+                  {chatHistory.length === 0 && (
+                    <div className="mt-4 p-3 bg-primary/5 rounded-lg border border-primary/20">
+                      <p className="text-xs text-primary font-medium mb-2">💬 ¿Tienes preguntas?</p>
+                      <p className="text-xs text-gray-600 mb-2">
+                        Activa el modo chat para preguntarme directamente
+                      </p>
+                      <Button
+                        onClick={toggleChatMode}
+                        size="sm"
+                        variant="outline"
+                        className="text-xs h-7"
+                      >
+                        Iniciar Chat
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
             </motion.div>
