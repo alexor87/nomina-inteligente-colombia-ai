@@ -373,9 +373,11 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
         setIsChatMode(false);
         
         // Show notification to user
-        import('@/components/ui/sonner').then(({ toast }) => {
-          toast.info('Contexto actualizado', {
-            description: 'El historial de conversación se ha limpiado para tu empresa actual.'
+        import('@/hooks/use-toast').then(({ toast }) => {
+          toast({
+            title: 'Contexto actualizado',
+            description: 'El historial de conversación se ha limpiado para tu empresa actual.',
+            duration: 5000
           });
         });
         return;
