@@ -69,8 +69,11 @@ function sanitizeEmployeeName(name: string, fullText?: string): string {
   // Remove leading prepositions: "a juan", "para maria", "de carlos"
   cleaned = cleaned.replace(/^(?:a|para|de)\s+/i, '');
   
-  // Special handling: if fullText contains "name al email/correo", remove trailing "al"
-  if (fullText && /\b(?:correo|email)\b/i.test(fullText)) {
+  // Special handling: if fullText contains email address, remove trailing "a" or "al"
+  if (fullText && /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/i.test(fullText)) {
+    // Remove "a" before email: "eliana a email@..." -> "eliana"
+    cleaned = cleaned.replace(/\s+a$/i, '');
+    // Also handle "al" before email/correo words
     const escapedName = cleaned.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const alBeforeEmailPattern = new RegExp(`${escapedName}\\s+al\\s+(?:correo|email)\\b`, 'i');
     if (alBeforeEmailPattern.test(fullText)) {
@@ -78,8 +81,8 @@ function sanitizeEmployeeName(name: string, fullText?: string): string {
     }
   }
   
-  // Remove trailing prepositions: "juan al", "maria del", "carlos de", "ana la", "pedro el"
-  cleaned = cleaned.replace(/\s+(?:al|del|de|la|el)\s*$/i, '');
+  // Remove trailing prepositions: "juan al", "maria del", "carlos de", "ana la", "pedro el", "eliana a"
+  cleaned = cleaned.replace(/\s+(?:a|al|del|de|la|el)\s*$/i, '');
   
   return cleaned.trim();
 }
