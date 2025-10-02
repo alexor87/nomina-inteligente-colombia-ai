@@ -200,6 +200,42 @@ function extractNameFromSalaryQuery(text: string): string | null {
   return null;
 }
 
+// Extract employee name from last assistant messages
+function extractLastEmployeeFromContext(conversation: any[]): string | null {
+  // Look at the last 2-3 assistant messages
+  const assistantMessages = conversation
+    .filter(msg => msg.role === 'assistant')
+    .slice(-3);
+  
+  if (assistantMessages.length === 0) {
+    return null;
+  }
+  
+  for (const message of assistantMessages.reverse()) {
+    const content = message.content || '';
+    
+    // Pattern 1: "Encontré a **NOMBRE APELLIDO**"
+    const foundMatch = content.match(/Encontré\s+a\s+\*\*([A-ZÁÉÍÓÚÑ\s]+)\*\*/i);
+    if (foundMatch) {
+      return foundMatch[1].trim();
+    }
+    
+    // Pattern 2: Employee card format "**NOMBRE APELLIDO**\n💼"
+    const cardMatch = content.match(/\*\*([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)+)\*\*[\s\n]*💼/i);
+    if (cardMatch) {
+      return cardMatch[1].trim();
+    }
+    
+    // Pattern 3: Bold name at start of response
+    const boldMatch = content.match(/^\*\*([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)+)\*\*/);
+    if (boldMatch) {
+      return boldMatch[1].trim();
+    }
+  }
+  
+  return null;
+}
+
 // CORS headers
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -739,6 +775,48 @@ serve(async (req) => {
         response = await getEmployeePaidTotal(userSupabase, intent.params);
         break;
         
+      case 'getEmployeeDetails':
+        // Handle "más información" requests
+        let employeeName = intent.params?.name;
+        
+        // If no name provided, extract from conversation context
+        if (!employeeName) {
+          employeeName = extractLastEmployeeFromContext(conversation);
+          console.log(`🧠 [CONTEXT] Extracted employee name from context: "${employeeName}"`);
+        }
+        
+        if (!employeeName) {
+          response = {
+            message: "¿De qué empleado necesitas más información? Por favor especifica el nombre.",
+            emotionalState: 'neutral'
+          };
+          break;
+        }
+        
+        // Validate employee exists
+        const detailsValidation = await validateEmployeeExists(userSupabase, employeeName);
+        if (!detailsValidation.exists) {
+          response = {
+            message: `No encontré un empleado llamado "${employeeName}" en tu empresa. ¿Podrías verificar la ortografía?`,
+            emotionalState: 'neutral'
+          };
+          break;
+        }
+        
+        if (detailsValidation.multiple) {
+          const employeeList = Array.isArray(detailsValidation.employee) 
+            ? detailsValidation.employee.map((emp: any) => `• **${emp.nombre} ${emp.apellido}**`).join('\n')
+            : '';
+          response = {
+            message: `Encontré varios empleados con "${employeeName}":\n\n${employeeList}\n\n¿Podrías ser más específico?`,
+            emotionalState: 'neutral'
+          };
+          break;
+        }
+        
+        response = await getEmployeeDetails(userSupabase, employeeName);
+        break;
+      
       case 'getPayrollTotals':
         response = await getPayrollTotals(userSupabase);
         break;
@@ -1381,6 +1459,125 @@ async function getEmployeeSalary(supabase: any, name: string) {
     console.error('[MAYA-KISS] Employee salary error:', error);
     return {
       message: `Error consultando el salario de "${name}".`,
+      emotionalState: 'concerned'
+    };
+  }
+}
+
+async function getEmployeeDetails(supabase: any, name: string) {
+  if (!name) {
+    return {
+      message: '¿De qué empleado necesitas información detallada?',
+      emotionalState: 'neutral'
+    };
+  }
+  
+  try {
+    // Search for employee with expanded data
+    const { data, error } = await supabase
+      .from('employees')
+      .select('id, nombre, apellido, cedula, cargo, salario_base, estado, fecha_ingreso, tipo_contrato, periodicidad_pago, email, telefono, departamento, eps, afp, caja_compensacion')
+      .or(`nombre.ilike.%${name}%,apellido.ilike.%${name}%`)
+      .limit(3);
+      
+    if (error) throw error;
+    
+    if (data.length === 0) {
+      return {
+        message: `No encontré un empleado llamado "${name}". ¿Podrías verificar la ortografía?`,
+        emotionalState: 'neutral'
+      };
+    }
+    
+    if (data.length > 1) {
+      const employeeList = data.map((emp: any) => 
+        `• **${emp.nombre} ${emp.apellido}** - ${emp.cargo || 'Sin cargo'}`
+      ).join('\n');
+      
+      return {
+        message: `Encontré **${data.length} empleados** con "${name}":\n\n${employeeList}\n\n¿Podrías ser más específico?`,
+        emotionalState: 'neutral'
+      };
+    }
+    
+    const employee = data[0];
+    
+    // Calculate tenure
+    let tenureText = '';
+    if (employee.fecha_ingreso) {
+      const ingresoDate = new Date(employee.fecha_ingreso);
+      const now = new Date();
+      const diffTime = Math.abs(now.getTime() - ingresoDate.getTime());
+      const diffYears = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 365.25));
+      const diffMonths = Math.floor((diffTime % (1000 * 60 * 60 * 24 * 365.25)) / (1000 * 60 * 60 * 24 * 30.44));
+      
+      if (diffYears > 0) {
+        tenureText = `${diffYears} año${diffYears > 1 ? 's' : ''}`;
+        if (diffMonths > 0) {
+          tenureText += ` y ${diffMonths} mes${diffMonths > 1 ? 'es' : ''}`;
+        }
+      } else if (diffMonths > 0) {
+        tenureText = `${diffMonths} mes${diffMonths > 1 ? 'es' : ''}`;
+      } else {
+        tenureText = 'menos de 1 mes';
+      }
+    }
+    
+    // Build comprehensive details
+    let detailsMessage = `📋 **Información Completa de ${employee.nombre} ${employee.apellido}**\n\n`;
+    
+    // Basic Info
+    detailsMessage += `**👤 Información Personal:**\n`;
+    detailsMessage += `• Cédula: ${employee.cedula || 'No especificada'}\n`;
+    detailsMessage += `• Email: ${employee.email || 'No especificado'}\n`;
+    detailsMessage += `• Teléfono: ${employee.telefono || 'No especificado'}\n`;
+    if (employee.departamento) {
+      detailsMessage += `• Departamento: ${employee.departamento}\n`;
+    }
+    detailsMessage += `\n`;
+    
+    // Employment Info
+    detailsMessage += `**💼 Información Laboral:**\n`;
+    detailsMessage += `• Cargo: ${employee.cargo || 'No especificado'}\n`;
+    detailsMessage += `• Estado: ${employee.estado === 'activo' ? '✅ Activo' : '❌ Inactivo'}\n`;
+    if (employee.fecha_ingreso) {
+      detailsMessage += `• Fecha de ingreso: ${new Date(employee.fecha_ingreso).toLocaleDateString('es-CO')}\n`;
+      detailsMessage += `• Antigüedad: ${tenureText}\n`;
+    }
+    if (employee.tipo_contrato) {
+      const contratoMap: Record<string, string> = {
+        'indefinido': 'Indefinido',
+        'fijo': 'Término Fijo',
+        'obra_labor': 'Obra o Labor',
+        'prestacion_servicios': 'Prestación de Servicios'
+      };
+      detailsMessage += `• Tipo de contrato: ${contratoMap[employee.tipo_contrato] || employee.tipo_contrato}\n`;
+    }
+    if (employee.periodicidad_pago) {
+      detailsMessage += `• Periodicidad de pago: ${employee.periodicidad_pago.charAt(0).toUpperCase() + employee.periodicidad_pago.slice(1)}\n`;
+    }
+    detailsMessage += `\n`;
+    
+    // Compensation
+    detailsMessage += `**💰 Compensación:**\n`;
+    detailsMessage += `• Salario base: **$${employee.salario_base?.toLocaleString('es-CO') || 'No especificado'}**\n`;
+    detailsMessage += `\n`;
+    
+    // Social Security
+    detailsMessage += `**🏥 Seguridad Social:**\n`;
+    detailsMessage += `• EPS: ${employee.eps || 'No asignada'}\n`;
+    detailsMessage += `• AFP: ${employee.afp || 'No asignada'}\n`;
+    detailsMessage += `• Caja de Compensación: ${employee.caja_compensacion || 'No asignada'}\n`;
+    
+    return {
+      message: detailsMessage,
+      emotionalState: 'neutral'
+    };
+    
+  } catch (error) {
+    console.error('[MAYA-KISS] Employee details error:', error);
+    return {
+      message: `Error consultando la información de "${name}".`,
       emotionalState: 'concerned'
     };
   }

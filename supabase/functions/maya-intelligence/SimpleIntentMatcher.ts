@@ -532,7 +532,41 @@ export class SimpleIntentMatcher {
       };
     }
 
-    // Employee search - Natural language patterns (HIGH PRIORITY)
+    // ============================================================================
+    // EMPLOYEE DETAILS - Extended info request (más información)
+    // ============================================================================
+    
+    // Pattern 1: "dame más información de [nombre]" - explicit name
+    const moreInfoExplicitMatch = text.match(/(?:dame|dime|muestra|quiero|necesito|ver)\s+(?:más\s+)?(?:información|info|detalles?)\s+(?:de|sobre|del|de\s+la)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)/i);
+    if (moreInfoExplicitMatch) {
+      let name = moreInfoExplicitMatch[1].trim();
+      // Remove common filler words and prepositions
+      name = name.replace(/^(el|la|los|las|un|una|de|sobre|del|al|a)\s+/i, '').trim();
+      
+      console.log(`🔍 [EMPLOYEE_DETAILS] Explicit request for: "${name}"`);
+      return {
+        type: 'EMPLOYEE_DETAILS',
+        confidence: 0.95,
+        method: 'getEmployeeDetails',
+        params: { name }
+      };
+    }
+    
+    // Pattern 2: "más información" without name - relies on context
+    if (/^(?:dame|dime|muestra|quiero|necesito|ver)?\s*(?:más\s+)?(?:información|info|detalles?)\s*$/i.test(text) ||
+        /^(?:más\s+)?(?:información|info|detalles?)\s*$/i.test(text)) {
+      console.log(`🔍 [EMPLOYEE_DETAILS] Bare request (no name) - will use context`);
+      return {
+        type: 'EMPLOYEE_DETAILS',
+        confidence: 0.90,
+        method: 'getEmployeeDetails',
+        params: { name: null } // Will be extracted from conversation context
+      };
+    }
+    
+    // ============================================================================
+    // EMPLOYEE SEARCH - Natural language patterns (HIGH PRIORITY)
+    // ============================================================================
     // Supports: "busca a eliana", "busca eliana", "dame info de carlos", "quién es maria", etc.
     const employeeSearchPattern = /(?:busca|encuentra|muestra|dame\s+(?:info|información)|quién\s+es|información\s+(?:de|sobre)|buscar|empleado)(?:\s+(?:a|al|el\s+empleado|empleado))?\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*)/i;
     const employeeSearchMatch = text.match(employeeSearchPattern);
