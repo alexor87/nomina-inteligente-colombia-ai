@@ -145,7 +145,7 @@ function inferIntentFromContext(followUpName: string, context: { intentType: str
     // Convert to legacy format for compatibility
     return {
       type: inferredIntent.type,
-      method: this.getMethodForIntent(inferredIntent.type),
+      method: getMethodForIntent(inferredIntent.type),
       params: inferredIntent.parameters,
       confidence: inferredIntent.confidence
     };
@@ -450,7 +450,8 @@ serve(async (req) => {
     const conversationContext = analyzeConversationContext(conversation);
     
     // Handle VOUCHER_CONFIRMATION_PENDING context (user provides alternative email after seeing buttons)
-    if (conversationContext.intentType === 'VOUCHER_CONFIRMATION_PENDING') {
+    console.log(`🔍 [VOUCHER_CONTEXT] Checking VOUCHER_CONFIRMATION_PENDING: contextType=${conversationContext.contextType}`);
+    if (conversationContext.contextType === 'VOUCHER_CONFIRMATION_PENDING') {
       // Check if user is providing an alternative email
       const emailMatch = lastMessage.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
       
@@ -542,7 +543,7 @@ serve(async (req) => {
     }
     
     // Handle PENDING_EMAIL_FOR_VOUCHER context
-    if (conversationContext.intentType === 'PENDING_EMAIL_FOR_VOUCHER') {
+    if (conversationContext.contextType === 'PENDING_EMAIL_FOR_VOUCHER') {
       const { employeeName } = conversationContext.params;
       
       // Extract email from user message
@@ -692,7 +693,7 @@ serve(async (req) => {
     }
     
     // Handle PENDING_SAVE_EMAIL_CONFIRMATION context
-    if (conversationContext.intentType === 'PENDING_SAVE_EMAIL_CONFIRMATION') {
+    if (conversationContext.contextType === 'PENDING_SAVE_EMAIL_CONFIRMATION') {
       const { employeeName, email } = conversationContext.params;
       
       // Detect affirmative response
@@ -895,7 +896,7 @@ serve(async (req) => {
         response = await handleVoucherMassSend(userSupabase, intent.params);
         break;
         
-      case 'handleVoucherEmailOverride':
+      case 'handleVoucherEmailOverride': {
         console.log('📧 [VOUCHER_EMAIL_OVERRIDE] Handling email override via SimpleIntentMatcher');
         const emailMatch = lastMessage.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
         
@@ -952,6 +953,7 @@ serve(async (req) => {
           }]
         };
         break;
+      }
         
       case 'blockSystemInfoQuery':
         response = await blockSystemInfoQuery();
@@ -1031,7 +1033,7 @@ serve(async (req) => {
         response = await getEmployeePaidTotal(userSupabase, intent.params);
         break;
         
-      case 'getEmployeeDetails':
+      case 'getEmployeeDetails': {
         // Handle "más información" requests
         let employeeName = intent.params?.name;
         
@@ -1072,6 +1074,7 @@ serve(async (req) => {
         
         response = await getEmployeeDetails(userSupabase, employeeName);
         break;
+      }
       
       case 'getPayrollTotals':
         response = await getPayrollTotals(userSupabase);
