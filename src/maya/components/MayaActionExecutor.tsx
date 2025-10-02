@@ -387,9 +387,6 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
       )}
 
       <div className="space-y-2 mt-3">
-        <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">
-          Acciones disponibles:
-        </p>
         {actions.map((action) => {
           const Icon = getActionIcon(action.type);
           const isLoading = isExecuting === action.id;
