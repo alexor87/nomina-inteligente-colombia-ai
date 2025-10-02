@@ -310,6 +310,9 @@ serve(async (req) => {
     const lastMessage = conversation[conversation.length - 1]?.content || '';
     console.log(`[MAYA-KISS] Processing: "${lastMessage}"`);
     
+    // Declare intent variable
+    let intent: any = null;
+    
     // ============================================================================
     // CONVERSATIONAL CONTEXT ANALYSIS - PRIORITY 1
     // ============================================================================
