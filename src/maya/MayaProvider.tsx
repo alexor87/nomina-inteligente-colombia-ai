@@ -21,6 +21,7 @@ interface MayaProviderValue {
   setPhase: (phase: PayrollPhase, additionalData?: Partial<MayaContextType>) => Promise<void>;
   performIntelligentValidation: (companyId: string, periodId?: string, employees?: any[]) => Promise<any>;
   setErrorContext: (errorType: string, errorDetails: any) => Promise<void>;
+  clearConversation: () => void;
 }
 
 const MayaContext = createContext<MayaProviderValue | null>(null);
@@ -351,6 +352,21 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
     });
   }, [setPhase]);
 
+  const clearConversation = useCallback(() => {
+    chatService.clearConversation();
+    setChatHistory([]);
+    setCurrentMessage(null);
+    setIsChatMode(false);
+    
+    import('@/hooks/use-toast').then(({ toast }) => {
+      toast({
+        title: '🔄 Conversación reiniciada',
+        description: 'Puedes iniciar una nueva conversación',
+        duration: 3000
+      });
+    });
+  }, [chatService]);
+
   // Sync with persisted conversation on mount with company validation
   useEffect(() => {
     const existingConversation = chatService.getConversation();
@@ -429,7 +445,8 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
     addActionMessage,
     setPhase,
     performIntelligentValidation,
-    setErrorContext
+    setErrorContext,
+    clearConversation
   };
 
   return (

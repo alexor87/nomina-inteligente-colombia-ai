@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Minimize2, Maximize2, Send, MessageSquare } from 'lucide-react';
+import { X, Minimize2, Maximize2, Send, MessageSquare, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -19,7 +19,8 @@ export const MayaFloatingAssistant: React.FC = () => {
     sendMessage,
     addActionMessage,
     isChatMode,
-    setChatMode 
+    setChatMode,
+    clearConversation
   } = useMaya();
   const [isMinimized, setIsMinimized] = useState(false);
   const [userInput, setUserInput] = useState('');
@@ -90,6 +91,15 @@ export const MayaFloatingAssistant: React.FC = () => {
               title={isChatMode ? 'Modo Información' : 'Modo Chat'}
             >
               <MessageSquare className={`h-4 w-4 ${isChatMode ? 'text-primary' : ''}`} />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearConversation}
+              className="h-8 w-8 p-0 hover:bg-orange-100 hover:text-orange-600"
+              title="Limpiar conversación"
+            >
+              <Trash2 className="h-4 w-4" />
             </Button>
             <Button
               variant="ghost"
