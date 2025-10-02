@@ -536,8 +536,8 @@ export class SimpleIntentMatcher {
     // EMPLOYEE DETAILS - Extended info request (más información)
     // ============================================================================
     
-    // Pattern 1: "dame más información de [nombre]" - explicit name
-    const moreInfoExplicitMatch = text.match(/(?:dame|dime|muestra|quiero|necesito|ver)\s+(?:más\s+)?(?:información|info|detalles?)\s+(?:de|sobre|del|de\s+la)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)/i);
+    // Pattern 1: "dame más información de [nombre]" - explicit name (accent-insensitive)
+    const moreInfoExplicitMatch = text.match(/(?:dame|dime|muestra|quiero|necesito|ver)\s+(?:m[aá]s\s+)?(?:informaci[oó]n|info|detalles?)\s+(?:de|sobre|del|de\s+la)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)/i);
     if (moreInfoExplicitMatch) {
       let name = moreInfoExplicitMatch[1].trim();
       // Remove common filler words and prepositions
@@ -552,9 +552,9 @@ export class SimpleIntentMatcher {
       };
     }
     
-    // Pattern 2: "más información" without name - relies on context
-    if (/^(?:dame|dime|muestra|quiero|necesito|ver)?\s*(?:más\s+)?(?:información|info|detalles?)\s*$/i.test(text) ||
-        /^(?:más\s+)?(?:información|info|detalles?)\s*$/i.test(text)) {
+    // Pattern 2: "más información" without name - relies on context (accent-insensitive)
+    if (/^(?:dame|dime|muestra|quiero|necesito|ver)?\s*(?:m[aá]s\s+)?(?:informaci[oó]n|info|detalles?)\s*$/i.test(text) ||
+        /^(?:m[aá]s\s+)?(?:informaci[oó]n|info|detalles?)\s*$/i.test(text)) {
       console.log(`🔍 [EMPLOYEE_DETAILS] Bare request (no name) - will use context`);
       return {
         type: 'EMPLOYEE_DETAILS',
@@ -567,8 +567,8 @@ export class SimpleIntentMatcher {
     // ============================================================================
     // EMPLOYEE SEARCH - Natural language patterns (HIGH PRIORITY)
     // ============================================================================
-    // Supports: "busca a eliana", "busca eliana", "dame info de carlos", "quién es maria", etc.
-    const employeeSearchPattern = /(?:busca|encuentra|muestra|dame\s+(?:info|información)|quién\s+es|información\s+(?:de|sobre)|buscar|empleado)(?:\s+(?:a|al|el\s+empleado|empleado))?\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*)/i;
+    // Supports: "busca a eliana", "busca eliana", "dame info de carlos", "quién es maria", etc. (accent-insensitive)
+    const employeeSearchPattern = /(?:busca|encuentra|muestra|dame\s+(?:info|informaci[oó]n)|qui[eé]n\s+es|informaci[oó]n\s+(?:de|sobre)|buscar|empleado)(?:\s+(?:a|al|el\s+empleado|empleado))?\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*)/i;
     const employeeSearchMatch = text.match(employeeSearchPattern);
     
     if (employeeSearchMatch) {
