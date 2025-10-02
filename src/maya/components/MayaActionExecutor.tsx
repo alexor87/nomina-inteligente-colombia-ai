@@ -3,7 +3,6 @@ import { Button } from '@/components/ui/button';
 import { ExecutableAction, ActionExecutionResult } from '../types/ExecutableAction';
 import { VoucherSendDialog } from '@/components/payroll/modals/VoucherSendDialog';
 import { PayrollEmployee } from '@/types/payroll';
-import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Send, User, FileText, Eye, Loader2, Calendar } from 'lucide-react';
 import { InlineSearchResults } from './inline/InlineSearchResults';
@@ -35,7 +34,6 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
   } | null>(null);
   const [selectedEmployee, setSelectedEmployee] = useState<EmployeeWithStatus | null>(null);
   const [showEmployeeDetails, setShowEmployeeDetails] = useState(false);
-  const { toast } = useToast();
 
   const getActionIcon = (type: string) => {
     switch (type) {
@@ -71,21 +69,6 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
             query: result.data.query
           });
         }
-        
-        // Skip success toast for Maya expand_periods and search actions
-        if (action.type !== 'expand_periods' && action.type !== 'search_employee') {
-          toast({
-            title: "✅ Acción ejecutada",
-            description: result.message,
-            className: "border-green-200 bg-green-50"
-          });
-        }
-      } else {
-        toast({
-          title: "❌ Error ejecutando acción",
-          description: result.message,
-          variant: "destructive"
-        });
       }
 
       onActionExecuted?.(action, result);
@@ -94,12 +77,6 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
         success: false,
         message: error.message || 'Error desconocido'
       };
-      
-      toast({
-        title: "❌ Error ejecutando acción",
-        description: result.message,
-        variant: "destructive"
-      });
 
       onActionExecuted?.(action, result);
     } finally {
@@ -371,16 +348,28 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
   };
 
   const handleEditEmployee = (employee: EmployeeWithStatus) => {
-    toast({
-      title: "🚧 Función en desarrollo",
-      description: "La edición de empleados estará disponible pronto",
+    // Notify through callback instead of toast
+    onActionExecuted?.({
+      id: 'edit-employee',
+      type: 'view_details',
+      label: 'Editar empleado',
+      parameters: { entityId: employee.id }
+    }, {
+      success: false,
+      message: '🚧 La edición de empleados estará disponible pronto'
     });
   };
 
   const handleSendEmployeeVoucher = (employee: EmployeeWithStatus) => {
-    toast({
-      title: "🚧 Función en desarrollo",
-      description: "El envío de comprobantes desde búsqueda estará disponible pronto",
+    // Notify through callback instead of toast
+    onActionExecuted?.({
+      id: 'send-voucher-search',
+      type: 'send_voucher',
+      label: 'Enviar comprobante',
+      parameters: { employeeId: employee.id }
+    }, {
+      success: false,
+      message: '🚧 El envío de comprobantes desde búsqueda estará disponible pronto'
     });
   };
 

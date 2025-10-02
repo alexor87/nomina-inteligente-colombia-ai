@@ -164,6 +164,13 @@ export const MayaFloatingAssistant: React.FC = () => {
                                       `Aquí tienes más opciones de períodos para ${employeeName}:`,
                                       result.data.executableActions
                                     );
+                                  } else {
+                                    // Handle all other action results with in-chat messages
+                                    if (result.success) {
+                                      addActionMessage(`✅ ${result.message}`, []);
+                                    } else {
+                                      addActionMessage(`❌ ${result.message}`, []);
+                                    }
                                   }
                                 }}
                               />
@@ -215,26 +222,38 @@ export const MayaFloatingAssistant: React.FC = () => {
                        {/* Executable Actions */}
                        {Array.isArray(currentMessage.executableActions) && currentMessage.executableActions.length > 0 && (
                          <div>
-                            <MayaActionExecutor 
-                              actions={currentMessage.executableActions}
-                              onActionExecuted={(action, result) => {
-                                console.log('🎯 Action executed (info):', action.type, result);
-                                
-                                // Handle expand_periods responses
-                                if (action.type === 'expand_periods' && result?.data?.executableActions) {
-                                  const employeeName = action.parameters?.employeeName || 'el empleado';
-                                  addActionMessage(
-                                    `Aquí tienes más opciones de períodos para ${employeeName}:`,
-                                    result.data.executableActions
-                                  );
-                                  
-                                  // Switch to chat mode to show the new message
-                                  if (!isChatMode) {
-                                    setChatMode(true);
-                                  }
-                                }
-                              }}
-                            />
+                             <MayaActionExecutor 
+                               actions={currentMessage.executableActions}
+                               onActionExecuted={(action, result) => {
+                                 console.log('🎯 Action executed (info):', action.type, result);
+                                 
+                                 // Handle expand_periods responses
+                                 if (action.type === 'expand_periods' && result?.data?.executableActions) {
+                                   const employeeName = action.parameters?.employeeName || 'el empleado';
+                                   addActionMessage(
+                                     `Aquí tienes más opciones de períodos para ${employeeName}:`,
+                                     result.data.executableActions
+                                   );
+                                   
+                                   // Switch to chat mode to show the new message
+                                   if (!isChatMode) {
+                                     setChatMode(true);
+                                   }
+                                 } else {
+                                   // Handle all other action results with in-chat messages
+                                   if (result.success) {
+                                     addActionMessage(`✅ ${result.message}`, []);
+                                   } else {
+                                     addActionMessage(`❌ ${result.message}`, []);
+                                   }
+                                   
+                                   // Switch to chat mode to show the feedback
+                                   if (!isChatMode) {
+                                     setChatMode(true);
+                                   }
+                                 }
+                               }}
+                             />
                          </div>
                        )}
 
