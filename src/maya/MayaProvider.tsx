@@ -50,9 +50,15 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
   const [currentMessage, setCurrentMessage] = useState<MayaMessage | null>(null);
   const [isVisible, setIsVisible] = useState(autoShow);
   const [isChatMode, setIsChatMode] = useState(false);
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [mayaEngine] = useState(() => MayaEngine.getInstance());
   const [chatService] = useState(() => MayaChatService.getInstance());
+  
+  // Initialize chatHistory from persisted conversation
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>(() => {
+    const persistedConversation = chatService.getConversation();
+    console.log('🤖 MAYA Provider: Initializing with persisted history', { messageCount: persistedConversation.messages.length });
+    return persistedConversation.messages;
+  });
 
   const updateContext = useCallback(async (context: MayaContextType) => {
     try {
@@ -339,16 +345,34 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
     });
   }, [setPhase]);
 
-  // Initialize Maya with welcome message
+  // Sync with persisted conversation on mount
   useEffect(() => {
-    const initializeMaya = async () => {
-      await setPhase('initial');
-    };
-    
-    if (autoShow) {
+    const existingConversation = chatService.getConversation();
+    if (existingConversation.messages.length > 0) {
+      console.log('🤖 MAYA Provider: Syncing with persisted conversation', { messageCount: existingConversation.messages.length });
+      setChatHistory([...existingConversation.messages]);
+      
+      // Set current message to last assistant message if exists
+      const lastAssistantMessage = [...existingConversation.messages].reverse().find(msg => msg.role === 'assistant');
+      if (lastAssistantMessage) {
+        setCurrentMessage({
+          id: lastAssistantMessage.id,
+          message: lastAssistantMessage.content,
+          emotionalState: 'neutral',
+          contextualActions: [],
+          executableActions: lastAssistantMessage.executableActions || [],
+          timestamp: lastAssistantMessage.timestamp,
+          isVisible: true
+        });
+      }
+    } else if (autoShow) {
+      // Only initialize with welcome message if no persisted conversation
+      const initializeMaya = async () => {
+        await setPhase('initial');
+      };
       initializeMaya();
     }
-  }, [setPhase, autoShow]);
+  }, [chatService, autoShow]); // Removed setPhase to prevent re-initialization on every phase change
 
   // Initialize chat with current message when switching to chat mode
   useEffect(() => {

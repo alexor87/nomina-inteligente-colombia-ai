@@ -6,30 +6,16 @@ export const MayaGlobalManager: React.FC = () => {
   const location = useLocation();
   const { setPhase, showMessage } = useMaya();
 
-  // Contexto por página
+  // Contexto por página - NO resetea el chat, solo actualiza visibilidad si es necesario
   useEffect(() => {
     const path = location.pathname;
     
-    // Auto-show MAYA en páginas clave con contexto específico
+    // Auto-show MAYA SOLO en página de nómina, sin resetear el chat existente
     if (path.includes('/payroll')) {
-      setPhase('initial', {
-        periodName: 'Gestión de Nómina'
-      });
       showMessage(); // Auto-mostrar en página de nómina
-    } else if (path.includes('/employees')) {
-      setPhase('initial', {
-        periodName: 'Gestión de Empleados'
-      });
-    } else if (path.includes('/reports')) {
-      setPhase('initial', {
-        periodName: 'Reportes y Análisis'
-      });
-    } else if (path.includes('/dashboard')) {
-      setPhase('initial', {
-        periodName: 'Dashboard Principal'
-      });
     }
-  }, [location.pathname, setPhase, showMessage]);
+    // En otras páginas, el chat persiste pero no se muestra automáticamente
+  }, [location.pathname, showMessage]);
 
   // No renderiza nada visible
   return null;

@@ -27,16 +27,47 @@ export interface RichContext {
 
 export class MayaChatService {
   private static instance: MayaChatService;
-  private currentConversation: ChatConversation = {
-    messages: [],
-    sessionId: this.generateSessionId()
-  };
+  private static readonly STORAGE_KEY = 'maya_conversation_history';
+  private currentConversation: ChatConversation;
+
+  private constructor() {
+    // Load from localStorage on initialization
+    this.currentConversation = this.loadFromStorage();
+  }
 
   static getInstance(): MayaChatService {
     if (!MayaChatService.instance) {
       MayaChatService.instance = new MayaChatService();
     }
     return MayaChatService.instance;
+  }
+
+  private loadFromStorage(): ChatConversation {
+    try {
+      const stored = localStorage.getItem(MayaChatService.STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        console.log('🤖 MAYA: Loaded conversation from localStorage', { messageCount: parsed.messages?.length });
+        return parsed;
+      }
+    } catch (error) {
+      console.error('🤖 MAYA: Error loading from localStorage', error);
+    }
+    
+    // Return fresh conversation if nothing in storage
+    return {
+      messages: [],
+      sessionId: this.generateSessionId()
+    };
+  }
+
+  private saveToStorage(): void {
+    try {
+      localStorage.setItem(MayaChatService.STORAGE_KEY, JSON.stringify(this.currentConversation));
+      console.log('🤖 MAYA: Saved conversation to localStorage', { messageCount: this.currentConversation.messages.length });
+    } catch (error) {
+      console.error('🤖 MAYA: Error saving to localStorage', error);
+    }
   }
 
   private generateSessionId(): string {
@@ -99,6 +130,7 @@ export class MayaChatService {
       console.log('🤖 MAYA Chat: Assistant response created:', assistantMessage);
 
       this.currentConversation.messages.push(assistantMessage);
+      this.saveToStorage(); // Persist to localStorage
       return assistantMessage;
 
     } catch (error: any) {
@@ -133,6 +165,7 @@ export class MayaChatService {
       };
 
       this.currentConversation.messages.push(fallbackMessage);
+      this.saveToStorage(); // Persist to localStorage
       return fallbackMessage;
     }
   }
@@ -146,6 +179,8 @@ export class MayaChatService {
       messages: [],
       sessionId: this.generateSessionId()
     };
+    this.saveToStorage(); // Clear localStorage
+    console.log('🤖 MAYA: Conversation cleared');
   }
 
   addSystemMessage(content: string): void {
@@ -157,6 +192,7 @@ export class MayaChatService {
     };
     
     this.currentConversation.messages.push(systemMessage);
+    this.saveToStorage(); // Persist to localStorage
   }
 
   getDebugInfo() {
