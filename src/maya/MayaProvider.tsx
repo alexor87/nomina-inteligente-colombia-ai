@@ -88,7 +88,10 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
 
   const showMessage = useCallback(() => {
     setIsVisible(true);
-  }, []);
+    if (!currentMessage) {
+      setPhase('initial').catch(console.error);
+    }
+  }, [currentMessage, setPhase]);
 
   const setChatMode = useCallback((enabled: boolean) => {
     setIsChatMode(enabled);
