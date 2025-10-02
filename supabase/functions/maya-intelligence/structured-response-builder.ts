@@ -41,6 +41,7 @@ function mapIntentToAction(intentType: string): string {
     'EMPLOYEE_COUNT': 'consultar_empleado',
     'EMPLOYEE_LIST': 'consultar_empleado',
     'EMPLOYEE_SEARCH': 'consultar_empleado',
+    'EMPLOYEE_DETAILS': 'consultar_empleado',
     'PAYROLL_TOTALS': 'consultar_nomina',
     'PAYROLL_BY_MONTH': 'consultar_nomina',
     'PAYROLL_BY_FORTNIGHT': 'consultar_nomina',

@@ -236,6 +236,41 @@ function extractLastEmployeeFromContext(conversation: any[]): string | null {
   return null;
 }
 
+// Check if Maya is waiting for an employee name for details
+function isAwaitingEmployeeNameForDetails(conversation: any[]): boolean {
+  const assistantMessages = conversation
+    .filter(msg => msg.role === 'assistant')
+    .slice(-1);
+  
+  if (assistantMessages.length === 0) {
+    return false;
+  }
+  
+  const lastMessage = assistantMessages[0]?.content || '';
+  
+  // Check if the last message was asking for an employee name
+  return /¿De\s+(?:qué|que)\s+empleado\s+necesitas\s+m[aá]s\s+informaci[oó]n\?/i.test(lastMessage);
+}
+
+// Extract name from short contextual reply like "de eliana" or "eliana"
+function extractNameFromShortReply(text: string): string | null {
+  const lowerText = text.toLowerCase().trim();
+  
+  // Pattern 1: "de [nombre]" or "del [nombre]"
+  const pattern1 = lowerText.match(/^(?:de|del|de\s+la)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)/i);
+  if (pattern1) {
+    return pattern1[1].trim();
+  }
+  
+  // Pattern 2: Just a name (single or double word)
+  const pattern2 = lowerText.match(/^([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)$/i);
+  if (pattern2 && pattern2[1].length > 2) {
+    return pattern2[1].trim();
+  }
+  
+  return null;
+}
+
 // CORS headers
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -279,53 +314,26 @@ serve(async (req) => {
     // CONVERSATIONAL CONTEXT ANALYSIS - PRIORITY 1
     // ============================================================================
     
-    // First, check if this is a follow-up query like "y a [name]?"
-    const followUpName = detectFollowUpQuery(lastMessage);
-    let intent;
-    
-    if (followUpName) {
-      console.log(`🔄 [CONTEXT] Follow-up query detected for: "${followUpName}"`);
+    // PRIORITY 1: Check if Maya is waiting for an employee name for details
+    if (isAwaitingEmployeeNameForDetails(conversation)) {
+      const extractedName = extractNameFromShortReply(lastMessage);
       
-      // CRITICAL: Validate employee exists before proceeding with ANY query
-      const validation = await validateEmployeeExists(userSupabase, followUpName);
-      
-      if (!validation.exists) {
-        console.log(`🚫 [SECURITY] Employee "${followUpName}" does not exist - blocking potential hallucination`);
-        return new Response(JSON.stringify({
-          message: `No encontré un empleado llamado "${followUpName}" en tu empresa. ¿Podrías verificar la ortografía o el nombre completo?`,
-          emotionalState: 'neutral',
-          sessionId,
-          timestamp: new Date().toISOString()
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
-      
-      if (validation.multiple) {
-        const employeeList = Array.isArray(validation.employee) 
-          ? validation.employee.map((emp: any) => `• **${emp.nombre} ${emp.apellido}**`).join('\n')
-          : '';
-        return new Response(JSON.stringify({
-          message: `Encontré varios empleados con "${followUpName}":\n\n${employeeList}\n\n¿Podrías ser más específico?`,
-          emotionalState: 'neutral',
-          sessionId,
-          timestamp: new Date().toISOString()
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
-      
-      // Analyze conversation context to infer intent
-      const context = analyzeConversationContext(conversation);
-      const inferredIntent = inferIntentFromContext(followUpName, context);
-      
-      if (inferredIntent) {
-        console.log(`✅ [CONTEXT] Intent inferred: ${inferredIntent.type} for "${followUpName}"`);
-        intent = inferredIntent;
+      if (extractedName) {
+        console.log(`[CONTEXT-ANSWER] Short reply detected for employee details: "${extractedName}"`);
+        
+        // Force EMPLOYEE_DETAILS intent with the extracted name
+        intent = {
+          type: 'EMPLOYEE_DETAILS',
+          method: 'getEmployeeDetails',
+          params: { name: extractedName },
+          confidence: 0.95
+        };
+        
+        console.log(`✅ [CONTEXT-ANSWER] Forcing EMPLOYEE_DETAILS for "${extractedName}"`);
       } else {
-        console.log(`❓ [CONTEXT] No clear context found, asking for clarification`);
+        console.log(`❓ [CONTEXT-ANSWER] Could not extract name from: "${lastMessage}"`);
         return new Response(JSON.stringify({
-          message: `¿Qué información necesitas sobre ${followUpName}? Por ejemplo:\n• Salario\n• Total pagado este año\n• Buscar datos del empleado`,
+          message: `No pude identificar el nombre. ¿Podrías escribir el nombre del empleado completo?`,
           emotionalState: 'neutral',
           sessionId,
           timestamp: new Date().toISOString()
@@ -333,8 +341,67 @@ serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
-    } else {
-      // No follow-up detected, use normal intent matching
+    }
+    
+    // PRIORITY 2: Check if this is a follow-up query like "y a [name]?"
+    if (!intent) {
+      const followUpName = detectFollowUpQuery(lastMessage);
+      
+      if (followUpName) {
+        console.log(`🔄 [CONTEXT] Follow-up query detected for: "${followUpName}"`);
+        
+        // CRITICAL: Validate employee exists before proceeding with ANY query
+        const validation = await validateEmployeeExists(userSupabase, followUpName);
+        
+        if (!validation.exists) {
+          console.log(`🚫 [SECURITY] Employee "${followUpName}" does not exist - blocking potential hallucination`);
+          return new Response(JSON.stringify({
+            message: `No encontré un empleado llamado "${followUpName}" en tu empresa. ¿Podrías verificar la ortografía o el nombre completo?`,
+            emotionalState: 'neutral',
+            sessionId,
+            timestamp: new Date().toISOString()
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        if (validation.multiple) {
+          const employeeList = Array.isArray(validation.employee) 
+            ? validation.employee.map((emp: any) => `• **${emp.nombre} ${emp.apellido}**`).join('\n')
+            : '';
+          return new Response(JSON.stringify({
+            message: `Encontré varios empleados con "${followUpName}":\n\n${employeeList}\n\n¿Podrías ser más específico?`,
+            emotionalState: 'neutral',
+            sessionId,
+            timestamp: new Date().toISOString()
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        // Analyze conversation context to infer intent
+        const context = analyzeConversationContext(conversation);
+        const inferredIntent = inferIntentFromContext(followUpName, context);
+        
+        if (inferredIntent) {
+          console.log(`✅ [CONTEXT] Intent inferred: ${inferredIntent.type} for "${followUpName}"`);
+          intent = inferredIntent;
+        } else {
+          console.log(`❓ [CONTEXT] No clear context found, asking for clarification`);
+          return new Response(JSON.stringify({
+            message: `¿Qué información necesitas sobre ${followUpName}? Por ejemplo:\n• Salario\n• Total pagado este año\n• Buscar datos del empleado`,
+            emotionalState: 'neutral',
+            sessionId,
+            timestamp: new Date().toISOString()
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+      }
+    }
+    
+    // PRIORITY 3: No context match, use normal intent matching
+    if (!intent) {
       intent = SimpleIntentMatcher.match(lastMessage);
     }
     
