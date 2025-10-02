@@ -9,6 +9,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { SimpleIntentMatcher } from './SimpleIntentMatcher.ts';
 import { liquidarNomina, registrarNovedad, calcularPrestacion, generarReporte } from './payroll-handlers.ts';
 import { buildStructuredResponse } from './structured-response-builder.ts';
+import { ConversationContextAnalyzer } from './core/conversation-context-analyzer.ts';
+import { SmartContextInferencer } from './core/smart-context-inferencer.ts';
 
 // ============================================================================
 // CONVERSATIONAL CONTEXT SYSTEM
@@ -40,91 +42,70 @@ function detectFollowUpQuery(text: string): string | null {
 }
 
 // Analyze previous assistant responses to identify the last intent and extract parameters
+// Now using ConversationContextAnalyzer for intelligent context detection
 function analyzeConversationContext(conversation: any[]): { intentType: string | null; params: any } {
-  // Look at the last 3 assistant messages to find context
-  const assistantMessages = conversation
-    .filter(msg => msg.role === 'assistant')
-    .slice(-3);
+  // Use the intelligent analyzer
+  const context = ConversationContextAnalyzer.analyze(conversation);
   
-  if (assistantMessages.length === 0) {
-    return { intentType: null, params: {} };
+  // Check if we have valid context
+  if (!ConversationContextAnalyzer.hasValidContext(context)) {
+    // Fallback to legacy pattern matching for specific cases
+    return legacyContextDetection(conversation);
   }
+  
+  console.log(`🔍 [CONTEXT] Detected ${context.contextType} (confidence: ${context.confidence})`);
+  
+  // Extract params based on context type
+  let params: any = {};
+  
+  if (context.contextType === 'PAYROLL_INFO' && context.entities) {
+    // Extract year/month for payroll queries
+    const responseText = context.lastResponseText;
+    if (/este\s+año/i.test(responseText)) {
+      params.year = new Date().getFullYear();
+    }
+    const monthMatch = responseText.match(/en\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i);
+    if (monthMatch) {
+      params.month = monthMatch[1].toLowerCase();
+    }
+  }
+  
+  if (context.contextType === 'CONFIRMATION' && context.entities.employeeName) {
+    params.employeeName = context.entities.employeeName;
+  }
+  
+  return {
+    intentType: context.contextType,
+    params
+  };
+}
+
+// Legacy context detection for backward compatibility
+function legacyContextDetection(conversation: any[]): { intentType: string | null; params: any } {
+  const assistantMessages = conversation.filter(msg => msg.role === 'assistant').slice(-3);
+  if (assistantMessages.length === 0) return { intentType: null, params: {} };
   
   const lastAssistantMessage = assistantMessages[assistantMessages.length - 1]?.content || '';
-  
-  // Detect EMPLOYEE_PAID_TOTAL context
-  if (/(?:le\s+has\s+pagado|total\s+pagado|pagado.*\*\*\$[\d,]+\*\*.*en\s+\*\*\d+\s+nóminas\*\*|este\s+año.*pagado)/i.test(lastAssistantMessage)) {
-    // Extract timeframe from the response
-    let year = null;
-    let month = null;
-    
-    // Look for "este año" or specific year
-    if (/este\s+año/i.test(lastAssistantMessage)) {
-      year = new Date().getFullYear();
-    } else {
-      const yearMatch = lastAssistantMessage.match(/en\s+(\d{4})/i);
-      if (yearMatch) {
-        year = parseInt(yearMatch[1]);
-      }
-    }
-    
-    // Look for specific month
-    const monthMatch = lastAssistantMessage.match(/en\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\s+(\d{4})?/i);
-    if (monthMatch) {
-      month = monthMatch[1].toLowerCase();
-      if (monthMatch[2]) {
-        year = parseInt(monthMatch[2]);
-      }
-    }
-    
-    console.log('🔍 [CONTEXT] Detected EMPLOYEE_PAID_TOTAL context:', { year, month });
-    return { 
-      intentType: 'EMPLOYEE_PAID_TOTAL', 
-      params: { year, month }
-    };
-  }
-  
-  // Detect EMPLOYEE_SALARY context
-  if (/(?:salario\s+base|💰\s+salario\s+base|cargo.*salario)/i.test(lastAssistantMessage)) {
-    console.log('🔍 [CONTEXT] Detected EMPLOYEE_SALARY context');
-    return { 
-      intentType: 'EMPLOYEE_SALARY', 
-      params: {}
-    };
-  }
-  
-  // Detect EMPLOYEE_SEARCH context
-  if (/encontré.*empleados|empleados.*encontré/i.test(lastAssistantMessage)) {
-    console.log('🔍 [CONTEXT] Detected EMPLOYEE_SEARCH context');
-    return { 
-      intentType: 'EMPLOYEE_SEARCH', 
-      params: {}
-    };
-  }
   
   // Detect PENDING_EMAIL_FOR_VOUCHER context
   if (/¿A\s+qué\s+email\s+deseas\s+enviar\s+el\s+comprobante\s+de\s+\*\*(.+?)\*\*\?/i.test(lastAssistantMessage)) {
     const employeeMatch = lastAssistantMessage.match(/\*\*(.+?)\*\*/);
-    const employeeName = employeeMatch ? employeeMatch[1] : null;
-    
-    console.log('🔍 [CONTEXT] Detected PENDING_EMAIL_FOR_VOUCHER context:', { employeeName });
     return { 
       intentType: 'PENDING_EMAIL_FOR_VOUCHER', 
-      params: { employeeName }
+      params: { employeeName: employeeMatch?.[1] || null }
     };
   }
 
   // Detect PENDING_SAVE_EMAIL_CONFIRMATION context
   if (/¿Deseas\s+guardar.*como\s+el\s+email\s+de\s+\*\*(.+?)\*\*\?/i.test(lastAssistantMessage)) {
     const emailMatch = lastAssistantMessage.match(/guardar\s+([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i);
-    const email = emailMatch ? emailMatch[1] : null;
     const employeeNameMatch = lastAssistantMessage.match(/de\s+\*\*(.+?)\*\*\?/);
-    const employeeName = employeeNameMatch ? employeeNameMatch[1] : null;
-    
-    console.log('🔍 [CONTEXT] Detected PENDING_SAVE_EMAIL_CONFIRMATION context:', { employeeName, email });
     return { 
       intentType: 'PENDING_SAVE_EMAIL_CONFIRMATION', 
-      params: { employeeName, email }
+      params: { 
+        employeeName: employeeNameMatch?.[1] || null,
+        email: emailMatch?.[1] || null
+      }
     };
   }
   
@@ -132,6 +113,7 @@ function analyzeConversationContext(conversation: any[]): { intentType: string |
 }
 
 // Infer intent based on follow-up query and context
+// Now using SmartContextInferencer for intelligent intent inference
 function inferIntentFromContext(followUpName: string, context: { intentType: string | null; params: any }): any {
   if (!context.intentType) {
     return null;
@@ -139,8 +121,52 @@ function inferIntentFromContext(followUpName: string, context: { intentType: str
   
   console.log(`🧠 [INFERENCE] Follow-up for "${followUpName}" with context: ${context.intentType}`);
   
+  // Use intelligent inferencer
+  const contextForInferencer = ConversationContextAnalyzer.analyze([
+    { role: 'assistant', content: `Context: ${context.intentType}` }
+  ]);
+  
+  const inferredIntent = SmartContextInferencer.infer(
+    followUpName,
+    contextForInferencer,
+    followUpName
+  );
+  
+  if (inferredIntent) {
+    // Convert to legacy format for compatibility
+    return {
+      type: inferredIntent.type,
+      method: this.getMethodForIntent(inferredIntent.type),
+      params: inferredIntent.parameters,
+      confidence: inferredIntent.confidence
+    };
+  }
+  
+  // Fallback to legacy mapping
+  return legacyIntentMapping(followUpName, context);
+}
+
+// Legacy intent mapping for backward compatibility
+function legacyIntentMapping(followUpName: string, context: { intentType: string | null; params: any }): any {
   switch (context.intentType) {
-    case 'EMPLOYEE_PAID_TOTAL':
+    case 'EMPLOYEE_INFO':
+    case 'EMPLOYEE_SEARCH':
+      return {
+        type: 'EMPLOYEE_SEARCH',
+        method: 'searchEmployee',
+        params: { name: followUpName },
+        confidence: 0.95
+      };
+      
+    case 'SALARY_INFO':
+      return {
+        type: 'EMPLOYEE_SALARY',
+        method: 'getEmployeeSalary',
+        params: { name: followUpName },
+        confidence: 0.95
+      };
+    
+    case 'PAYROLL_INFO':
       return {
         type: 'EMPLOYEE_PAID_TOTAL',
         method: 'getEmployeePaidTotal',
@@ -152,25 +178,22 @@ function inferIntentFromContext(followUpName: string, context: { intentType: str
         confidence: 0.95
       };
       
-    case 'EMPLOYEE_SALARY':
-      return {
-        type: 'EMPLOYEE_SALARY',
-        method: 'getEmployeeSalary',
-        params: { name: followUpName },
-        confidence: 0.95
-      };
-      
-    case 'EMPLOYEE_SEARCH':
-      return {
-        type: 'EMPLOYEE_SEARCH',
-        method: 'searchEmployee',
-        params: { name: followUpName },
-        confidence: 0.95
-      };
-      
     default:
       return null;
   }
+}
+
+// Helper to get method name from intent type
+function getMethodForIntent(intentType: string): string {
+  const methodMap: Record<string, string> = {
+    'EMPLOYEE_SEARCH': 'searchEmployee',
+    'EMPLOYEE_SALARY': 'getEmployeeSalary',
+    'EMPLOYEE_PAID_TOTAL': 'getEmployeePaidTotal',
+    'EMPLOYEE_DETAILS': 'getEmployeeDetails',
+    'BENEFIT_QUERY': 'getBenefitInfo',
+    'REPORT_GENERATE': 'generateReport'
+  };
+  return methodMap[intentType] || 'searchEmployee';
 }
 
 // Helper function to extract employee names from salary queries

@@ -1,0 +1,174 @@
+// ============================================================================
+// MAYA Context Patterns Configuration
+// ============================================================================
+// Centralized configuration for response patterns and context mappings
+// Allows easy extension of conversational contexts without modifying core code
+
+export interface ResponsePattern {
+  patterns: RegExp[];
+  contextType: string;
+  structure: 'DetailedCard' | 'Metric' | 'List' | 'Table' | 'Confirmation';
+  description?: string;
+}
+
+export interface ContextMapping {
+  intentType: string;
+  confidence: number;
+  description?: string;
+}
+
+// ============================================================================
+// RESPONSE PATTERNS - Detect types of Maya responses
+// ============================================================================
+
+export const RESPONSE_PATTERNS: Record<string, ResponsePattern> = {
+  EMPLOYEE_DETAILED_CARD: {
+    patterns: [
+      /👤\s*\*\*[A-ZÁÉÍÓÚÑ\s]+\*\*/i,
+      /💼\s*Cargo:/i,
+      /🛡️\s*Seguridad\s+Social:/i,
+    ],
+    contextType: 'EMPLOYEE_INFO',
+    structure: 'DetailedCard',
+    description: 'Detailed employee information card'
+  },
+
+  SALARY_RESPONSE: {
+    patterns: [
+      /💰\s*Salario\s+Base:/i,
+      /\$\s*[\d,]+.*mes/i,
+    ],
+    contextType: 'SALARY_INFO',
+    structure: 'Metric',
+    description: 'Employee salary information'
+  },
+
+  PAYROLL_TOTAL_RESPONSE: {
+    patterns: [
+      /Total\s+pagado/i,
+      /💵.*\$\s*[\d,]+/i,
+      /Registros\s+de\s+nómina:/i,
+    ],
+    contextType: 'PAYROLL_INFO',
+    structure: 'Metric',
+    description: 'Total payroll paid to employee'
+  },
+
+  EMPLOYEE_LIST_RESPONSE: {
+    patterns: [
+      /Empleados\s+encontrados:/i,
+      /encontré\s+\d+\s+empleado/i,
+      /📋\s*Lista\s+de\s+empleados/i,
+    ],
+    contextType: 'LIST_RESPONSE',
+    structure: 'List',
+    description: 'List of employees'
+  },
+
+  VOUCHER_SENT_CONFIRMATION: {
+    patterns: [
+      /✅\s*Comprobante.*enviado/i,
+      /📧\s*Email.*enviado/i,
+    ],
+    contextType: 'CONFIRMATION',
+    structure: 'Confirmation',
+    description: 'Voucher sent confirmation'
+  },
+
+  BENEFIT_INFO_RESPONSE: {
+    patterns: [
+      /Prestaciones\s+sociales/i,
+      /Prima\s+de\s+servicios/i,
+      /Cesantías/i,
+    ],
+    contextType: 'BENEFIT_INFO',
+    structure: 'DetailedCard',
+    description: 'Social benefits information'
+  },
+
+  REPORT_RESPONSE: {
+    patterns: [
+      /Reporte\s+de/i,
+      /Análisis\s+de/i,
+      /📊\s*Estadísticas/i,
+    ],
+    contextType: 'REPORT_INFO',
+    structure: 'Table',
+    description: 'Report or analysis'
+  }
+};
+
+// ============================================================================
+// CONTEXT TO INTENT MAPPING - Map context types to intent types
+// ============================================================================
+
+export const CONTEXT_TO_INTENT_MAP: Record<string, ContextMapping> = {
+  'EMPLOYEE_INFO': {
+    intentType: 'EMPLOYEE_SEARCH',
+    confidence: 0.95,
+    description: 'User wants detailed info about another employee'
+  },
+
+  'SALARY_INFO': {
+    intentType: 'EMPLOYEE_SALARY',
+    confidence: 0.95,
+    description: 'User wants salary info about another employee'
+  },
+
+  'PAYROLL_INFO': {
+    intentType: 'EMPLOYEE_PAID_TOTAL',
+    confidence: 0.95,
+    description: 'User wants payroll totals for another employee'
+  },
+
+  'LIST_RESPONSE': {
+    intentType: 'EMPLOYEE_SEARCH',
+    confidence: 0.90,
+    description: 'Repeat search for another employee'
+  },
+
+  'CONFIRMATION': {
+    intentType: 'VOUCHER_SEND',
+    confidence: 0.90,
+    description: 'Repeat action for another employee'
+  },
+
+  'BENEFIT_INFO': {
+    intentType: 'BENEFIT_QUERY',
+    confidence: 0.92,
+    description: 'Query benefits for another employee'
+  },
+
+  'REPORT_INFO': {
+    intentType: 'REPORT_GENERATE',
+    confidence: 0.88,
+    description: 'Generate similar report'
+  }
+};
+
+// ============================================================================
+// FOLLOW-UP PATTERNS - Detect follow-up questions
+// ============================================================================
+
+export const FOLLOW_UP_PATTERNS = {
+  NAME_FOLLOW_UP: [
+    /^y\s+(?:de\s+)?([a-záéíóúñ\s]+)$/i,
+    /^(?:y\s+)?(?:a\s+)?([a-záéíóúñ\s]+)$/i,
+    /^(?:ahora\s+)?(?:de\s+)?([a-záéíóúñ\s]+)$/i,
+  ],
+  
+  PRONOUN_FOLLOW_UP: [
+    /^y\s+(?:él|ella|este|esta)$/i,
+  ]
+};
+
+// ============================================================================
+// ENTITY EXTRACTION PATTERNS
+// ============================================================================
+
+export const ENTITY_PATTERNS = {
+  EMPLOYEE_NAME: /👤\s*\*\*([A-ZÁÉÍÓÚÑ\s]+)\*\*/i,
+  SALARY_AMOUNT: /\$\s*([\d,]+(?:\.\d+)?)/,
+  PERIOD_NAME: /Período:\s*([^\n]+)/i,
+  DATE_RANGE: /(\d{1,2}\/\d{1,2}\/\d{4})\s*-\s*(\d{1,2}\/\d{1,2}\/\d{4})/,
+};
