@@ -352,11 +352,13 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
     });
   }, [setPhase]);
 
-  const clearConversation = useCallback(() => {
+  const clearConversation = useCallback(async () => {
     chatService.clearConversation();
     setChatHistory([]);
-    setCurrentMessage(null);
     setIsChatMode(false);
+    
+    // Reinicializar con mensaje de bienvenida
+    await setPhase('initial');
     
     import('@/hooks/use-toast').then(({ toast }) => {
       toast({
@@ -365,7 +367,7 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
         duration: 3000
       });
     });
-  }, [chatService]);
+  }, [chatService, setPhase]);
 
   // Sync with persisted conversation on mount with company validation
   useEffect(() => {
