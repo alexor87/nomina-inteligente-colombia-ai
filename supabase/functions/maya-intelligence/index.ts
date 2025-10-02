@@ -327,7 +327,7 @@ serve(async (req) => {
       global: { headers: { Authorization: authHeader } }
     });
 
-    const { conversation, sessionId } = await req.json();
+    const { conversation, sessionId, richContext } = await req.json();
     
     if (!conversation || !Array.isArray(conversation)) {
       return new Response(JSON.stringify({
@@ -337,6 +337,32 @@ serve(async (req) => {
         status: 400, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       });
+    }
+
+    // Validate richContext if provided
+    if (richContext?.companyId) {
+      console.log(`🔍 [CONTEXT_VALIDATION] Received companyId: ${richContext.companyId}`);
+      
+      // Get user's actual company from database
+      const { data: userData } = await userSupabase.auth.getUser();
+      if (userData?.user) {
+        const { data: profileData } = await userSupabase
+          .from('profiles')
+          .select('company_id')
+          .eq('user_id', userData.user.id)
+          .single();
+        
+        if (profileData?.company_id && profileData.company_id !== richContext.companyId) {
+          console.error(`🚨 [SECURITY] Company mismatch! User: ${profileData.company_id}, Context: ${richContext.companyId}`);
+          return new Response(JSON.stringify({
+            error: 'Invalid context',
+            message: 'El contexto proporcionado no coincide con tu empresa actual. Por favor recarga la página.'
+          }), { 
+            status: 403, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          });
+        }
+      }
     }
 
     const lastMessage = conversation[conversation.length - 1]?.content || '';

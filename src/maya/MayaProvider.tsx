@@ -351,11 +351,36 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
     });
   }, [setPhase]);
 
-  // Sync with persisted conversation on mount
+  // Sync with persisted conversation on mount with company validation
   useEffect(() => {
     const existingConversation = chatService.getConversation();
+    const currentCompanyId = companyId;
+    
     if (existingConversation.messages.length > 0) {
-      console.log('🤖 MAYA Provider: Syncing with persisted conversation', { messageCount: existingConversation.messages.length });
+      console.log('🤖 MAYA Provider: Syncing with persisted conversation', { 
+        messageCount: existingConversation.messages.length,
+        storedCompanyId: existingConversation.companyId,
+        currentCompanyId
+      });
+      
+      // Validate context integrity
+      const isValid = chatService.validateContextIntegrity(currentCompanyId);
+      
+      if (!isValid) {
+        console.warn('⚠️ MAYA Provider: Company mismatch detected, clearing conversation');
+        chatService.clearConversation();
+        setChatHistory([]);
+        setIsChatMode(false);
+        
+        // Show notification to user
+        import('@/components/ui/sonner').then(({ toast }) => {
+          toast.info('Contexto actualizado', {
+            description: 'El historial de conversación se ha limpiado para tu empresa actual.'
+          });
+        });
+        return;
+      }
+      
       setChatHistory([...existingConversation.messages]);
       setIsChatMode(true); // Auto-activate chat mode when history exists
       
@@ -379,7 +404,7 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
       };
       initializeMaya();
     }
-  }, [chatService, autoShow]); // Removed setPhase to prevent re-initialization on every phase change
+  }, [companyId, chatService, autoShow, setPhase]); // Re-run when company changes
 
   // Initialize chat with current message when switching to chat mode
   useEffect(() => {

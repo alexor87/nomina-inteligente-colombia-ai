@@ -12,6 +12,8 @@ export interface ChatMessage {
 export interface ChatConversation {
   messages: ChatMessage[];
   sessionId: string;
+  companyId?: string;
+  lastUpdated?: string;
 }
 
 export interface RichContext {
@@ -47,7 +49,11 @@ export class MayaChatService {
       const stored = localStorage.getItem(MayaChatService.STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        console.log('🤖 MAYA: Loaded conversation from localStorage', { messageCount: parsed.messages?.length });
+        console.log('🤖 MAYA: Loaded conversation from localStorage', { 
+          messageCount: parsed.messages?.length,
+          companyId: parsed.companyId,
+          lastUpdated: parsed.lastUpdated
+        });
         return parsed;
       }
     } catch (error) {
@@ -76,6 +82,12 @@ export class MayaChatService {
 
   async sendMessage(userMessage: string, context?: RichContext): Promise<ChatMessage> {
     console.log('🤖 MAYA Chat: Sending message:', userMessage);
+    
+    // Update company_id in conversation if context provided
+    if (context?.companyId) {
+      this.currentConversation.companyId = context.companyId;
+      this.currentConversation.lastUpdated = new Date().toISOString();
+    }
     
     // Add user message to conversation
     const userChatMessage: ChatMessage = {
@@ -177,10 +189,39 @@ export class MayaChatService {
   clearConversation(): void {
     this.currentConversation = {
       messages: [],
-      sessionId: this.generateSessionId()
+      sessionId: this.generateSessionId(),
+      companyId: undefined,
+      lastUpdated: undefined
     };
     this.saveToStorage(); // Clear localStorage
     console.log('🤖 MAYA: Conversation cleared');
+  }
+
+  validateContextIntegrity(currentCompanyId?: string): boolean {
+    if (!currentCompanyId) {
+      console.log('🔍 MAYA: No company_id provided for validation');
+      return true; // Allow if no company context
+    }
+
+    const storedCompanyId = this.currentConversation.companyId;
+    
+    if (!storedCompanyId) {
+      console.log('🔍 MAYA: No stored company_id, updating with current');
+      this.currentConversation.companyId = currentCompanyId;
+      this.saveToStorage();
+      return true;
+    }
+
+    if (storedCompanyId !== currentCompanyId) {
+      console.warn('⚠️ MAYA: Company mismatch detected!', {
+        stored: storedCompanyId,
+        current: currentCompanyId
+      });
+      return false;
+    }
+
+    console.log('✅ MAYA: Context integrity validated');
+    return true;
   }
 
   addSystemMessage(content: string): void {
