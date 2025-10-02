@@ -75,6 +75,17 @@ export const RESPONSE_PATTERNS: Record<string, ResponsePattern> = {
     description: 'Voucher sent confirmation'
   },
 
+  VOUCHER_CONFIRMATION_BUTTONS: {
+    patterns: [
+      /Enviar\s+a\s+[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/i,
+      /📧.*Enviar/i,
+      /👁️.*Vista\s+Previa/i,
+    ],
+    contextType: 'VOUCHER_CONFIRMATION_PENDING',
+    structure: 'Confirmation',
+    description: 'Voucher confirmation buttons shown'
+  },
+
   BENEFIT_INFO_RESPONSE: {
     patterns: [
       /Prestaciones\s+sociales/i,
@@ -143,6 +154,12 @@ export const CONTEXT_TO_INTENT_MAP: Record<string, ContextMapping> = {
     intentType: 'REPORT_GENERATE',
     confidence: 0.88,
     description: 'Generate similar report'
+  },
+
+  'VOUCHER_CONFIRMATION_PENDING': {
+    intentType: 'VOUCHER_EMAIL_OVERRIDE',
+    confidence: 0.95,
+    description: 'User wants to send voucher to alternative email'
   }
 };
 
@@ -171,4 +188,5 @@ export const ENTITY_PATTERNS = {
   SALARY_AMOUNT: /\$\s*([\d,]+(?:\.\d+)?)/,
   PERIOD_NAME: /Período:\s*([^\n]+)/i,
   DATE_RANGE: /(\d{1,2}\/\d{1,2}\/\d{4})\s*-\s*(\d{1,2}\/\d{1,2}\/\d{4})/,
+  EMPLOYEE_NAME_FROM_CONTEXT: /(?:comprobante|voucher|colilla)\s+de\s+\*\*([A-ZÁÉÍÓÚÑ\s]+)\*\*/i,
 };

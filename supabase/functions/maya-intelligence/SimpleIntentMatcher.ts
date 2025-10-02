@@ -315,6 +315,19 @@ export class SimpleIntentMatcher {
       };
     }
     
+    // VOUCHER SEND WITH ALTERNATIVE EMAIL - Fallback pattern
+    const alternativeEmailMatch = text.match(/(?:envia|manda|envia|envi[aá])(?:la|lo|me)?\s+(?:a|al)\s+(?:email|correo)?\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i);
+    if (alternativeEmailMatch) {
+      const email = alternativeEmailMatch[1];
+      console.log('📧 [VOUCHER_ALTERNATIVE_EMAIL] Pattern matched for email:', email);
+      return {
+        type: 'VOUCHER_EMAIL_OVERRIDE',
+        confidence: 0.94,
+        method: 'handleVoucherEmailOverride',
+        params: { alternativeEmail: email }
+      };
+    }
+    
     // SALARY REPORT - General salary listing (BEFORE specific employee queries)
     if (/(?:salario|sueldo)s?\s+(?:por|de|de\s+cada)\s+empleado/i.test(text) ||
         /(?:listado|lista|reporte|informe)\s+de\s+salarios?/i.test(text) ||

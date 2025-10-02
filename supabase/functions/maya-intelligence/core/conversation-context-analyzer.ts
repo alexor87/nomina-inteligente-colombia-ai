@@ -136,6 +136,14 @@ export class ConversationContextAnalyzer {
     if (nameMatch) {
       entities.employeeName = nameMatch[1].trim();
     }
+    
+    // Extract employee name from context (voucher/colilla de **NAME**)
+    if (!entities.employeeName) {
+      const contextNameMatch = responseText.match(ENTITY_PATTERNS.EMPLOYEE_NAME_FROM_CONTEXT);
+      if (contextNameMatch) {
+        entities.employeeName = contextNameMatch[1].trim();
+      }
+    }
 
     // Extract salary amount
     const salaryMatch = responseText.match(ENTITY_PATTERNS.SALARY_AMOUNT);

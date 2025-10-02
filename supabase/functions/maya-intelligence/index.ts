@@ -440,6 +440,87 @@ serve(async (req) => {
     // Check for conversational contexts that need special handling
     const conversationContext = analyzeConversationContext(conversation);
     
+    // Handle VOUCHER_EMAIL_OVERRIDE context (user provides alternative email after seeing buttons)
+    if (conversationContext.intentType === 'VOUCHER_EMAIL_OVERRIDE') {
+      const { employeeName } = conversationContext.params;
+      
+      // Extract email from user message
+      const emailMatch = lastMessage.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+      const providedEmail = emailMatch ? emailMatch[1] : null;
+      
+      if (!providedEmail) {
+        return new Response(JSON.stringify({
+          message: "❌ No detecté un email válido. Por favor escríbelo en el formato correcto (ejemplo: nombre@ejemplo.com)",
+          emotionalState: 'concerned',
+          sessionId,
+          timestamp: new Date().toISOString()
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      
+      // Get company context
+      const { data: companyData } = await userSupabase
+        .from('profiles')
+        .select('company_id')
+        .eq('user_id', (await userSupabase.auth.getUser()).data.user?.id)
+        .single();
+      
+      if (!companyData?.company_id) {
+        return new Response(JSON.stringify({
+          message: "❌ No pude identificar tu empresa.",
+          emotionalState: 'concerned',
+          sessionId,
+          timestamp: new Date().toISOString()
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      
+      // Find employee from context
+      const { data: employees } = await userSupabase
+        .from('employees')
+        .select('id, nombre, apellido, email')
+        .eq('company_id', companyData.company_id)
+        .eq('estado', 'activo')
+        .ilike('nombre', `%${employeeName}%`);
+      
+      const employee = employees?.[0];
+      
+      if (!employee) {
+        return new Response(JSON.stringify({
+          message: `❌ No pude encontrar al empleado ${employeeName}. Por favor intenta de nuevo.`,
+          emotionalState: 'concerned',
+          sessionId,
+          timestamp: new Date().toISOString()
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      
+      // Show confirmation with alternative email
+      console.log(`✅ [VOUCHER_OVERRIDE] User wants to send to ${providedEmail} instead of ${employee.email || 'N/A'}`);
+      
+      return new Response(JSON.stringify({
+        message: `✅ Perfecto, enviaré el comprobante de **${employee.nombre} ${employee.apellido}** a **${providedEmail}**`,
+        emotionalState: 'encouraging',
+        executableActions: [
+          {
+            id: `confirm_send_voucher_${employee.id}_${Date.now()}`,
+            type: 'confirm_send_voucher',
+            label: '📧 Confirmar Envío',
+            description: `Enviar comprobante a ${providedEmail}`,
+            parameters: {
+              employeeId: employee.id,
+              employeeName: `${employee.nombre} ${employee.apellido}`,
+              email: providedEmail,
+              periodId: 'latest'
+            },
+            requiresConfirmation: false,
+            icon: '📧'
+          }
+        ],
+        sessionId,
+        timestamp: new Date().toISOString()
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
     // Handle PENDING_EMAIL_FOR_VOUCHER context
     if (conversationContext.intentType === 'PENDING_EMAIL_FOR_VOUCHER') {
       const { employeeName } = conversationContext.params;
