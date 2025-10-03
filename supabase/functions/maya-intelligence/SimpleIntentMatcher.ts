@@ -196,19 +196,19 @@ export class SimpleIntentMatcher {
     // ORDEN: Patrones con empleado PRIMERO, luego generales
     const provisionPatterns = [
       // Patrón 1: Consultas con empleado específico (tipo ANTES de empleado) - PRIORIDAD ALTA
-      /(?:cu[aá]nto|cuanto|qu[eé]|que)\s+(?:hemos\s+)?(?:provisionad(?:o|a|os|as)|provisiones?|provisi[oó]n)\s+(?:en\s+|de\s+)?(vacaciones|prima|cesant[ií]as|intereses?\s+(?:de\s+)?cesant[ií]as)\s+(?:para|a|de)\s+([a-záéíóúñ]+(?:[\s-][a-záéíóúñ]+){0,3})(?:\s+(?:en|del?)\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre))?(?:\s+(?:de\s+|del?\s+)?(\d{4}))?/i,
+      /(?:cu[aá]nto|cuanto|qu[eé]|que)\s+(?:(?:hemos|se)\s+)?(?:ha\s+)?(?:provisionad(?:o|a|os|as)|provisiono|provisionó|provisionaron|provisionamos|provisiones?|provisi[oó]n)\s+(?:en\s+|de\s+)?(vacaciones|prima|cesant[ií]as|intereses?\s+(?:de\s+)?cesant[ií]as)\s+(?:para|a|de)\s+([a-záéíóúñ]+(?:[\s-][a-záéíóúñ]+){0,3})(?:\s+(?:en|del?)\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre))?(?:\s+(?:de\s+|del?\s+)?(\d{4}))?/i,
       
       // Patrón 2: Consultas con empleado específico (tipo DESPUÉS de empleado) - PRIORIDAD ALTA
       /(?:provisi[oó]n(?:es)?)\s+(?:de\s+|en\s+)?(vacaciones|prima|cesant[ií]as|intereses?\s+(?:de\s+)?cesant[ií]as)\s+(?:de|para|a)\s+([a-záéíóúñ]+(?:[\s-][a-záéíóúñ]+){0,3})(?:\s+(?:en|del?)\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre))?(?:\s+(?:de\s+|del?\s+)?(\d{4}))?/i,
       
       // Patrón 3: Empleado primero, tipo después - PRIORIDAD ALTA
-      /(?:cu[aá]nto|cuanto)\s+(?:se\s+ha\s+)?(?:provisionad(?:o|a))\s+(?:para|a|de)\s+([a-záéíóúñ]+(?:[\s-][a-záéíóúñ]+){0,3})\s+(?:en\s+|de\s+)?(vacaciones|prima|cesant[ií]as|intereses?\s+(?:de\s+)?cesant[ií]as)(?:\s+(?:en|del?)\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre))?(?:\s+(?:de\s+|del?\s+)?(\d{4}))?/i,
+      /(?:cu[aá]nto|cuanto)\s+(?:(?:se|hemos)\s+)?(?:ha\s+)?(?:provisionad(?:o|a)|provisiono|provisionó|provisionaron|provisionamos)\s+(?:para|a|de)\s+([a-záéíóúñ]+(?:[\s-][a-záéíóúñ]+){0,3})\s+(?:en\s+|de\s+)?(vacaciones|prima|cesant[ií]as|intereses?\s+(?:de\s+)?cesant[ií]as)(?:\s+(?:en|del?)\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre))?(?:\s+(?:de\s+|del?\s+)?(\d{4}))?/i,
       
       // Patrón 4: Consultas generales por tipo (SIN empleado específico) - PRIORIDAD MEDIA
-      /(?:cu[aá]nto|cuanto|qu[eé]|que|total)\s+(?:hemos\s+)?(?:provisionad(?:o|a|os|as)|provisiones?|provisi[oó]n)\s+(?:en\s+|de\s+)?(vacaciones|prima|cesant[ií]as|intereses?\s+(?:de\s+)?cesant[ií]as)(?:\s+(?:en|del?)\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre))?(?:\s+(?:de\s+|del?\s+)?(\d{4}))?(?!\s+(?:para|a|de)\s+[a-záéíóúñ])/i,
+      /(?:cu[aá]nto|cuanto|qu[eé]|que|total)\s+(?:(?:hemos|se)\s+)?(?:ha\s+)?(?:provisionad(?:o|a|os|as)|provisiono|provisionó|provisionaron|provisionamos|provisiones?|provisi[oó]n)\s+(?:en\s+|de\s+)?(vacaciones|prima|cesant[ií]as|intereses?\s+(?:de\s+)?cesant[ií]as)(?:\s+(?:en|del?)\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre))?(?:\s+(?:de\s+|del?\s+)?(\d{4}))?(?!\s+(?:para|a|de)\s+[a-záéíóúñ])/i,
       
       // Patrón 5: Consultas generales SIN tipo ni empleado - PRIORIDAD BAJA
-      /(?:cu[aá]nto|cuanto|qu[eé]|que|total)\s+(?:hemos\s+)?(?:provisionad(?:o|a|os|as)|provisiones?|provisi[oó]n)(?:\s+(?:para|de|a)\s+([a-záéíóúñ]+(?:[\s-][a-záéíóúñ]+){0,3}))?(?:\s+(?:en|del?)\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre))?(?:\s+(?:de\s+|del?\s+)?(\d{4}))?/i
+      /(?:cu[aá]nto|cuanto|qu[eé]|que|total)\s+(?:(?:hemos|se)\s+)?(?:ha\s+)?(?:provisionad(?:o|a|os|as)|provisiono|provisionó|provisionaron|provisionamos|provisiones?|provisi[oó]n)(?:\s+(?:para|de|a)\s+([a-záéíóúñ]+(?:[\s-][a-záéíóúñ]+){0,3}))?(?:\s+(?:en|del?)\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre))?(?:\s+(?:de\s+|del?\s+)?(\d{4}))?/i
     ];
 
     for (let i = 0; i < provisionPatterns.length; i++) {
