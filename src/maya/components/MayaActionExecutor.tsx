@@ -4,10 +4,12 @@ import { ExecutableAction, ActionExecutionResult } from '../types/ExecutableActi
 import { VoucherSendDialog } from '@/components/payroll/modals/VoucherSendDialog';
 import { PayrollEmployee } from '@/types/payroll';
 import { supabase } from '@/integrations/supabase/client';
-import { Send, User, FileText, Eye, Loader2, Calendar } from 'lucide-react';
+import { Send, User, FileText, Eye, Loader2, Calendar, Users } from 'lucide-react';
 import { InlineSearchResults } from './inline/InlineSearchResults';
 import { EmployeeWithStatus } from '@/types/employee-extended';
 import { EmployeeDetailsModal } from '@/components/employees/EmployeeDetailsModal';
+import { EmployeeTransformationService } from '@/services/EmployeeTransformationService';
+import { CompanyConfigurationService } from '@/services/CompanyConfigurationService';
 
 interface MayaActionExecutorProps {
   actions: ExecutableAction[];
@@ -42,6 +44,7 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
       case 'confirm_send_voucher': return Send;
       case 'expand_periods': return Calendar;
       case 'search_employee': return User;
+      case 'list_employees': return Users;
       case 'view_details': return Eye;
       case 'generate_report': return FileText;
       default: return FileText;
@@ -123,6 +126,8 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
         return await handleExpandPeriods(action);
       case 'search_employee':
         return await executeSearchEmployee(action);
+      case 'list_employees':
+        return await executeListEmployees(action);
       case 'view_details':
         return await executeViewDetails(action);
       default:
@@ -266,6 +271,57 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
       return {
         success: false,
         message: error.message || 'Error al buscar empleados'
+      };
+    }
+  };
+
+  const executeListEmployees = async (action: ExecutableAction): Promise<ActionExecutionResult> => {
+    try {
+      console.log('👥 Listing all active employees');
+      
+      // Get company ID
+      const companyId = await CompanyConfigurationService.getCurrentUserCompanyId();
+      if (!companyId) {
+        throw new Error('No se pudo obtener el ID de la empresa');
+      }
+
+      const today = new Date().toISOString().slice(0, 10);
+
+      // Query active employees
+      const { data, error } = await supabase
+        .from('employees')
+        .select('*')
+        .eq('company_id', companyId)
+        .eq('estado', 'activo')
+        .or(`fecha_finalizacion_contrato.is.null,fecha_finalizacion_contrato.gte.${today}`)
+        .order('nombre', { ascending: true });
+
+      if (error) {
+        console.error('❌ Error fetching employees:', error);
+        throw error;
+      }
+
+      // Transform employee data
+      const employees = EmployeeTransformationService.transformEmployeeData(data || []);
+      
+      console.log(`✅ Found ${employees.length} active employees`);
+
+      // Set search results to display inline
+      setSearchResults({
+        employees,
+        query: 'Empleados activos'
+      });
+
+      return {
+        success: true,
+        message: `Mostrando ${employees.length} empleados`,
+        data: { employees }
+      };
+    } catch (error: any) {
+      console.error('❌ Error listing employees:', error);
+      return {
+        success: false,
+        message: error.message || 'Error al listar empleados'
       };
     }
   };
