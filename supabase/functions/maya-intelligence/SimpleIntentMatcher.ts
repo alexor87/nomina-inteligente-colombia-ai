@@ -193,26 +193,29 @@ export class SimpleIntentMatcher {
     //          "provisiones de cesantías para maría este año"
     //          "cuánto hemos provisionado en prima" (sin empleado específico)
     //          "total provisionado en vacaciones"
+    // ORDEN: Patrones con empleado PRIMERO, luego generales
     const provisionPatterns = [
-      // Patrón 1: Consultas generales por tipo (SIN empleado específico)
+      // Patrón 1: Consultas con empleado específico (tipo ANTES de empleado) - PRIORIDAD ALTA
+      /(?:cu[aá]nto|cuanto|qu[eé]|que)\s+(?:hemos\s+)?(?:provisionad(?:o|a|os|as)|provisiones?|provisi[oó]n)\s+(?:en\s+|de\s+)?(vacaciones|prima|cesant[ií]as|intereses?\s+(?:de\s+)?cesant[ií]as)\s+(?:para|a|de)\s+([a-záéíóúñ]+(?:[\s-][a-záéíóúñ]+){0,3})/i,
+      
+      // Patrón 2: Consultas con empleado específico (tipo DESPUÉS de empleado) - PRIORIDAD ALTA
+      /(?:provisi[oó]n(?:es)?)\s+(?:de\s+|en\s+)?(vacaciones|prima|cesant[ií]as|intereses?\s+(?:de\s+)?cesant[ií]as)\s+(?:de|para|a)\s+([a-záéíóúñ]+(?:[\s-][a-záéíóúñ]+){0,3})/i,
+      
+      // Patrón 3: Empleado primero, tipo después - PRIORIDAD ALTA
+      /(?:cu[aá]nto|cuanto)\s+(?:se\s+ha\s+)?(?:provisionad(?:o|a))\s+(?:para|a|de)\s+([a-záéíóúñ]+(?:[\s-][a-záéíóúñ]+){0,3})\s+(?:en\s+|de\s+)?(vacaciones|prima|cesant[ií]as|intereses?\s+(?:de\s+)?cesant[ií]as)/i,
+      
+      // Patrón 4: Consultas generales por tipo (SIN empleado específico) - PRIORIDAD MEDIA
       /(?:cu[aá]nto|cuanto|qu[eé]|que|total)\s+(?:hemos\s+)?(?:provisionad(?:o|a|os|as)|provisiones?|provisi[oó]n)\s+(?:en\s+|de\s+)?(vacaciones|prima|cesant[ií]as|intereses?\s+(?:de\s+)?cesant[ií]as)(?:\s+(?:en\s+|del?\s+)?(?:último\s+per[ií]odo|este\s+(?:a[ñn]o|mes)|20\d{2})?)?(?!\s+(?:para|a|de)\s+[a-záéíóúñ])/i,
       
-      // Patrón 2: Consultas con empleado específico (ANTES de tipo)
-      /(?:cu[aá]nto|cuanto|qu[eé]|que)\s+(?:hemos\s+)?(?:provisionad(?:o|a|os|as)|provisiones?|provisi[oó]n)\s+(?:en\s+|de\s+)?(vacaciones|prima|cesant[ií]as|intereses?\s+(?:de\s+)?cesant[ií]as)\s+(?:para|a|de)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)/i,
-      
-      // Patrón 3: Consultas con empleado específico (DESPUÉS de tipo)
-      /(?:provisi[oó]n(?:es)?)\s+(?:de\s+|en\s+)?(vacaciones|prima|cesant[ií]as|intereses?\s+(?:de\s+)?cesant[ií]as)\s+(?:de|para|a)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)/i,
-      
-      // Patrón 4: Empleado primero, tipo después
-      /(?:cu[aá]nto|cuanto)\s+(?:se\s+ha\s+)?(?:provisionad(?:o|a))\s+(?:para|a|de)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)\s+(?:en\s+|de\s+)?(vacaciones|prima|cesant[ií]as|intereses?\s+(?:de\s+)?cesant[ií]as)/i,
-      
-      // Patrón 5: Consultas generales SIN tipo ni empleado
-      /(?:cu[aá]nto|cuanto|qu[eé]|que|total)\s+(?:hemos\s+)?(?:provisionad(?:o|a|os|as)|provisiones?|provisi[oó]n)(?:\s+(?:para|de|a)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?))?(?:\s+(?:en\s+|del?\s+)?(?:último\s+per[ií]odo|este\s+(?:a[ñn]o|mes)|20\d{2})?)?$/i
+      // Patrón 5: Consultas generales SIN tipo ni empleado - PRIORIDAD BAJA
+      /(?:cu[aá]nto|cuanto|qu[eé]|que|total)\s+(?:hemos\s+)?(?:provisionad(?:o|a|os|as)|provisiones?|provisi[oó]n)(?:\s+(?:para|de|a)\s+([a-záéíóúñ]+(?:[\s-][a-záéíóúñ]+){0,3}))?(?:\s+(?:en\s+|del?\s+)?(?:último\s+per[ií]odo|este\s+(?:a[ñn]o|mes)|20\d{2})?)?$/i
     ];
 
-    for (const pattern of provisionPatterns) {
+    for (let i = 0; i < provisionPatterns.length; i++) {
+      const pattern = provisionPatterns[i];
       const match = text.match(pattern);
       if (match) {
+        console.log(`🎯 [BENEFIT_PROVISION] Pattern ${i + 1} matched:`, match.slice(0, 4));
         // Identificar qué se capturó
         let employeeName: string | null = null;
         let benefitType: string | null = null;

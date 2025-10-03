@@ -2141,12 +2141,16 @@ async function getEmployeeBenefitProvision(supabase: any, params: any) {
     
     // Si se especificó nombre, buscar empleado
     if (name) {
+      console.log(`🔍 [BENEFIT_PROVISION] Searching employee with term: "${name}"`);
+      
       const { data: employees, error: employeeError } = await supabase
         .from('employees')
         .select('id, nombre, apellido')
         .eq('company_id', companyId)
         .or(`nombre.ilike.%${name}%,apellido.ilike.%${name}%`)
         .limit(3);
+      
+      console.log(`📊 [BENEFIT_PROVISION] Found ${employees?.length || 0} employees matching "${name}"`);
       
       if (employeeError) throw employeeError;
       
