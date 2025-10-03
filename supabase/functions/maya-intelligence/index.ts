@@ -2125,17 +2125,10 @@ async function getEmployeeDetails(supabase: any, name: string) {
 }
 
 async function getEmployeeBenefitProvision(supabase: any, params: any) {
-  const { name, benefitType, year } = params || {};
-  
-  if (!name) {
-    return {
-      message: '¿De qué empleado quieres consultar las provisiones?',
-      emotionalState: 'neutral'
-    };
-  }
+  const { name, benefitType, year, useLastPeriod } = params || {};
   
   try {
-    console.log(`💰 [BENEFIT_PROVISION] Querying provisions for: ${name}, type: ${benefitType || 'all'}, year: ${year || 'current'}`);
+    console.log(`💰 [BENEFIT_PROVISION] Querying provisions for: employee="${name || 'ALL'}", type=${benefitType || 'ALL'}, year=${year || (useLastPeriod ? 'last_period' : 'current')}`);
     
     // Get company ID
     const companyId = await getCurrentCompanyId(supabase);
@@ -2143,48 +2136,88 @@ async function getEmployeeBenefitProvision(supabase: any, params: any) {
       return { message: '❌ No pude identificar tu empresa.', emotionalState: 'concerned' };
     }
     
-    // Find employee
-    const { data: employees, error: employeeError } = await supabase
-      .from('employees')
-      .select('id, nombre, apellido')
-      .eq('company_id', companyId)
-      .or(`nombre.ilike.%${name}%,apellido.ilike.%${name}%`)
-      .limit(3);
+    let employeeId: string | null = null;
+    let employeeFullName: string | null = null;
     
-    if (employeeError) throw employeeError;
-    
-    if (!employees || employees.length === 0) {
-      return {
-        message: `No encontré un empleado llamado "${name}". ¿Podrías verificar la ortografía?`,
-        emotionalState: 'neutral'
-      };
-    }
-    
-    if (employees.length > 1) {
-      const employeeList = employees.map((emp: any) => 
-        `• **${emp.nombre} ${emp.apellido}**`
-      ).join('\n');
+    // Si se especificó nombre, buscar empleado
+    if (name) {
+      const { data: employees, error: employeeError } = await supabase
+        .from('employees')
+        .select('id, nombre, apellido')
+        .eq('company_id', companyId)
+        .or(`nombre.ilike.%${name}%,apellido.ilike.%${name}%`)
+        .limit(3);
       
-      return {
-        message: `Encontré **${employees.length} empleados** con "${name}":\n\n${employeeList}\n\n¿Podrías ser más específico?`,
-        emotionalState: 'neutral'
-      };
+      if (employeeError) throw employeeError;
+      
+      if (!employees || employees.length === 0) {
+        return {
+          message: `No encontré un empleado llamado "${name}". ¿Podrías verificar la ortografía?`,
+          emotionalState: 'neutral'
+        };
+      }
+      
+      if (employees.length > 1) {
+        const employeeList = employees.map((emp: any) => 
+          `• **${emp.nombre} ${emp.apellido}**`
+        ).join('\n');
+        
+        return {
+          message: `Encontré **${employees.length} empleados** con "${name}":\n\n${employeeList}\n\n¿Podrías ser más específico?`,
+          emotionalState: 'neutral'
+        };
+      }
+      
+      employeeId = employees[0].id;
+      employeeFullName = `${employees[0].nombre} ${employees[0].apellido}`;
     }
     
-    const employee = employees[0];
-    const targetYear = year || new Date().getFullYear();
-    const startDate = `${targetYear}-01-01`;
-    const endDate = `${targetYear}-12-31`;
+    // Determinar rango de fechas
+    let startDate: string;
+    let endDate: string;
+    let periodLabel: string;
+    
+    if (useLastPeriod) {
+      // Obtener el último período cerrado
+      const { data: lastPeriod, error: periodError } = await supabase
+        .from('payroll_periods_real')
+        .select('fecha_inicio, fecha_fin, periodo')
+        .eq('company_id', companyId)
+        .eq('estado', 'cerrado')
+        .order('fecha_fin', { ascending: false })
+        .limit(1)
+        .single();
+      
+      if (periodError || !lastPeriod) {
+        return {
+          message: '❌ No encontré períodos cerrados. Las provisiones se calculan al cerrar períodos de nómina.',
+          emotionalState: 'neutral'
+        };
+      }
+      
+      startDate = lastPeriod.fecha_inicio;
+      endDate = lastPeriod.fecha_fin;
+      periodLabel = `Período: **${lastPeriod.periodo}**`;
+    } else {
+      const targetYear = year || new Date().getFullYear();
+      startDate = `${targetYear}-01-01`;
+      endDate = `${targetYear}-12-31`;
+      periodLabel = `Período: **Año ${targetYear}**`;
+    }
     
     // Query provisions from social_benefit_calculations
     let query = supabase
       .from('social_benefit_calculations')
-      .select('benefit_type, amount, period_start, period_end, created_at')
+      .select('benefit_type, amount, period_start, period_end, created_at, employee_id, employees!inner(nombre, apellido)')
       .eq('company_id', companyId)
-      .eq('employee_id', employee.id)
       .gte('period_end', startDate)
       .lte('period_end', endDate)
       .order('period_end', { ascending: true });
+    
+    // Filter by employee if specified
+    if (employeeId) {
+      query = query.eq('employee_id', employeeId);
+    }
     
     // Filter by benefit type if specified
     if (benefitType) {
@@ -2202,24 +2235,29 @@ async function getEmployeeBenefitProvision(supabase: any, params: any) {
       const typeText = benefitType ? 
         `de **${benefitType}**` : 
         'de prestaciones sociales';
+      const employeeText = employeeFullName ? ` para **${employeeFullName}**` : '';
       
       return {
-        message: `No encontré provisiones ${typeText} para **${employee.nombre} ${employee.apellido}** en el año ${targetYear}.\n\n` +
+        message: `No encontré provisiones ${typeText}${employeeText} en ${periodLabel.replace('Período: ', '')}.\n\n` +
                 `💡 Las provisiones se generan automáticamente al cerrar períodos de nómina. Si ya cerraste períodos, puedes recalcular provisiones en el módulo de **Provisiones**.`,
         emotionalState: 'neutral'
       };
     }
     
-    // Group provisions by month
-    const provisionsByMonth: Record<string, any[]> = {};
+    // Group provisions by month or employee
+    const provisionsByGroup: Record<string, any[]> = {};
     let totalAmount = 0;
     
     provisions.forEach((prov: any) => {
       const monthKey = new Date(prov.period_end).toLocaleString('es-CO', { month: 'long', year: 'numeric' });
-      if (!provisionsByMonth[monthKey]) {
-        provisionsByMonth[monthKey] = [];
+      
+      // Si no hay empleado específico, agrupar por mes
+      const groupKey = employeeFullName ? monthKey : `${prov.employees.nombre} ${prov.employees.apellido}`;
+      
+      if (!provisionsByGroup[groupKey]) {
+        provisionsByGroup[groupKey] = [];
       }
-      provisionsByMonth[monthKey].push(prov);
+      provisionsByGroup[groupKey].push(prov);
       totalAmount += parseFloat(prov.amount) || 0;
     });
     
@@ -2232,36 +2270,46 @@ async function getEmployeeBenefitProvision(supabase: any, params: any) {
     };
     
     let message = `📊 **Provisiones de ${benefitType ? benefitTypeNames[benefitType] : 'Prestaciones Sociales'}**\n`;
-    message += `👤 Empleado: **${employee.nombre} ${employee.apellido}**\n`;
-    message += `📅 Período: **Año ${targetYear}**\n\n`;
+    if (employeeFullName) {
+      message += `👤 Empleado: **${employeeFullName}**\n`;
+    }
+    message += `📅 ${periodLabel}\n\n`;
     
-    // Add monthly breakdown
+    // Add breakdown (by month if employee specified, by employee if not)
     const monthOrder = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-    const sortedMonths = Object.keys(provisionsByMonth).sort((a, b) => {
-      const monthA = a.split(' ')[0].toLowerCase();
-      const monthB = b.split(' ')[0].toLowerCase();
-      return monthOrder.indexOf(monthA) - monthOrder.indexOf(monthB);
-    });
     
-    for (const monthKey of sortedMonths) {
-      const monthProvisions = provisionsByMonth[monthKey];
-      const monthTotal = monthProvisions.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+    let sortedGroups: string[];
+    if (employeeFullName) {
+      // Ordenar por mes
+      sortedGroups = Object.keys(provisionsByGroup).sort((a, b) => {
+        const monthA = a.split(' ')[0].toLowerCase();
+        const monthB = b.split(' ')[0].toLowerCase();
+        return monthOrder.indexOf(monthA) - monthOrder.indexOf(monthB);
+      });
+    } else {
+      // Ordenar por empleado alfabéticamente
+      sortedGroups = Object.keys(provisionsByGroup).sort();
+    }
+    
+    for (const groupKey of sortedGroups) {
+      const groupProvisions = provisionsByGroup[groupKey];
+      const groupTotal = groupProvisions.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
       
-      message += `### ${monthKey.charAt(0).toUpperCase() + monthKey.slice(1)}\n`;
+      message += `### ${groupKey.charAt(0).toUpperCase() + groupKey.slice(1)}\n`;
       
-      // Group by benefit type within the month
+      // Group by benefit type within the group
       const byType: Record<string, any[]> = {};
-      monthProvisions.forEach((prov: any) => {
+      groupProvisions.forEach((prov: any) => {
         if (!byType[prov.benefit_type]) {
           byType[prov.benefit_type] = [];
         }
         byType[prov.benefit_type].push(prov);
       });
       
-      for (const [type, provisions] of Object.entries(byType)) {
+      for (const [type, typeProvisions] of Object.entries(byType)) {
         const typeName = benefitTypeNames[type] || type;
         
-        provisions.forEach((prov: any) => {
+        typeProvisions.forEach((prov: any) => {
           const periodStart = new Date(prov.period_start).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' });
           const periodEnd = new Date(prov.period_end).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' });
           const amount = parseFloat(prov.amount) || 0;
@@ -2271,11 +2319,11 @@ async function getEmployeeBenefitProvision(supabase: any, params: any) {
         });
       }
       
-      message += `  💰 **Subtotal mes: $${monthTotal.toLocaleString('es-CO')}**\n\n`;
+      message += `  💰 **Subtotal: $${groupTotal.toLocaleString('es-CO')}**\n\n`;
     }
     
     message += `---\n`;
-    message += `💵 **Total provisionado en ${targetYear}: $${totalAmount.toLocaleString('es-CO')}**\n`;
+    message += `💵 **Total provisionado: $${totalAmount.toLocaleString('es-CO')}**\n`;
     message += `📈 **Total de registros: ${provisions.length}**`;
     
     return {

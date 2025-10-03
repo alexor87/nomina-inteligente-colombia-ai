@@ -191,43 +191,81 @@ export class SimpleIntentMatcher {
     // Patterns: "cuánto hemos provisionado en vacaciones para laura"
     //          "provisión de prima de juan 2024"
     //          "provisiones de cesantías para maría este año"
+    //          "cuánto hemos provisionado en prima" (sin empleado específico)
+    //          "total provisionado en vacaciones"
     const provisionPatterns = [
+      // Patrón 1: Consultas generales por tipo (SIN empleado específico)
+      /(?:cu[aá]nto|cuanto|qu[eé]|que|total)\s+(?:hemos\s+)?(?:provisionad(?:o|a|os|as)|provisiones?|provisi[oó]n)\s+(?:en\s+|de\s+)?(vacaciones|prima|cesant[ií]as|intereses?\s+(?:de\s+)?cesant[ií]as)(?:\s+(?:en\s+|del?\s+)?(?:último\s+per[ií]odo|este\s+(?:a[ñn]o|mes)|20\d{2})?)?(?!\s+(?:para|a|de)\s+[a-záéíóúñ])/i,
+      
+      // Patrón 2: Consultas con empleado específico (ANTES de tipo)
       /(?:cu[aá]nto|cuanto|qu[eé]|que)\s+(?:hemos\s+)?(?:provisionad(?:o|a|os|as)|provisiones?|provisi[oó]n)\s+(?:en\s+|de\s+)?(vacaciones|prima|cesant[ií]as|intereses?\s+(?:de\s+)?cesant[ií]as)\s+(?:para|a|de)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)/i,
+      
+      // Patrón 3: Consultas con empleado específico (DESPUÉS de tipo)
       /(?:provisi[oó]n(?:es)?)\s+(?:de\s+|en\s+)?(vacaciones|prima|cesant[ií]as|intereses?\s+(?:de\s+)?cesant[ií]as)\s+(?:de|para|a)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)/i,
-      /(?:cu[aá]nto|cuanto)\s+(?:se\s+ha\s+)?(?:provisionad(?:o|a))\s+(?:para|a|de)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)\s+(?:en\s+|de\s+)?(vacaciones|prima|cesant[ií]as|intereses?\s+(?:de\s+)?cesant[ií]as)/i
+      
+      // Patrón 4: Empleado primero, tipo después
+      /(?:cu[aá]nto|cuanto)\s+(?:se\s+ha\s+)?(?:provisionad(?:o|a))\s+(?:para|a|de)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)\s+(?:en\s+|de\s+)?(vacaciones|prima|cesant[ií]as|intereses?\s+(?:de\s+)?cesant[ií]as)/i,
+      
+      // Patrón 5: Consultas generales SIN tipo ni empleado
+      /(?:cu[aá]nto|cuanto|qu[eé]|que|total)\s+(?:hemos\s+)?(?:provisionad(?:o|a|os|as)|provisiones?|provisi[oó]n)(?:\s+(?:para|de|a)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?))?(?:\s+(?:en\s+|del?\s+)?(?:último\s+per[ií]odo|este\s+(?:a[ñn]o|mes)|20\d{2})?)?$/i
     ];
 
     for (const pattern of provisionPatterns) {
       const match = text.match(pattern);
       if (match) {
-        const employeeName = match[2] || match[1];
-        let benefitType = match[1] || match[2];
+        // Identificar qué se capturó
+        let employeeName: string | null = null;
+        let benefitType: string | null = null;
+        
+        // Determinar empleado y tipo según el patrón
+        if (match[1] && /vacaciones|prima|cesant[ií]as|intereses/i.test(match[1])) {
+          // match[1] es el tipo de beneficio
+          benefitType = match[1];
+          employeeName = match[2] || null; // Puede ser null si no se especificó empleado
+        } else if (match[2] && /vacaciones|prima|cesant[ií]as|intereses/i.test(match[2])) {
+          // match[2] es el tipo de beneficio
+          benefitType = match[2];
+          employeeName = match[1] || null;
+        } else if (match[1]) {
+          // Solo se capturó un grupo, podría ser empleado o tipo
+          if (/vacaciones|prima|cesant[ií]as|intereses/i.test(match[1])) {
+            benefitType = match[1];
+          } else {
+            employeeName = match[1];
+          }
+        }
         
         // Normalize benefit type
-        if (/vacaciones/i.test(benefitType)) {
-          benefitType = 'vacaciones';
-        } else if (/prima/i.test(benefitType)) {
-          benefitType = 'prima';
-        } else if (/intereses/i.test(benefitType)) {
-          benefitType = 'intereses_cesantias';
-        } else if (/cesant[ií]as/i.test(benefitType)) {
-          benefitType = 'cesantias';
+        if (benefitType) {
+          if (/vacaciones/i.test(benefitType)) {
+            benefitType = 'vacaciones';
+          } else if (/prima/i.test(benefitType)) {
+            benefitType = 'prima';
+          } else if (/intereses/i.test(benefitType)) {
+            benefitType = 'intereses_cesantias';
+          } else if (/cesant[ií]as/i.test(benefitType)) {
+            benefitType = 'cesantias';
+          }
         }
         
         // Extract year if provided
         const yearMatch = text.match(/\b(20\d{2})\b/);
         const year = yearMatch ? parseInt(yearMatch[1]) : null;
         
-        console.log(`💰 [BENEFIT_PROVISION_QUERY] Detected: "${employeeName}" - ${benefitType} ${year || '(current year)'}`);
+        // Detectar si pide "último período"
+        const useLastPeriod = /último\s+per[ií]odo/i.test(text);
+        
+        console.log(`💰 [BENEFIT_PROVISION_QUERY] Detected: employee="${employeeName || 'ALL'}" - type=${benefitType || 'ALL'} year=${year || (useLastPeriod ? 'last_period' : 'current')}`);
         
         return {
           type: 'BENEFIT_PROVISION_QUERY',
           confidence: 0.96,
           method: 'getEmployeeBenefitProvision',
           params: {
-            name: employeeName.trim(),
-            benefitType,
-            year
+            name: employeeName ? employeeName.trim() : null,
+            benefitType: benefitType,
+            year,
+            useLastPeriod
           }
         };
       }
