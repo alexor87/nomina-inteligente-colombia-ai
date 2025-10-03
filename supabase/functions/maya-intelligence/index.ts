@@ -11,6 +11,7 @@ import { liquidarNomina, registrarNovedad, calcularPrestacion, generarReporte } 
 import { buildStructuredResponse } from './structured-response-builder.ts';
 import { ConversationContextAnalyzer } from './core/conversation-context-analyzer.ts';
 import { SmartContextInferencer } from './core/smart-context-inferencer.ts';
+import * as AggregationService from './services/AggregationService.ts';
 
 // ============================================================================
 // CONVERSATIONAL CONTEXT SYSTEM
@@ -1150,6 +1151,32 @@ serve(async (req) => {
       case 'getEmployeeCount':
         response = await getEmployeeCount(userSupabase);
         break;
+        
+      // ============================================================================
+      // PHASE 1: AGGREGATION HANDLERS (New - Maya Intelligence Expansion)
+      // ============================================================================
+      case 'getTotalPayrollCost':
+        response = await handleTotalPayrollCost(userSupabase, intent.params);
+        break;
+        
+      case 'getSecurityContributions':
+        response = await handleSecurityContributions(userSupabase, intent.params);
+        break;
+        
+      case 'getHighestCostEmployees':
+        response = await handleHighestCostEmployees(userSupabase, intent.params);
+        break;
+        
+      case 'getTotalIncapacityDays':
+        response = await handleTotalIncapacityDays(userSupabase, intent.params);
+        break;
+        
+      case 'getTotalOvertimeHours':
+        response = await handleTotalOvertimeHours(userSupabase, intent.params);
+        break;
+      // ============================================================================
+      // END PHASE 1: AGGREGATION HANDLERS
+      // ============================================================================
         
       // NEW COLOMBIAN PAYROLL METHODS
       case 'liquidarNomina':
@@ -2809,6 +2836,33 @@ async function getPayrollByFortnight(supabase: any, month: string, year: number,
     };
   }
 }
+
+// ============================================================================
+// PHASE 1: AGGREGATION HANDLERS
+// ============================================================================
+async function handleTotalPayrollCost(supabase: any, params: any) {
+  return await AggregationService.getTotalPayrollCost(supabase, params);
+}
+
+async function handleSecurityContributions(supabase: any, params: any) {
+  return await AggregationService.getSecurityContributions(supabase, params);
+}
+
+async function handleHighestCostEmployees(supabase: any, params: any) {
+  return await AggregationService.getHighestCostEmployees(supabase, params);
+}
+
+async function handleTotalIncapacityDays(supabase: any, params: any) {
+  return await AggregationService.getTotalIncapacityDays(supabase, params);
+}
+
+async function handleTotalOvertimeHours(supabase: any, params: any) {
+  return await AggregationService.getTotalOvertimeHours(supabase, params);
+}
+
+// ============================================================================
+// END PHASE 1: AGGREGATION HANDLERS
+// ============================================================================
 
 async function handleConversation(message: string, conversation: any[]) {
   const openaiKey = Deno.env.get('OPENAI_API_KEY');

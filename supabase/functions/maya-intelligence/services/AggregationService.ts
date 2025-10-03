@@ -1,0 +1,682 @@
+// ============================================================================
+// AggregationService - Consultas de Agregación y Análisis de Datos
+// ============================================================================
+// Fase 1: Agregaciones Básicas
+// - Total de costos de nómina
+// - Aportes a seguridad social
+// - Empleados con mayor costo
+// - Total de días de incapacidad
+// - Total de horas extras
+
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+export interface AggregationResult {
+  message: string;
+  emotionalState: string;
+  data?: any;
+  visualization?: {
+    type: 'metric' | 'table' | 'chart';
+    data: any;
+  };
+}
+
+// Helper: Get current company ID
+async function getCurrentCompanyId(client: any): Promise<string | null> {
+  try {
+    const { data: { user } } = await client.auth.getUser();
+    if (!user) return null;
+    const { data, error } = await client
+      .from('profiles')
+      .select('company_id')
+      .eq('user_id', user.id)
+      .single();
+    if (error) {
+      console.error('🔒 [AGGREGATION] Error fetching company_id:', error);
+      return null;
+    }
+    return data?.company_id ?? null;
+  } catch (e) {
+    console.error('🔒 [AGGREGATION] getCurrentCompanyId failed:', e);
+    return null;
+  }
+}
+
+// Helper: Format currency in COP
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat('es-CO', {
+    style: 'currency',
+    currency: 'COP',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(amount);
+}
+
+// Helper: Get period ID from params (month/year or latest)
+async function getPeriodId(
+  client: any, 
+  companyId: string, 
+  params: { month?: string; year?: number }
+): Promise<{ id: string; periodo: string } | null> {
+  try {
+    let query = client
+      .from('payroll_periods_real')
+      .select('id, periodo, fecha_inicio, fecha_fin')
+      .eq('company_id', companyId)
+      .eq('estado', 'cerrado');
+    
+    // Filter by year if provided
+    if (params.year) {
+      const yearStr = params.year.toString();
+      query = query.like('periodo', `%${yearStr}%`);
+    }
+    
+    // Filter by month if provided
+    if (params.month) {
+      const monthCapitalized = params.month.charAt(0).toUpperCase() + params.month.slice(1);
+      query = query.like('periodo', `%${monthCapitalized}%`);
+    }
+    
+    query = query.order('fecha_fin', { ascending: false }).limit(1);
+    
+    const { data, error } = await query;
+    
+    if (error) {
+      console.error('❌ [AGGREGATION] Error fetching period:', error);
+      return null;
+    }
+    
+    return data?.[0] ? { id: data[0].id, periodo: data[0].periodo } : null;
+  } catch (e) {
+    console.error('❌ [AGGREGATION] getPeriodId failed:', e);
+    return null;
+  }
+}
+
+// ============================================================================
+// 1. TOTAL PAYROLL COST
+// ============================================================================
+export async function getTotalPayrollCost(
+  client: any,
+  params: { month?: string; year?: number; periodId?: string }
+): Promise<AggregationResult> {
+  console.log('💰 [AGGREGATION] getTotalPayrollCost called with params:', params);
+  
+  try {
+    const companyId = await getCurrentCompanyId(client);
+    if (!companyId) {
+      return {
+        message: '❌ No pude identificar tu empresa.',
+        emotionalState: 'concerned'
+      };
+    }
+    
+    // Get period
+    let periodId = params.periodId;
+    let periodName = '';
+    
+    if (!periodId) {
+      const period = await getPeriodId(client, companyId, params);
+      if (!period) {
+        return {
+          message: params.month || params.year 
+            ? `❌ No encontré períodos cerrados para ${params.month || ''} ${params.year || ''}`
+            : '❌ No encontré períodos cerrados en tu empresa.',
+          emotionalState: 'concerned'
+        };
+      }
+      periodId = period.id;
+      periodName = period.periodo;
+    }
+    
+    // Query payrolls for the period
+    const { data: payrolls, error } = await client
+      .from('payrolls')
+      .select('total_devengado, total_deducciones, neto_pagado, employee_id')
+      .eq('company_id', companyId)
+      .eq('period_id', periodId);
+    
+    if (error) {
+      console.error('❌ [AGGREGATION] Error querying payrolls:', error);
+      return {
+        message: '❌ Hubo un error al consultar la nómina.',
+        emotionalState: 'concerned'
+      };
+    }
+    
+    if (!payrolls || payrolls.length === 0) {
+      return {
+        message: `No encontré registros de nómina para el período ${periodName || 'solicitado'}.`,
+        emotionalState: 'neutral'
+      };
+    }
+    
+    // Calculate totals
+    const totalDevengado = payrolls.reduce((sum, p) => sum + (p.total_devengado || 0), 0);
+    const totalDeducciones = payrolls.reduce((sum, p) => sum + (p.total_deducciones || 0), 0);
+    const totalNeto = payrolls.reduce((sum, p) => sum + (p.neto_pagado || 0), 0);
+    const employeeCount = payrolls.length;
+    
+    // Calculate employer contributions (approximate: 25% of devengado)
+    const employerContributions = totalDevengado * 0.25;
+    const totalCost = totalDevengado + employerContributions;
+    
+    return {
+      message: `📊 **Costo Total de Nómina - ${periodName}**\n\n` +
+        `👥 **${employeeCount}** empleados\n` +
+        `💰 **Devengado**: ${formatCurrency(totalDevengado)}\n` +
+        `📉 **Deducciones**: ${formatCurrency(totalDeducciones)}\n` +
+        `💵 **Neto Pagado**: ${formatCurrency(totalNeto)}\n` +
+        `🏢 **Aportes Patronales**: ${formatCurrency(employerContributions)}\n\n` +
+        `🎯 **COSTO TOTAL**: ${formatCurrency(totalCost)}`,
+      emotionalState: 'professional',
+      data: {
+        period: periodName,
+        employeeCount,
+        totalDevengado,
+        totalDeducciones,
+        totalNeto,
+        employerContributions,
+        totalCost
+      },
+      visualization: {
+        type: 'metric',
+        data: {
+          title: 'Costo Total de Nómina',
+          value: totalCost,
+          subtitle: periodName,
+          breakdown: [
+            { label: 'Devengado', value: totalDevengado },
+            { label: 'Aportes Patronales', value: employerContributions },
+            { label: 'Deducciones', value: totalDeducciones }
+          ]
+        }
+      }
+    };
+  } catch (e) {
+    console.error('❌ [AGGREGATION] getTotalPayrollCost failed:', e);
+    return {
+      message: `❌ Error al calcular el costo total: ${e.message}`,
+      emotionalState: 'concerned'
+    };
+  }
+}
+
+// ============================================================================
+// 2. SECURITY CONTRIBUTIONS
+// ============================================================================
+export async function getSecurityContributions(
+  client: any,
+  params: { month?: string; year?: number; periodId?: string }
+): Promise<AggregationResult> {
+  console.log('🏥 [AGGREGATION] getSecurityContributions called with params:', params);
+  
+  try {
+    const companyId = await getCurrentCompanyId(client);
+    if (!companyId) {
+      return {
+        message: '❌ No pude identificar tu empresa.',
+        emotionalState: 'concerned'
+      };
+    }
+    
+    // Get period
+    let periodId = params.periodId;
+    let periodName = '';
+    
+    if (!periodId) {
+      const period = await getPeriodId(client, companyId, params);
+      if (!period) {
+        return {
+          message: params.month || params.year 
+            ? `❌ No encontré períodos cerrados para ${params.month || ''} ${params.year || ''}`
+            : '❌ No encontré períodos cerrados en tu empresa.',
+          emotionalState: 'concerned'
+        };
+      }
+      periodId = period.id;
+      periodName = period.periodo;
+    }
+    
+    // Query payrolls for the period
+    const { data: payrolls, error } = await client
+      .from('payrolls')
+      .select('salario_base, total_devengado')
+      .eq('company_id', companyId)
+      .eq('period_id', periodId);
+    
+    if (error) {
+      console.error('❌ [AGGREGATION] Error querying payrolls:', error);
+      return {
+        message: '❌ Hubo un error al consultar la nómina.',
+        emotionalState: 'concerned'
+      };
+    }
+    
+    if (!payrolls || payrolls.length === 0) {
+      return {
+        message: `No encontré registros de nómina para el período ${periodName || 'solicitado'}.`,
+        emotionalState: 'neutral'
+      };
+    }
+    
+    // Calculate security contributions
+    // EPS: 12.5% total (8.5% empleador, 4% empleado)
+    // Pensión: 16% total (12% empleador, 4% empleado)
+    // ARL: ~0.522% empleador (promedio)
+    
+    const totalDevengado = payrolls.reduce((sum, p) => sum + (p.total_devengado || 0), 0);
+    
+    const epsEmployee = totalDevengado * 0.04;
+    const epsEmployer = totalDevengado * 0.085;
+    const epsTotal = epsEmployee + epsEmployer;
+    
+    const pensionEmployee = totalDevengado * 0.04;
+    const pensionEmployer = totalDevengado * 0.12;
+    const pensionTotal = pensionEmployee + pensionEmployer;
+    
+    const arl = totalDevengado * 0.00522;
+    
+    const totalContributions = epsTotal + pensionTotal + arl;
+    
+    return {
+      message: `🏥 **Aportes a Seguridad Social - ${periodName}**\n\n` +
+        `**EPS (Salud)**\n` +
+        `👤 Empleado: ${formatCurrency(epsEmployee)} (4%)\n` +
+        `🏢 Empleador: ${formatCurrency(epsEmployer)} (8.5%)\n` +
+        `📊 Total EPS: ${formatCurrency(epsTotal)}\n\n` +
+        `**Pensión**\n` +
+        `👤 Empleado: ${formatCurrency(pensionEmployee)} (4%)\n` +
+        `🏢 Empleador: ${formatCurrency(pensionEmployer)} (12%)\n` +
+        `📊 Total Pensión: ${formatCurrency(pensionTotal)}\n\n` +
+        `**ARL**\n` +
+        `🏢 Empleador: ${formatCurrency(arl)} (0.522%)\n\n` +
+        `🎯 **TOTAL APORTES**: ${formatCurrency(totalContributions)}`,
+      emotionalState: 'professional',
+      data: {
+        period: periodName,
+        eps: { employee: epsEmployee, employer: epsEmployer, total: epsTotal },
+        pension: { employee: pensionEmployee, employer: pensionEmployer, total: pensionTotal },
+        arl,
+        totalContributions
+      },
+      visualization: {
+        type: 'chart',
+        data: {
+          title: 'Aportes a Seguridad Social',
+          subtitle: periodName,
+          type: 'bar',
+          categories: ['EPS', 'Pensión', 'ARL'],
+          series: [
+            { name: 'Empleado', data: [epsEmployee, pensionEmployee, 0] },
+            { name: 'Empleador', data: [epsEmployer, pensionEmployer, arl] }
+          ]
+        }
+      }
+    };
+  } catch (e) {
+    console.error('❌ [AGGREGATION] getSecurityContributions failed:', e);
+    return {
+      message: `❌ Error al calcular los aportes: ${e.message}`,
+      emotionalState: 'concerned'
+    };
+  }
+}
+
+// ============================================================================
+// 3. HIGHEST COST EMPLOYEES
+// ============================================================================
+export async function getHighestCostEmployees(
+  client: any,
+  params: { month?: string; year?: number; periodId?: string; limit?: number }
+): Promise<AggregationResult> {
+  console.log('👥 [AGGREGATION] getHighestCostEmployees called with params:', params);
+  
+  try {
+    const companyId = await getCurrentCompanyId(client);
+    if (!companyId) {
+      return {
+        message: '❌ No pude identificar tu empresa.',
+        emotionalState: 'concerned'
+      };
+    }
+    
+    // Get period
+    let periodId = params.periodId;
+    let periodName = '';
+    
+    if (!periodId) {
+      const period = await getPeriodId(client, companyId, params);
+      if (!period) {
+        return {
+          message: params.month || params.year 
+            ? `❌ No encontré períodos cerrados para ${params.month || ''} ${params.year || ''}`
+            : '❌ No encontré períodos cerrados en tu empresa.',
+          emotionalState: 'concerned'
+        };
+      }
+      periodId = period.id;
+      periodName = period.periodo;
+    }
+    
+    const limit = params.limit || 5;
+    
+    // Query payrolls with employee names
+    const { data: payrolls, error } = await client
+      .from('payrolls')
+      .select(`
+        total_devengado,
+        employee_id,
+        employees!inner(nombre, apellido)
+      `)
+      .eq('company_id', companyId)
+      .eq('period_id', periodId)
+      .order('total_devengado', { ascending: false })
+      .limit(limit);
+    
+    if (error) {
+      console.error('❌ [AGGREGATION] Error querying payrolls:', error);
+      return {
+        message: '❌ Hubo un error al consultar la nómina.',
+        emotionalState: 'concerned'
+      };
+    }
+    
+    if (!payrolls || payrolls.length === 0) {
+      return {
+        message: `No encontré registros de nómina para el período ${periodName || 'solicitado'}.`,
+        emotionalState: 'neutral'
+      };
+    }
+    
+    // Calculate employer cost (devengado + 25% contributions)
+    const employeesWithCost = payrolls.map(p => ({
+      name: `${p.employees.nombre} ${p.employees.apellido}`,
+      devengado: p.total_devengado,
+      employerContributions: p.total_devengado * 0.25,
+      totalCost: p.total_devengado * 1.25
+    }));
+    
+    const tableRows = employeesWithCost.map((e, i) => 
+      `${i + 1}. **${e.name}**\n` +
+      `   💰 Devengado: ${formatCurrency(e.devengado)}\n` +
+      `   🏢 Aportes: ${formatCurrency(e.employerContributions)}\n` +
+      `   🎯 Costo Total: ${formatCurrency(e.totalCost)}`
+    ).join('\n\n');
+    
+    return {
+      message: `👥 **Empleados con Mayor Costo - ${periodName}**\n\n${tableRows}`,
+      emotionalState: 'professional',
+      data: {
+        period: periodName,
+        employees: employeesWithCost
+      },
+      visualization: {
+        type: 'table',
+        data: {
+          title: `Top ${limit} Empleados por Costo`,
+          subtitle: periodName,
+          headers: ['#', 'Empleado', 'Devengado', 'Aportes', 'Costo Total'],
+          rows: employeesWithCost.map((e, i) => [
+            (i + 1).toString(),
+            e.name,
+            formatCurrency(e.devengado),
+            formatCurrency(e.employerContributions),
+            formatCurrency(e.totalCost)
+          ])
+        }
+      }
+    };
+  } catch (e) {
+    console.error('❌ [AGGREGATION] getHighestCostEmployees failed:', e);
+    return {
+      message: `❌ Error al obtener empleados: ${e.message}`,
+      emotionalState: 'concerned'
+    };
+  }
+}
+
+// ============================================================================
+// 4. TOTAL INCAPACITY DAYS
+// ============================================================================
+export async function getTotalIncapacityDays(
+  client: any,
+  params: { month?: string; year?: number; periodId?: string }
+): Promise<AggregationResult> {
+  console.log('🏥 [AGGREGATION] getTotalIncapacityDays called with params:', params);
+  
+  try {
+    const companyId = await getCurrentCompanyId(client);
+    if (!companyId) {
+      return {
+        message: '❌ No pude identificar tu empresa.',
+        emotionalState: 'concerned'
+      };
+    }
+    
+    // Get period
+    let periodId = params.periodId;
+    let periodName = '';
+    
+    if (!periodId) {
+      const period = await getPeriodId(client, companyId, params);
+      if (!period) {
+        return {
+          message: params.month || params.year 
+            ? `❌ No encontré períodos cerrados para ${params.month || ''} ${params.year || ''}`
+            : '❌ No encontré períodos cerrados en tu empresa.',
+          emotionalState: 'concerned'
+        };
+      }
+      periodId = period.id;
+      periodName = period.periodo;
+    }
+    
+    // Query novedades for incapacidades
+    const { data: novedades, error } = await client
+      .from('payroll_novedades')
+      .select(`
+        dias,
+        valor,
+        subtipo,
+        empleado_id,
+        employees!inner(nombre, apellido)
+      `)
+      .eq('company_id', companyId)
+      .eq('periodo_id', periodId)
+      .eq('tipo_novedad', 'incapacidad');
+    
+    if (error) {
+      console.error('❌ [AGGREGATION] Error querying novedades:', error);
+      return {
+        message: '❌ Hubo un error al consultar las novedades.',
+        emotionalState: 'concerned'
+      };
+    }
+    
+    if (!novedades || novedades.length === 0) {
+      return {
+        message: `✅ No hubo incapacidades registradas en el período ${periodName}.`,
+        emotionalState: 'celebrating'
+      };
+    }
+    
+    const totalDays = novedades.reduce((sum, n) => sum + (n.dias || 0), 0);
+    const totalCost = novedades.reduce((sum, n) => sum + Math.abs(n.valor || 0), 0);
+    const employeeCount = new Set(novedades.map(n => n.empleado_id)).size;
+    
+    // Group by subtype
+    const bySubtype: Record<string, { count: number; days: number }> = {};
+    novedades.forEach(n => {
+      const subtype = n.subtipo || 'general';
+      if (!bySubtype[subtype]) {
+        bySubtype[subtype] = { count: 0, days: 0 };
+      }
+      bySubtype[subtype].count++;
+      bySubtype[subtype].days += n.dias || 0;
+    });
+    
+    const subtypeBreakdown = Object.entries(bySubtype)
+      .map(([type, data]) => `• **${type}**: ${data.count} incapacidades, ${data.days} días`)
+      .join('\n');
+    
+    return {
+      message: `🏥 **Total de Incapacidades - ${periodName}**\n\n` +
+        `📊 **${novedades.length}** incapacidades registradas\n` +
+        `👥 **${employeeCount}** empleados afectados\n` +
+        `📅 **${totalDays}** días totales\n` +
+        `💰 Costo estimado: ${formatCurrency(totalCost)}\n\n` +
+        `**Por tipo:**\n${subtypeBreakdown}`,
+      emotionalState: 'professional',
+      data: {
+        period: periodName,
+        totalIncapacities: novedades.length,
+        totalDays,
+        totalCost,
+        affectedEmployees: employeeCount,
+        bySubtype
+      },
+      visualization: {
+        type: 'metric',
+        data: {
+          title: 'Días de Incapacidad',
+          value: totalDays,
+          subtitle: periodName,
+          breakdown: Object.entries(bySubtype).map(([type, data]) => ({
+            label: type,
+            value: data.days
+          }))
+        }
+      }
+    };
+  } catch (e) {
+    console.error('❌ [AGGREGATION] getTotalIncapacityDays failed:', e);
+    return {
+      message: `❌ Error al consultar incapacidades: ${e.message}`,
+      emotionalState: 'concerned'
+    };
+  }
+}
+
+// ============================================================================
+// 5. TOTAL OVERTIME HOURS
+// ============================================================================
+export async function getTotalOvertimeHours(
+  client: any,
+  params: { month?: string; year?: number; periodId?: string }
+): Promise<AggregationResult> {
+  console.log('⏰ [AGGREGATION] getTotalOvertimeHours called with params:', params);
+  
+  try {
+    const companyId = await getCurrentCompanyId(client);
+    if (!companyId) {
+      return {
+        message: '❌ No pude identificar tu empresa.',
+        emotionalState: 'concerned'
+      };
+    }
+    
+    // Get period
+    let periodId = params.periodId;
+    let periodName = '';
+    
+    if (!periodId) {
+      const period = await getPeriodId(client, companyId, params);
+      if (!period) {
+        return {
+          message: params.month || params.year 
+            ? `❌ No encontré períodos cerrados para ${params.month || ''} ${params.year || ''}`
+            : '❌ No encontré períodos cerrados en tu empresa.',
+          emotionalState: 'concerned'
+        };
+      }
+      periodId = period.id;
+      periodName = period.periodo;
+    }
+    
+    // Query novedades for overtime
+    const { data: novedades, error } = await client
+      .from('payroll_novedades')
+      .select(`
+        dias,
+        valor,
+        subtipo,
+        tipo_novedad,
+        empleado_id,
+        employees!inner(nombre, apellido)
+      `)
+      .eq('company_id', companyId)
+      .eq('periodo_id', periodId)
+      .in('tipo_novedad', ['hora_extra', 'recargo_nocturno', 'recargo_dominical']);
+    
+    if (error) {
+      console.error('❌ [AGGREGATION] Error querying novedades:', error);
+      return {
+        message: '❌ Hubo un error al consultar las novedades.',
+        emotionalState: 'concerned'
+      };
+    }
+    
+    if (!novedades || novedades.length === 0) {
+      return {
+        message: `No se registraron horas extras en el período ${periodName}.`,
+        emotionalState: 'neutral'
+      };
+    }
+    
+    const totalHours = novedades.reduce((sum, n) => sum + (n.dias || 0), 0);
+    const totalCost = novedades.reduce((sum, n) => sum + (n.valor || 0), 0);
+    const employeeCount = new Set(novedades.map(n => n.empleado_id)).size;
+    
+    // Group by type
+    const byType: Record<string, { count: number; hours: number; cost: number }> = {};
+    novedades.forEach(n => {
+      const type = n.tipo_novedad || 'hora_extra';
+      if (!byType[type]) {
+        byType[type] = { count: 0, hours: 0, cost: 0 };
+      }
+      byType[type].count++;
+      byType[type].hours += n.dias || 0;
+      byType[type].cost += n.valor || 0;
+    });
+    
+    const typeBreakdown = Object.entries(byType)
+      .map(([type, data]) => 
+        `• **${type.replace(/_/g, ' ')}**: ${data.hours} horas - ${formatCurrency(data.cost)}`
+      )
+      .join('\n');
+    
+    return {
+      message: `⏰ **Total de Horas Extras - ${periodName}**\n\n` +
+        `📊 **${totalHours}** horas extras totales\n` +
+        `👥 **${employeeCount}** empleados\n` +
+        `💰 Costo total: ${formatCurrency(totalCost)}\n\n` +
+        `**Por tipo:**\n${typeBreakdown}`,
+      emotionalState: 'professional',
+      data: {
+        period: periodName,
+        totalHours,
+        totalCost,
+        employeeCount,
+        byType
+      },
+      visualization: {
+        type: 'metric',
+        data: {
+          title: 'Horas Extras',
+          value: totalHours,
+          subtitle: periodName,
+          breakdown: Object.entries(byType).map(([type, data]) => ({
+            label: type.replace(/_/g, ' '),
+            value: data.hours
+          }))
+        }
+      }
+    };
+  } catch (e) {
+    console.error('❌ [AGGREGATION] getTotalOvertimeHours failed:', e);
+    return {
+      message: `❌ Error al consultar horas extras: ${e.message}`,
+      emotionalState: 'concerned'
+    };
+  }
+}

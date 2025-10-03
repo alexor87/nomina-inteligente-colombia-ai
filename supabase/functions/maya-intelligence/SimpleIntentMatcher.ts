@@ -187,6 +187,110 @@ export class SimpleIntentMatcher {
       };
     }
 
+    // ============================================================================
+    // PHASE 1: AGGREGATION INTENTS (New - Maya Intelligence Expansion)
+    // ============================================================================
+    
+    // 1. TOTAL PAYROLL COST
+    if (/(?:cuánto|cuanto|qué|que)\s+(?:me\s+)?(?:costó|costo|costaron)\s+(?:la|el)?\s*(?:última|ultimo|pasada|pasado)?\s*(?:nómin|nomin|quincena|período|periodo|mes)/i.test(text) ||
+        /(?:costo|coste)\s+(?:de\s+la|del)?\s*(?:nómin|nomin|quincena)/i.test(text) ||
+        /(?:cuál|cual)\s+(?:fue|es)\s+el\s+costo\s+total/i.test(text)) {
+      
+      const monthMatch = text.match(/(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i);
+      const yearMatch = text.match(/(\d{4})/);
+      
+      return {
+        type: 'TOTAL_PAYROLL_COST',
+        confidence: 0.95,
+        method: 'getTotalPayrollCost',
+        params: {
+          month: monthMatch ? monthMatch[1].toLowerCase() : null,
+          year: yearMatch ? parseInt(yearMatch[1]) : null
+        }
+      };
+    }
+    
+    // 2. SECURITY CONTRIBUTIONS
+    if (/(?:cuánto|cuanto|qué|que)\s+(?:fue|es|fueron|son)\s+(?:el|la|los|las)?\s*(?:aporte|aportes|contribución|contribuciones)\s+(?:a|de)?\s*(?:seguridad\s+social|eps|pensión|pension|salud)/i.test(text) ||
+        /(?:valor|total)\s+(?:de\s+)?(?:aporte|aportes)\s+(?:a\s+)?(?:seguridad|eps|pensión)/i.test(text)) {
+      
+      const monthMatch = text.match(/(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i);
+      const yearMatch = text.match(/(\d{4})/);
+      
+      return {
+        type: 'SECURITY_CONTRIBUTIONS',
+        confidence: 0.94,
+        method: 'getSecurityContributions',
+        params: {
+          month: monthMatch ? monthMatch[1].toLowerCase() : null,
+          year: yearMatch ? parseInt(yearMatch[1]) : null
+        }
+      };
+    }
+    
+    // 3. HIGHEST COST EMPLOYEES
+    if (/(?:qué|que|cuáles|cuales)\s+(?:empleados?|trabajadores?)\s+(?:tienen|representan|son|me\s+cuestan)\s+(?:el\s+)?(?:mayor|más\s+alto|más\s+grande)\s+(?:costo|gasto)/i.test(text) ||
+        /(?:empleados?|trabajadores?)\s+(?:con|de)\s+(?:mayor|más\s+alto)\s+costo/i.test(text) ||
+        /(?:ranking|top)\s+(?:de\s+)?empleados/i.test(text)) {
+      
+      const limitMatch = text.match(/(?:top|primeros?|mejores?)\s+(\d+)/i);
+      const monthMatch = text.match(/(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i);
+      const yearMatch = text.match(/(\d{4})/);
+      
+      return {
+        type: 'HIGHEST_COST_EMPLOYEES',
+        confidence: 0.93,
+        method: 'getHighestCostEmployees',
+        params: {
+          limit: limitMatch ? parseInt(limitMatch[1]) : 5,
+          month: monthMatch ? monthMatch[1].toLowerCase() : null,
+          year: yearMatch ? parseInt(yearMatch[1]) : null
+        }
+      };
+    }
+    
+    // 4. TOTAL INCAPACITY DAYS
+    if (/(?:cuántos|cuantos|qué|que)\s+días\s+de\s+incapacidad/i.test(text) ||
+        /(?:total|cantidad)\s+(?:de\s+)?(?:días|dia)\s+(?:de\s+)?incapacidad/i.test(text) ||
+        /(?:incapacidades|incapacitados)\s+(?:en|del|de)/i.test(text)) {
+      
+      const monthMatch = text.match(/(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i);
+      const yearMatch = text.match(/(\d{4})/);
+      
+      return {
+        type: 'TOTAL_INCAPACITY_DAYS',
+        confidence: 0.94,
+        method: 'getTotalIncapacityDays',
+        params: {
+          month: monthMatch ? monthMatch[1].toLowerCase() : null,
+          year: yearMatch ? parseInt(yearMatch[1]) : null
+        }
+      };
+    }
+    
+    // 5. TOTAL OVERTIME HOURS
+    if (/(?:cuántas|cuantas|qué|que)\s+horas\s+extra/i.test(text) ||
+        /(?:total|cantidad)\s+(?:de\s+)?horas\s+extra/i.test(text) ||
+        /(?:cuánto|cuanto)\s+(?:debo\s+)?pagar\s+(?:por\s+|de\s+)?horas\s+extra/i.test(text)) {
+      
+      const monthMatch = text.match(/(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i);
+      const yearMatch = text.match(/(\d{4})/);
+      
+      return {
+        type: 'TOTAL_OVERTIME_HOURS',
+        confidence: 0.93,
+        method: 'getTotalOvertimeHours',
+        params: {
+          month: monthMatch ? monthMatch[1].toLowerCase() : null,
+          year: yearMatch ? parseInt(yearMatch[1]) : null
+        }
+      };
+    }
+    
+    // ============================================================================
+    // END PHASE 1: AGGREGATION INTENTS
+    // ============================================================================
+
     // CONSULTAR PROVISIONES DE PRESTACIONES SOCIALES
     // Patterns: "cuánto hemos provisionado en vacaciones para laura"
     //          "provisión de prima de juan 2024"
