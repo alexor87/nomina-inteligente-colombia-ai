@@ -524,8 +524,8 @@ export class SimpleIntentMatcher {
 
     // INTERROGATIVE PATTERNS (LOWER PRIORITY)
     // Pattern 3: "¿cuánto se le ha pagado a eliana?" - Traditional interrogative
-    if (/(?:cuánto|cuanto|qué|que)\s+(?:se\s+le\s+ha\s+)?(?:pagado|pago|pagamos)\s+(?:a|para)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*?)(?:\s+(?:este|en|durante|\d{4}|enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)|$)/i.test(text)) {
-      const nameMatch = text.match(/(?:cuánto|cuanto|qué|que)\s+(?:se\s+le\s+ha\s+)?(?:pagado|pago|pagamos)\s+(?:a|para)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*?)(?:\s+(?:este|en|durante|\d{4}|enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)|$)/i);
+    if (/(?:cuánto|cuanto|qué|que)\s+(?:(?:se\s+)?(?:le\s+)?(?:ha|hemos|han|he)\s+)?(?:pagado|pago|pagamos)\s+(?:a|para)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*?)(?:\s+(?:este|en|durante|\d{4}|enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)|$)/i.test(text)) {
+      const nameMatch = text.match(/(?:cuánto|cuanto|qué|que)\s+(?:(?:se\s+)?(?:le\s+)?(?:ha|hemos|han|he)\s+)?(?:pagado|pago|pagamos)\s+(?:a|para)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*?)(?:\s+(?:este|en|durante|\d{4}|enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)|$)/i);
       const name = nameMatch?.[1]?.trim().replace(/[?.,!]+$/, '') || '';
       
       console.log('🎯 [EMPLOYEE_PAID_INTERROGATIVE] Pattern matched for:', name);
