@@ -1,6 +1,6 @@
 export interface ExecutableAction {
   id: string;
-  type: 'send_voucher' | 'search_employee' | 'generate_report' | 'view_details' | 'confirm_send_voucher' | 'show_period_alternatives' | 'send_voucher_all' | 'expand_periods' | 'list_employees';
+  type: 'send_voucher' | 'search_employee' | 'generate_report' | 'view_details' | 'confirm_send_voucher' | 'show_period_alternatives' | 'send_voucher_all' | 'expand_periods' | 'list_employees' | 'send_message';
   label: string;
   description?: string;
   parameters: Record<string, any>;
@@ -68,4 +68,11 @@ export interface ListEmployeesAction extends ExecutableAction {
   };
 }
 
-export type MayaExecutableAction = VoucherSendAction | SearchEmployeeAction | ViewDetailsAction | SendVoucherAllAction | ExpandPeriodsAction | ListEmployeesAction;
+export interface SendMessageAction extends ExecutableAction {
+  type: 'send_message';
+  parameters: {
+    message: string;
+  };
+}
+
+export type MayaExecutableAction = VoucherSendAction | SearchEmployeeAction | ViewDetailsAction | SendVoucherAllAction | ExpandPeriodsAction | ListEmployeesAction | SendMessageAction;

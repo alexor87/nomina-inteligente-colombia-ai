@@ -1736,11 +1736,13 @@ async function getEmployeeCount(supabase: any) {
       message: `Tienes **${count} empleados activos** en tu empresa. ${count > 0 ? '¿Te gustaría ver quiénes son?' : ''}`,
       emotionalState: 'neutral',
       actions: count > 0 ? [{
-        id: 'list-employees',
-        type: 'list_employees',
+        id: 'show-employees',
+        type: 'send_message',
         label: '👥 Ver empleados',
         description: 'Mostrar la lista de empleados activos',
-        parameters: {}
+        parameters: {
+          message: 'muéstrame los empleados activos'
+        }
       }] : []
     };
   } catch (error) {
