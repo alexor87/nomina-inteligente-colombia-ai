@@ -106,6 +106,58 @@ export const RESPONSE_PATTERNS: Record<string, ResponsePattern> = {
     contextType: 'REPORT_INFO',
     structure: 'Table',
     description: 'Report or analysis'
+  },
+
+  TOTAL_PAYROLL_COST_RESPONSE: {
+    patterns: [
+      /Costo\s+Total\s+de\s+Nómina/i,
+      /💰\s*Devengado\s+Total:/i,
+      /🎯\s*COSTO\s+TOTAL/i,
+    ],
+    contextType: 'AGGREGATION_PAYROLL_COST',
+    structure: 'Metric',
+    description: 'Response with total payroll cost'
+  },
+
+  SECURITY_CONTRIBUTIONS_RESPONSE: {
+    patterns: [
+      /Aportes\s+a\s+Seguridad\s+Social/i,
+      /🏥\s*EPS:/i,
+      /💼\s*Pensión:/i,
+    ],
+    contextType: 'AGGREGATION_SECURITY_CONTRIBUTIONS',
+    structure: 'Metric',
+    description: 'Response with security contributions'
+  },
+
+  HIGHEST_COST_EMPLOYEES_RESPONSE: {
+    patterns: [
+      /Empleados\s+con\s+Mayor\s+Costo/i,
+      /Top\s+\d+\s+empleados/i,
+    ],
+    contextType: 'AGGREGATION_HIGHEST_COST',
+    structure: 'List',
+    description: 'Response with highest cost employees'
+  },
+
+  INCAPACITY_DAYS_RESPONSE: {
+    patterns: [
+      /Días\s+de\s+Incapacidad/i,
+      /Total\s+días\s+incapacidad/i,
+    ],
+    contextType: 'AGGREGATION_INCAPACITY_DAYS',
+    structure: 'Metric',
+    description: 'Response with incapacity days'
+  },
+
+  OVERTIME_HOURS_RESPONSE: {
+    patterns: [
+      /Horas\s+Extra/i,
+      /Total\s+horas\s+extra/i,
+    ],
+    contextType: 'AGGREGATION_OVERTIME_HOURS',
+    structure: 'Metric',
+    description: 'Response with overtime hours'
   }
 };
 
@@ -160,6 +212,36 @@ export const CONTEXT_TO_INTENT_MAP: Record<string, ContextMapping> = {
     intentType: 'VOUCHER_EMAIL_OVERRIDE',
     confidence: 0.95,
     description: 'User wants to send voucher to alternative email'
+  },
+
+  'AGGREGATION_PAYROLL_COST': {
+    intentType: 'TOTAL_PAYROLL_COST',
+    confidence: 0.95,
+    description: 'Repeat payroll cost query with different time period'
+  },
+
+  'AGGREGATION_SECURITY_CONTRIBUTIONS': {
+    intentType: 'SECURITY_CONTRIBUTIONS',
+    confidence: 0.95,
+    description: 'Repeat security contributions query with different time period'
+  },
+
+  'AGGREGATION_HIGHEST_COST': {
+    intentType: 'HIGHEST_COST_EMPLOYEES',
+    confidence: 0.95,
+    description: 'Repeat highest cost employees query with different time period'
+  },
+
+  'AGGREGATION_INCAPACITY_DAYS': {
+    intentType: 'TOTAL_INCAPACITY_DAYS',
+    confidence: 0.95,
+    description: 'Repeat incapacity days query with different time period'
+  },
+
+  'AGGREGATION_OVERTIME_HOURS': {
+    intentType: 'TOTAL_OVERTIME_HOURS',
+    confidence: 0.95,
+    description: 'Repeat overtime hours query with different time period'
   }
 };
 
@@ -176,6 +258,36 @@ export const FOLLOW_UP_PATTERNS = {
   
   PRONOUN_FOLLOW_UP: [
     /^y\s+(?:él|ella|este|esta)$/i,
+  ]
+};
+
+// ============================================================================
+// TEMPORAL FOLLOW-UP PATTERNS - Detect temporal modifications
+// ============================================================================
+
+export const TEMPORAL_FOLLOW_UP_PATTERNS = {
+  FULL_YEAR: [
+    /^y\s+(?:de|del|en)\s+todo\s+el\s+año\??$/i,
+    /^(?:y\s+)?todo\s+el\s+año\??$/i,
+    /^(?:y\s+)?el\s+año\s+completo\??$/i,
+    /^(?:y\s+)?anual(?:mente)?\??$/i,
+  ],
+  
+  SPECIFIC_MONTH: [
+    /^y\s+(?:de|del|en)\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\??$/i,
+    /^(?:y\s+)?(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\??$/i,
+  ],
+  
+  LAST_MONTH: [
+    /^y\s+(?:del|de|en)\s+mes\s+pasado\??$/i,
+    /^(?:y\s+)?mes\s+pasado\??$/i,
+    /^(?:y\s+)?el\s+mes\s+anterior\??$/i,
+  ],
+  
+  THIS_YEAR: [
+    /^y\s+(?:de|del|en)\s+este\s+año\??$/i,
+    /^(?:y\s+)?este\s+año\??$/i,
+    /^(?:y\s+)?año\s+actual\??$/i,
   ]
 };
 

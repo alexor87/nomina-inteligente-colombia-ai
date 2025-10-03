@@ -207,6 +207,18 @@ function getMethodForIntent(intentType: string): string {
   return methodMap[intentType] || 'searchEmployee';
 }
 
+// Helper to map aggregation intent types to service method names
+function getMethodForAggregationIntent(intentType: string): string | null {
+  const methodMap: Record<string, string> = {
+    'TOTAL_PAYROLL_COST': 'getTotalPayrollCost',
+    'SECURITY_CONTRIBUTIONS': 'getSecurityContributions',
+    'HIGHEST_COST_EMPLOYEES': 'getHighestCostEmployees',
+    'TOTAL_INCAPACITY_DAYS': 'getTotalIncapacityDays',
+    'TOTAL_OVERTIME_HOURS': 'getTotalOvertimeHours'
+  };
+  return methodMap[intentType] || null;
+}
+
 // Helper function to extract employee names from salary queries
 function extractNameFromSalaryQuery(text: string): string | null {
   const lowerText = text.toLowerCase().trim();
@@ -300,6 +312,82 @@ function extractNameFromShortReply(text: string): string | null {
   const pattern2 = lowerText.match(/^([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)$/i);
   if (pattern2 && pattern2[1].length > 2) {
     return pattern2[1].trim();
+  }
+  
+  return null;
+}
+
+// Detect temporal follow-up queries like "y de todo el año?"
+async function detectTemporalFollowUp(text: string): Promise<{ type: string | null; params: any } | null> {
+  const lowerText = text.toLowerCase().trim();
+  
+  // Import patterns from context-patterns
+  const { TEMPORAL_FOLLOW_UP_PATTERNS } = await import('./config/context-patterns.ts');
+  
+  // Check FULL_YEAR patterns
+  for (const pattern of TEMPORAL_FOLLOW_UP_PATTERNS.FULL_YEAR) {
+    if (pattern.test(lowerText)) {
+      console.log('📅 [TEMPORAL_FOLLOW_UP] Detected: FULL_YEAR');
+      return {
+        type: 'FULL_YEAR',
+        params: {
+          year: new Date().getFullYear(),
+          month: null,
+          periodId: null
+        }
+      };
+    }
+  }
+  
+  // Check SPECIFIC_MONTH patterns
+  for (const pattern of TEMPORAL_FOLLOW_UP_PATTERNS.SPECIFIC_MONTH) {
+    const match = lowerText.match(pattern);
+    if (match) {
+      const month = match[1] || match[0].replace(/^y\s+/, '').replace(/\?$/, '').trim();
+      console.log(`📅 [TEMPORAL_FOLLOW_UP] Detected: SPECIFIC_MONTH (${month})`);
+      return {
+        type: 'SPECIFIC_MONTH',
+        params: {
+          month: month.toLowerCase(),
+          year: null, // Will be inferred
+          periodId: null
+        }
+      };
+    }
+  }
+  
+  // Check LAST_MONTH patterns
+  for (const pattern of TEMPORAL_FOLLOW_UP_PATTERNS.LAST_MONTH) {
+    if (pattern.test(lowerText)) {
+      const now = new Date();
+      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 
+                         'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+      console.log('📅 [TEMPORAL_FOLLOW_UP] Detected: LAST_MONTH');
+      return {
+        type: 'LAST_MONTH',
+        params: {
+          month: monthNames[lastMonth.getMonth()],
+          year: lastMonth.getFullYear(),
+          periodId: null
+        }
+      };
+    }
+  }
+  
+  // Check THIS_YEAR patterns
+  for (const pattern of TEMPORAL_FOLLOW_UP_PATTERNS.THIS_YEAR) {
+    if (pattern.test(lowerText)) {
+      console.log('📅 [TEMPORAL_FOLLOW_UP] Detected: THIS_YEAR');
+      return {
+        type: 'THIS_YEAR',
+        params: {
+          year: new Date().getFullYear(),
+          month: null,
+          periodId: null
+        }
+      };
+    }
   }
   
   return null;
@@ -457,7 +545,53 @@ serve(async (req) => {
       }
     }
     
-    // PRIORITY 2: Check if this is a follow-up query like "y a [name]?"
+    // PRIORITY 2: Check for temporal follow-up queries (HIGHEST PRIORITY FOR TEMPORAL CHANGES)
+    if (!intent) {
+      const temporalFollowUp = await detectTemporalFollowUp(lastMessage);
+      
+      if (temporalFollowUp) {
+        console.log(`📅 [TEMPORAL_CONTEXT] Temporal follow-up detected: ${temporalFollowUp.type}`);
+        
+        // Analyze conversation context to find last aggregation intent
+        const context = analyzeConversationContext(conversation);
+        
+        // Import context patterns
+        const { CONTEXT_TO_INTENT_MAP } = await import('./config/context-patterns.ts');
+        
+        // Check if context is an aggregation type
+        if (context.intentType && context.intentType.startsWith('AGGREGATION_')) {
+          const mapping = CONTEXT_TO_INTENT_MAP[context.intentType];
+          
+          if (mapping) {
+            const aggregationIntent = mapping.intentType;
+            const method = getMethodForAggregationIntent(aggregationIntent);
+            
+            if (method) {
+              console.log(`✅ [TEMPORAL_CONTEXT] Applying temporal follow-up to ${aggregationIntent}`);
+              
+              intent = {
+                type: aggregationIntent,
+                method: method,
+                params: temporalFollowUp.params,
+                confidence: 0.96
+              };
+            }
+          }
+        } else {
+          console.log(`❓ [TEMPORAL_CONTEXT] No aggregation context found for temporal follow-up`);
+          return new Response(JSON.stringify({
+            message: `¿De qué consulta te refieres? Necesito más contexto para entender qué información buscas para ese período.`,
+            emotionalState: 'neutral',
+            sessionId,
+            timestamp: new Date().toISOString()
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+      }
+    }
+    
+    // PRIORITY 3: Check if this is a follow-up query like "y a [name]?"
     if (!intent) {
       const followUpName = detectFollowUpQuery(lastMessage);
       
