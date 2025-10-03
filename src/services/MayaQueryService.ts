@@ -21,10 +21,13 @@ export class MayaQueryService {
    */
   static async getEmployeeCount(): Promise<QueryResult> {
     try {
+      const today = new Date().toISOString().slice(0, 10);
+      
       const { count, error } = await supabase
         .from('employees')
         .select('*', { count: 'exact', head: true })
-        .eq('estado', 'activo');
+        .eq('estado', 'activo')
+        .or(`fecha_finalizacion_contrato.is.null,fecha_finalizacion_contrato.gte.${today}`);
         
       if (error) throw error;
       

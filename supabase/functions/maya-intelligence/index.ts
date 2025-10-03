@@ -1611,11 +1611,15 @@ async function handleVoucherMassSend(supabase: any, params: any): Promise<{ mess
   if (!companyId) {
     return { message: '❌ No pude identificar tu empresa.', emotionalState: 'concerned' } as any;
   }
+  
+  const today = new Date().toISOString().slice(0, 10);
+  
   const { data: employees, error: employeesError } = await supabase
     .from('employees')
     .select('id, nombre, apellido, email, cargo')
     .eq('estado', 'activo')
-    .eq('company_id', companyId);
+    .eq('company_id', companyId)
+    .or(`fecha_finalizacion_contrato.is.null,fecha_finalizacion_contrato.gte.${today}`);
   
   if (employeesError || !employees || employees.length === 0) {
     console.error('❌ [VOUCHER_MASS_SEND] Error fetching employees:', employeesError);
@@ -1705,13 +1709,18 @@ async function getEmployeeCount(supabase: any) {
     const companyId = await getCurrentCompanyId(supabase);
     if (!companyId) throw new Error('🔒 [SECURITY] No company found for user');
 
+    const today = new Date().toISOString().slice(0, 10);
+
     const { count, error } = await supabase
       .from('employees')
       .select('*', { count: 'exact', head: true })
       .eq('estado', 'activo')
-      .eq('company_id', companyId);
+      .eq('company_id', companyId)
+      .or(`fecha_finalizacion_contrato.is.null,fecha_finalizacion_contrato.gte.${today}`);
       
     if (error) throw error;
+    
+    console.log(`👥 [EMPLOYEE_COUNT] company=${companyId} today=${today} count=${count}`);
     
     return {
       message: `Tienes **${count} empleados activos** en tu empresa. ${count > 0 ? '¿Te gustaría ver quiénes son?' : ''}`,
@@ -1731,11 +1740,14 @@ async function listAllEmployees(supabase: any) {
     const companyId = await getCurrentCompanyId(supabase);
     if (!companyId) throw new Error('🔒 [SECURITY] No company found for user');
 
+    const today = new Date().toISOString().slice(0, 10);
+
     const { data: employees, error } = await supabase
       .from('employees')
       .select('id, nombre, apellido, cargo, email')
       .eq('estado', 'activo')
       .eq('company_id', companyId)
+      .or(`fecha_finalizacion_contrato.is.null,fecha_finalizacion_contrato.gte.${today}`)
       .order('nombre', { ascending: true });
 
     if (error) throw error;
@@ -1822,11 +1834,15 @@ async function getSalaryReport(supabase: any) {
   if (!companyId) {
     return { message: '❌ No pude identificar tu empresa.', emotionalState: 'concerned' } as any;
   }
+  
+  const today = new Date().toISOString().slice(0, 10);
+  
   const { data, error } = await supabase
     .from('employees')
     .select('nombre, apellido, cargo, salario_base')
     .eq('estado', 'activo')
     .eq('company_id', companyId)
+    .or(`fecha_finalizacion_contrato.is.null,fecha_finalizacion_contrato.gte.${today}`)
     .order('salario_base', { ascending: false });
       
     if (error) throw error;
