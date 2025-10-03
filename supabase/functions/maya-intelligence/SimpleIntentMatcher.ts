@@ -187,6 +187,52 @@ export class SimpleIntentMatcher {
       };
     }
 
+    // CONSULTAR PROVISIONES DE PRESTACIONES SOCIALES
+    // Patterns: "cuánto hemos provisionado en vacaciones para laura"
+    //          "provisión de prima de juan 2024"
+    //          "provisiones de cesantías para maría este año"
+    const provisionPatterns = [
+      /(?:cu[aá]nto|cuanto|qu[eé]|que)\s+(?:hemos\s+)?(?:provisionad(?:o|a|os|as)|provisiones?|provisi[oó]n)\s+(?:en\s+|de\s+)?(vacaciones|prima|cesant[ií]as|intereses?\s+(?:de\s+)?cesant[ií]as)\s+(?:para|a|de)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)/i,
+      /(?:provisi[oó]n(?:es)?)\s+(?:de\s+|en\s+)?(vacaciones|prima|cesant[ií]as|intereses?\s+(?:de\s+)?cesant[ií]as)\s+(?:de|para|a)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)/i,
+      /(?:cu[aá]nto|cuanto)\s+(?:se\s+ha\s+)?(?:provisionad(?:o|a))\s+(?:para|a|de)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)\s+(?:en\s+|de\s+)?(vacaciones|prima|cesant[ií]as|intereses?\s+(?:de\s+)?cesant[ií]as)/i
+    ];
+
+    for (const pattern of provisionPatterns) {
+      const match = text.match(pattern);
+      if (match) {
+        const employeeName = match[2] || match[1];
+        let benefitType = match[1] || match[2];
+        
+        // Normalize benefit type
+        if (/vacaciones/i.test(benefitType)) {
+          benefitType = 'vacaciones';
+        } else if (/prima/i.test(benefitType)) {
+          benefitType = 'prima';
+        } else if (/intereses/i.test(benefitType)) {
+          benefitType = 'intereses_cesantias';
+        } else if (/cesant[ií]as/i.test(benefitType)) {
+          benefitType = 'cesantias';
+        }
+        
+        // Extract year if provided
+        const yearMatch = text.match(/\b(20\d{2})\b/);
+        const year = yearMatch ? parseInt(yearMatch[1]) : null;
+        
+        console.log(`💰 [BENEFIT_PROVISION_QUERY] Detected: "${employeeName}" - ${benefitType} ${year || '(current year)'}`);
+        
+        return {
+          type: 'BENEFIT_PROVISION_QUERY',
+          confidence: 0.96,
+          method: 'getEmployeeBenefitProvision',
+          params: {
+            name: employeeName.trim(),
+            benefitType,
+            year
+          }
+        };
+      }
+    }
+
     // GENERAR REPORTES (with normalization)
     if (/(?:generar|crear|mostrar|dame)\s+(?:el\s+)?(?:reporte|informe)/i.test(text) || 
         /(?:planilla|pila|seguridad\s+social|parafiscales)/i.test(text)) {

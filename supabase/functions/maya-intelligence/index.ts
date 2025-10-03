@@ -200,7 +200,8 @@ function getMethodForIntent(intentType: string): string {
     'EMPLOYEE_PAID_TOTAL': 'getEmployeePaidTotal',
     'EMPLOYEE_DETAILS': 'getEmployeeDetails',
     'BENEFIT_QUERY': 'getBenefitInfo',
-    'REPORT_GENERATE': 'generateReport'
+    'REPORT_GENERATE': 'generateReport',
+    'BENEFIT_PROVISION_QUERY': 'getEmployeeBenefitProvision'
   };
   return methodMap[intentType] || 'searchEmployee';
 }
@@ -947,6 +948,33 @@ serve(async (req) => {
           year = new Date().getFullYear();
         }
         
+        // Safety Override 3: If classified as CALCULAR_PRESTACION or getPayrollTotals but contains provision keywords
+        if ((intent.method === 'getPayrollTotals' || intent.method === 'calcularPrestacion') && 
+            /(?:provisionad(?:o|a|os|as)|provisión|provisiones)/i.test(lastMessage)) {
+          const provMatch = lastMessage.match(/(?:provisi[oó]n(?:es)?|provisionad(?:o|a|os|as)).*?(vacaciones|prima|cesant[ií]as|intereses?\s+(?:de\s+)?cesant[ií]as).*?(?:de|para|a)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)/i);
+          if (provMatch) {
+            const benefitRaw = provMatch[1];
+            const employeeName = provMatch[2];
+            
+            let benefitType = 'vacaciones';
+            if (/prima/i.test(benefitRaw)) benefitType = 'prima';
+            else if (/intereses/i.test(benefitRaw)) benefitType = 'intereses_cesantias';
+            else if (/cesant/i.test(benefitRaw)) benefitType = 'cesantias';
+            
+            const yearMatch = lastMessage.match(/\b(20\d{2})\b/);
+            const year = yearMatch ? parseInt(yearMatch[1]) : null;
+            
+            console.log(`🔄 [SAFETY_OVERRIDE] Forcing BENEFIT_PROVISION_QUERY: ${employeeName} - ${benefitType}`);
+            
+            intent = {
+              type: 'BENEFIT_PROVISION_QUERY',
+              method: 'getEmployeeBenefitProvision',
+              confidence: 0.96,
+              params: { name: employeeName.trim(), benefitType, year }
+            };
+          }
+        }
+        
         const monthMatch = lastMessage.match(/(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i);
         if (monthMatch) {
           month = monthMatch[1].toLowerCase();
@@ -1191,6 +1219,21 @@ serve(async (req) => {
           }
         }
         response = await getEmployeePaidTotal(userSupabase, intent.params);
+        break;
+        
+      case 'getEmployeeBenefitProvision':
+        // Additional validation for employee benefit provision
+        if (intent.params?.name) {
+          const validation = await validateEmployeeExists(userSupabase, intent.params.name);
+          if (!validation.exists) {
+            response = {
+              message: `No encontré un empleado llamado "${intent.params.name}" en tu empresa. ¿Podrías verificar la ortografía?`,
+              emotionalState: 'neutral'
+            };
+            break;
+          }
+        }
+        response = await getEmployeeBenefitProvision(userSupabase, intent.params);
         break;
         
       case 'getEmployeeDetails': {
@@ -2076,6 +2119,174 @@ async function getEmployeeDetails(supabase: any, name: string) {
     console.error('[MAYA-KISS] Employee details error:', error);
     return {
       message: `Error consultando la información de "${name}".`,
+      emotionalState: 'concerned'
+    };
+  }
+}
+
+async function getEmployeeBenefitProvision(supabase: any, params: any) {
+  const { name, benefitType, year } = params || {};
+  
+  if (!name) {
+    return {
+      message: '¿De qué empleado quieres consultar las provisiones?',
+      emotionalState: 'neutral'
+    };
+  }
+  
+  try {
+    console.log(`💰 [BENEFIT_PROVISION] Querying provisions for: ${name}, type: ${benefitType || 'all'}, year: ${year || 'current'}`);
+    
+    // Get company ID
+    const companyId = await getCurrentCompanyId(supabase);
+    if (!companyId) {
+      return { message: '❌ No pude identificar tu empresa.', emotionalState: 'concerned' };
+    }
+    
+    // Find employee
+    const { data: employees, error: employeeError } = await supabase
+      .from('employees')
+      .select('id, nombre, apellido')
+      .eq('company_id', companyId)
+      .or(`nombre.ilike.%${name}%,apellido.ilike.%${name}%`)
+      .limit(3);
+    
+    if (employeeError) throw employeeError;
+    
+    if (!employees || employees.length === 0) {
+      return {
+        message: `No encontré un empleado llamado "${name}". ¿Podrías verificar la ortografía?`,
+        emotionalState: 'neutral'
+      };
+    }
+    
+    if (employees.length > 1) {
+      const employeeList = employees.map((emp: any) => 
+        `• **${emp.nombre} ${emp.apellido}**`
+      ).join('\n');
+      
+      return {
+        message: `Encontré **${employees.length} empleados** con "${name}":\n\n${employeeList}\n\n¿Podrías ser más específico?`,
+        emotionalState: 'neutral'
+      };
+    }
+    
+    const employee = employees[0];
+    const targetYear = year || new Date().getFullYear();
+    const startDate = `${targetYear}-01-01`;
+    const endDate = `${targetYear}-12-31`;
+    
+    // Query provisions from social_benefit_calculations
+    let query = supabase
+      .from('social_benefit_calculations')
+      .select('benefit_type, amount, period_start, period_end, created_at')
+      .eq('company_id', companyId)
+      .eq('employee_id', employee.id)
+      .gte('period_end', startDate)
+      .lte('period_end', endDate)
+      .order('period_end', { ascending: true });
+    
+    // Filter by benefit type if specified
+    if (benefitType) {
+      query = query.eq('benefit_type', benefitType);
+    }
+    
+    const { data: provisions, error: provisionError } = await query;
+    
+    if (provisionError) {
+      console.error('[BENEFIT_PROVISION] Query error:', provisionError);
+      throw provisionError;
+    }
+    
+    if (!provisions || provisions.length === 0) {
+      const typeText = benefitType ? 
+        `de **${benefitType}**` : 
+        'de prestaciones sociales';
+      
+      return {
+        message: `No encontré provisiones ${typeText} para **${employee.nombre} ${employee.apellido}** en el año ${targetYear}.\n\n` +
+                `💡 Las provisiones se generan automáticamente al cerrar períodos de nómina. Si ya cerraste períodos, puedes recalcular provisiones en el módulo de **Provisiones**.`,
+        emotionalState: 'neutral'
+      };
+    }
+    
+    // Group provisions by month
+    const provisionsByMonth: Record<string, any[]> = {};
+    let totalAmount = 0;
+    
+    provisions.forEach((prov: any) => {
+      const monthKey = new Date(prov.period_end).toLocaleString('es-CO', { month: 'long', year: 'numeric' });
+      if (!provisionsByMonth[monthKey]) {
+        provisionsByMonth[monthKey] = [];
+      }
+      provisionsByMonth[monthKey].push(prov);
+      totalAmount += parseFloat(prov.amount) || 0;
+    });
+    
+    // Build detailed message
+    const benefitTypeNames: Record<string, string> = {
+      'vacaciones': 'Vacaciones',
+      'prima': 'Prima de Servicios',
+      'cesantias': 'Cesantías',
+      'intereses_cesantias': 'Intereses de Cesantías'
+    };
+    
+    let message = `📊 **Provisiones de ${benefitType ? benefitTypeNames[benefitType] : 'Prestaciones Sociales'}**\n`;
+    message += `👤 Empleado: **${employee.nombre} ${employee.apellido}**\n`;
+    message += `📅 Período: **Año ${targetYear}**\n\n`;
+    
+    // Add monthly breakdown
+    const monthOrder = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+    const sortedMonths = Object.keys(provisionsByMonth).sort((a, b) => {
+      const monthA = a.split(' ')[0].toLowerCase();
+      const monthB = b.split(' ')[0].toLowerCase();
+      return monthOrder.indexOf(monthA) - monthOrder.indexOf(monthB);
+    });
+    
+    for (const monthKey of sortedMonths) {
+      const monthProvisions = provisionsByMonth[monthKey];
+      const monthTotal = monthProvisions.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+      
+      message += `### ${monthKey.charAt(0).toUpperCase() + monthKey.slice(1)}\n`;
+      
+      // Group by benefit type within the month
+      const byType: Record<string, any[]> = {};
+      monthProvisions.forEach((prov: any) => {
+        if (!byType[prov.benefit_type]) {
+          byType[prov.benefit_type] = [];
+        }
+        byType[prov.benefit_type].push(prov);
+      });
+      
+      for (const [type, provisions] of Object.entries(byType)) {
+        const typeName = benefitTypeNames[type] || type;
+        
+        provisions.forEach((prov: any) => {
+          const periodStart = new Date(prov.period_start).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' });
+          const periodEnd = new Date(prov.period_end).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' });
+          const amount = parseFloat(prov.amount) || 0;
+          
+          message += `  • ${typeName}: **$${amount.toLocaleString('es-CO')}**\n`;
+          message += `    📅 Período: ${periodStart} - ${periodEnd}\n`;
+        });
+      }
+      
+      message += `  💰 **Subtotal mes: $${monthTotal.toLocaleString('es-CO')}**\n\n`;
+    }
+    
+    message += `---\n`;
+    message += `💵 **Total provisionado en ${targetYear}: $${totalAmount.toLocaleString('es-CO')}**\n`;
+    message += `📈 **Total de registros: ${provisions.length}**`;
+    
+    return {
+      message,
+      emotionalState: 'satisfied'
+    };
+    
+  } catch (error) {
+    console.error('[BENEFIT_PROVISION] Error:', error);
+    return {
+      message: `Error consultando las provisiones. Por favor intenta de nuevo.`,
       emotionalState: 'concerned'
     };
   }
