@@ -2154,6 +2154,26 @@ async function getEmployeeBenefitProvision(supabase: any, params: any) {
       
       if (employeeError) throw employeeError;
       
+      // Fallback: If no results and name contains month suffix, try cleaning it
+      if ((!employees || employees.length === 0) && /\s+(?:en|del?)\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)(?:\s+(?:de|del)\s+\d{4})?/i.test(name)) {
+        const cleanedName = name.replace(/\s+(?:en|del?)\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)(?:\s+(?:de|del)\s+\d{4})?/i, '').trim();
+        console.log(`🔄 [BENEFIT_PROVISION_FALLBACK] Retrying with cleaned name: "${cleanedName}"`);
+        
+        const { data: retryEmployees, error: retryError } = await supabase
+          .from('employees')
+          .select('id, nombre, apellido')
+          .eq('company_id', companyId)
+          .or(`nombre.ilike.%${cleanedName}%,apellido.ilike.%${cleanedName}%`)
+          .limit(5);
+        
+        if (!retryError && retryEmployees && retryEmployees.length > 0) {
+          console.log(`✅ [BENEFIT_PROVISION_FALLBACK] Found ${retryEmployees.length} employees with cleaned name`);
+          // Use retry results
+          employees.length = 0;
+          employees.push(...retryEmployees);
+        }
+      }
+      
       if (!employees || employees.length === 0) {
         return {
           message: `No encontré un empleado llamado "${name}". ¿Podrías verificar la ortografía?`,

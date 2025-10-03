@@ -194,21 +194,26 @@ export class SimpleIntentMatcher {
     //          "cuánto hemos provisionado en prima" (sin empleado específico)
     //          "total provisionado en vacaciones"
     // ORDEN: Patrones con empleado PRIMERO, luego generales
+    
+    // Month regex for lookahead
+    const MONTH = '(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)';
+    
     const provisionPatterns = [
       // Patrón 1: Consultas con empleado específico (tipo ANTES de empleado) - PRIORIDAD ALTA
-      /(?:cu[aá]nto|cuanto|qu[eé]|que)\s+(?:(?:hemos|se)\s+)?(?:ha\s+)?(?:provisionad(?:o|a|os|as)|provisiono|provisionó|provisionaron|provisionamos|provisiones?|provisi[oó]n)\s+(?:en\s+|de\s+)?(vacaciones|prima|cesant[ií]as|intereses?\s+(?:de\s+)?cesant[ií]as)\s+(?:para|a|de)\s+([a-záéíóúñ]+(?:[\s-][a-záéíóúñ]+){0,3})(?:\s+(?:en|del?)\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre))?(?:\s+(?:de\s+|del?\s+)?(\d{4}))?/i,
+      // Lazy capture for employee name with lookahead to stop before month/year
+      new RegExp(`(?:cu[aá]nto|cuanto|qu[eé]|que)\\s+(?:(?:hemos|se)\\s+)?(?:ha\\s+)?(?:provisionad(?:o|a|os|as)|provisiono|provisionó|provisionaron|provisionamos|provisiones?|provisi[oó]n)\\s+(?:en\\s+|de\\s+)?(vacaciones|prima|cesant[ií]as|intereses?\\s+(?:de\\s+)?cesant[ií]as)\\s+(?:para|a|de)\\s+([a-záéíóúñ]+(?:[\\s-][a-záéíóúñ]+){0,3}?)(?=\\s+(?:en|del?)\\s+${MONTH}|(?:\\s+(?:de|del)\\s+\\d{4})|[?.!,]|$)(?:\\s+(?:en|del?)\\s+(${MONTH}))?(?:\\s+(?:de\\s+|del?\\s+)?(\\d{4}))?`, 'i'),
       
       // Patrón 2: Consultas con empleado específico (tipo DESPUÉS de empleado) - PRIORIDAD ALTA
-      /(?:provisi[oó]n(?:es)?)\s+(?:de\s+|en\s+)?(vacaciones|prima|cesant[ií]as|intereses?\s+(?:de\s+)?cesant[ií]as)\s+(?:de|para|a)\s+([a-záéíóúñ]+(?:[\s-][a-záéíóúñ]+){0,3})(?:\s+(?:en|del?)\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre))?(?:\s+(?:de\s+|del?\s+)?(\d{4}))?/i,
+      new RegExp(`(?:provisi[oó]n(?:es)?)\\s+(?:de\\s+|en\\s+)?(vacaciones|prima|cesant[ií]as|intereses?\\s+(?:de\\s+)?cesant[ií]as)\\s+(?:de|para|a)\\s+([a-záéíóúñ]+(?:[\\s-][a-záéíóúñ]+){0,3}?)(?=\\s+(?:en|del?)\\s+${MONTH}|(?:\\s+(?:de|del)\\s+\\d{4})|[?.!,]|$)(?:\\s+(?:en|del?)\\s+(${MONTH}))?(?:\\s+(?:de\\s+|del?\\s+)?(\\d{4}))?`, 'i'),
       
       // Patrón 3: Empleado primero, tipo después - PRIORIDAD ALTA
-      /(?:cu[aá]nto|cuanto)\s+(?:(?:se|hemos)\s+)?(?:ha\s+)?(?:provisionad(?:o|a)|provisiono|provisionó|provisionaron|provisionamos)\s+(?:para|a|de)\s+([a-záéíóúñ]+(?:[\s-][a-záéíóúñ]+){0,3})\s+(?:en\s+|de\s+)?(vacaciones|prima|cesant[ií]as|intereses?\s+(?:de\s+)?cesant[ií]as)(?:\s+(?:en|del?)\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre))?(?:\s+(?:de\s+|del?\s+)?(\d{4}))?/i,
+      new RegExp(`(?:cu[aá]nto|cuanto)\\s+(?:(?:se|hemos)\\s+)?(?:ha\\s+)?(?:provisionad(?:o|a)|provisiono|provisionó|provisionaron|provisionamos)\\s+(?:para|a|de)\\s+([a-záéíóúñ]+(?:[\\s-][a-záéíóúñ]+){0,3}?)(?=\\s+(?:en|del?)\\s+${MONTH}|(?:\\s+(?:de|del)\\s+\\d{4})|[?.!,]|$)\\s+(?:en\\s+|de\\s+)?(vacaciones|prima|cesant[ií]as|intereses?\\s+(?:de\\s+)?cesant[ií]as)(?:\\s+(?:en|del?)\\s+(${MONTH}))?(?:\\s+(?:de\\s+|del?\\s+)?(\\d{4}))?`, 'i'),
       
       // Patrón 4: Consultas generales por tipo (SIN empleado específico) - PRIORIDAD MEDIA
-      /(?:cu[aá]nto|cuanto|qu[eé]|que|total)\s+(?:(?:hemos|se)\s+)?(?:ha\s+)?(?:provisionad(?:o|a|os|as)|provisiono|provisionó|provisionaron|provisionamos|provisiones?|provisi[oó]n)\s+(?:en\s+|de\s+)?(vacaciones|prima|cesant[ií]as|intereses?\s+(?:de\s+)?cesant[ií]as)(?:\s+(?:en|del?)\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre))?(?:\s+(?:de\s+|del?\s+)?(\d{4}))?(?!\s+(?:para|a|de)\s+[a-záéíóúñ])/i,
+      new RegExp(`(?:cu[aá]nto|cuanto|qu[eé]|que|total)\\s+(?:(?:hemos|se)\\s+)?(?:ha\\s+)?(?:provisionad(?:o|a|os|as)|provisiono|provisionó|provisionaron|provisionamos|provisiones?|provisi[oó]n)\\s+(?:en\\s+|de\\s+)?(vacaciones|prima|cesant[ií]as|intereses?\\s+(?:de\\s+)?cesant[ií]as)(?:\\s+(?:en|del?)\\s+(${MONTH}))?(?:\\s+(?:de\\s+|del?\\s+)?(\\d{4}))?(?!\\s+(?:para|a|de)\\s+[a-záéíóúñ])`, 'i'),
       
       // Patrón 5: Consultas generales SIN tipo ni empleado - PRIORIDAD BAJA
-      /(?:cu[aá]nto|cuanto|qu[eé]|que|total)\s+(?:(?:hemos|se)\s+)?(?:ha\s+)?(?:provisionad(?:o|a|os|as)|provisiono|provisionó|provisionaron|provisionamos|provisiones?|provisi[oó]n)(?:\s+(?:para|de|a)\s+([a-záéíóúñ]+(?:[\s-][a-záéíóúñ]+){0,3}))?(?:\s+(?:en|del?)\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre))?(?:\s+(?:de\s+|del?\s+)?(\d{4}))?/i
+      new RegExp(`(?:cu[aá]nto|cuanto|qu[eé]|que|total)\\s+(?:(?:hemos|se)\\s+)?(?:ha\\s+)?(?:provisionad(?:o|a|os|as)|provisiono|provisionó|provisionaron|provisionamos|provisiones?|provisi[oó]n)(?:\\s+(?:para|de|a)\\s+([a-záéíóúñ]+(?:[\\s-][a-záéíóúñ]+){0,3}))?(?:\\s+(?:en|del?)\\s+(${MONTH}))?(?:\\s+(?:de\\s+|del?\\s+)?(\\d{4}))?`, 'i')
     ];
 
     for (let i = 0; i < provisionPatterns.length; i++) {
@@ -249,6 +254,21 @@ export class SimpleIntentMatcher {
           }
         }
         
+        // Store raw name for debugging
+        const rawName = employeeName;
+        
+        // CRITICAL: Clean employeeName if month was captured
+        if (employeeName && month) {
+          const monthPattern = new RegExp(`\\s+(?:en|del?)\\s+${month}(?:\\s+(?:de|del)\\s+\\d{4})?$`, 'i');
+          employeeName = employeeName.replace(monthPattern, '').trim();
+          console.log(`🧹 [NAME_CLEANING] Raw: "${rawName}" -> Cleaned: "${employeeName}"`);
+        }
+        
+        // Apply sanitization
+        if (employeeName) {
+          employeeName = sanitizeEmployeeName(employeeName, text);
+        }
+        
         // Normalize benefit type
         if (benefitType) {
           if (/vacaciones/i.test(benefitType)) {
@@ -270,7 +290,7 @@ export class SimpleIntentMatcher {
         // Detectar si pide "último período" solo si no hay mes ni año
         const useLastPeriod = /último\s+per[ií]odo/i.test(text) && !month && !year;
         
-        console.log(`💰 [BENEFIT_PROVISION_QUERY] Detected: employee="${employeeName || 'ALL'}" - type=${benefitType || 'ALL'} month=${month || 'none'} year=${year || (useLastPeriod ? 'last_period' : 'current')}`);
+        console.log(`💰 [BENEFIT_PROVISION_QUERY] Detected: rawName="${rawName || 'ALL'}" -> cleanedName="${employeeName || 'ALL'}" - type=${benefitType || 'ALL'} month=${month || 'none'} year=${year || (useLastPeriod ? 'last_period' : 'current')}`);
         
         return {
           type: 'BENEFIT_PROVISION_QUERY',
