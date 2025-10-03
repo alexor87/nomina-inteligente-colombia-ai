@@ -514,7 +514,17 @@ serve(async (req) => {
     
     // PRIORITY 3: No context match, use normal intent matching
     if (!intent) {
-      intent = SimpleIntentMatcher.match(lastMessage);
+      // 🎯 [CONTEXTUAL] Detect affirmative responses to "¿Te gustaría ver quiénes son?"
+      const affirmativePattern = /^(s[ií]|ok|dale|claro|ver|muestramelos?|verlos?|mostrar|lis[tá]talos?|por\s*supuesto|obvio|afirmativo|yes)$/i;
+      const lastAssistantMessage = conversation.filter(m => m.role === 'assistant').slice(-1)[0];
+      const isEmployeeListPrompt = lastAssistantMessage?.content?.match(/¿Te\s+gustar[ií]a\s+ver\s+qui[eé]nes\s+son\?/i);
+      
+      if (affirmativePattern.test(lastMessage.trim()) && isEmployeeListPrompt) {
+        console.log('🎯 [CONTEXTUAL] Affirmative detected after employee count → forcing EMPLOYEE_LIST intent');
+        intent = { type: 'EMPLOYEE_LIST', method: 'listAllEmployees', confidence: 0.99 } as any;
+      } else {
+        intent = SimpleIntentMatcher.match(lastMessage);
+      }
     }
     
     console.log(`[MAYA-KISS] Intent: ${intent.type} (${intent.confidence})`);
@@ -1724,7 +1734,14 @@ async function getEmployeeCount(supabase: any) {
     
     return {
       message: `Tienes **${count} empleados activos** en tu empresa. ${count > 0 ? '¿Te gustaría ver quiénes son?' : ''}`,
-      emotionalState: 'neutral'
+      emotionalState: 'neutral',
+      actions: count > 0 ? [{
+        id: 'list-employees',
+        type: 'list_employees',
+        label: '👥 Ver empleados',
+        description: 'Mostrar la lista de empleados activos',
+        parameters: {}
+      }] : []
     };
   } catch (error) {
     console.error('[MAYA-KISS] Employee count error:', error);
