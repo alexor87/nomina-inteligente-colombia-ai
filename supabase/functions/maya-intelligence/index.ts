@@ -2125,10 +2125,10 @@ async function getEmployeeDetails(supabase: any, name: string) {
 }
 
 async function getEmployeeBenefitProvision(supabase: any, params: any) {
-  const { name, benefitType, year, useLastPeriod } = params || {};
+  const { name, benefitType, month, year, useLastPeriod } = params || {};
   
   try {
-    console.log(`💰 [BENEFIT_PROVISION] Querying provisions for: employee="${name || 'ALL'}", type=${benefitType || 'ALL'}, year=${year || (useLastPeriod ? 'last_period' : 'current')}`);
+    console.log(`💰 [BENEFIT_PROVISION] Querying provisions for: employee="${name || 'ALL'}", type=${benefitType || 'ALL'}, month=${month || 'none'}, year=${year || (useLastPeriod ? 'last_period' : 'current')}`);
     
     // Get company ID
     const companyId = await getCurrentCompanyId(supabase);
@@ -2148,7 +2148,7 @@ async function getEmployeeBenefitProvision(supabase: any, params: any) {
         .select('id, nombre, apellido')
         .eq('company_id', companyId)
         .or(`nombre.ilike.%${name}%,apellido.ilike.%${name}%`)
-        .limit(3);
+        .limit(5);
       
       console.log(`📊 [BENEFIT_PROVISION] Found ${employees?.length || 0} employees matching "${name}"`);
       
@@ -2161,19 +2161,29 @@ async function getEmployeeBenefitProvision(supabase: any, params: any) {
         };
       }
       
-      if (employees.length > 1) {
+      // Priorizar coincidencia exacta
+      const exactMatch = employees.find((emp: any) => 
+        emp.nombre.toLowerCase() === name.toLowerCase() ||
+        emp.apellido.toLowerCase() === name.toLowerCase() ||
+        `${emp.nombre} ${emp.apellido}`.toLowerCase() === name.toLowerCase()
+      );
+      
+      if (exactMatch) {
+        employeeId = exactMatch.id;
+        employeeFullName = `${exactMatch.nombre} ${exactMatch.apellido}`;
+      } else if (employees.length === 1) {
+        employeeId = employees[0].id;
+        employeeFullName = `${employees[0].nombre} ${employees[0].apellido}`;
+      } else {
         const employeeList = employees.map((emp: any) => 
           `• **${emp.nombre} ${emp.apellido}**`
         ).join('\n');
         
         return {
-          message: `Encontré **${employees.length} empleados** con "${name}":\n\n${employeeList}\n\n¿Podrías ser más específico?`,
+          message: `Encontré **${employees.length} empleados** con "${name}":\n\n${employeeList}\n\n¿Podrías ser más específico con el nombre completo?`,
           emotionalState: 'neutral'
         };
       }
-      
-      employeeId = employees[0].id;
-      employeeFullName = `${employees[0].nombre} ${employees[0].apellido}`;
     }
     
     // Determinar rango de fechas
@@ -2181,7 +2191,34 @@ async function getEmployeeBenefitProvision(supabase: any, params: any) {
     let endDate: string;
     let periodLabel: string;
     
-    if (useLastPeriod) {
+    if (month) {
+      // Consulta por mes específico
+      const monthMap: Record<string, number> = {
+        'enero': 1, 'febrero': 2, 'marzo': 3, 'abril': 4,
+        'mayo': 5, 'junio': 6, 'julio': 7, 'agosto': 8,
+        'septiembre': 9, 'octubre': 10, 'noviembre': 11, 'diciembre': 12
+      };
+      
+      const monthNumber = monthMap[month.toLowerCase()];
+      const targetYear = year || new Date().getFullYear();
+      
+      if (!monthNumber) {
+        return {
+          message: `❌ No reconozco el mes "${month}".`,
+          emotionalState: 'concerned'
+        };
+      }
+      
+      // Calcular primer y último día del mes
+      const lastDay = new Date(targetYear, monthNumber, 0).getDate();
+      startDate = `${targetYear}-${String(monthNumber).padStart(2, '0')}-01`;
+      endDate = `${targetYear}-${String(monthNumber).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+      
+      const monthNameCapitalized = month.charAt(0).toUpperCase() + month.slice(1);
+      periodLabel = `Período: **${monthNameCapitalized} ${targetYear}**`;
+      
+      console.log(`📅 [BENEFIT_PROVISION] Month detected: ${month} -> ${startDate} to ${endDate}`);
+    } else if (useLastPeriod && !year) {
       // Obtener el último período cerrado
       const { data: lastPeriod, error: periodError } = await supabase
         .from('payroll_periods_real')
@@ -2190,7 +2227,7 @@ async function getEmployeeBenefitProvision(supabase: any, params: any) {
         .eq('estado', 'cerrado')
         .order('fecha_fin', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
       
       if (periodError || !lastPeriod) {
         return {
@@ -2202,11 +2239,16 @@ async function getEmployeeBenefitProvision(supabase: any, params: any) {
       startDate = lastPeriod.fecha_inicio;
       endDate = lastPeriod.fecha_fin;
       periodLabel = `Período: **${lastPeriod.periodo}**`;
+      
+      console.log(`📅 [BENEFIT_PROVISION] Using last closed period: ${lastPeriod.periodo}`);
     } else {
+      // Por defecto: año completo
       const targetYear = year || new Date().getFullYear();
       startDate = `${targetYear}-01-01`;
       endDate = `${targetYear}-12-31`;
       periodLabel = `Período: **Año ${targetYear}**`;
+      
+      console.log(`📅 [BENEFIT_PROVISION] Using full year: ${targetYear}`);
     }
     
     // Query provisions from social_benefit_calculations
@@ -2249,6 +2291,7 @@ async function getEmployeeBenefitProvision(supabase: any, params: any) {
     console.log('[BENEFIT_PROVISION] Query results:', {
       count: provisions?.length || 0,
       hasError: !!provisionError,
+      dateRange: `${startDate} to ${endDate}`,
       sampleRecord: provisions?.[0]
     });
     
