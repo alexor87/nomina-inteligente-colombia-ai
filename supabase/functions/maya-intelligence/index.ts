@@ -324,15 +324,155 @@ async function detectTemporalFollowUp(text: string): Promise<{ type: string | nu
   // Import patterns from context-patterns
   const { TEMPORAL_FOLLOW_UP_PATTERNS } = await import('./config/context-patterns.ts');
   
+  const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 
+                     'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  const quarterNames: Record<string, number> = { 'primer': 1, 'segundo': 2, 'tercer': 3, 'cuarto': 4 };
+  const semesterNames: Record<string, number> = { 'primer': 1, 'segundo': 2 };
+  
+  // Check LAST_YEAR patterns
+  for (const pattern of TEMPORAL_FOLLOW_UP_PATTERNS.LAST_YEAR) {
+    if (pattern.test(lowerText)) {
+      const lastYear = new Date().getFullYear() - 1;
+      console.log(`📅 [TEMPORAL_FOLLOW_UP] Detected: LAST_YEAR (${lastYear})`);
+      return {
+        type: 'LAST_YEAR',
+        params: {
+          year: lastYear,
+          month: null,
+          periodId: null
+        }
+      };
+    }
+  }
+  
+  // Check SPECIFIC_YEAR patterns
+  for (const pattern of TEMPORAL_FOLLOW_UP_PATTERNS.SPECIFIC_YEAR) {
+    const match = lowerText.match(pattern);
+    if (match) {
+      const year = parseInt(match[1] || match[0].replace(/\D/g, ''));
+      console.log(`📅 [TEMPORAL_FOLLOW_UP] Detected: SPECIFIC_YEAR (${year})`);
+      return {
+        type: 'SPECIFIC_YEAR',
+        params: {
+          year,
+          month: null,
+          periodId: null
+        }
+      };
+    }
+  }
+  
   // Check FULL_YEAR patterns
   for (const pattern of TEMPORAL_FOLLOW_UP_PATTERNS.FULL_YEAR) {
     if (pattern.test(lowerText)) {
-      console.log('📅 [TEMPORAL_FOLLOW_UP] Detected: FULL_YEAR');
+      const currentYear = new Date().getFullYear();
+      console.log(`📅 [TEMPORAL_FOLLOW_UP] Detected: FULL_YEAR (${currentYear})`);
       return {
         type: 'FULL_YEAR',
         params: {
-          year: new Date().getFullYear(),
+          year: currentYear,
           month: null,
+          periodId: null
+        }
+      };
+    }
+  }
+  
+  // Check LAST_N_MONTHS patterns
+  for (const pattern of TEMPORAL_FOLLOW_UP_PATTERNS.LAST_N_MONTHS) {
+    const match = lowerText.match(pattern);
+    if (match) {
+      const monthCount = parseInt(match[1]);
+      console.log(`📅 [TEMPORAL_FOLLOW_UP] Detected: LAST_N_MONTHS (${monthCount})`);
+      return {
+        type: 'LAST_N_MONTHS',
+        params: {
+          monthCount,
+          periodId: null
+        }
+      };
+    }
+  }
+  
+  // Check QUARTER patterns
+  for (const pattern of TEMPORAL_FOLLOW_UP_PATTERNS.QUARTER) {
+    const match = lowerText.match(pattern);
+    if (match) {
+      let quarterNumber: number | null = null;
+      
+      if (match[1] && /^\d+$/.test(match[1])) {
+        // "trimestre 1", "q1"
+        quarterNumber = parseInt(match[1]);
+      } else if (match[1] && quarterNames[match[1]]) {
+        // "primer trimestre", "segundo trimestre"
+        quarterNumber = quarterNames[match[1]];
+      } else if (/pasado|anterior/i.test(match[0])) {
+        // "trimestre pasado"
+        const currentMonth = new Date().getMonth();
+        const currentQuarter = Math.floor(currentMonth / 3) + 1;
+        quarterNumber = currentQuarter === 1 ? 4 : currentQuarter - 1;
+      }
+      
+      if (quarterNumber && quarterNumber >= 1 && quarterNumber <= 4) {
+        console.log(`📅 [TEMPORAL_FOLLOW_UP] Detected: QUARTER (${quarterNumber})`);
+        return {
+          type: 'QUARTER',
+          params: {
+            quarter: quarterNumber,
+            year: null,
+            periodId: null
+          }
+        };
+      }
+    }
+  }
+  
+  // Check SEMESTER patterns
+  for (const pattern of TEMPORAL_FOLLOW_UP_PATTERNS.SEMESTER) {
+    const match = lowerText.match(pattern);
+    if (match) {
+      let semesterNumber: number | null = null;
+      
+      if (match[1] && /^\d+$/.test(match[1])) {
+        // "semestre 1"
+        semesterNumber = parseInt(match[1]);
+      } else if (match[1] && semesterNames[match[1]]) {
+        // "primer semestre"
+        semesterNumber = semesterNames[match[1]];
+      } else if (/pasado|anterior/i.test(match[0])) {
+        // "semestre pasado"
+        const currentMonth = new Date().getMonth();
+        const currentSemester = currentMonth < 6 ? 1 : 2;
+        semesterNumber = currentSemester === 1 ? 2 : 1;
+      }
+      
+      if (semesterNumber && (semesterNumber === 1 || semesterNumber === 2)) {
+        console.log(`📅 [TEMPORAL_FOLLOW_UP] Detected: SEMESTER (${semesterNumber})`);
+        return {
+          type: 'SEMESTER',
+          params: {
+            semester: semesterNumber,
+            year: null,
+            periodId: null
+          }
+        };
+      }
+    }
+  }
+  
+  // Check MONTH_RANGE patterns
+  for (const pattern of TEMPORAL_FOLLOW_UP_PATTERNS.MONTH_RANGE) {
+    const match = lowerText.match(pattern);
+    if (match) {
+      const monthStart = match[1].toLowerCase();
+      const monthEnd = match[2].toLowerCase();
+      console.log(`📅 [TEMPORAL_FOLLOW_UP] Detected: MONTH_RANGE (${monthStart} a ${monthEnd})`);
+      return {
+        type: 'MONTH_RANGE',
+        params: {
+          monthStart,
+          monthEnd,
+          year: null,
           periodId: null
         }
       };
@@ -361,8 +501,6 @@ async function detectTemporalFollowUp(text: string): Promise<{ type: string | nu
     if (pattern.test(lowerText)) {
       const now = new Date();
       const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 
-                         'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
       console.log('📅 [TEMPORAL_FOLLOW_UP] Detected: LAST_MONTH');
       return {
         type: 'LAST_MONTH',

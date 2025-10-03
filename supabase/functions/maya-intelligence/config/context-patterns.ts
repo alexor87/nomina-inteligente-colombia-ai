@@ -266,29 +266,70 @@ export const FOLLOW_UP_PATTERNS = {
 // ============================================================================
 
 export const TEMPORAL_FOLLOW_UP_PATTERNS = {
+  // Full year queries: "y de todo el año?"
   FULL_YEAR: [
-    /^y\s+(?:de|del|en)\s+todo\s+el\s+año\??$/i,
-    /^(?:y\s+)?todo\s+el\s+año\??$/i,
-    /^(?:y\s+)?el\s+año\s+completo\??$/i,
+    /^(?:y\s+)?(?:de|del|en)\s+todo\s+el\s+año\??$/i,
+    /^(?:y\s+)?(?:de|del|en)\s+el\s+año\s+completo\??$/i,
+    /^(?:y\s+)?(?:de|del|en)\s+el\s+año\s+entero\??$/i,
     /^(?:y\s+)?anual(?:mente)?\??$/i,
   ],
   
+  // Last year queries: "y del año pasado?", "y del año anterior?"
+  LAST_YEAR: [
+    /^(?:y\s+)?(?:de|del|en)\s+(?:el\s+)?año\s+(?:pasado|anterior)\??$/i,
+    /^(?:y\s+)?(?:el\s+)?año\s+(?:pasado|anterior)\??$/i,
+  ],
+  
+  // Specific year queries: "y de 2024?", "y en 2023?"
+  SPECIFIC_YEAR: [
+    /^(?:y\s+)?(?:de|del|en)\s+(?:el\s+)?año\s+(20[0-9]{2})\??$/i,
+    /^(?:y\s+)?(20[0-9]{2})\??$/i,
+  ],
+  
+  // Specific month queries: "y de enero?", "y en marzo?"
   SPECIFIC_MONTH: [
-    /^y\s+(?:de|del|en)\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\??$/i,
+    /^(?:y\s+)?(?:de|del|en)\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\??$/i,
     /^(?:y\s+)?(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\??$/i,
   ],
   
+  // Last month queries: "y del mes pasado?"
   LAST_MONTH: [
-    /^y\s+(?:del|de|en)\s+mes\s+pasado\??$/i,
-    /^(?:y\s+)?mes\s+pasado\??$/i,
-    /^(?:y\s+)?el\s+mes\s+anterior\??$/i,
+    /^(?:y\s+)?(?:del|de)\s+mes\s+(?:pasado|anterior)\??$/i,
+    /^(?:y\s+)?(?:el\s+)?mes\s+(?:pasado|anterior)\??$/i,
   ],
   
+  // This year queries: "y de este año?"
   THIS_YEAR: [
-    /^y\s+(?:de|del|en)\s+este\s+año\??$/i,
-    /^(?:y\s+)?este\s+año\??$/i,
-    /^(?:y\s+)?año\s+actual\??$/i,
-  ]
+    /^(?:y\s+)?(?:de|del|en)\s+este\s+año\??$/i,
+    /^(?:y\s+)?(?:de|del|en)\s+el\s+año\s+actual\??$/i,
+  ],
+  
+  // Last N months queries: "y de los últimos 3 meses?", "y los 2 últimos meses?"
+  LAST_N_MONTHS: [
+    /^(?:y\s+)?(?:de\s+)?(?:los\s+)?(?:últimos|ultimos)\s+(\d+)\s+meses\??$/i,
+    /^(?:y\s+)?(?:los\s+)?(\d+)\s+(?:últimos|ultimos)\s+meses\??$/i,
+    /^(?:y\s+)?(\d+)\s+meses\s+(?:anteriores|pasados|atrás|atras)\??$/i,
+  ],
+  
+  // Quarter queries: "y del trimestre 1?", "y el primer trimestre?", "y del trimestre pasado?"
+  QUARTER: [
+    /^(?:y\s+)?(?:del|de|en)\s+(?:el\s+)?trimestre\s+(\d+)\??$/i,
+    /^(?:y\s+)?(?:el\s+)?trimestre\s+(?:pasado|anterior)\??$/i,
+    /^(?:y\s+)?(?:el\s+)?(primer|segundo|tercer|cuarto)\s+trimestre\??$/i,
+    /^(?:y\s+)?q(\d+)\??$/i, // Q1, Q2, etc.
+  ],
+  
+  // Semester queries: "y del semestre 1?", "y el primer semestre?", "y del semestre pasado?"
+  SEMESTER: [
+    /^(?:y\s+)?(?:del|de|en)\s+(?:el\s+)?semestre\s+(\d+)\??$/i,
+    /^(?:y\s+)?(?:el\s+)?semestre\s+(?:pasado|anterior)\??$/i,
+    /^(?:y\s+)?(?:el\s+)?(primer|segundo)\s+semestre\??$/i,
+  ],
+  
+  // Month range queries: "y de enero a marzo?", "y desde febrero hasta abril?"
+  MONTH_RANGE: [
+    /^(?:y\s+)?(?:de|desde)\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\s+(?:a|hasta)\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\??$/i,
+  ],
 };
 
 // ============================================================================
