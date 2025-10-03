@@ -1615,6 +1615,27 @@ async function validateEmployeeExists(supabase: any, name: string): Promise<{ ex
 function detectEmployeeNameInQuery(text: string): string | null {
   const lowerText = text.toLowerCase().trim();
   
+  // 🚫 TEMPORAL EXCLUSIONS: Known temporal phrases that should NOT be detected as employee names
+  const temporalExclusions = [
+    /^(?:y\s+)?(?:de|del|en)\s+todo\s+el\s+año\??$/i,
+    /^(?:y\s+)?(?:de|del|en)\s+este\s+año\??$/i,
+    /^(?:y\s+)?(?:de|del|en)\s+el\s+año\s+(?:pasado|anterior|actual)\??$/i,
+    /^(?:y\s+)?(?:de|del|en)\s+(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\??$/i,
+    /^(?:y\s+)?(?:del|de|en)\s+mes\s+(?:pasado|anterior|actual)\??$/i,
+    /^(?:y\s+)?(?:el\s+)?año\s+(?:completo|entero)\??$/i,
+    /^(?:y\s+)?anual(?:mente)?\??$/i,
+    /^(?:y\s+)?(?:el\s+)?trimestre\s+\d+\??$/i,
+    /^(?:y\s+)?(?:el\s+)?semestre\s+\d+\??$/i,
+  ];
+  
+  // Check if query matches any temporal exclusion pattern
+  for (const exclusion of temporalExclusions) {
+    if (exclusion.test(lowerText)) {
+      console.log(`⏭️ [EMPLOYEE_DETECTION] Skipping temporal phrase: "${text}"`);
+      return null; // Not an employee name, it's a temporal phrase
+    }
+  }
+  
   // Pattern 1: Follow-up queries "y a [name]?", "y [name]?", etc.
   const followUpPatterns = [
     /^(?:y\s+)?(?:a|para)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*)\s*\??$/i,
