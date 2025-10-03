@@ -918,7 +918,7 @@ serve(async (req) => {
 
     // Safety Override 2: If classified as general payroll but looks like employee paid total query
     if (intent.method === 'getPayrollTotals' && intent.type !== 'EMPLOYEE_PAID_TOTAL') {
-      const paidToMatch = lastMessage.match(/(?:cuánto|cuanto|qué|que)\s+(?:se\s+le\s+ha\s+)?(?:pagado|pago|pagamos)\s+(?:a|para)\s+([a-záéíóúñ\s]+)/i);
+      const paidToMatch = lastMessage.match(/(?:cuánto|cuanto|qué|que)\s+(?:(?:se\s+)?(?:le\s+)?(?:ha|hemos|han|he)\s+)?(?:pagad(?:o|os)?|pago|pagamos|pagan)\s+(?:a|para)\s+([a-záéíóúñ\s]+)/i);
       if (paidToMatch && !/(?:todas|todos|empresa|total|general)/i.test(lastMessage)) {
         const name = paidToMatch[1]?.trim().replace(/[?.,!]+$/, '') || '';
         

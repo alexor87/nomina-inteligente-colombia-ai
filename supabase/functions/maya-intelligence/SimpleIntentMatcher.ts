@@ -663,7 +663,7 @@ export class SimpleIntentMatcher {
       
       // No specific month - check if asking for totals/general info
       // BUT avoid classifying if it's an employee-specific query (IMPROVED SAFETY CHECK)
-      if (/cuánto|cuanto|total|valor|cost|sum|gast/.test(text) && !/(?:pagados?|pagos?|pagamos)\s+(?:a|para)\s+[a-záéíóúñ]/i.test(text)) {
+      if (/cuánto|cuanto|total|valor|cost|sum|gast/.test(text) && !/(?:pagad(?:o|os)?|pagos?|pagamos|pagan)\s+(?:a|para)\s+[a-záéíóúñ]/i.test(text)) {
         console.log('📊 [PAYROLL_TOTALS] General totals query detected (no employee specified)');
         return {
           type: 'PAYROLL_TOTALS',
