@@ -141,19 +141,32 @@ export async function getTotalPayrollCost(
       };
     }
     
+    // 🆕 INFER YEAR IF ONLY MONTH PROVIDED
+    let targetYear = params.year;
+    
+    if (params.month && !params.year && !params.periodId) {
+      // User asked for a month without year - find most recent period with that month
+      const recentPeriod = await getPeriodId(client, companyId, { month: params.month });
+      if (recentPeriod) {
+        // Extract year from period name (e.g., "16 - 31 Enero 2025" -> 2025)
+        const yearMatch = recentPeriod.periodo.match(/(\d{4})/);
+        targetYear = yearMatch ? parseInt(yearMatch[1]) : null;
+      }
+    }
+    
     // 🆕 DETECT FULL MONTH QUERY
-    const isFullMonthQuery = params.month && params.year && !params.periodId;
+    const isFullMonthQuery = params.month && targetYear && !params.periodId;
     
     if (isFullMonthQuery) {
       // Get ALL periods for the month
       const periods = await getPeriodsByMonth(client, companyId, {
         month: params.month!,
-        year: params.year!
+        year: targetYear!
       });
       
       if (!periods || periods.length === 0) {
         return {
-          message: `❌ No encontré períodos cerrados para ${params.month} ${params.year}`,
+          message: `❌ No encontré períodos cerrados para ${params.month} ${targetYear}`,
           emotionalState: 'concerned'
         };
       }
@@ -187,7 +200,7 @@ export async function getTotalPayrollCost(
       const monthCapitalized = params.month.charAt(0).toUpperCase() + params.month.slice(1);
       
       return {
-        message: `📊 **Costo Total de Nómina - ${monthCapitalized} ${params.year} (Mes Completo)**\n\n` +
+        message: `📊 **Costo Total de Nómina - ${monthCapitalized} ${targetYear} (Mes Completo)**\n\n` +
           `📅 **${periods.length} período${periods.length > 1 ? 's' : ''} sumado${periods.length > 1 ? 's' : ''}**: ${periodNames}\n` +
           `👥 **${employeeSet.size}** empleados\n` +
           `💰 **Devengado Total**: ${formatCurrency(totalDevengado)}\n` +
@@ -197,7 +210,7 @@ export async function getTotalPayrollCost(
           `🎯 **COSTO TOTAL DEL MES**: ${formatCurrency(totalCost)}`,
         emotionalState: 'professional',
         data: {
-          period: `${monthCapitalized} ${params.year}`,
+          period: `${monthCapitalized} ${targetYear}`,
           periodsCount: periods.length,
           periodNames: periods.map(p => p.periodo),
           employeeCount: employeeSet.size,
@@ -319,18 +332,29 @@ export async function getSecurityContributions(
       };
     }
     
+    // 🆕 INFER YEAR IF ONLY MONTH PROVIDED
+    let targetYear = params.year;
+    
+    if (params.month && !params.year && !params.periodId) {
+      const recentPeriod = await getPeriodId(client, companyId, { month: params.month });
+      if (recentPeriod) {
+        const yearMatch = recentPeriod.periodo.match(/(\d{4})/);
+        targetYear = yearMatch ? parseInt(yearMatch[1]) : null;
+      }
+    }
+    
     // 🆕 DETECT FULL MONTH QUERY
-    const isFullMonthQuery = params.month && params.year && !params.periodId;
+    const isFullMonthQuery = params.month && targetYear && !params.periodId;
     
     if (isFullMonthQuery) {
       const periods = await getPeriodsByMonth(client, companyId, {
         month: params.month!,
-        year: params.year!
+        year: targetYear!
       });
       
       if (!periods || periods.length === 0) {
         return {
-          message: `❌ No encontré períodos cerrados para ${params.month} ${params.year}`,
+          message: `❌ No encontré períodos cerrados para ${params.month} ${targetYear}`,
           emotionalState: 'concerned'
         };
       }
@@ -366,7 +390,7 @@ export async function getSecurityContributions(
       const monthCapitalized = params.month.charAt(0).toUpperCase() + params.month.slice(1);
       
       return {
-        message: `🏥 **Aportes a Seguridad Social - ${monthCapitalized} ${params.year} (Mes Completo)**\n\n` +
+        message: `🏥 **Aportes a Seguridad Social - ${monthCapitalized} ${targetYear} (Mes Completo)**\n\n` +
           `📅 **${periods.length} período${periods.length > 1 ? 's' : ''} sumado${periods.length > 1 ? 's' : ''}**: ${periodNames}\n\n` +
           `**EPS (Salud)**\n` +
           `👤 Empleado: ${formatCurrency(epsEmployee)} (4%)\n` +
@@ -381,7 +405,7 @@ export async function getSecurityContributions(
           `🎯 **TOTAL APORTES DEL MES**: ${formatCurrency(totalContributions)}`,
         emotionalState: 'professional',
         data: {
-          period: `${monthCapitalized} ${params.year}`,
+          period: `${monthCapitalized} ${targetYear}`,
           periodsCount: periods.length,
           eps: { employee: epsEmployee, employer: epsEmployer, total: epsTotal },
           pension: { employee: pensionEmployee, employer: pensionEmployer, total: pensionTotal },
@@ -514,18 +538,29 @@ export async function getHighestCostEmployees(
     
     const limit = params.limit || 5;
     
+    // 🆕 INFER YEAR IF ONLY MONTH PROVIDED
+    let targetYear = params.year;
+    
+    if (params.month && !params.year && !params.periodId) {
+      const recentPeriod = await getPeriodId(client, companyId, { month: params.month });
+      if (recentPeriod) {
+        const yearMatch = recentPeriod.periodo.match(/(\d{4})/);
+        targetYear = yearMatch ? parseInt(yearMatch[1]) : null;
+      }
+    }
+    
     // 🆕 DETECT FULL MONTH QUERY
-    const isFullMonthQuery = params.month && params.year && !params.periodId;
+    const isFullMonthQuery = params.month && targetYear && !params.periodId;
     
     if (isFullMonthQuery) {
       const periods = await getPeriodsByMonth(client, companyId, {
         month: params.month!,
-        year: params.year!
+        year: targetYear!
       });
       
       if (!periods || periods.length === 0) {
         return {
-          message: `❌ No encontré períodos cerrados para ${params.month} ${params.year}`,
+          message: `❌ No encontré períodos cerrados para ${params.month} ${targetYear}`,
           emotionalState: 'concerned'
         };
       }
@@ -579,11 +614,11 @@ export async function getHighestCostEmployees(
       const monthCapitalized = params.month.charAt(0).toUpperCase() + params.month.slice(1);
       
       return {
-        message: `👥 **Empleados con Mayor Costo - ${monthCapitalized} ${params.year} (Mes Completo)**\n\n` +
+        message: `👥 **Empleados con Mayor Costo - ${monthCapitalized} ${targetYear} (Mes Completo)**\n\n` +
           `📅 **${periods.length} período${periods.length > 1 ? 's' : ''} sumado${periods.length > 1 ? 's' : ''}**: ${periodNames}\n\n${tableRows}`,
         emotionalState: 'professional',
         data: {
-          period: `${monthCapitalized} ${params.year}`,
+          period: `${monthCapitalized} ${targetYear}`,
           periodsCount: periods.length,
           employees: employeesWithCost
         }
@@ -701,18 +736,29 @@ export async function getTotalIncapacityDays(
       };
     }
     
+    // 🆕 INFER YEAR IF ONLY MONTH PROVIDED
+    let targetYear = params.year;
+    
+    if (params.month && !params.year && !params.periodId) {
+      const recentPeriod = await getPeriodId(client, companyId, { month: params.month });
+      if (recentPeriod) {
+        const yearMatch = recentPeriod.periodo.match(/(\d{4})/);
+        targetYear = yearMatch ? parseInt(yearMatch[1]) : null;
+      }
+    }
+    
     // 🆕 DETECT FULL MONTH QUERY
-    const isFullMonthQuery = params.month && params.year && !params.periodId;
+    const isFullMonthQuery = params.month && targetYear && !params.periodId;
     
     if (isFullMonthQuery) {
       const periods = await getPeriodsByMonth(client, companyId, {
         month: params.month!,
-        year: params.year!
+        year: targetYear!
       });
       
       if (!periods || periods.length === 0) {
         return {
-          message: `❌ No encontré períodos cerrados para ${params.month} ${params.year}`,
+          message: `❌ No encontré períodos cerrados para ${params.month} ${targetYear}`,
           emotionalState: 'concerned'
         };
       }
@@ -767,7 +813,7 @@ export async function getTotalIncapacityDays(
       const monthCapitalized = params.month.charAt(0).toUpperCase() + params.month.slice(1);
       
       return {
-        message: `🏥 **Total de Incapacidades - ${monthCapitalized} ${params.year} (Mes Completo)**\n\n` +
+        message: `🏥 **Total de Incapacidades - ${monthCapitalized} ${targetYear} (Mes Completo)**\n\n` +
           `📅 **${periods.length} período${periods.length > 1 ? 's' : ''} sumado${periods.length > 1 ? 's' : ''}**: ${periodNames}\n` +
           `📊 **${allNovedades.length}** incapacidades registradas\n` +
           `👥 **${employeeCount}** empleados afectados\n` +
@@ -776,7 +822,7 @@ export async function getTotalIncapacityDays(
           `**Por tipo:**\n${subtypeBreakdown}`,
         emotionalState: 'professional',
         data: {
-          period: `${monthCapitalized} ${params.year}`,
+          period: `${monthCapitalized} ${targetYear}`,
           periodsCount: periods.length,
           totalIncapacities: allNovedades.length,
           totalDays,
@@ -909,18 +955,29 @@ export async function getTotalOvertimeHours(
       };
     }
     
+    // 🆕 INFER YEAR IF ONLY MONTH PROVIDED
+    let targetYear = params.year;
+    
+    if (params.month && !params.year && !params.periodId) {
+      const recentPeriod = await getPeriodId(client, companyId, { month: params.month });
+      if (recentPeriod) {
+        const yearMatch = recentPeriod.periodo.match(/(\d{4})/);
+        targetYear = yearMatch ? parseInt(yearMatch[1]) : null;
+      }
+    }
+    
     // 🆕 DETECT FULL MONTH QUERY
-    const isFullMonthQuery = params.month && params.year && !params.periodId;
+    const isFullMonthQuery = params.month && targetYear && !params.periodId;
     
     if (isFullMonthQuery) {
       const periods = await getPeriodsByMonth(client, companyId, {
         month: params.month!,
-        year: params.year!
+        year: targetYear!
       });
       
       if (!periods || periods.length === 0) {
         return {
-          message: `❌ No encontré períodos cerrados para ${params.month} ${params.year}`,
+          message: `❌ No encontré períodos cerrados para ${params.month} ${targetYear}`,
           emotionalState: 'concerned'
         };
       }
@@ -978,7 +1035,7 @@ export async function getTotalOvertimeHours(
       const monthCapitalized = params.month.charAt(0).toUpperCase() + params.month.slice(1);
       
       return {
-        message: `⏰ **Total de Horas Extras - ${monthCapitalized} ${params.year} (Mes Completo)**\n\n` +
+        message: `⏰ **Total de Horas Extras - ${monthCapitalized} ${targetYear} (Mes Completo)**\n\n` +
           `📅 **${periods.length} período${periods.length > 1 ? 's' : ''} sumado${periods.length > 1 ? 's' : ''}**: ${periodNames}\n` +
           `📊 **${totalHours}** horas extras totales\n` +
           `👥 **${employeeCount}** empleados\n` +
@@ -986,7 +1043,7 @@ export async function getTotalOvertimeHours(
           `**Por tipo:**\n${typeBreakdown}`,
         emotionalState: 'professional',
         data: {
-          period: `${monthCapitalized} ${params.year}`,
+          period: `${monthCapitalized} ${targetYear}`,
           periodsCount: periods.length,
           totalHours,
           totalCost,
