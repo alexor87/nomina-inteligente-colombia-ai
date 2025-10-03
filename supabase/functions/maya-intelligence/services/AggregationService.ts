@@ -785,49 +785,319 @@ export async function getTotalIncapacityDays(
           bySubtype
         }
       };
-849:       byType[type].count++;
-850:       byType[type].hours += n.dias || 0;
-851:       byType[type].cost += n.valor || 0;
-852:     });
-853:     
-854:     const typeBreakdown = Object.entries(byType)
-855:       .map(([type, data]) => 
-856:         `• **${type.replace(/_/g, ' ')}**: ${data.hours} horas - ${formatCurrency(data.cost)}`
-857:       )
-858:       .join('\n');
-859:     
-860:     return {
-861:       message: `⏰ **Total de Horas Extras - ${periodName}**\n\n` +
-862:         `📊 **${totalHours}** horas extras totales\n` +
-863:         `👥 **${employeeCount}** empleados\n` +
-864:         `💰 Costo total: ${formatCurrency(totalCost)}\n\n` +
-865:         `**Por tipo:**\n${typeBreakdown}`,
-866:       emotionalState: 'professional',
-867:       data: {
-868:         period: periodName,
-869:         totalHours,
-870:         totalCost,
-871:         employeeCount,
-872:         byType
-873:       },
-874:       visualization: {
-875:         type: 'metric',
-876:         data: {
-877:           title: 'Horas Extras',
-878:           value: totalHours,
-879:           subtitle: periodName,
-880:           breakdown: Object.entries(byType).map(([type, data]) => ({
-881:             label: type.replace(/_/g, ' '),
-882:             value: data.hours
-883:           }))
-884:         }
-885:       }
-886:     };
-887:   } catch (e) {
-888:     console.error('❌ [AGGREGATION] getTotalOvertimeHours failed:', e);
-889:     return {
-890:       message: `❌ Error al consultar horas extras: ${e.message}`,
-891:       emotionalState: 'concerned'
-892:     };
-893:   }
-894: }
+    }
+    
+    // ORIGINAL LOGIC: Specific period query
+    let periodId = params.periodId;
+    let periodName = '';
+    
+    if (!periodId) {
+      const period = await getPeriodId(client, companyId, params);
+      if (!period) {
+        return {
+          message: params.month || params.year 
+            ? `❌ No encontré períodos cerrados para ${params.month || ''} ${params.year || ''}`
+            : '❌ No encontré períodos cerrados en tu empresa.',
+          emotionalState: 'concerned'
+        };
+      }
+      periodId = period.id;
+      periodName = period.periodo;
+    }
+    
+    // Query novedades for incapacidades
+    const { data: novedades, error } = await client
+      .from('payroll_novedades')
+      .select(`
+        dias,
+        valor,
+        subtipo,
+        empleado_id,
+        employees!inner(nombre, apellido)
+      `)
+      .eq('company_id', companyId)
+      .eq('periodo_id', periodId)
+      .eq('tipo_novedad', 'incapacidad');
+    
+    if (error) {
+      console.error('❌ [AGGREGATION] Error querying novedades:', error);
+      return {
+        message: '❌ Hubo un error al consultar las novedades.',
+        emotionalState: 'concerned'
+      };
+    }
+    
+    if (!novedades || novedades.length === 0) {
+      return {
+        message: `✅ No hubo incapacidades registradas en el período ${periodName}.`,
+        emotionalState: 'celebrating'
+      };
+    }
+    
+    const totalDays = novedades.reduce((sum, n) => sum + (n.dias || 0), 0);
+    const totalCost = novedades.reduce((sum, n) => sum + Math.abs(n.valor || 0), 0);
+    const employeeCount = new Set(novedades.map(n => n.empleado_id)).size;
+    
+    // Group by subtype
+    const bySubtype: Record<string, { count: number; days: number }> = {};
+    novedades.forEach(n => {
+      const subtype = n.subtipo || 'general';
+      if (!bySubtype[subtype]) {
+        bySubtype[subtype] = { count: 0, days: 0 };
+      }
+      bySubtype[subtype].count++;
+      bySubtype[subtype].days += n.dias || 0;
+    });
+    
+    const subtypeBreakdown = Object.entries(bySubtype)
+      .map(([type, data]) => `• **${type}**: ${data.count} incapacidades, ${data.days} días`)
+      .join('\n');
+    
+    return {
+      message: `🏥 **Total de Incapacidades - ${periodName}**\n\n` +
+        `📊 **${novedades.length}** incapacidades registradas\n` +
+        `👥 **${employeeCount}** empleados afectados\n` +
+        `📅 **${totalDays}** días totales\n` +
+        `💰 Costo estimado: ${formatCurrency(totalCost)}\n\n` +
+        `**Por tipo:**\n${subtypeBreakdown}`,
+      emotionalState: 'professional',
+      data: {
+        period: periodName,
+        totalIncapacities: novedades.length,
+        totalDays,
+        totalCost,
+        affectedEmployees: employeeCount,
+        bySubtype
+      },
+      visualization: {
+        type: 'metric',
+        data: {
+          title: 'Días de Incapacidad',
+          value: totalDays,
+          subtitle: periodName,
+          breakdown: Object.entries(bySubtype).map(([type, data]) => ({
+            label: type,
+            value: data.days
+          }))
+        }
+      }
+    };
+  } catch (e) {
+    console.error('❌ [AGGREGATION] getTotalIncapacityDays failed:', e);
+    return {
+      message: `❌ Error al consultar incapacidades: ${e.message}`,
+      emotionalState: 'concerned'
+    };
+  }
+}
+
+// ============================================================================
+// 5. TOTAL OVERTIME HOURS
+// ============================================================================
+export async function getTotalOvertimeHours(
+  client: any,
+  params: { month?: string; year?: number; periodId?: string }
+): Promise<AggregationResult> {
+  console.log('⏰ [AGGREGATION] getTotalOvertimeHours called with params:', params);
+  
+  try {
+    const companyId = await getCurrentCompanyId(client);
+    if (!companyId) {
+      return {
+        message: '❌ No pude identificar tu empresa.',
+        emotionalState: 'concerned'
+      };
+    }
+    
+    // 🆕 DETECT FULL MONTH QUERY
+    const isFullMonthQuery = params.month && params.year && !params.periodId;
+    
+    if (isFullMonthQuery) {
+      const periods = await getPeriodsByMonth(client, companyId, {
+        month: params.month!,
+        year: params.year!
+      });
+      
+      if (!periods || periods.length === 0) {
+        return {
+          message: `❌ No encontré períodos cerrados para ${params.month} ${params.year}`,
+          emotionalState: 'concerned'
+        };
+      }
+      
+      const allNovedades: any[] = [];
+      
+      for (const period of periods) {
+        const { data: novedades } = await client
+          .from('payroll_novedades')
+          .select(`
+            dias,
+            valor,
+            tipo_novedad,
+            empleado_id
+          `)
+          .eq('company_id', companyId)
+          .eq('periodo_id', period.id)
+          .in('tipo_novedad', ['hora_extra', 'recargo_nocturno', 'recargo_dominical']);
+        
+        if (novedades) {
+          allNovedades.push(...novedades);
+        }
+      }
+      
+      if (allNovedades.length === 0) {
+        const monthCapitalized = params.month.charAt(0).toUpperCase() + params.month.slice(1);
+        return {
+          message: `No se registraron horas extras en ${monthCapitalized} ${params.year}.`,
+          emotionalState: 'neutral'
+        };
+      }
+      
+      const totalHours = allNovedades.reduce((sum, n) => sum + (n.dias || 0), 0);
+      const totalCost = allNovedades.reduce((sum, n) => sum + (n.valor || 0), 0);
+      const employeeCount = new Set(allNovedades.map(n => n.empleado_id)).size;
+      
+      const byType: Record<string, { count: number; hours: number; cost: number }> = {};
+      allNovedades.forEach(n => {
+        const type = n.tipo_novedad || 'hora_extra';
+        if (!byType[type]) {
+          byType[type] = { count: 0, hours: 0, cost: 0 };
+        }
+        byType[type].count++;
+        byType[type].hours += n.dias || 0;
+        byType[type].cost += n.valor || 0;
+      });
+      
+      const typeBreakdown = Object.entries(byType)
+        .map(([type, data]) => 
+          `• **${type.replace(/_/g, ' ')}**: ${data.hours} horas - ${formatCurrency(data.cost)}`
+        )
+        .join('\n');
+      
+      const periodNames = periods.map(p => p.periodo).join(', ');
+      const monthCapitalized = params.month.charAt(0).toUpperCase() + params.month.slice(1);
+      
+      return {
+        message: `⏰ **Total de Horas Extras - ${monthCapitalized} ${params.year} (Mes Completo)**\n\n` +
+          `📅 **${periods.length} período${periods.length > 1 ? 's' : ''} sumado${periods.length > 1 ? 's' : ''}**: ${periodNames}\n` +
+          `📊 **${totalHours}** horas extras totales\n` +
+          `👥 **${employeeCount}** empleados\n` +
+          `💰 Costo total: ${formatCurrency(totalCost)}\n\n` +
+          `**Por tipo:**\n${typeBreakdown}`,
+        emotionalState: 'professional',
+        data: {
+          period: `${monthCapitalized} ${params.year}`,
+          periodsCount: periods.length,
+          totalHours,
+          totalCost,
+          employeeCount,
+          byType
+        }
+      };
+    }
+    
+    // ORIGINAL LOGIC: Specific period query
+    let periodId = params.periodId;
+    let periodName = '';
+    
+    if (!periodId) {
+      const period = await getPeriodId(client, companyId, params);
+      if (!period) {
+        return {
+          message: params.month || params.year 
+            ? `❌ No encontré períodos cerrados para ${params.month || ''} ${params.year || ''}`
+            : '❌ No encontré períodos cerrados en tu empresa.',
+          emotionalState: 'concerned'
+        };
+      }
+      periodId = period.id;
+      periodName = period.periodo;
+    }
+    
+    // Query novedades for overtime
+    const { data: novedades, error } = await client
+      .from('payroll_novedades')
+      .select(`
+        dias,
+        valor,
+        subtipo,
+        tipo_novedad,
+        empleado_id,
+        employees!inner(nombre, apellido)
+      `)
+      .eq('company_id', companyId)
+      .eq('periodo_id', periodId)
+      .in('tipo_novedad', ['hora_extra', 'recargo_nocturno', 'recargo_dominical']);
+    
+    if (error) {
+      console.error('❌ [AGGREGATION] Error querying novedades:', error);
+      return {
+        message: '❌ Hubo un error al consultar las novedades.',
+        emotionalState: 'concerned'
+      };
+    }
+    
+    if (!novedades || novedades.length === 0) {
+      return {
+        message: `No se registraron horas extras en el período ${periodName}.`,
+        emotionalState: 'neutral'
+      };
+    }
+    
+    const totalHours = novedades.reduce((sum, n) => sum + (n.dias || 0), 0);
+    const totalCost = novedades.reduce((sum, n) => sum + (n.valor || 0), 0);
+    const employeeCount = new Set(novedades.map(n => n.empleado_id)).size;
+    
+    // Group by type
+    const byType: Record<string, { count: number; hours: number; cost: number }> = {};
+    novedades.forEach(n => {
+      const type = n.tipo_novedad || 'hora_extra';
+      if (!byType[type]) {
+        byType[type] = { count: 0, hours: 0, cost: 0 };
+      }
+      byType[type].count++;
+      byType[type].hours += n.dias || 0;
+      byType[type].cost += n.valor || 0;
+    });
+    
+    const typeBreakdown = Object.entries(byType)
+      .map(([type, data]) => 
+        `• **${type.replace(/_/g, ' ')}**: ${data.hours} horas - ${formatCurrency(data.cost)}`
+      )
+      .join('\n');
+    
+    return {
+      message: `⏰ **Total de Horas Extras - ${periodName}**\n\n` +
+        `📊 **${totalHours}** horas extras totales\n` +
+        `👥 **${employeeCount}** empleados\n` +
+        `💰 Costo total: ${formatCurrency(totalCost)}\n\n` +
+        `**Por tipo:**\n${typeBreakdown}`,
+      emotionalState: 'professional',
+      data: {
+        period: periodName,
+        totalHours,
+        totalCost,
+        employeeCount,
+        byType
+      },
+      visualization: {
+        type: 'metric',
+        data: {
+          title: 'Horas Extras',
+          value: totalHours,
+          subtitle: periodName,
+          breakdown: Object.entries(byType).map(([type, data]) => ({
+            label: type.replace(/_/g, ' '),
+            value: data.hours
+          }))
+        }
+      }
+    };
+  } catch (e) {
+    console.error('❌ [AGGREGATION] getTotalOvertimeHours failed:', e);
+    return {
+      message: `❌ Error al consultar horas extras: ${e.message}`,
+      emotionalState: 'concerned'
+    };
+  }
+}
