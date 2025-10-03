@@ -211,8 +211,8 @@ export class SimpleIntentMatcher {
     }
     
     // 2. SECURITY CONTRIBUTIONS
-    if (/(?:cuánto|cuanto|qué|que)\s+(?:fue|es|fueron|son)\s+(?:el|la|los|las)?\s*(?:aporte|aportes|contribución|contribuciones)\s+(?:a|de)?\s*(?:seguridad\s+social|eps|pensión|pension|salud)/i.test(text) ||
-        /(?:valor|total)\s+(?:de\s+)?(?:aporte|aportes)\s+(?:a\s+)?(?:seguridad|eps|pensión)/i.test(text)) {
+    if (/(?:cuánto|cuanto|qué|que|cuál|cual)\s+(?:fue|es|fueron|son)\s+(?:el|la|los|las)?\s*(?:aporte|aportes|contribución|contribuciones)\s+(?:a|de)?\s*(?:seguridad\s+social|eps|pensión|pension|salud)/i.test(text) ||
+        /(?:valor|total)\s+(?:de\s+)?(?:el|la|los|las)?\s*(?:aporte|aportes)\s+(?:a\s+)?(?:seguridad|eps|pensión)/i.test(text)) {
       
       const monthMatch = text.match(/(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i);
       const yearMatch = text.match(/(\d{4})/);
