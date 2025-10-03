@@ -314,6 +314,31 @@ const corsHeaders = {
 const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
 const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
 
+// 🔒 SECURITY HELPERS (KISS)
+async function getCurrentCompanyId(client: any): Promise<string | null> {
+  try {
+    const { data: { user } } = await client.auth.getUser();
+    if (!user) return null;
+    const { data, error } = await client
+      .from('profiles')
+      .select('company_id')
+      .eq('user_id', user.id)
+      .single();
+    if (error) {
+      console.error('🔒 [SECURITY] Error fetching company_id:', error);
+      return null;
+    }
+    return data?.company_id ?? null;
+  } catch (e) {
+    console.error('🔒 [SECURITY] getCurrentCompanyId failed:', e);
+    return null;
+  }
+}
+
+function scopeToCompany(query: any, companyId: string) {
+  return query.eq('company_id', companyId);
+}
+
 serve(async (req) => {
   // Handle CORS
   if (req.method === 'OPTIONS') {
@@ -972,11 +997,18 @@ serve(async (req) => {
           break;
         }
         
+        // Secure company scope
+        const companyId = await getCurrentCompanyId(userSupabase);
+        if (!companyId) {
+          response = { message: "❌ No pude identificar tu empresa.", emotionalState: 'concerned' };
+          break;
+        }
         // Find employee
         const { data: employees } = await userSupabase
           .from('employees')
           .select('id, nombre, apellido, email')
           .eq('estado', 'activo')
+          .eq('company_id', companyId)
           .ilike('nombre', `%${employeeName}%`);
         
         const employee = employees?.[0];
@@ -1017,11 +1049,18 @@ serve(async (req) => {
         console.log('🔄 [VOUCHER_EMAIL_OVERRIDE_CONTINUE] Continuing with employee name and pending email');
         const { employeeName, email } = intent.params;
         
+        // Secure company scope
+        const companyId = await getCurrentCompanyId(userSupabase);
+        if (!companyId) {
+          response = { message: "❌ No pude identificar tu empresa.", emotionalState: 'concerned' };
+          break;
+        }
         // Find employee
         const { data: employees } = await userSupabase
           .from('employees')
           .select('id, nombre, apellido, email')
           .eq('estado', 'activo')
+          .eq('company_id', companyId)
           .ilike('nombre', `%${employeeName}%`);
         
         const employee = employees?.[0];
@@ -1323,9 +1362,14 @@ async function validateEmployeeExists(supabase: any, name: string): Promise<{ ex
   try {
     console.log(`🔍 [VALIDATION] Checking if employee "${name}" exists in current company`);
     
+    const companyId = await getCurrentCompanyId(supabase);
+    if (!companyId) {
+      return { exists: false };
+    }
     const { data: employees, error } = await supabase
       .from('employees')
       .select('id, nombre, apellido, cargo, estado')
+      .eq('company_id', companyId)
       .or(`nombre.ilike.%${name.trim()}%,apellido.ilike.%${name.trim()}%`)
       .limit(5);
       
@@ -1563,10 +1607,15 @@ async function handleVoucherMassSend(supabase: any, params: any): Promise<{ mess
   console.log(`🎯 [VOUCHER_MASS_SEND] Processing mass voucher request`);
   
   // Step 1: Get all active employees
+  const companyId = await getCurrentCompanyId(supabase);
+  if (!companyId) {
+    return { message: '❌ No pude identificar tu empresa.', emotionalState: 'concerned' } as any;
+  }
   const { data: employees, error: employeesError } = await supabase
     .from('employees')
     .select('id, nombre, apellido, email, cargo')
-    .eq('estado', 'activo');
+    .eq('estado', 'activo')
+    .eq('company_id', companyId);
   
   if (employeesError || !employees || employees.length === 0) {
     console.error('❌ [VOUCHER_MASS_SEND] Error fetching employees:', employeesError);
@@ -1653,10 +1702,14 @@ async function blockSystemInfoQuery(): Promise<{ message: string; emotionalState
 // Simple, direct queries
 async function getEmployeeCount(supabase: any) {
   try {
+    const companyId = await getCurrentCompanyId(supabase);
+    if (!companyId) throw new Error('🔒 [SECURITY] No company found for user');
+
     const { count, error } = await supabase
       .from('employees')
       .select('*', { count: 'exact', head: true })
-      .eq('estado', 'activo');
+      .eq('estado', 'activo')
+      .eq('company_id', companyId);
       
     if (error) throw error;
     
@@ -1675,10 +1728,14 @@ async function getEmployeeCount(supabase: any) {
 
 async function listAllEmployees(supabase: any) {
   try {
+    const companyId = await getCurrentCompanyId(supabase);
+    if (!companyId) throw new Error('🔒 [SECURITY] No company found for user');
+
     const { data: employees, error } = await supabase
       .from('employees')
       .select('id, nombre, apellido, cargo, email')
       .eq('estado', 'activo')
+      .eq('company_id', companyId)
       .order('nombre', { ascending: true });
 
     if (error) throw error;
@@ -1717,9 +1774,14 @@ async function searchEmployee(supabase: any, name: string) {
   }
   
   try {
+    const companyId = await getCurrentCompanyId(supabase);
+    if (!companyId) {
+      return { message: '❌ No pude identificar tu empresa.', emotionalState: 'concerned' } as any;
+    }
     const { data, error } = await supabase
       .from('employees')
       .select('nombre, apellido, cargo, salario_base, estado')
+      .eq('company_id', companyId)
       .or(`nombre.ilike.%${name}%,apellido.ilike.%${name}%`)
       .limit(5);
       
@@ -1756,11 +1818,16 @@ async function searchEmployee(supabase: any, name: string) {
 
 async function getSalaryReport(supabase: any) {
   try {
-    const { data, error } = await supabase
-      .from('employees')
-      .select('nombre, apellido, cargo, salario_base')
-      .eq('estado', 'activo')
-      .order('salario_base', { ascending: false });
+  const companyId = await getCurrentCompanyId(supabase);
+  if (!companyId) {
+    return { message: '❌ No pude identificar tu empresa.', emotionalState: 'concerned' } as any;
+  }
+  const { data, error } = await supabase
+    .from('employees')
+    .select('nombre, apellido, cargo, salario_base')
+    .eq('estado', 'activo')
+    .eq('company_id', companyId)
+    .order('salario_base', { ascending: false });
       
     if (error) throw error;
     
@@ -1802,11 +1869,16 @@ async function getEmployeeSalary(supabase: any, name: string) {
   }
   
   try {
-    const { data, error } = await supabase
-      .from('employees')
-      .select('nombre, apellido, cargo, salario_base, fecha_ingreso, estado')
-      .or(`nombre.ilike.%${name}%,apellido.ilike.%${name}%`)
-      .limit(3);
+  const companyId = await getCurrentCompanyId(supabase);
+  if (!companyId) {
+    return { message: '❌ No pude identificar tu empresa.', emotionalState: 'concerned' } as any;
+  }
+  const { data, error } = await supabase
+    .from('employees')
+    .select('nombre, apellido, cargo, salario_base, fecha_ingreso, estado')
+    .eq('company_id', companyId)
+    .or(`nombre.ilike.%${name}%,apellido.ilike.%${name}%`)
+    .limit(3);
       
     if (error) throw error;
     
@@ -1860,11 +1932,16 @@ async function getEmployeeDetails(supabase: any, name: string) {
   
   try {
     // Search for employee with expanded data
-    const { data, error } = await supabase
-      .from('employees')
-      .select('id, nombre, apellido, cedula, cargo, salario_base, estado, fecha_ingreso, tipo_contrato, periodicidad_pago, email, telefono, departamento, eps, afp, caja_compensacion')
-      .or(`nombre.ilike.%${name}%,apellido.ilike.%${name}%`)
-      .limit(3);
+  const companyId = await getCurrentCompanyId(supabase);
+  if (!companyId) {
+    return { message: '❌ No pude identificar tu empresa.', emotionalState: 'concerned' } as any;
+  }
+  const { data, error } = await supabase
+    .from('employees')
+    .select('id, nombre, apellido, cedula, cargo, salario_base, estado, fecha_ingreso, tipo_contrato, periodicidad_pago, email, telefono, departamento, eps, afp, caja_compensacion')
+    .eq('company_id', companyId)
+    .or(`nombre.ilike.%${name}%,apellido.ilike.%${name}%`)
+    .limit(3);
       
     if (error) throw error;
     
@@ -1981,11 +2058,16 @@ async function getEmployeePaidTotal(supabase: any, params: any) {
   
   try {
     // First, find the employee
-    const { data: employees, error: employeeError } = await supabase
-      .from('employees')
-      .select('id, nombre, apellido')
-      .or(`nombre.ilike.%${name}%,apellido.ilike.%${name}%`)
-      .limit(3);
+  const companyId = await getCurrentCompanyId(supabase);
+  if (!companyId) {
+    return { message: '❌ No pude identificar tu empresa.', emotionalState: 'concerned' } as any;
+  }
+  const { data: employees, error: employeeError } = await supabase
+    .from('employees')
+    .select('id, nombre, apellido')
+    .eq('company_id', companyId)
+    .or(`nombre.ilike.%${name}%,apellido.ilike.%${name}%`)
+    .limit(3);
       
     if (employeeError) throw employeeError;
     
