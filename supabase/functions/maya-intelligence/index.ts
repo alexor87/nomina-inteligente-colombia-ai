@@ -2206,9 +2206,24 @@ async function getEmployeeBenefitProvision(supabase: any, params: any) {
     }
     
     // Query provisions from social_benefit_calculations
+    // Si hay employeeId específico, no necesitamos JOIN (ya tenemos employeeFullName)
+    // Si NO hay employeeId, necesitamos JOIN para obtener nombres de empleados
+    const selectFields = employeeId 
+      ? 'benefit_type, amount, period_start, period_end, created_at, employee_id'
+      : 'benefit_type, amount, period_start, period_end, created_at, employee_id, employees!inner(nombre, apellido)';
+    
+    console.log('[BENEFIT_PROVISION] Query config:', {
+      employeeId,
+      employeeFullName,
+      benefitType,
+      startDate,
+      endDate,
+      selectFields
+    });
+    
     let query = supabase
       .from('social_benefit_calculations')
-      .select('benefit_type, amount, period_start, period_end, created_at, employee_id, employees!inner(nombre, apellido)')
+      .select(selectFields)
       .eq('company_id', companyId)
       .gte('period_end', startDate)
       .lte('period_end', endDate)
@@ -2217,6 +2232,7 @@ async function getEmployeeBenefitProvision(supabase: any, params: any) {
     // Filter by employee if specified
     if (employeeId) {
       query = query.eq('employee_id', employeeId);
+      console.log('[BENEFIT_PROVISION] Applying employee filter:', employeeId);
     }
     
     // Filter by benefit type if specified
@@ -2225,6 +2241,12 @@ async function getEmployeeBenefitProvision(supabase: any, params: any) {
     }
     
     const { data: provisions, error: provisionError } = await query;
+    
+    console.log('[BENEFIT_PROVISION] Query results:', {
+      count: provisions?.length || 0,
+      hasError: !!provisionError,
+      sampleRecord: provisions?.[0]
+    });
     
     if (provisionError) {
       console.error('[BENEFIT_PROVISION] Query error:', provisionError);
@@ -2251,8 +2273,16 @@ async function getEmployeeBenefitProvision(supabase: any, params: any) {
     provisions.forEach((prov: any) => {
       const monthKey = new Date(prov.period_end).toLocaleString('es-CO', { month: 'long', year: 'numeric' });
       
-      // Si no hay empleado específico, agrupar por mes
-      const groupKey = employeeFullName ? monthKey : `${prov.employees.nombre} ${prov.employees.apellido}`;
+      // Si HAY empleado específico (employeeFullName), agrupar por mes
+      // Si NO hay empleado específico, agrupar por empleado (usando el JOIN)
+      let groupKey: string;
+      if (employeeFullName) {
+        // Consulta específica por empleado: agrupar por mes
+        groupKey = monthKey;
+      } else {
+        // Consulta general: agrupar por empleado
+        groupKey = `${prov.employees.nombre} ${prov.employees.apellido}`;
+      }
       
       if (!provisionsByGroup[groupKey]) {
         provisionsByGroup[groupKey] = [];
@@ -2269,7 +2299,12 @@ async function getEmployeeBenefitProvision(supabase: any, params: any) {
       'intereses_cesantias': 'Intereses de Cesantías'
     };
     
-    let message = `📊 **Provisiones de ${benefitType ? benefitTypeNames[benefitType] : 'Prestaciones Sociales'}**\n`;
+    // Clarificar si se filtró por tipo específico
+    const typeHeader = benefitType 
+      ? `${benefitTypeNames[benefitType]} (solo este tipo)` 
+      : 'Prestaciones Sociales (todos los tipos)';
+    
+    let message = `📊 **Provisiones de ${typeHeader}**\n`;
     if (employeeFullName) {
       message += `👤 Empleado: **${employeeFullName}**\n`;
     }
