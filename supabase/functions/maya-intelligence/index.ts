@@ -12,31 +12,31 @@ import { buildStructuredResponse } from './structured-response-builder.ts';
 import { ConversationContextAnalyzer } from './core/conversation-context-analyzer.ts';
 import { SmartContextInferencer } from './core/smart-context-inferencer.ts';
 import * as AggregationService from './services/AggregationService.ts';
+import { QueryClassifier, QueryType } from './core/query-classifier.ts';
 
 // ============================================================================
 // CONVERSATIONAL CONTEXT SYSTEM
 // ============================================================================
 
 // Detect follow-up queries like "y a [name]?", "y [name]?", etc.
+// Now using QueryClassifier for intelligent classification
 function detectFollowUpQuery(text: string): string | null {
   const lowerText = text.toLowerCase().trim();
   
-  // ⚠️ EXCLUSION: No procesar como follow-up de empleado si contiene palabras de agregación
-  const aggregationKeywords = /\b(más|mas|menos|mayor|menor|costoso|costosa|caro|cara|barato|barata|económico|económica|alto|alta|bajo|baja|costo|costos|precio|precios|gasto|gastos|total|totales|suma)\b/i;
+  // Use QueryClassifier to determine if this is actually an employee follow-up
+  const classification = QueryClassifier.classify(text);
   
-  if (aggregationKeywords.test(lowerText)) {
-    console.log(`🚫 [FOLLOW_UP] Excluded: "${text}" (contains aggregation keywords)`);
-    return null; // No es un follow-up de empleado, probablemente es un intent de agregación
-  }
+  // Log classification for debugging
+  console.log(`🤖 [CLASSIFIER] Query: "${text}" -> Type: ${QueryType[classification.type]} (${classification.confidence.toFixed(2)})`);
+  console.log(`   Indicators: ${classification.indicators.join(', ')}`);
   
-  // Exclusion: No procesar como follow-up de empleado si contiene palabras temporales
-  const temporalKeywords = /\b(año|años|mes|meses|día|días|semana|semanas|trimestre|semestre|periodo|período|periodos|períodos|este|esta|ese|esa|aquel|aquella|pasado|pasada|anterior|próximo|próxima|actual|presente)\b/i;
-  
-  if (temporalKeywords.test(lowerText)) {
-    console.log(`🚫 [FOLLOW_UP] Excluded: "${text}" (contains temporal keywords)`);
+  // Only proceed if classified as EMPLOYEE_FOLLOW_UP
+  if (classification.type !== QueryType.EMPLOYEE_FOLLOW_UP) {
+    console.log(`🚫 [FOLLOW_UP] Not an employee follow-up (classified as ${QueryType[classification.type]})`);
     return null;
   }
   
+  // Extract name patterns
   // Pattern 1: "y a [name]?" / "y para [name]?"
   const pattern1 = lowerText.match(/^(?:y\s+)?(?:a|para)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*)\s*\??$/i);
   if (pattern1) {

@@ -208,8 +208,20 @@ export class ConversationContextAnalyzer {
 
   /**
    * Checks if the context has enough information for follow-up inference
+   * Note: Aggregation contexts don't require entities (employee names, etc.)
    */
   static hasValidContext(context: ConversationContext): boolean {
+    // Aggregation contexts don't need entities - they work on entire datasets
+    const isAggregationContext = context.contextType?.startsWith('AGGREGATION_');
+    
+    if (isAggregationContext) {
+      return (
+        context.contextType !== null &&
+        context.confidence >= 0.70
+      );
+    }
+    
+    // Other contexts require entities (employee names, etc.)
     return (
       context.contextType !== null &&
       context.confidence >= 0.70 &&

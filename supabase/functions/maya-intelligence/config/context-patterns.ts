@@ -3,6 +3,24 @@
 // ============================================================================
 // Centralized configuration for response patterns and context mappings
 // Allows easy extension of conversational contexts without modifying core code
+//
+// 🔄 NEW ARCHITECTURE: This file now works with QueryClassifier (query-classifier.ts)
+//
+// QueryClassifier uses SEMANTIC PATTERNS for intelligent query classification:
+// - Temporal indicators (año, mes, este, pasado, etc.)
+// - Aggregation indicators (total, más, menos, cuántos, etc.)
+// - Employee follow-up indicators (y, también, a, de, etc.)
+//
+// The patterns in this file are used for:
+// 1. RESPONSE_PATTERNS: Detecting types of Maya's responses (for context analysis)
+// 2. TEMPORAL_FOLLOW_UP_PATTERNS: Extracting specific temporal parameters
+// 3. ENTITY_PATTERNS: Extracting entities from responses (names, dates, amounts)
+//
+// This semantic approach is MORE ROBUST than regex-only matching because:
+// ✅ Prevents misinterpretation (e.g., "y este año?" won't be confused with employee names)
+// ✅ Self-documenting and easy to extend
+// ✅ Priority-based classification prevents conflicts
+// ============================================================================
 
 export interface ResponsePattern {
   patterns: RegExp[];
