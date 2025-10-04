@@ -229,8 +229,12 @@ export class SimpleIntentMatcher {
     }
     
     // 3. HIGHEST COST EMPLOYEES
-    if (/(?:qué|que|cuáles|cuales)\s+(?:empleados?|trabajadores?)\s+(?:tienen|representan|son|me\s+cuestan)\s+(?:el\s+)?(?:mayor|más\s+alto|más\s+grande)\s+(?:costo|gasto)/i.test(text) ||
+    // 3. HIGHEST COST EMPLOYEES - Enhanced patterns
+    if (/(?:qué|que|cuáles|cuales)\s+(?:empleados?|trabajadores?)\s+(?:tienen|representan|son|me\s+cuestan?)\s+(?:el\s+)?(?:mayor|más\s+alto|más\s+grande)\s+(?:costo|gasto)/i.test(text) ||
+        /(?:qué|que|cuáles|cuales)\s+(?:empleados?|trabajadores?)\s+(?:me\s+)?cuestan?\s+m[aá]s/i.test(text) ||
+        /(?:qui[eé]n(?:es)?)\s+(?:me\s+)?cuestan?\s+m[aá]s/i.test(text) ||
         /(?:empleados?|trabajadores?)\s+(?:con|de)\s+(?:mayor|más\s+alto)\s+costo/i.test(text) ||
+        /(?:empleados?|trabajadores?).*(m[aá]s\s+caros?|m[aá]s\s+costosos?)/i.test(text) ||
         /(?:ranking|top)\s+(?:de\s+)?empleados/i.test(text)) {
       
       const limitMatch = text.match(/(?:top|primeros?|mejores?)\s+(\d+)/i);
