@@ -302,7 +302,13 @@ export class SimpleIntentMatcher {
         /(?:incapacidades|incapacitados)\s+(?:en|del|de)/i.test(text)) {
       
       const monthMatch = text.match(/(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i);
-      const yearMatch = text.match(/(\d{4})/);
+      let yearMatch = text.match(/(\d{4})/);
+      
+      // Detect "este año", "año actual", "el año", etc.
+      if (!yearMatch && /(?:este|actual|el)\s+año/i.test(text)) {
+        const currentYear = new Date().getFullYear();
+        yearMatch = [String(currentYear), String(currentYear)] as RegExpMatchArray;
+      }
       
       return {
         type: 'TOTAL_INCAPACITY_DAYS',
