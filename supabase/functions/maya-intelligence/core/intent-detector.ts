@@ -15,12 +15,70 @@ export class IntentDetector {
       return quickIntent;
     }
     
-    // 2. AI-Enhanced Detection for Complex Cases
-    if (openaiKey && quickIntent.confidence < 0.6) {
+    // 2. AI-Enhanced Detection for Complex Cases (includes typo detection)
+    const hasTypos = this.hasPotentialTypos(userMessage);
+    if (openaiKey && (quickIntent.confidence < 0.7 || hasTypos)) {
+      console.log(`[AI_ACTIVATION] Confidence: ${quickIntent.confidence.toFixed(2)} | Has typos: ${hasTypos}`);
       return await this.detectWithAI(userMessage, context, openaiKey);
     }
     
     return quickIntent;
+  }
+
+  // Detect potential typos using fuzzy matching
+  private static hasPotentialTypos(text: string): boolean {
+    // Keywords del dominio de nómina colombiano
+    const keywords = [
+      'costoso', 'costosa', 'caro', 'cara', 'barato', 'barata',
+      'empleado', 'empleada', 'trabajador', 'colaborador',
+      'salario', 'sueldo', 'pago', 'nomina', 'nómina',
+      'desprendible', 'colilla', 'recibo', 'voucher',
+      'vacaciones', 'ausencia', 'incapacidad', 'licencia'
+    ];
+    
+    const words = text.toLowerCase().split(/\s+/);
+    
+    for (const word of words) {
+      for (const keyword of keywords) {
+        // Permite 1-2 caracteres mal escritos (Levenshtein distance)
+        const distance = this.levenshteinDistance(word, keyword);
+        if (distance > 0 && distance <= 2 && word.length >= 4) {
+          console.log(`[TYPO_DETECTED] "${word}" ≈ "${keyword}" (distance: ${distance})`);
+          return true;
+        }
+      }
+    }
+    
+    return false;
+  }
+
+  // Calculate Levenshtein distance between two strings
+  private static levenshteinDistance(a: string, b: string): number {
+    const matrix: number[][] = [];
+    
+    for (let i = 0; i <= b.length; i++) {
+      matrix[i] = [i];
+    }
+    
+    for (let j = 0; j <= a.length; j++) {
+      matrix[0][j] = j;
+    }
+    
+    for (let i = 1; i <= b.length; i++) {
+      for (let j = 1; j <= a.length; j++) {
+        if (b.charAt(i - 1) === a.charAt(j - 1)) {
+          matrix[i][j] = matrix[i - 1][j - 1];
+        } else {
+          matrix[i][j] = Math.min(
+            matrix[i - 1][j - 1] + 1, // substitución
+            matrix[i][j - 1] + 1,     // inserción
+            matrix[i - 1][j] + 1      // eliminación
+          );
+        }
+      }
+    }
+    
+    return matrix[b.length][a.length];
   }
   
   private static detectByPatterns(message: string): Intent {
@@ -204,6 +262,15 @@ export class IntentDetector {
 
 MENSAJE: "${userMessage}"
 
+⚠️ IMPORTANTE: El usuario puede tener errores de ortografía, palabras en desorden o letras faltantes. 
+Interpreta la INTENCIÓN REAL del mensaje ignorando estos errores. Ejemplos comunes:
+- "el mas costso" → intención: buscar empleado más costoso
+- "empledos mas caros" → intención: listar empleados costosos
+- "salrio de maria" → intención: consultar salario de María
+- "nomina del me pasado" → intención: consultar nómina del mes pasado
+- "desprenible de juan" → intención: enviar desprendible a Juan
+- "vacasiones pendientes" → intención: consultar vacaciones pendientes
+
 CONTEXTO: ${context ? JSON.stringify(context) : 'No disponible'}
 
 INTENCIONES POSIBLES:
@@ -257,19 +324,35 @@ Responde SOLO en formato JSON:
         }
         const result = JSON.parse(content);
         
-        return {
+        const intentResult = {
           type: result.type as IntentType,
           confidence: result.confidence,
           parameters: {},
           requiresConfirmation: this.requiresConfirmation(result.type),
           entities: result.entities || []
         };
+        
+        // Log AI rescue scenarios para monitoreo
+        if (intentResult.type !== 'CONVERSATION') {
+          console.log(`[AI_RESCUE] Query: "${userMessage}" | Intent: ${intentResult.type} | Confidence: ${intentResult.confidence.toFixed(2)}`);
+        }
+        
+        return intentResult;
       }
     } catch (error) {
       console.warn('[IntentDetector] AI detection failed:', error);
+      
+      // Fallback to conversation
+      return {
+        type: 'CONVERSATION',
+        confidence: 0.3,
+        parameters: {},
+        requiresConfirmation: false,
+        entities: []
+      };
     }
     
-    // Fallback to conversation
+    // This should never be reached, but kept for safety
     return {
       type: 'CONVERSATION',
       confidence: 0.3,
