@@ -21,6 +21,14 @@ import * as AggregationService from './services/AggregationService.ts';
 function detectFollowUpQuery(text: string): string | null {
   const lowerText = text.toLowerCase().trim();
   
+  // ⚠️ EXCLUSION: No procesar como follow-up de empleado si contiene palabras de agregación
+  const aggregationKeywords = /\b(más|mas|menos|mayor|menor|costoso|costosa|caro|cara|barato|barata|económico|económica|alto|alta|bajo|baja|costo|costos|precio|precios|gasto|gastos|total|totales|suma)\b/i;
+  
+  if (aggregationKeywords.test(lowerText)) {
+    console.log(`🚫 [FOLLOW_UP] Excluded: "${text}" (contains aggregation keywords)`);
+    return null; // No es un follow-up de empleado, probablemente es un intent de agregación
+  }
+  
   // Pattern 1: "y a [name]?" / "y para [name]?"
   const pattern1 = lowerText.match(/^(?:y\s+)?(?:a|para)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*)\s*\??$/i);
   if (pattern1) {
