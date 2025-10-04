@@ -1448,6 +1448,10 @@ serve(async (req) => {
         response = await handleHighestCostEmployees(userSupabase, intent.params);
         break;
         
+      case 'getLowestCostEmployees':
+        response = await handleLowestCostEmployees(userSupabase, intent.params);
+        break;
+        
       case 'getTotalIncapacityDays':
         response = await handleTotalIncapacityDays(userSupabase, intent.params);
         break;
@@ -3160,6 +3164,10 @@ async function handleSecurityContributions(supabase: any, params: any) {
 
 async function handleHighestCostEmployees(supabase: any, params: any) {
   return await AggregationService.getHighestCostEmployees(supabase, params);
+}
+
+async function handleLowestCostEmployees(supabase: any, params: any) {
+  return await AggregationService.getLowestCostEmployees(supabase, params);
 }
 
 async function handleTotalIncapacityDays(supabase: any, params: any) {
