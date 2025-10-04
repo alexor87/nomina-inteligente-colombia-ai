@@ -160,8 +160,7 @@ async function getLastNMonthsPeriods(
 ): Promise<any[]> {
   try {
     const endDate = new Date();
-    const startDate = new Date();
-    startDate.setMonth(startDate.getMonth() - monthCount);
+    const startDate = new Date(endDate.getFullYear(), endDate.getMonth() - monthCount + 1, 1);
     
     const { data: periods, error } = await client
       .from('payroll_periods_real')
