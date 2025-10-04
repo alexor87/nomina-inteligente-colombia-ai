@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Minimize2, Maximize2, Send, MessageSquare, Trash2 } from 'lucide-react';
+import { X, Minimize2, Maximize2, Send, MessageSquare, Trash2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,7 @@ import { MayaAvatar } from './MayaAvatar';
 import { useMaya } from './MayaProvider';
 import { MayaReactivationButton } from './MayaReactivationButton';
 import { MayaActionExecutor } from './components/MayaActionExecutor';
+import { MayaTypingIndicator } from './components/MayaTypingIndicator';
 
 export const MayaFloatingAssistant: React.FC = () => {
   const { 
@@ -192,8 +193,16 @@ export const MayaFloatingAssistant: React.FC = () => {
                         <MayaAvatar emotionalState="neutral" isVisible={true} size="md" />
                         <p className="mt-2">¡Hola! Pregúntame lo que necesites sobre nómina.</p>
                       </div>
-                    )}
-                    <div ref={chatEndRef} />
+                     )}
+                     
+                     {/* Indicador de "Maya pensando" */}
+                     {isLoading && (
+                       <div className="flex justify-start">
+                         <MayaTypingIndicator />
+                       </div>
+                     )}
+                     
+                     <div ref={chatEndRef} />
                   </div>
 
                   {/* Chat Input */}
@@ -202,7 +211,7 @@ export const MayaFloatingAssistant: React.FC = () => {
                       <Input
                         value={userInput}
                         onChange={(e) => setUserInput(e.target.value)}
-                        placeholder="Escribe tu pregunta..."
+                        placeholder={isLoading ? "Maya está pensando..." : "Escribe tu pregunta..."}
                         disabled={isLoading}
                         className="flex-1"
                       />
@@ -212,7 +221,11 @@ export const MayaFloatingAssistant: React.FC = () => {
                         disabled={!userInput.trim() || isLoading}
                         className="px-3"
                       >
-                        <Send className="h-4 w-4" />
+                        {isLoading ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Send className="h-4 w-4" />
+                        )}
                       </Button>
                     </form>
                   </div>
