@@ -29,6 +29,14 @@ function detectFollowUpQuery(text: string): string | null {
     return null; // No es un follow-up de empleado, probablemente es un intent de agregación
   }
   
+  // Exclusion: No procesar como follow-up de empleado si contiene palabras temporales
+  const temporalKeywords = /\b(año|años|mes|meses|día|días|semana|semanas|trimestre|semestre|periodo|período|periodos|períodos|este|esta|ese|esa|aquel|aquella|pasado|pasada|anterior|próximo|próxima|actual|presente)\b/i;
+  
+  if (temporalKeywords.test(lowerText)) {
+    console.log(`🚫 [FOLLOW_UP] Excluded: "${text}" (contains temporal keywords)`);
+    return null;
+  }
+  
   // Pattern 1: "y a [name]?" / "y para [name]?"
   const pattern1 = lowerText.match(/^(?:y\s+)?(?:a|para)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*)\s*\??$/i);
   if (pattern1) {

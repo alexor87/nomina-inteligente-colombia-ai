@@ -306,6 +306,9 @@ export const TEMPORAL_FOLLOW_UP_PATTERNS = {
   THIS_YEAR: [
     /^(?:y\s+)?(?:de|del|en)\s+este\s+año\??$/i,
     /^(?:y\s+)?(?:de|del|en)\s+el\s+año\s+actual\??$/i,
+    /^(?:y\s+)?este\s+año\??$/i,
+    /^(?:y\s+)?el\s+año\s+actual\??$/i,
+    /^(?:y\s+)?(?:el\s+)?año\s+(?:en\s+curso|corriente)\??$/i,
   ],
   
   // Last N months queries: "y de los últimos 3 meses?", "y los 2 últimos meses?"
