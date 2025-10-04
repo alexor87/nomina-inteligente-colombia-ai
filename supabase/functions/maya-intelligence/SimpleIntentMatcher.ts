@@ -241,12 +241,17 @@ export class SimpleIntentMatcher {
       const monthMatch = text.match(/(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i);
       const yearMatch = text.match(/(\d{4})/);
       
+      // Detectar singular "el empleado" vs plural "los empleados"
+      const singularMatch = /(?:cuál|cual|qué|que)\s+es\s+el\s+(?:empleado|trabajador)/i.test(text) ||
+                            /el\s+(?:empleado|trabajador)\s+(?:más|mas)\s+(?:costoso|caro)/i.test(text) ||
+                            /(?:qui[eé]n)\s+(?:me\s+)?cuesta\s+m[aá]s/i.test(text);
+      
       return {
         type: 'HIGHEST_COST_EMPLOYEES',
         confidence: 0.93,
         method: 'getHighestCostEmployees',
         params: {
-          limit: limitMatch ? parseInt(limitMatch[1]) : 5,
+          limit: limitMatch ? parseInt(limitMatch[1]) : (singularMatch ? 1 : 5),
           month: monthMatch ? monthMatch[1].toLowerCase() : null,
           year: yearMatch ? parseInt(yearMatch[1]) : null
         }
