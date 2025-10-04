@@ -235,7 +235,8 @@ export class SimpleIntentMatcher {
         /(?:qui[eé]n(?:es)?)\s+(?:me\s+)?cuestan?\s+m[aá]s/i.test(text) ||
         /(?:empleados?|trabajadores?)\s+(?:con|de)\s+(?:mayor|más\s+alto)\s+costo/i.test(text) ||
         /(?:empleados?|trabajadores?).*(m[aá]s\s+caros?|m[aá]s\s+costosos?)/i.test(text) ||
-        /(?:ranking|top)\s+(?:de\s+)?empleados/i.test(text)) {
+        /(?:ranking|top)\s+(?:de\s+)?empleados/i.test(text) ||
+        /^(?:y\s+)?(?:el|la)\s+(?:m[aá]s\s+costos[oa]|m[aá]s\s+car[oa]|de\s+mayor\s+costo)\b/i.test(text)) {
       
       const limitMatch = text.match(/(?:top|primeros?|mejores?)\s+(\d+)/i);
       const monthMatch = text.match(/(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i);
@@ -264,7 +265,8 @@ export class SimpleIntentMatcher {
         /(?:qui[eé]n(?:es)?)\s+(?:me\s+)?cuesta\s+menos/i.test(text) ||
         /(?:el|los)\s+(?:empleados?|trabajadores?)\s+(?:más|mas)\s+(?:baratos?|económicos?)/i.test(text) ||
         /(?:empleados?|trabajadores?)\s+(?:con|de)\s+(?:menor|más\s+bajo)\s+costo/i.test(text) ||
-        /(?:empleados?|trabajadores?).*(menos\s+costosos?|más\s+baratos?|menor\s+costo)/i.test(text)) {
+        /(?:empleados?|trabajadores?).*(menos\s+costosos?|más\s+baratos?|menor\s+costo)/i.test(text) ||
+        /^(?:y\s+)?(?:el|la)\s+(?:menos\s+costos[oa]|m[aá]s\s+barat[oa]|de\s+menor\s+costo)\b/i.test(text)) {
       
       const limitMatch = text.match(/(?:top|primeros?|mejores?)\s+(\d+)/i);
       const monthMatch = text.match(/(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i);

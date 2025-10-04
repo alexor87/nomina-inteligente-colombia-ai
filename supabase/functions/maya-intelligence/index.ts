@@ -1762,6 +1762,14 @@ async function validateEmployeeExists(supabase: any, name: string): Promise<{ ex
 function detectEmployeeNameInQuery(text: string): string | null {
   const lowerText = text.toLowerCase().trim();
   
+  // ⚠️ AGGREGATION EXCLUSION: No procesar como nombre de empleado si contiene palabras de agregación
+  const aggregationKeywords = /\b(más|mas|menos|mayor|menor|costoso|costosa|caro|cara|barato|barata|económico|económica|alto|alta|bajo|baja|costo|costos|precio|precios|gasto|gastos|total|totales|suma)\b/i;
+  
+  if (aggregationKeywords.test(lowerText)) {
+    console.log(`🚫 [EMPLOYEE_DETECTION] Excluded: "${text}" (contains aggregation keywords)`);
+    return null; // No es un nombre de empleado, probablemente es un intent de agregación
+  }
+  
   // 🚫 TEMPORAL EXCLUSIONS: Known temporal phrases that should NOT be detected as employee names
   const temporalExclusions = [
     /^(?:y\s+)?(?:de|del|en)\s+todo\s+el\s+año\??$/i,
