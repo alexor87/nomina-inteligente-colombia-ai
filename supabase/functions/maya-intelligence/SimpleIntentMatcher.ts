@@ -304,16 +304,16 @@ export class SimpleIntentMatcher {
       const monthMatch = text.match(/(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i);
       let yearMatch = text.match(/(\d{4})/);
       
-      // Detect "este año", "año actual", "el año"
-      if (!yearMatch && /(?:este|actual|el)\s+año/i.test(text)) {
-        const currentYear = new Date().getFullYear();
-        yearMatch = [String(currentYear), String(currentYear)] as RegExpMatchArray;
-      }
-      
-      // Detect "año pasado", "año anterior"
+      // PRIORITY 1: Detect "año pasado", "año anterior" FIRST
       if (!yearMatch && /(?:año\s+pasado|año\s+anterior|pasado\s+año)/i.test(text)) {
         const lastYear = new Date().getFullYear() - 1;
         yearMatch = [String(lastYear), String(lastYear)] as RegExpMatchArray;
+      }
+      
+      // PRIORITY 2: Detect "este año", "año actual", "el año" (but NOT "el año pasado")
+      if (!yearMatch && /(?:este|actual|el)\s+año(?!\s+(?:pasado|anterior))/i.test(text)) {
+        const currentYear = new Date().getFullYear();
+        yearMatch = [String(currentYear), String(currentYear)] as RegExpMatchArray;
       }
       
       return {
