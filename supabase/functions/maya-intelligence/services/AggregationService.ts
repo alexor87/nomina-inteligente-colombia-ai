@@ -1188,8 +1188,15 @@ export async function getTotalIncapacityDays(
       
       if (allNovedades.length === 0) {
         return {
-          message: `✅ No hubo incapacidades registradas en el año ${params.year}.`,
-          emotionalState: 'celebrating'
+          message: `🏥 **Días de Incapacidad - Año ${params.year}**\n\n` +
+            `✅ No hubo incapacidades registradas en el año ${params.year}.`,
+          emotionalState: 'celebrating',
+          data: {
+            period: `Año ${params.year}`,
+            totalDays: 0,
+            totalIncapacities: 0,
+            totalCost: 0
+          }
         };
       }
       
@@ -1212,11 +1219,11 @@ export async function getTotalIncapacityDays(
         .join('\n');
       
       return {
-        message: `🏥 **Total de Incapacidades - Año ${params.year}**\n\n` +
+        message: `🏥 **Días de Incapacidad - Año ${params.year}**\n\n` +
           `📅 **${periods.length} período${periods.length > 1 ? 's' : ''} analizados**\n` +
-          `📊 **${allNovedades.length}** incapacidades registradas\n` +
+          `📊 **Total días incapacidad: ${totalDays}**\n` +
+          `📋 **${allNovedades.length}** incapacidades registradas\n` +
           `👥 **${employeeCount}** empleados afectados\n` +
-          `📅 **${totalDays}** días totales\n` +
           `💰 Costo estimado: ${formatCurrency(totalCost)}\n\n` +
           `**Por tipo:**\n${subtypeBreakdown}`,
         emotionalState: 'professional',

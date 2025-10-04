@@ -702,6 +702,14 @@ serve(async (req) => {
         // Analyze conversation context to find last aggregation intent
         const context = analyzeConversationContext(conversation);
         
+        // Enhanced logging for debugging
+        console.log(`🔍 [TEMPORAL_CONTEXT] Context analysis result:`, {
+          contextType: context.contextType,
+          confidence: context.confidence,
+          patterns: context.detectedPatterns,
+          lastResponsePreview: context.lastResponseText?.substring(0, 100)
+        });
+        
         // Import context patterns
         const { CONTEXT_TO_INTENT_MAP } = await import('./config/context-patterns.ts');
         

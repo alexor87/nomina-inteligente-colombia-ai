@@ -144,10 +144,14 @@ export const RESPONSE_PATTERNS: Record<string, ResponsePattern> = {
     patterns: [
       /Días\s+de\s+Incapacidad/i,
       /Total\s+días\s+incapacidad/i,
+      /incapacidad(?:es)?\s+(?:registrada|detectada)/i,
+      /Total\s+de\s+Incapacidad(?:es)?/i,
+      /🏥.*incapacidad(?:es)?/i,
+      /\d+\s+(?:días?|día)\s+(?:de\s+)?incapacidad/i,
     ],
     contextType: 'AGGREGATION_INCAPACITY_DAYS',
     structure: 'Metric',
-    description: 'Response with incapacity days'
+    description: 'Response with incapacity days (positive or negative)'
   },
 
   OVERTIME_HOURS_RESPONSE: {
