@@ -258,7 +258,37 @@ export class SimpleIntentMatcher {
       };
     }
     
-    // 4. TOTAL INCAPACITY DAYS
+    // 4. LOWEST COST EMPLOYEES
+    if (/(?:qué|que|cuáles|cuales)\s+(?:empleados?|trabajadores?)\s+(?:tienen|representan|son|me\s+cuestan?)\s+(?:el\s+)?(?:menor|menos|más\s+bajo)\s+(?:costo|gasto)/i.test(text) ||
+        /(?:qué|que|cuáles|cuales)\s+(?:empleados?|trabajadores?)\s+(?:me\s+)?cuestan?\s+menos/i.test(text) ||
+        /(?:qui[eé]n(?:es)?)\s+(?:me\s+)?cuesta\s+menos/i.test(text) ||
+        /(?:el|los)\s+(?:empleados?|trabajadores?)\s+(?:más|mas)\s+(?:baratos?|económicos?)/i.test(text) ||
+        /(?:empleados?|trabajadores?)\s+(?:con|de)\s+(?:menor|más\s+bajo)\s+costo/i.test(text) ||
+        /(?:empleados?|trabajadores?).*(menos\s+costosos?|más\s+baratos?|menor\s+costo)/i.test(text)) {
+      
+      const limitMatch = text.match(/(?:top|primeros?|mejores?)\s+(\d+)/i);
+      const monthMatch = text.match(/(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i);
+      const yearMatch = text.match(/(\d{4})/);
+      
+      // Detectar singular "el menos costoso" vs plural "los menos costosos"
+      const singularMatch = /(?:cuál|cual|qué|que)\s+es\s+el\s+(?:empleado|trabajador)\s+(?:menos|más\s+barato)/i.test(text) ||
+                            /el\s+(?:empleado|trabajador)\s+(?:menos|mas)\s+(?:costoso|caro)/i.test(text) ||
+                            /(?:qui[eé]n)\s+(?:me\s+)?cuesta\s+menos/i.test(text) ||
+                            /(?:el|al)\s+menos\s+costoso/i.test(text);
+      
+      return {
+        type: 'LOWEST_COST_EMPLOYEES',
+        confidence: 0.93,
+        method: 'getLowestCostEmployees',
+        params: {
+          limit: limitMatch ? parseInt(limitMatch[1]) : (singularMatch ? 1 : 5),
+          month: monthMatch ? monthMatch[1].toLowerCase() : null,
+          year: yearMatch ? parseInt(yearMatch[1]) : null
+        }
+      };
+    }
+    
+    // 5. TOTAL INCAPACITY DAYS
     if (/(?:cuántos|cuantos|qué|que)\s+días\s+de\s+incapacidad/i.test(text) ||
         /(?:total|cantidad)\s+(?:de\s+)?(?:días|dia)\s+(?:de\s+)?incapacidad/i.test(text) ||
         /(?:incapacidades|incapacitados)\s+(?:en|del|de)/i.test(text)) {

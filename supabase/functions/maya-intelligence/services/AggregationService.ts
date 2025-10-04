@@ -925,7 +925,209 @@ export async function getHighestCostEmployees(
 }
 
 // ============================================================================
-// 4. TOTAL INCAPACITY DAYS
+// 4. LOWEST COST EMPLOYEES
+// ============================================================================
+export async function getLowestCostEmployees(
+  client: any,
+  params: { month?: string; year?: number; periodId?: string; limit?: number }
+): Promise<AggregationResult> {
+  console.log('💰 [AGGREGATION] getLowestCostEmployees called with params:', params);
+  
+  try {
+    const companyId = await getCurrentCompanyId(client);
+    if (!companyId) {
+      return {
+        message: '❌ No pude identificar tu empresa.',
+        emotionalState: 'concerned'
+      };
+    }
+    
+    const limit = params.limit || 5;
+    
+    // 🆕 INFER YEAR IF ONLY MONTH PROVIDED
+    let targetYear = params.year;
+    
+    if (params.month && !params.year && !params.periodId) {
+      const recentPeriod = await getPeriodId(client, companyId, { month: params.month });
+      if (recentPeriod) {
+        const yearMatch = recentPeriod.periodo.match(/(\d{4})/);
+        targetYear = yearMatch ? parseInt(yearMatch[1]) : null;
+      }
+    }
+    
+    // 🆕 DETECT FULL MONTH QUERY
+    const isFullMonthQuery = params.month && targetYear && !params.periodId;
+    
+    if (isFullMonthQuery) {
+      const periods = await getPeriodsByMonth(client, companyId, {
+        month: params.month!,
+        year: targetYear!
+      });
+      
+      if (!periods || periods.length === 0) {
+        return {
+          message: `❌ No encontré períodos cerrados para ${params.month} ${targetYear}`,
+          emotionalState: 'concerned'
+        };
+      }
+      
+      // Accumulate costs per employee across all periods
+      const employeeCosts: Record<string, { name: string; devengado: number }> = {};
+      
+      for (const period of periods) {
+        const { data: payrolls } = await client
+          .from('payrolls')
+          .select(`
+            total_devengado,
+            employee_id,
+            employees!inner(nombre, apellido)
+          `)
+          .eq('company_id', companyId)
+          .eq('period_id', period.id);
+        
+        if (payrolls) {
+          payrolls.forEach((p: any) => {
+            const empId = p.employee_id;
+            if (!employeeCosts[empId]) {
+              employeeCosts[empId] = {
+                name: `${p.employees.nombre} ${p.employees.apellido}`,
+                devengado: 0
+              };
+            }
+            employeeCosts[empId].devengado += p.total_devengado || 0;
+          });
+        }
+      }
+      
+      const employeesWithCost = Object.values(employeeCosts)
+        .map(e => ({
+          name: e.name,
+          devengado: e.devengado,
+          employerContributions: e.devengado * 0.25,
+          totalCost: e.devengado * 1.25
+        }))
+        .sort((a, b) => a.totalCost - b.totalCost) // ASC - menor a mayor
+        .slice(0, limit);
+      
+      const tableRows = employeesWithCost.map((e, i) => 
+        `${i + 1}. **${e.name}**\n` +
+        `   💰 Devengado: ${formatCurrency(e.devengado)}\n` +
+        `   🏢 Aportes: ${formatCurrency(e.employerContributions)}\n` +
+        `   🎯 Costo Total: ${formatCurrency(e.totalCost)}`
+      ).join('\n\n');
+      
+      const periodNames = periods.map(p => p.periodo).join(', ');
+      const monthCapitalized = params.month.charAt(0).toUpperCase() + params.month.slice(1);
+      
+      return {
+        message: `👥 **Empleados con Menor Costo - ${monthCapitalized} ${targetYear} (Mes Completo)**\n\n` +
+          `📅 **${periods.length} período${periods.length > 1 ? 's' : ''} sumado${periods.length > 1 ? 's' : ''}**: ${periodNames}\n\n${tableRows}`,
+        emotionalState: 'professional',
+        data: {
+          period: `${monthCapitalized} ${targetYear}`,
+          periodsCount: periods.length,
+          employees: employeesWithCost
+        }
+      };
+    }
+    
+    // ORIGINAL LOGIC: Specific period query
+    let periodId = params.periodId;
+    let periodName = '';
+    
+    if (!periodId) {
+      const period = await getPeriodId(client, companyId, params);
+      if (!period) {
+        return {
+          message: params.month || params.year 
+            ? `❌ No encontré períodos cerrados para ${params.month || ''} ${params.year || ''}`
+            : '❌ No encontré períodos cerrados en tu empresa.',
+          emotionalState: 'concerned'
+        };
+      }
+      periodId = period.id;
+      periodName = period.periodo;
+    }
+    
+    // Query payrolls with employee names - ORDER BY ASC (menor a mayor)
+    const { data: payrolls, error } = await client
+      .from('payrolls')
+      .select(`
+        total_devengado,
+        employee_id,
+        employees!inner(nombre, apellido)
+      `)
+      .eq('company_id', companyId)
+      .eq('period_id', periodId)
+      .order('total_devengado', { ascending: true }) // ⚠️ KEY CHANGE: ASC instead of DESC
+      .limit(limit);
+    
+    if (error) {
+      console.error('❌ [AGGREGATION] Error querying payrolls:', error);
+      return {
+        message: '❌ Hubo un error al consultar la nómina.',
+        emotionalState: 'concerned'
+      };
+    }
+    
+    if (!payrolls || payrolls.length === 0) {
+      return {
+        message: `No encontré registros de nómina para el período ${periodName || 'solicitado'}.`,
+        emotionalState: 'neutral'
+      };
+    }
+    
+    // Calculate employer cost (devengado + 25% contributions)
+    const employeesWithCost = payrolls.map(p => ({
+      name: `${p.employees.nombre} ${p.employees.apellido}`,
+      devengado: p.total_devengado,
+      employerContributions: p.total_devengado * 0.25,
+      totalCost: p.total_devengado * 1.25
+    }));
+    
+    const tableRows = employeesWithCost.map((e, i) => 
+      `${i + 1}. **${e.name}**\n` +
+      `   💰 Devengado: ${formatCurrency(e.devengado)}\n` +
+      `   🏢 Aportes: ${formatCurrency(e.employerContributions)}\n` +
+      `   🎯 Costo Total: ${formatCurrency(e.totalCost)}`
+    ).join('\n\n');
+    
+    const titleSingular = limit === 1 ? 'Empleado con Menor Costo' : `Top ${limit} Empleados con Menor Costo`;
+    
+    return {
+      message: `👥 **${titleSingular} - ${periodName}**\n\n${tableRows}`,
+      emotionalState: 'professional',
+      data: {
+        period: periodName,
+        employees: employeesWithCost
+      },
+      visualization: {
+        type: 'table',
+        data: {
+          title: titleSingular,
+          subtitle: periodName,
+          headers: ['#', 'Empleado', 'Devengado', 'Aportes', 'Costo Total'],
+          rows: employeesWithCost.map((e, i) => [
+            (i + 1).toString(),
+            e.name,
+            formatCurrency(e.devengado),
+            formatCurrency(e.employerContributions),
+            formatCurrency(e.totalCost)
+          ])
+        }
+      }
+    };
+  } catch (e) {
+    console.error('❌ [AGGREGATION] getLowestCostEmployees failed:', e);
+    return {
+      message: `❌ Error al obtener empleados: ${e.message}`,
+      emotionalState: 'concerned'
+    };
+  }
+}
+
+// ============================================================================
+// 5. TOTAL INCAPACITY DAYS
 // ============================================================================
 export async function getTotalIncapacityDays(
   client: any,

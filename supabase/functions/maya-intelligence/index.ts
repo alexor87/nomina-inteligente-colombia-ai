@@ -213,6 +213,7 @@ function getMethodForAggregationIntent(intentType: string): string | null {
     'TOTAL_PAYROLL_COST': 'getTotalPayrollCost',
     'SECURITY_CONTRIBUTIONS': 'getSecurityContributions',
     'HIGHEST_COST_EMPLOYEES': 'getHighestCostEmployees',
+    'LOWEST_COST_EMPLOYEES': 'getLowestCostEmployees',
     'TOTAL_INCAPACITY_DAYS': 'getTotalIncapacityDays',
     'TOTAL_OVERTIME_HOURS': 'getTotalOvertimeHours'
   };
