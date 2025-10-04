@@ -245,7 +245,10 @@ export class SimpleIntentMatcher {
       // Detectar singular "el empleado" vs plural "los empleados"
       const singularMatch = /(?:cuál|cual|qué|que)\s+es\s+el\s+(?:empleado|trabajador)/i.test(text) ||
                             /el\s+(?:empleado|trabajador)\s+(?:más|mas)\s+(?:costoso|caro)/i.test(text) ||
-                            /(?:qui[eé]n)\s+(?:me\s+)?cuesta\s+m[aá]s/i.test(text);
+                            /(?:qui[eé]n)\s+(?:me\s+)?cuesta\s+m[aá]s/i.test(text) ||
+                            /(?:^|\s)(?:y\s+)?el\s+(?:m[aá]s\s+costos[oa]|m[aá]s\s+car[oa]|de\s+mayor\s+costo)\b/i.test(text);
+      
+      console.log(`[HIGHEST_COST] Query: "${text}" | Singular: ${singularMatch} | Limit: ${singularMatch ? 1 : 5}`);
       
       return {
         type: 'HIGHEST_COST_EMPLOYEES',
@@ -276,7 +279,9 @@ export class SimpleIntentMatcher {
       const singularMatch = /(?:cuál|cual|qué|que)\s+es\s+el\s+(?:empleado|trabajador)\s+(?:menos|más\s+barato)/i.test(text) ||
                             /el\s+(?:empleado|trabajador)\s+(?:menos|mas)\s+(?:costoso|caro)/i.test(text) ||
                             /(?:qui[eé]n)\s+(?:me\s+)?cuesta\s+menos/i.test(text) ||
-                            /(?:el|al)\s+menos\s+costoso/i.test(text);
+                            /(?:^|\s)(?:y\s+)?(?:el|al)\s+(?:menos\s+costos[oa]|m[aá]s\s+barat[oa]|de\s+menor\s+costo)\b/i.test(text);
+      
+      console.log(`[LOWEST_COST] Query: "${text}" | Singular: ${singularMatch} | Limit: ${singularMatch ? 1 : 5}`);
       
       return {
         type: 'LOWEST_COST_EMPLOYEES',
