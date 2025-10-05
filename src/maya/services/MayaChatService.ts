@@ -119,11 +119,19 @@ export class MayaChatService {
     try {
       console.log('🤖 MAYA Chat: Calling maya-intelligence function...');
       
-      // Simplified conversation - no conversationState needed (backend manages state)
+      // Simplified conversation WITH conversationState for context continuity
       const simplifiedConversation = this.currentConversation.messages.map(msg => ({
         role: msg.role,
-        content: msg.content
+        content: msg.content,
+        ...(msg.conversationState && { conversationState: msg.conversationState }),
+        ...(msg.fieldName && { fieldName: msg.fieldName })
       }));
+      
+      // Extract last conversation state from most recent assistant message
+      const lastAssistantMessage = [...this.currentConversation.messages]
+        .reverse()
+        .find(m => m.role === 'assistant');
+      const lastConversationState = lastAssistantMessage?.conversationState;
 
       console.log('🔄 [FRONTEND] Simplified Request:', {
         messageCount: simplifiedConversation.length,
@@ -141,7 +149,8 @@ export class MayaChatService {
           metadata: {
             messageCount: this.currentConversation.messages.length,
             companyId: this.currentConversation.companyId,
-            lastUpdated: this.currentConversation.lastUpdated
+            lastUpdated: this.currentConversation.lastUpdated,
+            ...(lastConversationState && { lastConversationState })
           }
         }
       });

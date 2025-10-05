@@ -375,13 +375,15 @@ const corsHeaders = {
 // Initialize Supabase client
 const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
 const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? supabaseKey;
 
 // ============================================================================
 // MVE SERVICE INITIALIZATION
 // ============================================================================
-const eventLogger = new EventLogger(supabaseUrl, supabaseKey);
-const sessionManager = new SessionManager(supabaseUrl, supabaseKey);
-const idempotencyHandler = new IdempotencyHandler(supabaseUrl, supabaseKey, 24);
+// Use SERVICE_ROLE_KEY for internal services to bypass RLS
+const eventLogger = new EventLogger(supabaseUrl, serviceRoleKey);
+const sessionManager = new SessionManager(supabaseUrl, serviceRoleKey);
+const idempotencyHandler = new IdempotencyHandler(supabaseUrl, serviceRoleKey, 24);
 const llmCircuitBreaker = new CircuitBreaker({
   failureThreshold: 5,
   successThreshold: 2,
