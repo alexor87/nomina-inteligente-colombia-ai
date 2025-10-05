@@ -15,6 +15,7 @@ import * as AggregationService from './services/aggregation/index.ts';
 import { QueryClassifier, QueryType } from './core/query-classifier.ts';
 import { LLMQueryClassifier, LLMQueryType } from './core/llm-query-classifier.ts';
 import { handleTemporalFollowUp, canHandleTemporalFollowUp } from './handlers/temporal-followup-handler.ts';
+import { TemporalResolver } from './core/temporal-resolver.ts';
 
 // ============================================================================
 // CONVERSATIONAL CONTEXT SYSTEM
@@ -3247,27 +3248,45 @@ async function getPayrollByFortnight(supabase: any, month: string, year: number,
 // PHASE 1: AGGREGATION HANDLERS
 // ============================================================================
 async function handleTotalPayrollCost(supabase: any, params: any) {
-  return await AggregationService.getTotalPayrollCost(supabase, params);
+  const temporalParams = TemporalResolver.isLegacyFormat(params)
+    ? TemporalResolver.fromLegacy(params)
+    : params;
+  return await AggregationService.getTotalPayrollCost(supabase, temporalParams);
 }
 
 async function handleSecurityContributions(supabase: any, params: any) {
-  return await AggregationService.getSecurityContributions(supabase, params);
+  const temporalParams = TemporalResolver.isLegacyFormat(params)
+    ? TemporalResolver.fromLegacy(params)
+    : params;
+  return await AggregationService.getSecurityContributions(supabase, temporalParams);
 }
 
 async function handleHighestCostEmployees(supabase: any, params: any) {
-  return await AggregationService.getHighestCostEmployees(supabase, params);
+  const temporalParams = TemporalResolver.isLegacyFormat(params)
+    ? TemporalResolver.fromLegacy(params)
+    : params;
+  return await AggregationService.getHighestCostEmployees(supabase, temporalParams);
 }
 
 async function handleLowestCostEmployees(supabase: any, params: any) {
-  return await AggregationService.getLowestCostEmployees(supabase, params);
+  const temporalParams = TemporalResolver.isLegacyFormat(params)
+    ? TemporalResolver.fromLegacy(params)
+    : params;
+  return await AggregationService.getLowestCostEmployees(supabase, temporalParams);
 }
 
 async function handleTotalIncapacityDays(supabase: any, params: any) {
-  return await AggregationService.getTotalIncapacityDays(supabase, params);
+  const temporalParams = TemporalResolver.isLegacyFormat(params)
+    ? TemporalResolver.fromLegacy(params)
+    : params;
+  return await AggregationService.getTotalIncapacityDays(supabase, temporalParams);
 }
 
 async function handleTotalOvertimeHours(supabase: any, params: any) {
-  return await AggregationService.getTotalOvertimeHours(supabase, params);
+  const temporalParams = TemporalResolver.isLegacyFormat(params)
+    ? TemporalResolver.fromLegacy(params)
+    : params;
+  return await AggregationService.getTotalOvertimeHours(supabase, temporalParams);
 }
 
 // ============================================================================

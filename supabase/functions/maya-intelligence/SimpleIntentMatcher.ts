@@ -386,7 +386,19 @@ export class SimpleIntentMatcher {
       const monthRegex = /(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/gi;
       const allMonthMatches = [...text.matchAll(monthRegex)];
       const allMonths = allMonthMatches.map(m => m[1].toLowerCase());
-      const yearMatch = text.match(/(\d{4})/);
+      let yearMatch = text.match(/(\d{4})/);
+      
+      // PRIORITY 1: Detect "año pasado", "año anterior" FIRST
+      if (!yearMatch && /(?:año\s+pasado|año\s+anterior|pasado\s+año)/i.test(text)) {
+        const lastYear = new Date().getFullYear() - 1;
+        yearMatch = [String(lastYear), String(lastYear)] as RegExpMatchArray;
+      }
+      
+      // PRIORITY 2: Detect "este año", "año actual", "el año" (but NOT "el año pasado")
+      if (!yearMatch && /(?:este|actual|el)\s+año(?!\s+(?:pasado|anterior))/i.test(text)) {
+        const currentYear = new Date().getFullYear();
+        yearMatch = [String(currentYear), String(currentYear)] as RegExpMatchArray;
+      }
       
       const params: any = { year: yearMatch ? parseInt(yearMatch[1]) : null };
       if (allMonths.length === 1) {
