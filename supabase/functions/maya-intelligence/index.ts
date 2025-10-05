@@ -11,7 +11,7 @@ import { liquidarNomina, registrarNovedad, calcularPrestacion, generarReporte } 
 import { buildStructuredResponse } from './structured-response-builder.ts';
 import { ConversationContextAnalyzer } from './core/conversation-context-analyzer.ts';
 import { SmartContextInferencer } from './core/smart-context-inferencer.ts';
-import * as AggregationService from './services/AggregationService.ts';
+import * as AggregationService from './services/aggregation/index.ts';
 import { QueryClassifier, QueryType } from './core/query-classifier.ts';
 import { LLMQueryClassifier, LLMQueryType } from './core/llm-query-classifier.ts';
 import { handleTemporalFollowUp, canHandleTemporalFollowUp } from './handlers/temporal-followup-handler.ts';
