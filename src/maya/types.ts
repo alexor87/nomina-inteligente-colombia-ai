@@ -1,5 +1,24 @@
 import { ExecutableAction } from './types/ExecutableAction';
 
+// Conversation Types
+export interface ConversationSummary {
+  id: string;
+  title: string;
+  lastMessage: string;
+  updated_at: string;
+  message_count: number;
+}
+
+export interface Conversation {
+  id: string;
+  user_id: string;
+  company_id: string;
+  title: string;
+  is_archived: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface QuickReplyOption {
   value: string;
   label: string;

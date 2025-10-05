@@ -38,10 +38,25 @@ export class MayaChatService {
   private static instance: MayaChatService;
   private static readonly STORAGE_KEY = 'maya_conversation_history';
   private currentConversation: ChatConversation;
+  private conversationManager: any; // Will be injected
+  private currentConversationId: string | null = null;
 
   private constructor() {
     // Load from localStorage on initialization
     this.currentConversation = this.loadFromStorage();
+  }
+
+  setConversationManager(manager: any): void {
+    this.conversationManager = manager;
+  }
+
+  setCurrentConversation(conversationId: string): void {
+    this.currentConversationId = conversationId;
+    console.log('🔄 MAYA Chat: Set current conversation', { conversationId });
+  }
+
+  getCurrentConversationId(): string | null {
+    return this.currentConversationId;
   }
 
   static getInstance(): MayaChatService {
@@ -189,6 +204,19 @@ export class MayaChatService {
 
       this.currentConversation.messages.push(assistantMessage);
       this.saveToStorage(); // Persist to localStorage
+      
+      // NUEVO: Persist to database if conversation manager is available
+      if (this.conversationManager && this.currentConversationId) {
+        try {
+          await this.conversationManager.saveMessage(this.currentConversationId, userChatMessage);
+          await this.conversationManager.saveMessage(this.currentConversationId, assistantMessage);
+          console.log('💾 MAYA Chat: Saved messages to database');
+        } catch (dbError) {
+          console.error('❌ MAYA Chat: Failed to save to database', dbError);
+          // Continue anyway - localStorage is backup
+        }
+      }
+      
       return assistantMessage;
 
     } catch (error: any) {

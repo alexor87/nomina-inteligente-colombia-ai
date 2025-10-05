@@ -2,16 +2,21 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 import { useLocation } from 'react-router-dom';
 import { MayaEngine } from './MayaEngine';
 import { MayaChatService, type ChatMessage } from './services/MayaChatService';
+import { MayaConversationManager, type ConversationSummary } from './services/MayaConversationManager';
 import type { MayaMessage, MayaContext as MayaContextType, PayrollPhase } from './types';
 import { useDashboard } from '@/hooks/useDashboard';
 import { useEmployeeData } from '@/hooks/useEmployeeData';
 import { useCurrentCompany } from '@/hooks/useCurrentCompany';
+import { supabase } from '@/integrations/supabase/client';
 
 interface MayaProviderValue {
   currentMessage: MayaMessage | null;
   isVisible: boolean;
   isChatMode: boolean;
   chatHistory: ChatMessage[];
+  conversations: ConversationSummary[];
+  currentConversationId: string | null;
+  isLoadingConversations: boolean;
   updateContext: (context: MayaContextType) => Promise<void>;
   hideMessage: () => void;
   showMessage: () => void;
@@ -22,6 +27,9 @@ interface MayaProviderValue {
   performIntelligentValidation: (companyId: string, periodId?: string, employees?: any[]) => Promise<any>;
   setErrorContext: (errorType: string, errorDetails: any) => Promise<void>;
   clearConversation: () => void;
+  loadConversations: () => Promise<void>;
+  loadConversation: (conversationId: string) => Promise<void>;
+  createNewConversation: () => Promise<string>;
 }
 
 const MayaContext = createContext<MayaProviderValue | null>(null);
@@ -56,6 +64,12 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
   });
   const [mayaEngine] = useState(() => MayaEngine.getInstance());
   const [chatService] = useState(() => MayaChatService.getInstance());
+  const [conversationManager] = useState(() => MayaConversationManager.getInstance());
+  
+  // NUEVO: Estado de conversaciones
+  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
+  const [isLoadingConversations, setIsLoadingConversations] = useState(false);
   
   // Initialize chatHistory from persisted conversation
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>(() => {
@@ -63,6 +77,11 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
     console.log('🤖 MAYA Provider: Initializing with persisted history', { messageCount: persistedConversation.messages.length });
     return persistedConversation.messages;
   });
+
+  // Inject conversation manager into chat service
+  useEffect(() => {
+    chatService.setConversationManager(conversationManager);
+  }, [chatService, conversationManager]);
 
   const updateContext = useCallback(async (context: MayaContextType) => {
     try {
@@ -249,6 +268,55 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
     return comprehensiveContext;
   }, [location.pathname, companyId, dashboardLoading, employeesLoading, metrics, recentEmployees, recentActivity, payrollTrends, efficiencyMetrics, employees]);
 
+  // NUEVO: Cargar todas las conversaciones
+  const loadConversations = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !companyId) return;
+
+      setIsLoadingConversations(true);
+      const convs = await conversationManager.getConversations(user.id, companyId);
+      setConversations(convs);
+      console.log('📚 MAYA Provider: Loaded conversations', { count: convs.length });
+    } catch (error) {
+      console.error('❌ MAYA Provider: Error loading conversations', error);
+    } finally {
+      setIsLoadingConversations(false);
+    }
+  }, [conversationManager, companyId]);
+
+  // NUEVO: Cargar una conversación específica
+  const loadConversation = useCallback(async (conversationId: string) => {
+    try {
+      const messages = await conversationManager.loadConversationMessages(conversationId);
+      setChatHistory(messages);
+      setCurrentConversationId(conversationId);
+      chatService.setCurrentConversation(conversationId);
+      conversationManager.setCurrentConversationId(conversationId);
+      console.log('💬 MAYA Provider: Loaded conversation', { conversationId, messageCount: messages.length });
+    } catch (error) {
+      console.error('❌ MAYA Provider: Error loading conversation', error);
+    }
+  }, [conversationManager, chatService]);
+
+  // NUEVO: Crear nueva conversación
+  const createNewConversation = useCallback(async (): Promise<string> => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !companyId) throw new Error('No user or company');
+
+      const newConv = await conversationManager.createConversation(user.id, companyId);
+      await loadConversations(); // Refresh list
+      await loadConversation(newConv.id);
+      
+      console.log('✨ MAYA Provider: Created new conversation', { id: newConv.id });
+      return newConv.id;
+    } catch (error) {
+      console.error('❌ MAYA Provider: Error creating conversation', error);
+      throw error;
+    }
+  }, [conversationManager, companyId, loadConversations, loadConversation]);
+
   const sendMessage = useCallback(async (message: string, conversationState?: Record<string, any>) => {
     console.log('📨 MAYA: Sending message with state', { message, conversationState });
     
@@ -266,6 +334,19 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
       
       // Update chat history
       setChatHistory([...chatService.getConversation().messages]);
+      
+      // NUEVO: Auto-generar título si es la primera interacción
+      if (currentConversationId && chatHistory.length === 0) {
+        try {
+          const allMessages = chatService.getConversation().messages;
+          const title = await conversationManager.generateTitle(allMessages);
+          await conversationManager.updateConversationTitle(currentConversationId, title);
+          await loadConversations(); // Refresh para mostrar nuevo título
+          console.log('📝 MAYA Provider: Generated conversation title', { title });
+        } catch (titleError) {
+          console.error('❌ MAYA Provider: Failed to generate title', titleError);
+        }
+      }
       
       // Also create a contextual message for non-chat mode
       const contextualMessage: MayaMessage = {
@@ -287,7 +368,7 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
       console.error('Error sending message to MAYA:', error);
       throw error;
     }
-  }, [chatService, generatePageContext]);
+  }, [chatService, generatePageContext, currentConversationId, chatHistory.length, conversationManager, loadConversations]);
 
   const addActionMessage = useCallback((message: string, executableActions: any[]) => {
     const actionMessage: ChatMessage = {
@@ -364,23 +445,78 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
   }, [setPhase]);
 
   const clearConversation = useCallback(async () => {
-    chatService.clearConversation();
-    setChatHistory([]);
-    setIsChatMode(false);
-    
-    // Reinicializar con mensaje de bienvenida
-    await setPhase('initial');
-    
-    import('@/hooks/use-toast').then(({ toast }) => {
-      toast({
-        title: '🔄 Conversación reiniciada',
-        description: 'Puedes iniciar una nueva conversación',
-        duration: 3000
+    // NUEVO: Crear nueva conversación en lugar de solo limpiar
+    try {
+      const newConvId = await createNewConversation();
+      setChatHistory([]);
+      setIsChatMode(false);
+      
+      // Reinicializar con mensaje de bienvenida
+      await setPhase('initial');
+      
+      import('@/hooks/use-toast').then(({ toast }) => {
+        toast({
+          title: '🔄 Nueva conversación',
+          description: 'Puedes iniciar una conversación fresca',
+          duration: 3000
+        });
       });
-    });
-  }, [chatService, setPhase]);
+    } catch (error) {
+      console.error('Error creating new conversation', error);
+      // Fallback a limpieza simple
+      chatService.clearConversation();
+      setChatHistory([]);
+      setIsChatMode(false);
+    }
+  }, [createNewConversation, chatService, setPhase]);
 
-  // Sync with persisted conversation on mount with company validation
+  // NUEVO: Inicialización completa con migración y carga de conversaciones
+  useEffect(() => {
+    const initializeConversations = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !companyId) return;
+
+      try {
+        // 1. Cargar lista de conversaciones
+        await loadConversations();
+
+        // 2. Intentar migrar conversación de localStorage si existe
+        const migratedId = await conversationManager.migrateFromLocalStorage(user.id, companyId);
+        if (migratedId) {
+          console.log('✅ MAYA Provider: Migrated localStorage conversation', { id: migratedId });
+          await loadConversation(migratedId);
+          setIsChatMode(true);
+          return;
+        }
+
+        // 3. Restaurar última conversación activa
+        const lastConvId = conversationManager.getCurrentConversationId();
+        if (lastConvId) {
+          const messages = await conversationManager.loadConversationMessages(lastConvId);
+          if (messages.length > 0) {
+            await loadConversation(lastConvId);
+            setIsChatMode(true);
+            console.log('🔄 MAYA Provider: Restored last conversation', { id: lastConvId });
+            return;
+          }
+        }
+
+        // 4. Si no hay conversaciones, crear una nueva automáticamente
+        const existingConvs = await conversationManager.getConversations(user.id, companyId);
+        if (existingConvs.length === 0) {
+          const newConvId = await createNewConversation();
+          console.log('✨ MAYA Provider: Created initial conversation', { id: newConvId });
+        }
+
+      } catch (error) {
+        console.error('❌ MAYA Provider: Initialization error', error);
+      }
+    };
+
+    initializeConversations();
+  }, [companyId, conversationManager, loadConversations, loadConversation, createNewConversation]);
+
+  // Legacy: Sync with old localStorage conversation for backward compatibility
   useEffect(() => {
     const existingConversation = chatService.getConversation();
     const currentCompanyId = companyId;
@@ -450,6 +586,9 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
     isVisible,
     isChatMode,
     chatHistory,
+    conversations,
+    currentConversationId,
+    isLoadingConversations,
     updateContext,
     hideMessage,
     showMessage,
@@ -459,7 +598,10 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
     setPhase,
     performIntelligentValidation,
     setErrorContext,
-    clearConversation
+    clearConversation,
+    loadConversations,
+    loadConversation,
+    createNewConversation
   };
 
   return (
