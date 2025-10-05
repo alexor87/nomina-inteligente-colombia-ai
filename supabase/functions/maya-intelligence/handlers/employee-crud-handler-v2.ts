@@ -15,7 +15,7 @@ import {
 } from '../core/conversation-state-manager.ts';
 import { StateTransitionValidator } from '../core/state-transition-validator.ts';
 import { StateResponseBuilder } from '../core/state-response-builder.ts';
-import { ResponseBuilder } from '../utils/response-builder.ts';
+import { ResponseBuilder } from '../core/response-builder.ts';
 
 export class EmployeeCrudHandlerV2 extends BaseHandler {
   /**
