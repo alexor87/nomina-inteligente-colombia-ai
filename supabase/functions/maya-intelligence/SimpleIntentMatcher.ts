@@ -159,7 +159,13 @@ export class SimpleIntentMatcher {
     // ============================================================================
 
     // 1️⃣ EMPLOYEE_CREATE (confidence: 0.96 - MAYOR que EMPLOYEE_SEARCH)
-    if (/(?:crea|crear|agrega|agregar|registra|registrar|añade|añadir|añad[ií]|da\s+de\s+alta|dar\s+de\s+alta)\s+(?:un|una)?\s*(?:nuevo|nueva)?\s*(?:empleado|trabajador|colaborador|empleada|trabajadora|colaboradora)/i.test(text) ||
+    // Pattern 1: "crea a [nombre]" / "crear a [nombre]" (direct name pattern)
+    const directCreatePattern = /(?:crea|crear|agrega|agregar|registra|registrar|añade|añadir)\s+(?:a|al)\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)+/i;
+    
+    // Pattern 2: Traditional patterns with "empleado" keyword
+    const traditionalCreatePattern = /(?:crea|crear|agrega|agregar|registra|registrar|añade|añadir|añad[ií]|da\s+de\s+alta|dar\s+de\s+alta)\s+(?:un|una)?\s*(?:nuevo|nueva)?\s*(?:empleado|trabajador|colaborador|empleada|trabajadora|colaboradora)/i;
+    
+    if (directCreatePattern.test(text) || traditionalCreatePattern.test(text) ||
         /(?:nuevo|nueva)\s+(?:empleado|trabajador|colaborador|empleada|trabajadora|colaboradora)(?:\s+llamad[oa])?/i.test(text)) {
       
       // Extract employee name with multiple fallback patterns

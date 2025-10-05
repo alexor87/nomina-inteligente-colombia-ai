@@ -137,7 +137,10 @@ export class MayaChatService {
         role: 'assistant',
         content: data?.message ?? data?.response ?? "Disculpa, no pude procesar tu mensaje en este momento.",
         timestamp: new Date().toISOString(),
-        executableActions: data?.executableActions || data?.executable_actions || []
+        executableActions: data?.executableActions || data?.executable_actions || [],
+        quickReplies: data?.quickReplies || [],
+        fieldName: data?.fieldName,
+        conversationState: data?.conversationState
       };
 
       // Debug log for executable actions

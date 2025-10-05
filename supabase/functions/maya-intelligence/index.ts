@@ -16,6 +16,8 @@ import { QueryClassifier, QueryType } from './core/query-classifier.ts';
 import { LLMQueryClassifier, LLMQueryType } from './core/llm-query-classifier.ts';
 import { handleTemporalFollowUp, canHandleTemporalFollowUp } from './handlers/temporal-followup-handler.ts';
 import { TemporalResolver } from './core/temporal-resolver.ts';
+import { HandlerRegistry } from './core/handler-registry.ts';
+import { MayaLogger } from './core/types.ts';
 
 // ============================================================================
 // CONVERSATIONAL CONTEXT SYSTEM
@@ -1701,6 +1703,63 @@ serve(async (req) => {
       case 'getRecentPeriods':
         response = await getRecentPeriods(userSupabase, intent.params?.statusFilter);
         break;
+      
+      // ============================================================================
+      // EMPLOYEE CRUD HANDLERS (Using HandlerRegistry)
+      // ============================================================================
+      case 'createEmployee':
+      case 'updateEmployee':
+      case 'deleteEmployee': {
+        console.log(`🔧 [CRUD] Handling ${intent.method} via HandlerRegistry`);
+        
+        // Create logger
+        const logger: MayaLogger = {
+          info: (message: string, data?: any) => console.log(`[INFO] ${message}`, data || ''),
+          warn: (message: string, data?: any) => console.warn(`[WARN] ${message}`, data || ''),
+          error: (message: string, data?: any) => console.error(`[ERROR] ${message}`, data || '')
+        };
+        
+        // Initialize HandlerRegistry
+        const handlerRegistry = new HandlerRegistry(logger, undefined, userSupabase);
+        
+        // Build Intent object for handler
+        const handlerIntent = {
+          type: intent.type,
+          confidence: intent.confidence,
+          entities: intent.entities || [],
+          parameters: {
+            ...intent.params,
+            employee_name: intent.params?.name || intent.params?.employee_name,
+            conversationParams: conversation.length > 0 ? 
+              conversation[conversation.length - 1]?.conversationState : undefined
+          }
+        };
+        
+        // Build rich context
+        const richContext = {
+          userId: (await userSupabase.auth.getUser()).data.user?.id || '',
+          companyId: await getCurrentCompanyId(userSupabase) || '',
+          conversationHistory: conversation,
+          currentPage: 'maya-chat',
+          sessionId
+        };
+        
+        // Process via HandlerRegistry
+        const handlerResponse = await handlerRegistry.processIntent(handlerIntent, richContext);
+        
+        // Map HandlerResponse to standard response format
+        response = {
+          message: handlerResponse.response,
+          emotionalState: handlerResponse.emotionalState || 'neutral',
+          actions: handlerResponse.actions || [],
+          quickReplies: handlerResponse.quickReplies || [],
+          fieldName: handlerResponse.fieldName,
+          conversationState: handlerResponse.conversationState
+        };
+        
+        console.log(`✅ [CRUD] Handler response: ${response.quickReplies?.length || 0} quick replies, ${response.actions?.length || 0} actions`);
+        break;
+      }
         
       default:
         // ============================================================================
@@ -1782,6 +1841,11 @@ serve(async (req) => {
       // EXECUTABLE ACTIONS (CRITICAL FOR UI)
       executableActions: response.actions || [],
       executable_actions: response.actions || [], // Backward compatibility
+      
+      // QUICK REPLIES (FOR EMPLOYEE CRUD)
+      quickReplies: response.quickReplies || [],
+      fieldName: response.fieldName,
+      conversationState: response.conversationState,
       
       // ORIGINAL FIELDS (BACKWARD COMPATIBILITY)
       message: response.message,
