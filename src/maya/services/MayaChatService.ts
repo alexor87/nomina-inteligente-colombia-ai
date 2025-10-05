@@ -134,10 +134,12 @@ export class MayaChatService {
       // Extract last assistant state for state machine continuity
       const lastConversationState = this.getLastAssistantState();
 
-      console.log('🔄 State Sync:', {
+      console.log('🔄 [FRONTEND] State Sync:', {
         messageCount: enrichedConversation.length,
         lastStateExists: !!lastConversationState,
-        lastStateKeys: lastConversationState ? Object.keys(lastConversationState) : []
+        lastStateType: typeof lastConversationState,
+        lastStateKeys: lastConversationState ? Object.keys(lastConversationState) : [],
+        lastStateSample: lastConversationState ? JSON.stringify(lastConversationState).substring(0, 200) : null
       });
 
       // Call MAYA intelligence with full state context

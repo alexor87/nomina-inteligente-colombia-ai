@@ -452,8 +452,12 @@ serve(async (req) => {
     let intent: any = null;
 
     // STATE GATE: Force EMPLOYEE_CREATE if a pending creation flow exists
+    let stateGateActive = false;
+    let preservedContext: any = null;
     try {
       const lastStateRaw = metadata?.lastConversationState;
+      console.log(`🔍 [STATE_GATE] Checking metadata.lastConversationState: ${typeof lastStateRaw}`, lastStateRaw ? 'present' : 'missing');
+      
       if (lastStateRaw) {
         let ctx: any = null;
         if (typeof lastStateRaw === 'string') {
@@ -463,14 +467,29 @@ serve(async (req) => {
         } else if (lastStateRaw?.state && lastStateRaw?.flowType) {
           ctx = lastStateRaw;
         }
+        
         if (ctx && ctx.flowType === FlowType.EMPLOYEE_CREATE && !ConversationStateManager.isFlowComplete(ctx)) {
-          console.log(`📦 [STATE_GATE] Forcing EMPLOYEE_CREATE due to pending state: ${ctx.state}`);
-          intent = {
+          console.log(`🚨 [STATE_GATE] ACTIVE - Forcing EMPLOYEE_CREATE (state: ${ctx.state})`);
+          stateGateActive = true;
+          preservedContext = ctx;
+          
+          // SHORT-CIRCUIT: Skip all classification and jump directly to CRUD handler
+          const crudResponse = await crudHandlerRegistry.handleIntent({
             type: 'EMPLOYEE_CREATE',
             method: 'createEmployee',
-            params: {},
-            confidence: 0.99
-          } as any;
+            confidence: 0.99,
+            entities: [],
+            parameters: {
+              originalMessage: lastMessage,
+              conversationState: metadata?.lastConversationState
+            }
+          }, richContext);
+          
+          console.log(`✅ [STATE_GATE] Handler processed, returning response`);
+          return new Response(
+            JSON.stringify(crudResponse),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
         }
       }
     } catch (e) {

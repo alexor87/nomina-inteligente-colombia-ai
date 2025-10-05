@@ -390,7 +390,7 @@ export class StateResponseBuilder {
         { value: 'confirmar', label: 'Confirmar', icon: '✅' },
         { value: 'cancelar', label: 'Cancelar', icon: '❌' }
       ],
-      conversationState: context
+      conversationState: ConversationStateManager.serialize(context) // ✅ Serialize properly
     };
   }
 

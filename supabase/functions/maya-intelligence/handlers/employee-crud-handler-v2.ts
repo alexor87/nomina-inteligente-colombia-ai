@@ -210,10 +210,14 @@ export class EmployeeCrudHandlerV2 extends BaseHandler {
 
   /**
    * Parse employee data from natural language message
+   * Enhanced with comma-separated parsing and date recognition
    */
   private parseEmployeeDataFromMessage(message: string, context: ConversationContext): Record<string, any> {
     const parsed: Record<string, any> = {};
     const messageLower = message.toLowerCase();
+    
+    // Split by commas for multi-field detection
+    const parts = message.split(',').map(p => p.trim());
     
     // Parse document type
     if (!ConversationStateManager.getData(context, 'tipoDocumento')) {
@@ -256,44 +260,97 @@ export class EmployeeCrudHandlerV2 extends BaseHandler {
       }
     }
     
-    // Parse cedula (document number)
+    // Parse cedula (document number) - handle with/without dots
     if (!ConversationStateManager.getData(context, 'cedula')) {
-      const cedulaMatch = message.match(/\b(\d{5,15})\b/);
+      const cedulaMatch = message.match(/\b(\d{1,3}(?:[.,]?\d{3})*)\b/);
       if (cedulaMatch) {
-        parsed.cedula = cedulaMatch[1];
+        const cleanCedula = cedulaMatch[1].replace(/[.,]/g, '');
+        if (cleanCedula.length >= 5 && cleanCedula.length <= 15) {
+          parsed.cedula = cleanCedula;
+        }
       }
     }
     
-    // Parse salary
+    // Parse birth date - multiple formats
+    if (!ConversationStateManager.getData(context, 'fecha_nacimiento')) {
+      // dd/mm/yyyy or dd-mm-yyyy
+      const dateMatch1 = message.match(/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})\b/);
+      if (dateMatch1) {
+        parsed.fecha_nacimiento = `${dateMatch1[3]}-${dateMatch1[2].padStart(2, '0')}-${dateMatch1[1].padStart(2, '0')}`;
+      } else {
+        // "1 febrero 2025" or "1 de febrero de 2025"
+        const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+        const dateMatch2 = message.match(/\b(\d{1,2})\s+(?:de\s+)?([a-záéíóúñ]+)\s+(?:de\s+)?(\d{4})\b/i);
+        if (dateMatch2) {
+          const monthIndex = monthNames.findIndex(m => m.toLowerCase() === dateMatch2[2].toLowerCase());
+          if (monthIndex !== -1) {
+            parsed.fecha_nacimiento = `${dateMatch2[3]}-${(monthIndex + 1).toString().padStart(2, '0')}-${dateMatch2[1].padStart(2, '0')}`;
+          }
+        }
+      }
+    }
+    
+    // Parse hire date (fecha_ingreso)
+    if (!ConversationStateManager.getData(context, 'fecha_ingreso')) {
+      // Look for date patterns in comma-separated parts
+      for (const part of parts) {
+        const dateMatch1 = part.match(/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})\b/);
+        if (dateMatch1 && !parsed.fecha_nacimiento) {
+          parsed.fecha_ingreso = `${dateMatch1[3]}-${dateMatch1[2].padStart(2, '0')}-${dateMatch1[1].padStart(2, '0')}`;
+          break;
+        }
+        
+        const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+        const dateMatch2 = part.match(/\b(\d{1,2})\s+(?:de\s+)?([a-záéíóúñ]+)\s+(?:de\s+)?(\d{4})\b/i);
+        if (dateMatch2 && !parsed.fecha_nacimiento) {
+          const monthIndex = monthNames.findIndex(m => m.toLowerCase() === dateMatch2[2].toLowerCase());
+          if (monthIndex !== -1) {
+            parsed.fecha_ingreso = `${dateMatch2[3]}-${(monthIndex + 1).toString().padStart(2, '0')}-${dateMatch2[1].padStart(2, '0')}`;
+            break;
+          }
+        }
+      }
+    }
+    
+    // Parse salary - handle various formats
     if (!ConversationStateManager.getData(context, 'salario_base')) {
-      // Try to find currency amounts
       const salaryMatch = message.match(/\$?\s*([\d,.]+)\s*(?:pesos|cop|cop)?/i);
       if (salaryMatch) {
         const salaryStr = salaryMatch[1].replace(/[,.]/g, '');
         const salary = parseInt(salaryStr);
-        // Only accept reasonable salary values (> 100k COP)
         if (!isNaN(salary) && salary > 100000) {
           parsed.salario_base = salary;
         }
       }
     }
     
-    // Parse position/cargo
+    // Parse position/cargo - enhanced detection
     if (!ConversationStateManager.getData(context, 'cargo')) {
       const cargoPatterns = [
         /cargo[:\s]+([a-záéíóúñ\s]+)/i,
         /posición[:\s]+([a-záéíóúñ\s]+)/i,
-        /como[:\s]+([a-záéíóúñ\s]+)/i,
-        /de[:\s]+([a-záéíóúñ\s]+)/i
+        /como[:\s]+([a-záéíóúñ\s]+)/i
       ];
       
       for (const pattern of cargoPatterns) {
         const match = message.match(pattern);
         if (match && match[1]) {
           const cargo = match[1].trim();
-          // Only accept if it's at least 3 characters and not a document type
           if (cargo.length >= 3 && !['cédula', 'cedula', 'pasaporte'].includes(cargo.toLowerCase())) {
             parsed.cargo = cargo;
+            break;
+          }
+        }
+      }
+      
+      // If not found, check comma-separated parts for standalone job titles
+      if (!parsed.cargo) {
+        for (const part of parts) {
+          const cleaned = part.trim();
+          // Check if it looks like a job title (alphanumeric, spaces, 3+ chars, no numbers-only)
+          if (cleaned.length >= 3 && /^[a-záéíóúñ\s]+$/i.test(cleaned) && 
+              !['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'].some(m => cleaned.toLowerCase().includes(m))) {
+            parsed.cargo = cleaned;
             break;
           }
         }
