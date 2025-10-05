@@ -7,7 +7,6 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 import type { ConversationContext, FlowType } from '../core/conversation-state-manager.ts';
-import { createHash } from 'https://deno.land/std@0.224.0/crypto/mod.ts';
 
 export interface SessionState {
   session_id: string;
@@ -52,7 +51,7 @@ export class SessionManager {
       }
 
       // Validate checksum
-      const calculatedChecksum = this.calculateChecksum(data.current_state, data.accumulated_data);
+      const calculatedChecksum = await this.calculateChecksum(data.current_state, data.accumulated_data);
       if (calculatedChecksum !== data.checksum) {
         console.warn(`⚠️ [SESSION_MANAGER] Checksum mismatch for session ${sessionId}`);
       }
@@ -93,7 +92,7 @@ export class SessionManager {
         flowType: context.flowType,
       };
 
-      const checksum = this.calculateChecksum(currentState, context.accumulatedData);
+      const checksum = await this.calculateChecksum(currentState, context.accumulatedData);
 
       // Check if session exists
       const existing = await this.loadContext(sessionId);
@@ -152,13 +151,15 @@ export class SessionManager {
   }
 
   /**
-   * Calculate checksum for state validation
+   * Calculate checksum for state validation using Web Crypto API
    */
-  private calculateChecksum(currentState: any, accumulatedData: any): string {
+  private async calculateChecksum(currentState: any, accumulatedData: any): Promise<string> {
     const payload = JSON.stringify({ currentState, accumulatedData });
-    const hash = createHash('md5');
-    hash.update(payload);
-    return hash.toString();
+    const encoder = new TextEncoder();
+    const dataBuffer = encoder.encode(payload);
+    const hashBuffer = await crypto.subtle.digest('MD5', dataBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
   }
 
   /**
