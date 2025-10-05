@@ -6,6 +6,7 @@
 
 import { LLMClassification, LLMQueryType } from '../core/llm-query-classifier.ts';
 import { ConversationContextAnalyzer } from '../core/conversation-context-analyzer.ts';
+import { TemporalResolver } from '../core/temporal-resolver.ts';
 
 export interface Intent {
   type: string;
@@ -69,48 +70,26 @@ export async function handleTemporalFollowUp(
     return null;
   }
   
-  // 4. Build params from LLM extracted context
-  const params: any = {};
-  const extracted = llmClassification.extractedContext;
+  // 4. Build params using TemporalResolver (standardized approach)
+  const temporalParams = TemporalResolver.resolve(llmClassification.extractedContext);
   
-  // Extract temporal parameters
-  if (extracted.temporalModifier === 'LAST_YEAR') {
-    const lastYear = new Date().getFullYear() - 1;
-    params.year = lastYear;
-    params.month = null;
-    console.log(`   Temporal modifier: LAST_YEAR (${lastYear})`);
-  } else if (extracted.temporalModifier === 'THIS_YEAR' || extracted.temporalModifier === 'FULL_YEAR') {
-    const currentYear = new Date().getFullYear();
-    params.year = currentYear;
-    params.month = null;
-    console.log(`   Temporal modifier: THIS_YEAR (${currentYear})`);
-  } else if (extracted.temporalModifier === 'SPECIFIC_MONTH') {
-    params.month = extracted.month || null;
-    params.year = extracted.year || new Date().getFullYear();
-    console.log(`   Temporal modifier: SPECIFIC_MONTH (${params.month} ${params.year})`);
-  } else if (extracted.temporalModifier === 'QUARTER') {
-    params.quarter = extracted.quarter || null;
-    params.year = extracted.year || new Date().getFullYear();
-    console.log(`   Temporal modifier: QUARTER (Q${params.quarter} ${params.year})`);
-  } else if (extracted.temporalModifier === 'SEMESTER') {
-    params.semester = extracted.semester || null;
-    params.year = extracted.year || new Date().getFullYear();
-    console.log(`   Temporal modifier: SEMESTER (S${params.semester} ${params.year})`);
-  } else if (extracted.year) {
-    params.year = extracted.year;
-    params.month = extracted.month || null;
-    console.log(`   Explicit year: ${params.year}${params.month ? `, month: ${params.month}` : ''}`);
-  }
+  console.log(`   ✅ Temporal params resolved:`, {
+    type: temporalParams.type,
+    displayName: TemporalResolver.getDisplayName(temporalParams)
+  });
   
-  // 5. Return intent with updated temporal params
+  // 5. Return intent with standardized TemporalParams
   const intent: Intent = {
     type: mapping.intentType,
     method: mapping.method,
-    params,
+    params: temporalParams,
     confidence: llmClassification.confidence
   };
   
-  console.log(`✅ [TEMPORAL_FOLLOWUP] Intent created: ${intent.type} with params:`, params);
+  console.log(`✅ [TEMPORAL_FOLLOWUP] Intent created: ${intent.type}`, {
+    type: temporalParams.type,
+    displayName: TemporalResolver.getDisplayName(temporalParams)
+  });
   
   return intent;
 }

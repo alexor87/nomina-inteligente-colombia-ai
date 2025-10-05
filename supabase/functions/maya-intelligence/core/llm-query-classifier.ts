@@ -75,12 +75,14 @@ ${lastContext ? `Última consulta fue sobre: ${lastContext.summary}` : 'No hay c
 - "y el año pasado?" → TEMPORAL_FOLLOWUP (LAST_YEAR)
 - "y este año?" → TEMPORAL_FOLLOWUP (THIS_YEAR)
 - "y en enero?" → TEMPORAL_FOLLOWUP (SPECIFIC_MONTH: enero)
+- "y los últimos 3 meses?" → TEMPORAL_FOLLOWUP (LAST_N_MONTHS: 3)
+- "y los últimos 6 meses?" → TEMPORAL_FOLLOWUP (LAST_N_MONTHS: 6)
 - "y a María?" → EMPLOYEE_FOLLOWUP
 - "cuántos empleados?" → AGGREGATION (sin follow-up)
 - "liquidar nómina" → DIRECT_INTENT
 
 **Extracción de parámetros:**
-- Para temporales: extraer year, month, quarter, semester
+- Para temporales: extraer year, month, quarter, semester, monthCount (para "últimos N meses")
 - Para empleados: extraer nombre completo
 - Para agregaciones: extraer métrica (salario, incapacidad, etc.)`;
 
@@ -126,8 +128,13 @@ Clasifica esta query y extrae los parámetros relevantes.`;
                       properties: {
                         temporalModifier: {
                           type: "string",
-                          enum: ["LAST_YEAR", "THIS_YEAR", "SPECIFIC_MONTH", "QUARTER", "SEMESTER", "LAST_MONTH", "FULL_YEAR"],
+                          enum: ["LAST_YEAR", "THIS_YEAR", "SPECIFIC_MONTH", "QUARTER", "SEMESTER", "LAST_N_MONTHS", "FULL_YEAR"],
                           description: "Temporal modifier for follow-up queries"
+                        },
+                        monthCount: {
+                          type: "number",
+                          description: "Number of months for 'últimos N meses' queries (e.g., 3 for 'últimos 3 meses')"
+                        },
                         },
                         year: {
                           type: "number",
@@ -271,7 +278,8 @@ Clasifica esta query y extrae los parámetros relevantes.`;
         queryType: LLMQueryType.TEMPORAL_FOLLOWUP,
         confidence: 0.80,
         extractedContext: {
-          temporalModifier: "LAST_MONTH",
+          temporalModifier: "LAST_N_MONTHS",
+          monthCount: parseInt(monthsMatch[1]),
           year: new Date().getFullYear()
         },
         reasoning: `Text fallback: detected "últimos ${monthsMatch[1]} meses"`

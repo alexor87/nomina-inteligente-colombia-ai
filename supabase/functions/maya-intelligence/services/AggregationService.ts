@@ -9,6 +9,9 @@
 // - Total de horas extras
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { TemporalParams, TemporalType } from '../core/temporal-types.ts';
+import { PeriodQueryBuilder } from '../core/period-query-builder.ts';
+import { TemporalResolver } from '../core/temporal-resolver.ts';
 
 export interface AggregationResult {
   message: string;
@@ -1127,11 +1130,11 @@ export async function getLowestCostEmployees(
 }
 
 // ============================================================================
-// 5. TOTAL INCAPACITY DAYS
+// 5. TOTAL INCAPACITY DAYS (REFACTORED WITH TEMPORAL ARCHITECTURE)
 // ============================================================================
 export async function getTotalIncapacityDays(
   client: any,
-  params: { month?: string; year?: number; periodId?: string }
+  params: TemporalParams | { month?: string; year?: number; periodId?: string; monthCount?: number }
 ): Promise<AggregationResult> {
   console.log('🏥 [AGGREGATION] getTotalIncapacityDays called with params:', params);
   
@@ -1144,264 +1147,70 @@ export async function getTotalIncapacityDays(
       };
     }
     
-    // 🆕 HANDLE FULL YEAR QUERY (year without month)
-    if (params.year && !params.month && !params.periodId) {
-      console.log(`🏥 [AGGREGATION] Full year query detected for year: ${params.year}`);
-      
-      // Get all periods for the specified year
-      const { data: periods, error: periodsError } = await client
-        .from('payroll_periods_real')
-        .select('id, periodo')
-        .eq('company_id', companyId)
-        .ilike('periodo', `%${params.year}%`)
-        .order('fecha_inicio', { ascending: true });
-      
-      if (periodsError || !periods || periods.length === 0) {
-        return {
-          message: `❌ No encontré períodos cerrados para el año ${params.year}`,
-          emotionalState: 'concerned'
-        };
-      }
-      
-      console.log(`🏥 [AGGREGATION] Found ${periods.length} periods for year ${params.year}`);
-      
-      // Query all incapacidades for all periods of the year
-      const allNovedades: any[] = [];
-      
-      for (const period of periods) {
-        const { data: novedades } = await client
-          .from('payroll_novedades')
-          .select(`
-            dias,
-            valor,
-            subtipo,
-            empleado_id
-          `)
-          .eq('company_id', companyId)
-          .eq('periodo_id', period.id)
-          .eq('tipo_novedad', 'incapacidad');
-        
-        if (novedades) {
-          allNovedades.push(...novedades);
-        }
-      }
-      
-      if (allNovedades.length === 0) {
-        return {
-          message: `🏥 **Días de Incapacidad - Año ${params.year}**\n\n` +
-            `✅ No hubo incapacidades registradas en el año ${params.year}.`,
-          emotionalState: 'celebrating',
-          data: {
-            period: `Año ${params.year}`,
-            totalDays: 0,
-            totalIncapacities: 0,
-            totalCost: 0
-          }
-        };
-      }
-      
-      const totalDays = allNovedades.reduce((sum, n) => sum + (n.dias || 0), 0);
-      const totalCost = allNovedades.reduce((sum, n) => sum + Math.abs(n.valor || 0), 0);
-      const employeeCount = new Set(allNovedades.map(n => n.empleado_id)).size;
-      
-      const bySubtype: Record<string, { count: number; days: number }> = {};
-      allNovedades.forEach(n => {
-        const subtype = n.subtipo || 'general';
-        if (!bySubtype[subtype]) {
-          bySubtype[subtype] = { count: 0, days: 0 };
-        }
-        bySubtype[subtype].count++;
-        bySubtype[subtype].days += n.dias || 0;
-      });
-      
-      const subtypeBreakdown = Object.entries(bySubtype)
-        .map(([type, data]) => `• **${type}**: ${data.count} incapacidades, ${data.days} días`)
-        .join('\n');
-      
+    // 🆕 BACKWARD COMPATIBILITY: Convert legacy params to TemporalParams
+    let temporalParams: TemporalParams;
+    if ('type' in params && params.type) {
+      // Already using TemporalParams format
+      temporalParams = params as TemporalParams;
+      console.log('✅ [AGGREGATION] Using TemporalParams format');
+    } else {
+      // Legacy format - convert to TemporalParams
+      temporalParams = TemporalResolver.fromLegacy(params);
+      console.log('🔄 [AGGREGATION] Converted legacy params to TemporalParams');
+    }
+    
+    // 🆕 USE PERIOD QUERY BUILDER (centralized period resolution)
+    const resolved = await PeriodQueryBuilder.resolvePeriods(client, companyId, temporalParams);
+    
+    if (!resolved) {
       return {
-        message: `🏥 **Días de Incapacidad - Año ${params.year}**\n\n` +
-          `📅 **${periods.length} período${periods.length > 1 ? 's' : ''} analizados**\n` +
-          `📊 **Total días incapacidad: ${totalDays}**\n` +
-          `📋 **${allNovedades.length}** incapacidades registradas\n` +
-          `👥 **${employeeCount}** empleados afectados\n` +
-          `💰 Costo estimado: ${formatCurrency(totalCost)}\n\n` +
-          `**Por tipo:**\n${subtypeBreakdown}`,
-        emotionalState: 'professional',
-        data: {
-          period: `Año ${params.year}`,
-          periodsCount: periods.length,
-          totalIncapacities: allNovedades.length,
-          totalDays,
-          totalCost,
-          affectedEmployees: employeeCount,
-          bySubtype
-        },
-        visualization: {
-          type: 'metric',
-          data: {
-            title: 'Días de Incapacidad',
-            value: totalDays,
-            subtitle: `Año ${params.year}`,
-            breakdown: Object.entries(bySubtype).map(([type, data]) => ({
-              label: type,
-              value: data.days
-            }))
-          }
-        }
-      };
-    }
-    
-    // 🆕 INFER YEAR IF ONLY MONTH PROVIDED
-    let targetYear = params.year;
-    
-    if (params.month && !params.year && !params.periodId) {
-      const recentPeriod = await getPeriodId(client, companyId, { month: params.month });
-      if (recentPeriod) {
-        const yearMatch = recentPeriod.periodo.match(/(\d{4})/);
-        targetYear = yearMatch ? parseInt(yearMatch[1]) : null;
-      }
-    }
-    
-    // 🆕 DETECT FULL MONTH QUERY
-    const isFullMonthQuery = params.month && targetYear && !params.periodId;
-    
-    if (isFullMonthQuery) {
-      const periods = await getPeriodsByMonth(client, companyId, {
-        month: params.month!,
-        year: targetYear!
-      });
-      
-      if (!periods || periods.length === 0) {
-        return {
-          message: `❌ No encontré períodos cerrados para ${params.month} ${targetYear}`,
-          emotionalState: 'concerned'
-        };
-      }
-      
-      const allNovedades: any[] = [];
-      
-      for (const period of periods) {
-        const { data: novedades } = await client
-          .from('payroll_novedades')
-          .select(`
-            dias,
-            valor,
-            subtipo,
-            empleado_id
-          `)
-          .eq('company_id', companyId)
-          .eq('periodo_id', period.id)
-          .eq('tipo_novedad', 'incapacidad');
-        
-        if (novedades) {
-          allNovedades.push(...novedades);
-        }
-      }
-      
-      if (allNovedades.length === 0) {
-        const monthCapitalized = params.month.charAt(0).toUpperCase() + params.month.slice(1);
-        return {
-          message: `✅ No hubo incapacidades registradas en ${monthCapitalized} ${params.year}.`,
-          emotionalState: 'celebrating'
-        };
-      }
-      
-      const totalDays = allNovedades.reduce((sum, n) => sum + (n.dias || 0), 0);
-      const totalCost = allNovedades.reduce((sum, n) => sum + Math.abs(n.valor || 0), 0);
-      const employeeCount = new Set(allNovedades.map(n => n.empleado_id)).size;
-      
-      const bySubtype: Record<string, { count: number; days: number }> = {};
-      allNovedades.forEach(n => {
-        const subtype = n.subtipo || 'general';
-        if (!bySubtype[subtype]) {
-          bySubtype[subtype] = { count: 0, days: 0 };
-        }
-        bySubtype[subtype].count++;
-        bySubtype[subtype].days += n.dias || 0;
-      });
-      
-      const subtypeBreakdown = Object.entries(bySubtype)
-        .map(([type, data]) => `• **${type}**: ${data.count} incapacidades, ${data.days} días`)
-        .join('\n');
-      
-      const periodNames = periods.map(p => p.periodo).join(', ');
-      const monthCapitalized = params.month.charAt(0).toUpperCase() + params.month.slice(1);
-      
-      return {
-        message: `🏥 **Total de Incapacidades - ${monthCapitalized} ${targetYear} (Mes Completo)**\n\n` +
-          `📅 **${periods.length} período${periods.length > 1 ? 's' : ''} sumado${periods.length > 1 ? 's' : ''}**: ${periodNames}\n` +
-          `📊 **${allNovedades.length}** incapacidades registradas\n` +
-          `👥 **${employeeCount}** empleados afectados\n` +
-          `📅 **${totalDays}** días totales\n` +
-          `💰 Costo estimado: ${formatCurrency(totalCost)}\n\n` +
-          `**Por tipo:**\n${subtypeBreakdown}`,
-        emotionalState: 'professional',
-        data: {
-          period: `${monthCapitalized} ${targetYear}`,
-          periodsCount: periods.length,
-          totalIncapacities: allNovedades.length,
-          totalDays,
-          totalCost,
-          affectedEmployees: employeeCount,
-          bySubtype
-        }
-      };
-    }
-    
-    // ORIGINAL LOGIC: Specific period query
-    let periodId = params.periodId;
-    let periodName = '';
-    
-    if (!periodId) {
-      const period = await getPeriodId(client, companyId, params);
-      if (!period) {
-        return {
-          message: params.month || params.year 
-            ? `❌ No encontré períodos cerrados para ${params.month || ''} ${params.year || ''}`
-            : '❌ No encontré períodos cerrados en tu empresa.',
-          emotionalState: 'concerned'
-        };
-      }
-      periodId = period.id;
-      periodName = period.periodo;
-    }
-    
-    // Query novedades for incapacidades
-    const { data: novedades, error } = await client
-      .from('payroll_novedades')
-      .select(`
-        dias,
-        valor,
-        subtipo,
-        empleado_id,
-        employees!inner(nombre, apellido)
-      `)
-      .eq('company_id', companyId)
-      .eq('periodo_id', periodId)
-      .eq('tipo_novedad', 'incapacidad');
-    
-    if (error) {
-      console.error('❌ [AGGREGATION] Error querying novedades:', error);
-      return {
-        message: '❌ Hubo un error al consultar las novedades.',
+        message: `❌ No encontré períodos cerrados para ${TemporalResolver.getDisplayName(temporalParams)}`,
         emotionalState: 'concerned'
       };
     }
     
-    if (!novedades || novedades.length === 0) {
+    console.log(`✅ [AGGREGATION] Found ${resolved.periods.length} periods for ${resolved.displayName}`);
+    
+    // Query incapacidades for ALL resolved periods
+    const allNovedades: any[] = [];
+    
+    for (const period of resolved.periods) {
+      const { data: novedades } = await client
+        .from('payroll_novedades')
+        .select('dias, valor, subtipo, empleado_id')
+        .eq('company_id', companyId)
+        .eq('periodo_id', period.id)
+        .eq('tipo_novedad', 'incapacidad');
+      
+      if (novedades) {
+        allNovedades.push(...novedades);
+      }
+    }
+    
+    // Handle no incapacities case
+    if (allNovedades.length === 0) {
       return {
-        message: `✅ No hubo incapacidades registradas en el período ${periodName}.`,
-        emotionalState: 'celebrating'
+        message: `🏥 **Días de Incapacidad - ${resolved.displayName}**\n\n` +
+          `✅ No hubo incapacidades registradas en ${resolved.displayName}.`,
+        emotionalState: 'celebrating',
+        data: {
+          period: resolved.displayName,
+          periodsCount: resolved.periods.length,
+          totalDays: 0,
+          totalIncapacities: 0,
+          totalCost: 0
+        }
       };
     }
     
-    const totalDays = novedades.reduce((sum, n) => sum + (n.dias || 0), 0);
-    const totalCost = novedades.reduce((sum, n) => sum + Math.abs(n.valor || 0), 0);
-    const employeeCount = new Set(novedades.map(n => n.empleado_id)).size;
+    // Calculate totals
+    const totalDays = allNovedades.reduce((sum, n) => sum + (n.dias || 0), 0);
+    const totalCost = allNovedades.reduce((sum, n) => sum + Math.abs(n.valor || 0), 0);
+    const employeeCount = new Set(allNovedades.map(n => n.empleado_id)).size;
     
-    // Group by subtype
+    // Breakdown by subtype
     const bySubtype: Record<string, { count: number; days: number }> = {};
-    novedades.forEach(n => {
+    allNovedades.forEach(n => {
       const subtype = n.subtipo || 'general';
       if (!bySubtype[subtype]) {
         bySubtype[subtype] = { count: 0, days: 0 };
@@ -1415,16 +1224,18 @@ export async function getTotalIncapacityDays(
       .join('\n');
     
     return {
-      message: `🏥 **Total de Incapacidades - ${periodName}**\n\n` +
-        `📊 **${novedades.length}** incapacidades registradas\n` +
+      message: `🏥 **Días de Incapacidad - ${resolved.displayName}**\n\n` +
+        `📅 **${resolved.periods.length} período${resolved.periods.length > 1 ? 's' : ''} analizados**\n` +
+        `📊 **Total días incapacidad: ${totalDays}**\n` +
+        `📋 **${allNovedades.length}** incapacidades registradas\n` +
         `👥 **${employeeCount}** empleados afectados\n` +
-        `📅 **${totalDays}** días totales\n` +
         `💰 Costo estimado: ${formatCurrency(totalCost)}\n\n` +
         `**Por tipo:**\n${subtypeBreakdown}`,
-      emotionalState: 'professional',
+      emotionalState: totalDays > 30 ? 'concerned' : 'professional',
       data: {
-        period: periodName,
-        totalIncapacities: novedades.length,
+        period: resolved.displayName,
+        periodsCount: resolved.periods.length,
+        totalIncapacities: allNovedades.length,
         totalDays,
         totalCost,
         affectedEmployees: employeeCount,
@@ -1435,7 +1246,7 @@ export async function getTotalIncapacityDays(
         data: {
           title: 'Días de Incapacidad',
           value: totalDays,
-          subtitle: periodName,
+          subtitle: resolved.displayName,
           breakdown: Object.entries(bySubtype).map(([type, data]) => ({
             label: type,
             value: data.days
@@ -1446,11 +1257,12 @@ export async function getTotalIncapacityDays(
   } catch (e) {
     console.error('❌ [AGGREGATION] getTotalIncapacityDays failed:', e);
     return {
-      message: `❌ Error al consultar incapacidades: ${e.message}`,
+      message: `❌ Error al calcular días de incapacidad: ${e.message}`,
       emotionalState: 'concerned'
     };
   }
 }
+
 
 // ============================================================================
 // 5. TOTAL OVERTIME HOURS
