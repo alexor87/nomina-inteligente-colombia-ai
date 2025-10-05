@@ -104,53 +104,80 @@ export class EmployeeCrudHandlerV2 extends BaseHandler {
     
     console.log(`📊 [V2] Accumulated data:`, convContext.accumulatedData);
     
-    // 5. Determine next state
-    const nextState = ConversationStateManager.getNextState(convContext);
+    // 5. Auto-advance loop through intermediate states
+    const MAX_AUTO_ADVANCES = 5;
+    let autoAdvanceCount = 0;
+    let currentContext = convContext;
     
-    console.log(`🎯 [V2] Current state: ${convContext.state}, Next state: ${nextState || 'COMPLETE'}`);
-    
-    // 6. If no next state, flow is complete - build executable action
-    if (!nextState) {
-      console.log(`✅ [V2] Flow complete, building executable action`);
-      const actionResponse = StateResponseBuilder.buildExecutableActionFromContext(
-        'EMPLOYEE_CREATE' as FlowType, 
-        convContext
+    while (autoAdvanceCount < MAX_AUTO_ADVANCES) {
+      // Determine next state
+      const nextState = ConversationStateManager.getNextState(currentContext);
+      
+      console.log(`🎯 [V2] Current state: ${currentContext.state}, Next state: ${nextState || 'COMPLETE'}`);
+      
+      // 6. If no next state, flow is complete - build executable action
+      if (!nextState) {
+        console.log(`✅ [V2] Flow complete, building executable action`);
+        const actionResponse = StateResponseBuilder.buildExecutableActionFromContext(
+          'EMPLOYEE_CREATE' as FlowType, 
+          currentContext
+        );
+        
+        // Log final state for debugging
+        console.log(`🎬 [V2] Final action:`, actionResponse.actions?.[0]?.type);
+        
+        return actionResponse;
+      }
+      
+      // 7. Validate transition
+      const validation = StateTransitionValidator.validateTransition(currentContext.state, nextState);
+      
+      if (!validation.isValid) {
+        console.error(`❌ [V2] Invalid transition: ${currentContext.state} → ${nextState}`);
+        return StateResponseBuilder.buildTransitionErrorResponse(
+          currentContext.state,
+          nextState,
+          validation.reason || 'Transición inválida'
+        );
+      }
+      
+      // 8. Transition to next state
+      currentContext = ConversationStateManager.transitionTo(
+        currentContext, 
+        nextState, 
+        'user_input',
+        'Advancing to next required field'
       );
       
-      // Log final state for debugging
-      console.log(`🎬 [V2] Final action:`, actionResponse.actions?.[0]?.type);
+      console.log(`➡️ [V2] Transitioned to: ${nextState}`);
       
-      return actionResponse;
+      // 9. Build response for the new state
+      const stateResponse = StateResponseBuilder.buildStateResponse(nextState, currentContext);
+      
+      // 10. Check if this state requires user input (has quick replies or is terminal)
+      const hasQuickReplies = stateResponse.quickReplies && stateResponse.quickReplies.length > 0;
+      const isTerminalState = nextState.endsWith('_READY') || nextState === 'READY';
+      const hasMessage = stateResponse.message && stateResponse.message.trim().length > 0;
+      
+      // If state requires user input, stop auto-advancing
+      if (hasQuickReplies || isTerminalState || hasMessage) {
+        console.log(`🛑 [V2] Stopped auto-advance at: ${nextState} (quickReplies: ${hasQuickReplies}, terminal: ${isTerminalState}, message: ${hasMessage})`);
+        console.log(`💬 [V2] Response: ${stateResponse.quickReplies?.length || 0} quick replies`);
+        return stateResponse;
+      }
+      
+      // This is an intermediate state, continue auto-advancing
+      autoAdvanceCount++;
+      console.log(`⚡ [V2] Auto-advancing (${autoAdvanceCount}/${MAX_AUTO_ADVANCES}): ${currentContext.state} → ${nextState}`);
+      
+      // Parse more data if available (in case we extracted multiple fields initially)
+      // This allows skipping multiple states in one message
     }
     
-    // 7. Validate transition
-    const validation = StateTransitionValidator.validateTransition(convContext.state, nextState);
-    
-    if (!validation.isValid) {
-      console.error(`❌ [V2] Invalid transition: ${convContext.state} → ${nextState}`);
-      return StateResponseBuilder.buildTransitionErrorResponse(
-        convContext.state,
-        nextState,
-        validation.reason || 'Transición inválida'
-      );
-    }
-    
-    // 8. Transition to next state
-    convContext = ConversationStateManager.transitionTo(
-      convContext, 
-      nextState, 
-      'user_input',
-      'Advancing to next required field'
-    );
-    
-    console.log(`➡️ [V2] Transitioned to: ${nextState}`);
-    
-    // 9. Build response for the new state
-    const stateResponse = StateResponseBuilder.buildStateResponse(nextState, convContext);
-    
-    console.log(`💬 [V2] Response: ${stateResponse.quickReplies?.length || 0} quick replies`);
-    
-    return stateResponse;
+    // If we hit the max auto-advances, return current state
+    console.warn(`⚠️ [V2] Max auto-advances (${MAX_AUTO_ADVANCES}) reached, stopping at: ${currentContext.state}`);
+    const finalResponse = StateResponseBuilder.buildStateResponse(currentContext.state, currentContext);
+    return finalResponse;
   }
 
   /**
