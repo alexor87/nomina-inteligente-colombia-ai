@@ -1762,6 +1762,20 @@ serve(async (req) => {
     // Sanitize response
     const sanitizedResponse = ResponseOrchestrator.sanitize(orchestratedResponse);
     
+    // ============================================================================
+    // 💾 SAVE CONVERSATION STATE (if exists)
+    // ============================================================================
+    if (sanitizedResponse?.conversationState) {
+      console.log(`💾 [SESSION_MANAGER] Saving conversation state for session: ${sessionId}`);
+      try {
+        await sessionManager.saveContext(sanitizedResponse.conversationState);
+        console.log(`✅ [SESSION_MANAGER] Context saved successfully`);
+      } catch (saveError) {
+        console.error('🚨 [SESSION_MANAGER] Error saving context:', saveError);
+        // No bloquear la respuesta si falla el guardado
+      }
+    }
+    
     // Return enhanced JSON response with backward compatibility
     return new Response(JSON.stringify({
       ...sanitizedResponse,
