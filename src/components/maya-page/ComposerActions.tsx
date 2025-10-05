@@ -8,7 +8,7 @@ export const ComposerActions: React.FC = () => {
       <Button
         variant="ghost"
         size="sm"
-        className="text-slate-400 hover:text-white hover:bg-white/5 h-8 w-8 p-0"
+        className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 h-8 w-8 p-0"
         disabled
         title="Próximamente: Comando de voz"
       >
@@ -18,7 +18,7 @@ export const ComposerActions: React.FC = () => {
       <Button
         variant="ghost"
         size="sm"
-        className="text-slate-400 hover:text-white hover:bg-white/5 h-8 w-8 p-0"
+        className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 h-8 w-8 p-0"
         disabled
         title="Próximamente: Adjuntar archivos"
       >
@@ -28,7 +28,7 @@ export const ComposerActions: React.FC = () => {
       <Button
         variant="ghost"
         size="sm"
-        className="text-slate-400 hover:text-white hover:bg-white/5 h-8 w-8 p-0"
+        className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 h-8 w-8 p-0"
         disabled
         title="Próximamente: Emojis"
       >

@@ -7,7 +7,7 @@ import { motion } from 'framer-motion';
 
 export default function MayaPage() {
   return (
-    <div className="relative h-screen w-full overflow-hidden bg-gradient-to-br from-slate-900 via-purple-900/20 to-slate-900">
+    <div className="relative h-screen w-full overflow-hidden bg-white">
       <MayaBackground />
       
       <motion.div 

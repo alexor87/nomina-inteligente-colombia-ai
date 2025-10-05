@@ -48,7 +48,7 @@ export const MayaChatArea: React.FC = () => {
   return (
     <div 
       ref={scrollRef}
-      className="flex-1 overflow-y-auto mb-4 space-y-3 scrollbar-thin scrollbar-thumb-purple-500/10 scrollbar-track-transparent pr-2"
+      className="flex-1 overflow-y-auto mb-4 space-y-3 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent pr-2"
     >
       <AnimatePresence mode="popLayout">
         {groupedMessages.length === 0 ? (
@@ -62,42 +62,17 @@ export const MayaChatArea: React.FC = () => {
             <motion.div
               animate={{ 
                 y: [0, -8, 0],
-                rotate: [0, 5, -5, 0],
               }}
               transition={{ 
-                duration: 6,
+                duration: 4,
                 repeat: Infinity,
                 ease: "easeInOut"
               }}
               className="mb-8 relative"
             >
-              {/* Glow effect */}
-              <div className="absolute inset-0 bg-gradient-to-r from-purple-500 via-pink-500 to-purple-500 rounded-full blur-2xl opacity-30 animate-pulse" />
-              
-              {/* Main orb */}
-              <div className="relative w-24 h-24 bg-gradient-to-br from-purple-600 via-purple-500 to-pink-600 rounded-full flex items-center justify-center shadow-2xl ring-1 ring-white/20">
-                <Sparkles className="h-12 w-12 text-white" />
-                
-                {/* Subtle sparkles around */}
-                {[...Array(6)].map((_, i) => (
-                  <motion.div
-                    key={i}
-                    className="absolute w-1.5 h-1.5 bg-white rounded-full"
-                    style={{
-                      top: `${50 + 40 * Math.sin((i * Math.PI * 2) / 6)}%`,
-                      left: `${50 + 40 * Math.cos((i * Math.PI * 2) / 6)}%`,
-                    }}
-                    animate={{
-                      scale: [0, 1, 0],
-                      opacity: [0, 1, 0],
-                    }}
-                    transition={{
-                      duration: 2,
-                      repeat: Infinity,
-                      delay: i * 0.2,
-                    }}
-                  />
-                ))}
+              {/* Simple logo circle */}
+              <div className="relative w-20 h-20 bg-primary rounded-full flex items-center justify-center shadow-lg">
+                <Sparkles className="h-10 w-10 text-white" />
               </div>
             </motion.div>
             
@@ -105,7 +80,7 @@ export const MayaChatArea: React.FC = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
-              className="text-3xl font-bold text-white mb-3 bg-gradient-to-r from-purple-400 via-pink-400 to-purple-400 bg-clip-text text-transparent"
+              className="text-3xl font-bold text-gray-900 mb-3"
             >
               ¡Hola! Soy MAYA
             </motion.h2>
@@ -114,7 +89,7 @@ export const MayaChatArea: React.FC = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
-              className="text-slate-300 max-w-md mb-10 text-sm leading-relaxed"
+              className="text-gray-600 max-w-md mb-10 text-sm leading-relaxed"
             >
               Tu asistente inteligente para gestión de nómina.
               <br />
@@ -131,23 +106,20 @@ export const MayaChatArea: React.FC = () => {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.4 + idx * 0.08 }}
-                    whileHover={{ scale: 1.03, y: -2 }}
+                    whileHover={{ scale: 1.02, y: -2 }}
                     whileTap={{ scale: 0.98 }}
-                    className="group relative bg-slate-800/40 backdrop-blur-xl border border-white/10 rounded-2xl p-4 text-left transition-all hover:bg-slate-800/60 hover:border-white/20"
+                    className="group relative bg-white border border-gray-200 rounded-xl p-4 text-left transition-all hover:bg-gray-50 hover:border-gray-300 hover:shadow-md"
                   >
-                    {/* Gradient glow on hover */}
-                    <div className={`absolute inset-0 bg-gradient-to-br ${action.color} opacity-0 group-hover:opacity-10 rounded-2xl transition-opacity`} />
-                    
-                    <div className="relative flex items-start gap-3">
-                      <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${action.color} flex items-center justify-center shadow-lg flex-shrink-0`}>
+                    <div className="flex items-start gap-3">
+                      <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${action.color} flex items-center justify-center shadow-sm flex-shrink-0`}>
                         <Icon className="h-5 w-5 text-white" />
                       </div>
                       
                       <div className="flex-1 min-w-0">
-                        <h3 className="text-sm font-semibold text-white mb-0.5 group-hover:text-purple-300 transition-colors">
+                        <h3 className="text-sm font-semibold text-gray-900 mb-0.5 group-hover:text-primary transition-colors">
                           {action.title}
                         </h3>
-                        <p className="text-xs text-slate-400 leading-snug">
+                        <p className="text-xs text-gray-600 leading-snug">
                           {action.desc}
                         </p>
                       </div>

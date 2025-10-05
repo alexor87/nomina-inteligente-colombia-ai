@@ -19,12 +19,12 @@ export const MayaHeaderActions: React.FC<MayaHeaderActionsProps> = ({ onNewConve
       >
         <Badge 
           variant="outline" 
-          className="bg-emerald-500/10 border-emerald-500/30 text-emerald-400 px-2.5 py-1 text-xs font-medium"
+          className="bg-blue-600 border-blue-600 text-white px-2.5 py-1 text-xs font-medium"
         >
           <motion.span
-            animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }}
+            animate={{ scale: [1, 1.2, 1], opacity: [0.7, 1, 0.7] }}
             transition={{ duration: 2, repeat: Infinity }}
-            className="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5 inline-block"
+            className="w-1.5 h-1.5 rounded-full bg-white mr-1.5 inline-block"
           />
           IA • Activo
         </Badge>
@@ -36,7 +36,7 @@ export const MayaHeaderActions: React.FC<MayaHeaderActionsProps> = ({ onNewConve
           variant="ghost"
           size="sm"
           onClick={onNewConversation}
-          className="text-slate-300 hover:text-white hover:bg-white/5 h-8 px-3"
+          className="text-gray-600 hover:text-gray-900 hover:bg-gray-100 h-8 px-3"
         >
           <Plus className="h-4 w-4 mr-1.5" />
           <span className="text-xs font-medium">Nueva</span>
@@ -45,7 +45,7 @@ export const MayaHeaderActions: React.FC<MayaHeaderActionsProps> = ({ onNewConve
         <Button
           variant="ghost"
           size="sm"
-          className="text-slate-400 hover:text-white hover:bg-white/5 h-8 w-8 p-0"
+          className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 h-8 w-8 p-0"
           disabled
           title="Próximamente"
         >
@@ -55,7 +55,7 @@ export const MayaHeaderActions: React.FC<MayaHeaderActionsProps> = ({ onNewConve
         <Button
           variant="ghost"
           size="sm"
-          className="text-slate-400 hover:text-white hover:bg-white/5 h-8 w-8 p-0"
+          className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 h-8 w-8 p-0"
           disabled
           title="Próximamente"
         >
@@ -65,7 +65,7 @@ export const MayaHeaderActions: React.FC<MayaHeaderActionsProps> = ({ onNewConve
         <Button
           variant="ghost"
           size="sm"
-          className="text-slate-400 hover:text-white hover:bg-white/5 h-8 w-8 p-0"
+          className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 h-8 w-8 p-0"
           disabled
           title="Próximamente"
         >

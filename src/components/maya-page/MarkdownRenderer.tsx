@@ -36,16 +36,16 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
                 variant="ghost"
                 size="sm"
                 onClick={() => handleCopy(code, currentIndex)}
-                className="absolute top-2 right-2 h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-700/80 hover:bg-slate-600"
+                className="absolute top-2 right-2 h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-700 hover:bg-gray-600"
               >
                 {copiedIndex === currentIndex ? (
                   <Check className="h-3.5 w-3.5 text-emerald-400" />
                 ) : (
-                  <Copy className="h-3.5 w-3.5 text-slate-300" />
+                  <Copy className="h-3.5 w-3.5 text-gray-300" />
                 )}
               </Button>
-              <pre className="bg-slate-900/80 border border-white/5 rounded-xl p-4 overflow-x-auto">
-                <code className="text-xs text-slate-200 font-mono leading-relaxed">{code}</code>
+              <pre className="bg-gray-900 border border-gray-800 rounded-xl p-4 overflow-x-auto">
+                <code className="text-xs text-gray-100 font-mono leading-relaxed">{code}</code>
               </pre>
             </div>
           );
@@ -67,7 +67,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
       // Headers
       if (line.startsWith('### ')) {
         elements.push(
-          <h3 key={idx} className="text-base font-semibold text-slate-100 mt-4 mb-2">
+          <h3 key={idx} className="text-base font-semibold text-gray-900 mt-4 mb-2">
             {line.replace('### ', '')}
           </h3>
         );
@@ -76,7 +76,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
 
       if (line.startsWith('## ')) {
         elements.push(
-          <h2 key={idx} className="text-lg font-bold text-white mt-4 mb-2">
+          <h2 key={idx} className="text-lg font-bold text-gray-900 mt-4 mb-2">
             {line.replace('## ', '')}
           </h2>
         );
@@ -88,8 +88,8 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
         const content = line.trim().replace(/^[-*]\s/, '');
         elements.push(
           <div key={idx} className="flex gap-2 my-1.5 ml-2">
-            <span className="text-purple-400 mt-1.5 text-xs">•</span>
-            <span className="text-sm text-slate-200 leading-relaxed flex-1">{content}</span>
+            <span className="text-blue-600 mt-1.5 text-xs">•</span>
+            <span className="text-sm text-gray-900 leading-relaxed flex-1">{content}</span>
           </div>
         );
         return;
@@ -100,9 +100,9 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
       if (boldPattern.test(line)) {
         const parts = line.split(boldPattern);
         elements.push(
-          <p key={idx} className="text-sm text-slate-200 leading-relaxed my-1.5">
+          <p key={idx} className="text-sm text-gray-900 leading-relaxed my-1.5">
             {parts.map((part, i) => 
-              i % 2 === 1 ? <strong key={i} className="font-semibold text-white">{part}</strong> : part
+              i % 2 === 1 ? <strong key={i} className="font-semibold text-gray-900">{part}</strong> : part
             )}
           </p>
         );
@@ -112,7 +112,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
       // Regular paragraphs
       if (line.trim()) {
         elements.push(
-          <p key={idx} className="text-sm text-slate-200 leading-relaxed my-1.5">
+          <p key={idx} className="text-sm text-gray-900 leading-relaxed my-1.5">
             {line}
           </p>
         );

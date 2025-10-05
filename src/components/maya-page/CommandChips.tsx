@@ -22,11 +22,11 @@ export const CommandChips: React.FC = () => {
             transition={{ delay: idx * 0.05 }}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className="flex items-center gap-2 px-3 py-1.5 bg-slate-800/40 backdrop-blur-sm border border-white/10 rounded-full text-xs text-slate-300 hover:bg-white/5 hover:text-white hover:border-white/20 transition-all whitespace-nowrap"
+            className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-full text-xs text-gray-600 hover:bg-gray-200 hover:text-gray-900 hover:border-gray-300 transition-all whitespace-nowrap"
             disabled
             title={item.description}
           >
-            <Icon className="h-3.5 w-3.5 text-purple-400" />
+            <Icon className="h-3.5 w-3.5 text-blue-600" />
             <span className="font-medium">{item.label}</span>
           </motion.button>
         );
