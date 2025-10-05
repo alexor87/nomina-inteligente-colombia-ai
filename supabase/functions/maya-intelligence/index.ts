@@ -83,9 +83,14 @@ function analyzeConversationContext(conversation: any[]): { intentType: string |
     if (/este\s+año/i.test(responseText)) {
       params.year = new Date().getFullYear();
     }
-    const monthMatch = responseText.match(/en\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i);
-    if (monthMatch) {
-      params.month = monthMatch[1].toLowerCase();
+    const monthRegex = /en\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/gi;
+    const allMonthMatches = [...responseText.matchAll(monthRegex)];
+    const allMonths = allMonthMatches.map(m => m[1].toLowerCase());
+    if (allMonths.length === 1) {
+      params.month = allMonths[0];
+    } else if (allMonths.length >= 2) {
+      params.monthStart = allMonths[0];
+      params.monthEnd = allMonths[allMonths.length - 1];
     }
   }
   
@@ -1332,10 +1337,20 @@ serve(async (req) => {
           }
         }
         
-        const monthMatch = lastMessage.match(/(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i);
-        if (monthMatch) {
-          month = monthMatch[1].toLowerCase();
+        const monthRegex = /(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/gi;
+        const allMonthMatches = [...lastMessage.matchAll(monthRegex)];
+        const allMonths = allMonthMatches.map(m => m[1].toLowerCase());
+        if (allMonths.length === 1) {
+          month = allMonths[0];
           if (!year) year = new Date().getFullYear();
+        } else if (allMonths.length >= 2) {
+          // For multiple months, pass as range
+          intent.params = { 
+            name, 
+            year: year || new Date().getFullYear(),
+            monthStart: allMonths[0],
+            monthEnd: allMonths[allMonths.length - 1]
+          };
         }
         
         if (!year && !month) {

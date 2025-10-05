@@ -125,19 +125,31 @@ export class SimpleIntentMatcher {
     
     // LIQUIDACIÓN DE NÓMINA
     if (/(?:liquidar|procesar|calcular|generar)\s+(?:la\s+)?(?:nómin|nomin)/i.test(text)) {
-      // Extract period
-      const monthMatch = text.match(/(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i);
+      // Extract period - support multiple months
+      const monthRegex = /(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/gi;
+      const allMonthMatches = [...text.matchAll(monthRegex)];
+      const allMonths = allMonthMatches.map(m => m[1].toLowerCase());
       const yearMatch = text.match(/(\d{4})/);
       const fortnightMatch = text.match(/(primera|segunda|1ra|2da|quincenal)/i);
+      
+      const monthParams: any = {};
+      if (allMonths.length === 1) {
+        monthParams.month = allMonths[0];
+      } else if (allMonths.length >= 2) {
+        monthParams.monthStart = allMonths[0];
+        monthParams.monthEnd = allMonths[allMonths.length - 1];
+      }
       
       return {
         type: 'LIQUIDAR_NOMINA',
         confidence: 0.95,
         method: 'liquidarNomina',
         params: {
-          periodo: monthMatch ? `${monthMatch[1]} ${yearMatch ? yearMatch[1] : new Date().getFullYear()}` : 'actual',
+          periodo: allMonths.length > 0 ? `${allMonths.join(' y ')} ${yearMatch ? yearMatch[1] : new Date().getFullYear()}` : 'actual',
           quincena: fortnightMatch ? fortnightMatch[1] : null,
-          empleados: 'todos'
+          empleados: 'todos',
+          ...monthParams,
+          year: yearMatch ? parseInt(yearMatch[1]) : null
         }
       };
     }
@@ -196,17 +208,24 @@ export class SimpleIntentMatcher {
         /(?:costo|coste)\s+(?:de\s+la|del)?\s*(?:nómin|nomin|quincena)/i.test(text) ||
         /(?:cuál|cual)\s+(?:fue|es)\s+el\s+costo\s+total/i.test(text)) {
       
-      const monthMatch = text.match(/(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i);
+      const monthRegex = /(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/gi;
+      const allMonthMatches = [...text.matchAll(monthRegex)];
+      const allMonths = allMonthMatches.map(m => m[1].toLowerCase());
       const yearMatch = text.match(/(\d{4})/);
+      
+      const params: any = { year: yearMatch ? parseInt(yearMatch[1]) : null };
+      if (allMonths.length === 1) {
+        params.month = allMonths[0];
+      } else if (allMonths.length >= 2) {
+        params.monthStart = allMonths[0];
+        params.monthEnd = allMonths[allMonths.length - 1];
+      }
       
       return {
         type: 'TOTAL_PAYROLL_COST',
         confidence: 0.95,
         method: 'getTotalPayrollCost',
-        params: {
-          month: monthMatch ? monthMatch[1].toLowerCase() : null,
-          year: yearMatch ? parseInt(yearMatch[1]) : null
-        }
+        params
       };
     }
     
@@ -214,17 +233,24 @@ export class SimpleIntentMatcher {
     if (/(?:cuánto|cuanto|qué|que|cuál|cual)\s+(?:fue|es|fueron|son)\s+(?:el|la|los|las)?\s*(?:aporte|aportes|contribución|contribuciones)\s+(?:a|de)?\s*(?:seguridad\s+social|eps|pensión|pension|salud)/i.test(text) ||
         /(?:valor|total)\s+(?:de\s+)?(?:el|la|los|las)?\s*(?:aporte|aportes)\s+(?:a\s+)?(?:seguridad|eps|pensión)/i.test(text)) {
       
-      const monthMatch = text.match(/(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i);
+      const monthRegex = /(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/gi;
+      const allMonthMatches = [...text.matchAll(monthRegex)];
+      const allMonths = allMonthMatches.map(m => m[1].toLowerCase());
       const yearMatch = text.match(/(\d{4})/);
+      
+      const params: any = { year: yearMatch ? parseInt(yearMatch[1]) : null };
+      if (allMonths.length === 1) {
+        params.month = allMonths[0];
+      } else if (allMonths.length >= 2) {
+        params.monthStart = allMonths[0];
+        params.monthEnd = allMonths[allMonths.length - 1];
+      }
       
       return {
         type: 'SECURITY_CONTRIBUTIONS',
         confidence: 0.94,
         method: 'getSecurityContributions',
-        params: {
-          month: monthMatch ? monthMatch[1].toLowerCase() : null,
-          year: yearMatch ? parseInt(yearMatch[1]) : null
-        }
+        params
       };
     }
     
@@ -240,7 +266,9 @@ export class SimpleIntentMatcher {
         /^(?:y\s+)?(?:el|la)\s+(?:m[aá]s\s+costos[oa]|m[aá]s\s+car[oa]|de\s+mayor\s+costo)\b/i.test(text)) {
       
       const limitMatch = text.match(/(?:top|primeros?|mejores?)\s+(\d+)/i);
-      const monthMatch = text.match(/(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i);
+      const monthRegex = /(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/gi;
+      const allMonthMatches = [...text.matchAll(monthRegex)];
+      const allMonths = allMonthMatches.map(m => m[1].toLowerCase());
       const yearMatch = text.match(/(\d{4})/);
       
       // Detectar singular "el empleado" vs plural "los empleados"
@@ -251,15 +279,22 @@ export class SimpleIntentMatcher {
       
       console.log(`[HIGHEST_COST] Query: "${text}" | Singular: ${singularMatch} | Limit: ${singularMatch ? 1 : 5}`);
       
+      const params: any = {
+        limit: limitMatch ? parseInt(limitMatch[1]) : (singularMatch ? 1 : 5),
+        year: yearMatch ? parseInt(yearMatch[1]) : null
+      };
+      if (allMonths.length === 1) {
+        params.month = allMonths[0];
+      } else if (allMonths.length >= 2) {
+        params.monthStart = allMonths[0];
+        params.monthEnd = allMonths[allMonths.length - 1];
+      }
+      
       return {
         type: 'HIGHEST_COST_EMPLOYEES',
         confidence: 0.93,
         method: 'getHighestCostEmployees',
-        params: {
-          limit: limitMatch ? parseInt(limitMatch[1]) : (singularMatch ? 1 : 5),
-          month: monthMatch ? monthMatch[1].toLowerCase() : null,
-          year: yearMatch ? parseInt(yearMatch[1]) : null
-        }
+        params
       };
     }
     
@@ -273,7 +308,9 @@ export class SimpleIntentMatcher {
         /^(?:y\s+)?(?:el|la)\s+(?:menos\s+costos[oa]|m[aá]s\s+barat[oa]|de\s+menor\s+costo)\b/i.test(text)) {
       
       const limitMatch = text.match(/(?:top|primeros?|mejores?)\s+(\d+)/i);
-      const monthMatch = text.match(/(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i);
+      const monthRegex = /(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/gi;
+      const allMonthMatches = [...text.matchAll(monthRegex)];
+      const allMonths = allMonthMatches.map(m => m[1].toLowerCase());
       const yearMatch = text.match(/(\d{4})/);
       
       // Detectar singular "el menos costoso" vs plural "los menos costosos"
@@ -284,15 +321,22 @@ export class SimpleIntentMatcher {
       
       console.log(`[LOWEST_COST] Query: "${text}" | Singular: ${singularMatch} | Limit: ${singularMatch ? 1 : 5}`);
       
+      const params: any = {
+        limit: limitMatch ? parseInt(limitMatch[1]) : (singularMatch ? 1 : 5),
+        year: yearMatch ? parseInt(yearMatch[1]) : null
+      };
+      if (allMonths.length === 1) {
+        params.month = allMonths[0];
+      } else if (allMonths.length >= 2) {
+        params.monthStart = allMonths[0];
+        params.monthEnd = allMonths[allMonths.length - 1];
+      }
+      
       return {
         type: 'LOWEST_COST_EMPLOYEES',
         confidence: 0.93,
         method: 'getLowestCostEmployees',
-        params: {
-          limit: limitMatch ? parseInt(limitMatch[1]) : (singularMatch ? 1 : 5),
-          month: monthMatch ? monthMatch[1].toLowerCase() : null,
-          year: yearMatch ? parseInt(yearMatch[1]) : null
-        }
+        params
       };
     }
     
@@ -301,7 +345,9 @@ export class SimpleIntentMatcher {
         /(?:total|cantidad)\s+(?:de\s+)?(?:días|dia)\s+(?:de\s+)?incapacidad/i.test(text) ||
         /(?:incapacidades|incapacitados)\s+(?:en|del|de)/i.test(text)) {
       
-      const monthMatch = text.match(/(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i);
+      const monthRegex = /(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/gi;
+      const allMonthMatches = [...text.matchAll(monthRegex)];
+      const allMonths = allMonthMatches.map(m => m[1].toLowerCase());
       let yearMatch = text.match(/(\d{4})/);
       
       // PRIORITY 1: Detect "año pasado", "año anterior" FIRST
@@ -316,14 +362,19 @@ export class SimpleIntentMatcher {
         yearMatch = [String(currentYear), String(currentYear)] as RegExpMatchArray;
       }
       
+      const params: any = { year: yearMatch ? parseInt(yearMatch[1]) : null };
+      if (allMonths.length === 1) {
+        params.month = allMonths[0];
+      } else if (allMonths.length >= 2) {
+        params.monthStart = allMonths[0];
+        params.monthEnd = allMonths[allMonths.length - 1];
+      }
+      
       return {
         type: 'TOTAL_INCAPACITY_DAYS',
         confidence: 0.94,
         method: 'getTotalIncapacityDays',
-        params: {
-          month: monthMatch ? monthMatch[1].toLowerCase() : null,
-          year: yearMatch ? parseInt(yearMatch[1]) : null
-        }
+        params
       };
     }
     
@@ -332,17 +383,24 @@ export class SimpleIntentMatcher {
         /(?:total|cantidad)\s+(?:de\s+)?horas\s+extra/i.test(text) ||
         /(?:cuánto|cuanto)\s+(?:debo\s+)?pagar\s+(?:por\s+|de\s+)?horas\s+extra/i.test(text)) {
       
-      const monthMatch = text.match(/(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i);
+      const monthRegex = /(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/gi;
+      const allMonthMatches = [...text.matchAll(monthRegex)];
+      const allMonths = allMonthMatches.map(m => m[1].toLowerCase());
       const yearMatch = text.match(/(\d{4})/);
+      
+      const params: any = { year: yearMatch ? parseInt(yearMatch[1]) : null };
+      if (allMonths.length === 1) {
+        params.month = allMonths[0];
+      } else if (allMonths.length >= 2) {
+        params.monthStart = allMonths[0];
+        params.monthEnd = allMonths[allMonths.length - 1];
+      }
       
       return {
         type: 'TOTAL_OVERTIME_HOURS',
         confidence: 0.93,
         method: 'getTotalOvertimeHours',
-        params: {
-          month: monthMatch ? monthMatch[1].toLowerCase() : null,
-          year: yearMatch ? parseInt(yearMatch[1]) : null
-        }
+        params
       };
     }
     
