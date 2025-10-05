@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Minimize2, Maximize2, Send, MessageSquare, Trash2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -12,6 +13,7 @@ import { MayaTypingIndicator } from './components/MayaTypingIndicator';
 import { MayaQuickReplies } from './components/MayaQuickReplies';
 
 export const MayaFloatingAssistant: React.FC = () => {
+  const location = useLocation();
   const { 
     currentMessage, 
     isVisible, 
@@ -33,6 +35,11 @@ export const MayaFloatingAssistant: React.FC = () => {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatHistory]);
+
+  // No mostrar el flotante si estamos en la página de MAYA
+  if (location.pathname === '/app/maya') {
+    return null;
+  }
 
   // Conditional return AFTER all hooks
   if (!isVisible || !currentMessage) {

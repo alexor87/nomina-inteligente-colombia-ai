@@ -1,14 +1,16 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { MayaAvatar } from './MayaAvatar';
 import { useMaya } from './MayaProvider';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const MayaReactivationButton: React.FC = () => {
+  const location = useLocation();
   const { isVisible, showMessage, currentMessage, setPhase } = useMaya();
 
-  // Solo mostrar si MAYA no está visible
-  if (isVisible) {
+  // No mostrar el botón si estamos en la página de MAYA o si MAYA está visible
+  if (isVisible || location.pathname === '/app/maya') {
     return null;
   }
 

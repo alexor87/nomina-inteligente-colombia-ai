@@ -9,7 +9,9 @@ import {
   Building2,
   Calculator,
   Calendar,
-  PiggyBank
+  PiggyBank,
+  Brain,
+  Sparkles
 } from "lucide-react";
 
 import {
@@ -26,6 +28,13 @@ import {
 } from "@/components/ui/sidebar";
 
 const navigationItems = [
+  {
+    title: "MAYA",
+    url: "/app/maya",
+    icon: Brain,
+    badge: "IA",
+    animated: true,
+  },
   {
     title: "Dashboard",
     url: "/app/dashboard",
@@ -102,6 +111,8 @@ export function AppSidebar() {
             <SidebarMenu>
               {navigationItems.map((item) => {
                 const isActive = currentPath === item.url;
+                const isMaya = item.title === "MAYA";
+                
                 return (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild isActive={isActive}>
@@ -112,8 +123,25 @@ export function AppSidebar() {
                           isActive ? "bg-primary text-primary-foreground font-medium" : "hover:bg-muted/50"
                         }
                       >
-                        <item.icon className="mr-2 h-4 w-4" />
-                        {!isCollapsed && <span>{item.title}</span>}
+                        <div className={`relative mr-2 ${isMaya ? 'animate-pulse' : ''}`}>
+                          <item.icon className="h-4 w-4" />
+                          {isMaya && (
+                            <>
+                              <Sparkles className="h-2 w-2 absolute -top-1 -right-1 text-purple-400 animate-pulse" />
+                              <div className="absolute inset-0 bg-gradient-to-r from-purple-400 to-pink-400 rounded-full blur-sm opacity-50 animate-pulse"></div>
+                            </>
+                          )}
+                        </div>
+                        {!isCollapsed && (
+                          <span className={isMaya ? 'bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent font-semibold' : ''}>
+                            {item.title}
+                          </span>
+                        )}
+                        {!isCollapsed && item.badge && (
+                          <span className="ml-auto text-xs bg-gradient-to-r from-purple-500 to-pink-500 text-white px-2 py-0.5 rounded-full">
+                            {item.badge}
+                          </span>
+                        )}
                       </NavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

@@ -15,6 +15,7 @@ import Index from "./pages/Index";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import LogoutPage from "./pages/LogoutPage";
+import MayaPage from "./pages/MayaPage";
 import DashboardPage from "./pages/DashboardPage";
 import EmployeesPage from "./pages/EmployeesPage";
 import CreateEmployeeModernPage from "./pages/CreateEmployeeModernPage";
@@ -52,6 +53,7 @@ function AppContent() {
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         {/* Rutas protegidas con Layout */}
         <Route path="/app" element={<Layout />}>
+          <Route path="maya" element={<MayaPage />} />
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="employees" element={<EmployeesPage />} />
           <Route path="employees/create" element={<CreateEmployeeModernPage />} />
