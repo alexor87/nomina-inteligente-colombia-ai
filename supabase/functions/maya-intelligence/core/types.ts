@@ -107,6 +107,7 @@ export interface Intent {
   parameters: Record<string, any>;
   requiresConfirmation: boolean;
   entities: ExtractedEntity[];
+  resolvedByLLM?: boolean;
 }
 
 export interface ExtractedEntity {

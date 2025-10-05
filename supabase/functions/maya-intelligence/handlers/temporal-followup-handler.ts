@@ -43,25 +43,21 @@ export async function handleTemporalFollowUp(
       intentType: 'TOTAL_INCAPACITY_DAYS',
       method: 'getTotalIncapacityDays'
     },
-    'AGGREGATION_SALARY_COST': {
+    'AGGREGATION_PAYROLL_COST': {
       intentType: 'TOTAL_PAYROLL_COST',
       method: 'getTotalPayrollCost'
     },
-    'AGGREGATION_OVERTIME': {
+    'AGGREGATION_OVERTIME_HOURS': {
       intentType: 'TOTAL_OVERTIME_HOURS',
       method: 'getTotalOvertimeHours'
     },
-    'AGGREGATION_SECURITY': {
+    'AGGREGATION_SECURITY_CONTRIBUTIONS': {
       intentType: 'SECURITY_CONTRIBUTIONS',
       method: 'getSecurityContributions'
     },
     'AGGREGATION_HIGHEST_COST': {
       intentType: 'HIGHEST_COST_EMPLOYEES',
       method: 'getHighestCostEmployees'
-    },
-    'AGGREGATION_LOWEST_COST': {
-      intentType: 'LOWEST_COST_EMPLOYEES',
-      method: 'getLowestCostEmployees'
     }
   };
   
@@ -69,6 +65,7 @@ export async function handleTemporalFollowUp(
   
   if (!mapping) {
     console.log(`❌ [TEMPORAL_FOLLOWUP] No mapping found for context: ${context.contextType}`);
+    console.log(`   Available mappings: ${Object.keys(intentMapping).join(', ')}`);
     return null;
   }
   
