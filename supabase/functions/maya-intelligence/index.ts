@@ -28,6 +28,7 @@ import {
   extractNameFromShortReply
 } from './core/context-enricher.ts';
 import { ResponseOrchestrator } from './core/response-orchestrator.ts';
+import { ConversationStateManager, FlowType } from './core/conversation-state-manager.ts';
 
 // ============================================================================
 // CONVERSATIONAL CONTEXT SYSTEM
@@ -449,6 +450,32 @@ serve(async (req) => {
     
     // Declare intent variable
     let intent: any = null;
+
+    // STATE GATE: Force EMPLOYEE_CREATE if a pending creation flow exists
+    try {
+      const lastStateRaw = metadata?.lastConversationState;
+      if (lastStateRaw) {
+        let ctx: any = null;
+        if (typeof lastStateRaw === 'string') {
+          ctx = ConversationStateManager.deserialize(lastStateRaw);
+        } else if (lastStateRaw?.context && typeof lastStateRaw.context === 'string') {
+          ctx = ConversationStateManager.deserialize(lastStateRaw.context);
+        } else if (lastStateRaw?.state && lastStateRaw?.flowType) {
+          ctx = lastStateRaw;
+        }
+        if (ctx && ctx.flowType === FlowType.EMPLOYEE_CREATE && !ConversationStateManager.isFlowComplete(ctx)) {
+          console.log(`📦 [STATE_GATE] Forcing EMPLOYEE_CREATE due to pending state: ${ctx.state}`);
+          intent = {
+            type: 'EMPLOYEE_CREATE',
+            method: 'createEmployee',
+            params: {},
+            confidence: 0.99
+          } as any;
+        }
+      }
+    } catch (e) {
+      console.warn('⚠️ [STATE_GATE] Failed to process lastConversationState', e);
+    }
     
     // ============================================================================
     // CONVERSATIONAL CONTEXT ANALYSIS - PRIORITY 1
@@ -1481,8 +1508,7 @@ serve(async (req) => {
               ...intent.params,
               employee_name: intent.params?.name || intent.params?.employee_name,
               originalMessage: lastMessage, // 🔥 CRITICAL: Pass original message
-              conversationState: conversation.length > 0 ?
-                conversation[conversation.length - 1] : undefined // 🔥 CRITICAL: Pass full conversation state
+              conversationState: metadata?.lastConversationState // Use serialized context from metadata
             }
           };
           
