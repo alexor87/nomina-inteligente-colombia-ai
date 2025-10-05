@@ -1,11 +1,15 @@
 import React from 'react';
-import { Brain, Sparkles } from 'lucide-react';
+import { Brain, Sparkles, ArrowLeft } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
 import { useMaya } from '@/maya/MayaProvider';
 import { motion } from 'framer-motion';
 import { MayaHeaderActions } from './MayaHeaderActions';
+import { Button } from '@/components/ui/button';
 
 export const MayaPageHeader: React.FC = () => {
   const { clearConversation } = useMaya();
+  const location = useLocation();
+  const comesFromModules = location.state?.from?.startsWith('/modules');
 
   return (
     <motion.header 
@@ -19,6 +23,13 @@ export const MayaPageHeader: React.FC = () => {
       
       <div className="max-w-7xl mx-auto px-4 md:px-8 py-3.5 flex items-center justify-between">
         <div className="flex items-center gap-3">
+          {comesFromModules && (
+            <Link to="/modules/dashboard">
+              <Button variant="ghost" size="icon">
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </Link>
+          )}
           <motion.div
             animate={{ 
               rotate: [0, 5, -5, 0],

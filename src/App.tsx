@@ -9,13 +9,13 @@ import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
 import { YearProvider } from "@/contexts/YearContext";
 import { useSystemInitialization } from "@/hooks/useSystemInitialization";
 import { Layout } from "@/components/layout/Layout";
+import { MayaFullScreenLayout } from "@/components/maya-page/layouts/MayaFullScreenLayout";
 
 // Components and pages
 import Index from "./pages/Index";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import LogoutPage from "./pages/LogoutPage";
-import MayaPage from "./pages/MayaPage";
 import DashboardPage from "./pages/DashboardPage";
 import EmployeesPage from "./pages/EmployeesPage";
 import CreateEmployeeModernPage from "./pages/CreateEmployeeModernPage";
@@ -44,16 +44,25 @@ function AppContent() {
   return (
     <div className="min-h-screen bg-background">
       <Routes>
-        <Route path="/" element={<Index />} />
+        {/* Root redirects to Maya */}
+        <Route path="/" element={<Navigate to="/maya" replace />} />
+        
+        {/* MAYA Full-Screen Experience (outside traditional Layout) */}
+        <Route path="/maya" element={<MayaFullScreenLayout />} />
+        
+        {/* Public routes */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/register/company" element={<CompanyRegistrationPage />} />
         <Route path="/auth" element={<Navigate to="/login" replace />} />
         <Route path="/logout" element={<LogoutPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
-        {/* Rutas protegidas con Layout */}
-        <Route path="/app" element={<Layout />}>
-          <Route path="maya" element={<MayaPage />} />
+        
+        {/* Legacy landing (redirect to Maya) */}
+        <Route path="/app" element={<Navigate to="/maya" replace />} />
+        
+        {/* Modules (inside traditional Layout) */}
+        <Route path="/modules" element={<Layout />}>
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="employees" element={<EmployeesPage />} />
           <Route path="employees/create" element={<CreateEmployeeModernPage />} />
