@@ -154,6 +154,100 @@ export class SimpleIntentMatcher {
       };
     }
 
+    // ============================================================================
+    // EMPLOYEE CRUD OPERATIONS - HIGHEST PRIORITY (before EMPLOYEE_SEARCH)
+    // ============================================================================
+
+    // 1️⃣ EMPLOYEE_CREATE (confidence: 0.96 - MAYOR que EMPLOYEE_SEARCH)
+    if (/(?:crea|crear|agrega|agregar|registra|registrar|añade|añadir|añad[ií]|da\s+de\s+alta|dar\s+de\s+alta)\s+(?:un|una)?\s*(?:nuevo|nueva)?\s*(?:empleado|trabajador|colaborador|empleada|trabajadora|colaboradora)/i.test(text) ||
+        /(?:nuevo|nueva)\s+(?:empleado|trabajador|colaborador|empleada|trabajadora|colaboradora)(?:\s+llamad[oa])?/i.test(text)) {
+      
+      // Extract employee name from patterns like:
+      // "crea un empleado llamado Juan Pérez"
+      // "crear empleado Pedro López"
+      // "nuevo empleado Maria Garcia"
+      let employeeName = null;
+      
+      // Try "llamado/llamada" pattern first
+      const namedPattern = /(?:llamad[oa]|de\s+nombre)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)*)/i;
+      const namedMatch = text.match(namedPattern);
+      
+      if (namedMatch) {
+        employeeName = namedMatch[1].trim();
+      } else {
+        // Try extracting name after the trigger phrase
+        const afterTriggerPattern = /(?:empleado|trabajador|colaborador|empleada|trabajadora|colaboradora)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)*)/i;
+        const afterMatch = text.match(afterTriggerPattern);
+        if (afterMatch) {
+          employeeName = afterMatch[1].trim();
+        }
+      }
+      
+      console.log('✅ [EMPLOYEE_CREATE] Detected:', { employeeName });
+      
+      return {
+        type: 'EMPLOYEE_CREATE',
+        confidence: 0.96,
+        method: 'createEmployee',
+        params: {
+          employee_name: employeeName,
+          name: employeeName
+        }
+      };
+    }
+
+    // 2️⃣ EMPLOYEE_UPDATE (confidence: 0.95 - IGUAL que EMPLOYEE_SEARCH pero con prioridad por orden)
+    if (/(?:actualiza|actualizar|modifica|modificar|cambia|cambiar|cambi[óo]|edita|editar)\s+(?:el|la|los|las|datos|información|info|salario|cargo|email|tel[eé]fono)?\s*(?:de|del|de\s+la)?\s*(?:empleado|trabajador|colaborador)/i.test(text) ||
+        /(?:cambio|actualización|modificación|cambiar|actualizar)\s+(?:de|en|del|para)\s+(?:salario|cargo|datos|información|email|tel[eé]fono)/i.test(text)) {
+      
+      // Extract employee name
+      let employeeName = null;
+      const namePattern = /(?:de|del|para|a)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)*)/i;
+      const nameMatch = text.match(namePattern);
+      
+      if (nameMatch) {
+        employeeName = nameMatch[1].trim();
+      }
+      
+      console.log('📝 [EMPLOYEE_UPDATE] Detected:', { employeeName });
+      
+      return {
+        type: 'EMPLOYEE_UPDATE',
+        confidence: 0.95,
+        method: 'updateEmployee',
+        params: {
+          employee_name: employeeName,
+          name: employeeName
+        }
+      };
+    }
+
+    // 3️⃣ EMPLOYEE_DELETE (confidence: 0.97 - OPERACIÓN CRÍTICA, mayor prioridad)
+    if (/(?:elimina|eliminar|borra|borrar|da\s+de\s+baja|dar\s+de\s+baja|inactiva|inactivar|desactiva|desactivar)\s+(?:al|a\s+la|el|la)?\s*(?:empleado|trabajador|colaborador)/i.test(text)) {
+      
+      // Extract employee name
+      let employeeName = null;
+      const namePattern = /(?:al|a\s+la|a|de|del)\s+(?:empleado|trabajador|colaborador)?\s*([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)*)/i;
+      const nameMatch = text.match(namePattern);
+      
+      if (nameMatch) {
+        employeeName = nameMatch[1].trim();
+      }
+      
+      console.log('🗑️ [EMPLOYEE_DELETE] Detected:', { employeeName });
+      
+      return {
+        type: 'EMPLOYEE_DELETE',
+        confidence: 0.97,
+        method: 'deleteEmployee',
+        params: {
+          employee_name: employeeName,
+          name: employeeName
+        }
+      };
+    }
+
+    // ============================================================================
     // REGISTRAR NOVEDADES
     if (/(?:registrar|reportar|anotar|incluir)\s+(?:una?\s+)?(?:incapacidad|licencia|ausencia|horas?\s+extra|novedad)/i.test(text)) {
       const employeeMatch = text.match(/(?:de|para|a)\s+([a-záéíóúñ\s]+)/i);
