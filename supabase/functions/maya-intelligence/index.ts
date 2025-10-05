@@ -3283,9 +3283,22 @@ async function handleTotalIncapacityDays(supabase: any, params: any) {
 }
 
 async function handleTotalOvertimeHours(supabase: any, params: any) {
-  const temporalParams = TemporalResolver.isLegacyFormat(params)
+  let temporalParams = TemporalResolver.isLegacyFormat(params)
     ? TemporalResolver.fromLegacy(params)
     : params;
+  
+  // Safeguard: if type is still missing, default to SPECIFIC_PERIOD
+  if (!temporalParams.type) {
+    console.log('⚠️ [OVERTIME_HANDLER] Missing type after conversion, defaulting to SPECIFIC_PERIOD');
+    temporalParams = { ...temporalParams, type: 'specific_period' };
+  }
+  
+  console.log('📊 [OVERTIME_HANDLER] Final temporalParams:', {
+    type: temporalParams.type,
+    year: temporalParams.year,
+    month: temporalParams.month
+  });
+  
   return await AggregationService.getTotalOvertimeHours(supabase, temporalParams);
 }
 

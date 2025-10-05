@@ -36,6 +36,7 @@ export class OvertimeService extends BaseAggregationService {
           .from('payroll_novedades')
           .select(`
             dias,
+            horas,
             valor,
             subtipo,
             tipo_novedad,
@@ -64,8 +65,8 @@ export class OvertimeService extends BaseAggregationService {
         };
       }
 
-      // Calculate totals
-      const totalHours = allNovedades.reduce((sum, n) => sum + (n.dias || 0), 0);
+      // Calculate totals using 'horas' field
+      const totalHours = allNovedades.reduce((sum, n) => sum + (n.horas || 0), 0);
       const totalCost = allNovedades.reduce((sum, n) => sum + (n.valor || 0), 0);
       const employeeCount = new Set(allNovedades.map(n => n.empleado_id)).size;
 
@@ -77,7 +78,7 @@ export class OvertimeService extends BaseAggregationService {
           byType[type] = { count: 0, hours: 0, cost: 0 };
         }
         byType[type].count++;
-        byType[type].hours += n.dias || 0;
+        byType[type].hours += n.horas || 0; // Use 'horas' instead of 'dias'
         byType[type].cost += n.valor || 0;
       });
 

@@ -121,6 +121,10 @@ export class TemporalResolver {
    * Check if params represent a legacy format (for backward compatibility)
    */
   static isLegacyFormat(params: any): boolean {
+    // If type is undefined or missing, treat as legacy
+    if (!params.type) {
+      return true;
+    }
     return !('type' in params) && (
       'month' in params ||
       'year' in params ||
