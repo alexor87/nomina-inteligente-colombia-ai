@@ -52,10 +52,10 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
 
   // Lógica simplificada de navegación - siempre mostrar módulos básicos
   const getFilteredNavigation = () => {
-    // Siempre mostrar dashboard
-    const mandatoryItems = [navigation[0]]; // Dashboard
+    // Siempre mostrar MAYA y Dashboard
+    const mandatoryItems = navigation.filter(i => i.module === 'maya' || i.module === 'dashboard');
     
-    // Si está cargando auth, mostrar solo dashboard
+    // Si está cargando auth, mostrar solo obligatorios
     if (loading) {
       return mandatoryItems;
     }
@@ -65,10 +65,10 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
       return navigation;
     }
 
-    // Si tiene roles, filtrar por acceso a módulos
+    // Si tiene roles, filtrar por acceso a módulos (mantener obligatorios)
     if (roles.length > 0 && hasModuleAccess) {
       return navigation.filter(item => 
-        item.module === 'dashboard' || hasModuleAccess(item.module)
+        item.module === 'maya' || item.module === 'dashboard' || hasModuleAccess(item.module)
       );
     }
 
