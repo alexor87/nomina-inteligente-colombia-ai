@@ -44,7 +44,7 @@ export class MayaConversationManager {
    */
   async getConversations(userId: string, companyId: string): Promise<ConversationSummary[]> {
     try {
-      const { data: conversations, error } = await supabase
+      const { data: conversations, error } = await (supabase as any)
         .from('maya_conversations')
         .select(`
           id,
@@ -66,7 +66,7 @@ export class MayaConversationManager {
       if (error) throw error;
 
       // Transform to summary format
-      const summaries: ConversationSummary[] = conversations?.map(conv => {
+      const summaries: ConversationSummary[] = conversations?.map((conv: any) => {
         const messages = (conv.maya_messages as any[]) || [];
         const lastMsg = messages.length > 0 ? messages[messages.length - 1] : null;
         
@@ -92,7 +92,7 @@ export class MayaConversationManager {
    */
   async createConversation(userId: string, companyId: string): Promise<Conversation> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('maya_conversations')
         .insert({
           user_id: userId,
@@ -122,7 +122,7 @@ export class MayaConversationManager {
    */
   async loadConversationMessages(conversationId: string): Promise<ChatMessage[]> {
     try {
-      const { data: messages, error } = await supabase
+      const { data: messages, error } = await (supabase as any)
         .from('maya_messages')
         .select('*')
         .eq('conversation_id', conversationId)
@@ -131,7 +131,7 @@ export class MayaConversationManager {
       if (error) throw error;
 
       // Transform to ChatMessage format
-      const chatMessages: ChatMessage[] = messages?.map(msg => ({
+      const chatMessages: ChatMessage[] = messages?.map((msg: any) => ({
         id: msg.id,
         role: msg.role as 'user' | 'assistant',
         content: msg.content,
@@ -155,7 +155,7 @@ export class MayaConversationManager {
    */
   async saveMessage(conversationId: string, message: ChatMessage): Promise<void> {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('maya_messages')
         .insert({
           conversation_id: conversationId,
@@ -172,7 +172,7 @@ export class MayaConversationManager {
       if (error) throw error;
 
       // Update conversation timestamp
-      await supabase
+      await (supabase as any)
         .from('maya_conversations')
         .update({ updated_at: new Date().toISOString() })
         .eq('id', conversationId);
@@ -189,7 +189,7 @@ export class MayaConversationManager {
    */
   async updateConversationTitle(conversationId: string, title: string): Promise<void> {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('maya_conversations')
         .update({ title })
         .eq('id', conversationId);
@@ -208,7 +208,7 @@ export class MayaConversationManager {
    */
   async archiveConversation(conversationId: string): Promise<void> {
     try {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('maya_conversations')
         .update({ is_archived: true })
         .eq('id', conversationId);
@@ -228,7 +228,7 @@ export class MayaConversationManager {
   async deleteConversation(conversationId: string): Promise<void> {
     try {
       // Messages will be deleted by cascade
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('maya_conversations')
         .delete()
         .eq('id', conversationId);
