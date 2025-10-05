@@ -149,12 +149,31 @@ export class MayaChatService {
       const debugCode = `E-${Date.now().toString().slice(-6)}`;
       let userFriendlyMessage = `Disculpa, tengo un problema técnico (${debugCode}). Por favor intenta de nuevo en unos segundos.`;
       
+      // Retry once for FunctionsFetchError (boot failures)
+      if (error instanceof FunctionsFetchError && !(error as any).isRetry) {
+        console.warn('⚠️ MAYA Chat: Retrying after FunctionsFetchError...');
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        try {
+          (error as any).isRetry = true;
+          return await this.sendMessage(userMessage, context);
+        } catch (retryError) {
+          console.error('❌ MAYA Chat: Retry failed:', retryError);
+          // Continue with normal error handling below
+        }
+      }
+      
       try {
         if (error instanceof FunctionsHttpError) {
           const errJson = await error.context.json().catch(() => null);
-          console.error('🤖 MAYA Chat: FunctionsHttpError', { errJson });
-          // Use server's error message if available
-          if (errJson?.message) {
+          console.error('🤖 MAYA Chat: FunctionsHttpError', { errJson, status: error.context.status });
+          
+          // Check for specific status codes
+          if (error.context.status === 429) {
+            userFriendlyMessage = 'Maya está recibiendo muchas consultas en este momento. Por favor intenta en unos segundos.';
+          } else if (error.context.status === 402) {
+            userFriendlyMessage = 'Límite de créditos alcanzado. Contacta al administrador para continuar usando Maya.';
+          } else if (errJson?.message) {
+            // Use server's error message if available
             userFriendlyMessage = errJson.message;
           }
         } else if (error instanceof FunctionsRelayError) {
