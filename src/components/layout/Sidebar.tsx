@@ -128,25 +128,32 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
               key={item.name}
               to={item.href}
               className={cn(
-                "group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 relative",
+                "group flex items-center px-3 py-2.5 text-sm font-medium rounded-xl transition-all duration-200 relative",
                 "hover:bg-gray-50 active:scale-[0.98]",
-                isActive
+                isActive && item.module === 'maya'
+                  ? "bg-gradient-to-r from-purple-600/15 via-pink-600/10 to-purple-600/15 text-white border border-purple-500/20 shadow-lg shadow-purple-500/10"
+                  : isActive
                   ? "bg-blue-50 text-blue-700 shadow-sm border border-blue-100"
                   : "text-gray-700 hover:text-gray-900",
                 collapsed ? "justify-center" : "justify-start",
-                item.module === 'maya' && !isActive && "hover:bg-purple-50/50"
+                item.module === 'maya' && "overflow-hidden"
               )}
               title={collapsed ? item.name : undefined}
             >
-              {/* MAYA special effects */}
+              {/* Special effects for MAYA - only when active */}
               {item.module === 'maya' && (
                 <>
-                  {/* Animated background glow */}
-                  <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-purple-500/10 via-pink-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 animate-pulse" />
+                  {/* Light beam effect on left edge when active */}
+                  {isActive && (
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-purple-500 via-pink-500 to-purple-500" />
+                  )}
+                  
+                  {/* Subtle glow on hover */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-purple-600/5 via-pink-600/5 to-purple-600/5 opacity-0 group-hover:opacity-100 transition-opacity" />
                   
                   {/* Sparkles */}
-                  {!collapsed && (
-                    <Sparkles className="absolute right-2 top-2 h-3 w-3 text-purple-500 animate-pulse" />
+                  {!collapsed && !isActive && (
+                    <Sparkles className="absolute right-2 top-2 h-3 w-3 text-purple-500/60 animate-pulse" />
                   )}
                 </>
               )}
@@ -155,12 +162,11 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
                 "flex items-center justify-center rounded-md transition-all duration-200 relative",
                 collapsed ? "w-8 h-8" : "w-6 h-6 mr-3",
                 item.module === 'maya' 
-                  ? isActive
-                    ? "text-purple-600"
-                    : "text-purple-500 group-hover:text-purple-600 animate-pulse"
+                  ? "text-purple-400"
                   : isActive 
                     ? "text-blue-600" 
-                    : "text-gray-500 group-hover:text-gray-700"
+                    : "text-gray-500 group-hover:text-gray-700",
+                item.module === 'maya' && item.animated && "animate-pulse"
               )}>
                 <item.icon className="h-4 w-4" />
               </div>
@@ -168,7 +174,7 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
               {!collapsed && (
                 <span className={cn(
                   "truncate font-medium flex-1",
-                  item.module === 'maya' && !isActive && "bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent"
+                  item.module === 'maya' && "bg-gradient-to-r from-purple-400 via-pink-400 to-purple-400 bg-clip-text text-transparent"
                 )}>
                   {item.name}
                 </span>
@@ -176,9 +182,21 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
               
               {/* Badge for MAYA */}
               {!collapsed && item.badge && (
-                <span className="ml-2 px-2 py-0.5 text-xs font-semibold rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-sm">
-                  {item.badge}
+                <span className="relative ml-2 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-purple-500/20 border border-purple-500/30 text-purple-300 overflow-hidden">
+                  {/* Shimmer effect */}
+                  <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent" style={{
+                    animation: 'shimmer 2s infinite',
+                    backgroundSize: '200% 100%'
+                  }} />
+                  <span className="relative">{item.badge}</span>
                 </span>
+              )}
+              
+              {/* Badge indicator for collapsed */}
+              {collapsed && item.badge && (
+                <div className="absolute -top-1 -right-1 w-2 h-2 bg-purple-500 rounded-full">
+                  <span className="absolute inset-0 rounded-full bg-purple-400 animate-ping" />
+                </div>
               )}
               
               {/* Tooltip for collapsed sidebar */}
