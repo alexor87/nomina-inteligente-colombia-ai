@@ -152,12 +152,13 @@ export class SessionManager {
 
   /**
    * Calculate checksum for state validation using Web Crypto API
+   * Uses SHA-256 (Deno-compatible algorithm)
    */
   private async calculateChecksum(currentState: any, accumulatedData: any): Promise<string> {
     const payload = JSON.stringify({ currentState, accumulatedData });
     const encoder = new TextEncoder();
     const dataBuffer = encoder.encode(payload);
-    const hashBuffer = await crypto.subtle.digest('MD5', dataBuffer);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', dataBuffer);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
   }
