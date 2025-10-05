@@ -28,8 +28,13 @@ export class EmployeeCrudHandler extends BaseHandler {
   
   private async handleCreate(intent: Intent, context?: RichContext): Promise<HandlerResponse> {
     // Extract employee information from entities
-    const employeeNameEntity = intent.entities.find(e => e.type === 'employee');
-    const employeeName = employeeNameEntity?.value;
+    // Try to get employee name from multiple sources
+    const employeeNameEntity = intent.entities?.find(e => e.type === 'employee');
+    const employeeName = 
+      employeeNameEntity?.value || 
+      intent.parameters?.employee_name || 
+      intent.parameters?.name ||
+      intent.parameters?.conversationParams?.employeeName;
     
     if (!employeeName) {
       return ResponseBuilder.buildClarificationResponse(

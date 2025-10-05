@@ -162,24 +162,29 @@ export class SimpleIntentMatcher {
     if (/(?:crea|crear|agrega|agregar|registra|registrar|añade|añadir|añad[ií]|da\s+de\s+alta|dar\s+de\s+alta)\s+(?:un|una)?\s*(?:nuevo|nueva)?\s*(?:empleado|trabajador|colaborador|empleada|trabajadora|colaboradora)/i.test(text) ||
         /(?:nuevo|nueva)\s+(?:empleado|trabajador|colaborador|empleada|trabajadora|colaboradora)(?:\s+llamad[oa])?/i.test(text)) {
       
-      // Extract employee name from patterns like:
-      // "crea un empleado llamado Juan Pérez"
-      // "crear empleado Pedro López"
-      // "nuevo empleado Maria Garcia"
+      // Extract employee name with multiple fallback patterns
       let employeeName = null;
       
-      // Try "llamado/llamada" pattern first
-      const namedPattern = /(?:llamad[oa]|de\s+nombre)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)*)/i;
-      const namedMatch = text.match(namedPattern);
+      // Pattern 1: "crea a [nombre]" or "crear a [nombre]" (highest priority)
+      const directPattern = /(?:crea|crear|agrega|agregar|registra|registrar|añade|añadir)\s+(?:a|al)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)+)/i;
+      const directMatch = text.match(directPattern);
       
-      if (namedMatch) {
-        employeeName = namedMatch[1].trim();
+      if (directMatch) {
+        employeeName = directMatch[1].trim();
       } else {
-        // Try extracting name after the trigger phrase
-        const afterTriggerPattern = /(?:empleado|trabajador|colaborador|empleada|trabajadora|colaboradora)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)*)/i;
-        const afterMatch = text.match(afterTriggerPattern);
-        if (afterMatch) {
-          employeeName = afterMatch[1].trim();
+        // Pattern 2: "llamado/llamada" pattern
+        const namedPattern = /(?:llamad[oa]|de\s+nombre)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)*)/i;
+        const namedMatch = text.match(namedPattern);
+        
+        if (namedMatch) {
+          employeeName = namedMatch[1].trim();
+        } else {
+          // Pattern 3: After trigger word "empleado/trabajador"
+          const afterTriggerPattern = /(?:empleado|trabajador|colaborador|empleada|trabajadora|colaboradora)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)*)/i;
+          const afterMatch = text.match(afterTriggerPattern);
+          if (afterMatch) {
+            employeeName = afterMatch[1].trim();
+          }
         }
       }
       
