@@ -135,7 +135,6 @@ Clasifica esta query y extrae los parámetros relevantes.`;
                           type: "number",
                           description: "Number of months for 'últimos N meses' queries (e.g., 3 for 'últimos 3 meses')"
                         },
-                        },
                         year: {
                           type: "number",
                           description: "Year extracted from query (e.g., 2024, 2025)"
