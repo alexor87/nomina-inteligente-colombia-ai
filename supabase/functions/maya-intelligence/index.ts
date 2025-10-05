@@ -18,220 +18,29 @@ import { handleTemporalFollowUp, canHandleTemporalFollowUp } from './handlers/te
 import { TemporalResolver } from './core/temporal-resolver.ts';
 import { HandlerRegistry } from './core/handler-registry.ts';
 import { MayaLogger } from './core/types.ts';
+import { IntentRouter } from './core/intent-router.ts';
+import { 
+  detectFollowUpQuery, 
+  analyzeConversationContext, 
+  inferIntentFromContext,
+  extractNameFromSalaryQuery,
+  isAwaitingEmployeeNameForDetails,
+  extractNameFromShortReply
+} from './core/context-enricher.ts';
+import { ResponseOrchestrator } from './core/response-orchestrator.ts';
 
 // ============================================================================
 // CONVERSATIONAL CONTEXT SYSTEM
 // ============================================================================
+// Functions moved to core/context-enricher.ts for better modularity
 
-// Detect follow-up queries like "y a [name]?", "y [name]?", etc.
-// Now using QueryClassifier for intelligent classification
-function detectFollowUpQuery(text: string): string | null {
-  const lowerText = text.toLowerCase().trim();
-  
-  // Use QueryClassifier to determine if this is actually an employee follow-up
-  const classification = QueryClassifier.classify(text);
-  
-  // Log classification for debugging
-  console.log(`🤖 [CLASSIFIER] Query: "${text}" -> Type: ${QueryType[classification.type]} (${classification.confidence.toFixed(2)})`);
-  console.log(`   Indicators: ${classification.indicators.join(', ')}`);
-  
-  // Only proceed if classified as EMPLOYEE_FOLLOW_UP
-  if (classification.type !== QueryType.EMPLOYEE_FOLLOW_UP) {
-    console.log(`🚫 [FOLLOW_UP] Not an employee follow-up (classified as ${QueryType[classification.type]})`);
-    return null;
-  }
-  
-  // Extract name patterns
-  // Pattern 1: "y a [name]?" / "y para [name]?"
-  const pattern1 = lowerText.match(/^(?:y\s+)?(?:a|para)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*)\s*\??$/i);
-  if (pattern1) {
-    return pattern1[1].trim();
-  }
-  
-  // Pattern 2: "y [name]?" / "también [name]?"
-  const pattern2 = lowerText.match(/^(?:y|también|tambien)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*)\s*\??$/i);
-  if (pattern2) {
-    return pattern2[1].trim();
-  }
-  
-  // Pattern 3: "qué tal [name]?" / "y de [name]?"
-  const pattern3 = lowerText.match(/^(?:qué\s+tal|que\s+tal|y\s+de|y\s+del|y\s+de\s+la)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*)\s*\??$/i);
-  if (pattern3) {
-    return pattern3[1].trim();
-  }
-  
-  return null;
-}
+// Context analysis functions moved to core/context-enricher.ts
 
-// Analyze previous assistant responses to identify the last intent and extract parameters
-// Now using ConversationContextAnalyzer for intelligent context detection
-function analyzeConversationContext(conversation: any[]): { intentType: string | null; params: any } {
-  // Use the intelligent analyzer
-  const context = ConversationContextAnalyzer.analyze(conversation);
-  
-  // Check if we have valid context
-  if (!ConversationContextAnalyzer.hasValidContext(context)) {
-    // Fallback to legacy pattern matching for specific cases
-    return legacyContextDetection(conversation);
-  }
-  
-  console.log(`🔍 [CONTEXT] Detected ${context.contextType} (confidence: ${context.confidence})`);
-  
-  // Extract params based on context type
-  let params: any = {};
-  
-  if (context.contextType === 'PAYROLL_INFO' && context.entities) {
-    // Extract year/month for payroll queries
-    const responseText = context.lastResponseText;
-    if (/este\s+año/i.test(responseText)) {
-      params.year = new Date().getFullYear();
-    }
-    const monthRegex = /en\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/gi;
-    const allMonthMatches = [...responseText.matchAll(monthRegex)];
-    const allMonths = allMonthMatches.map(m => m[1].toLowerCase());
-    if (allMonths.length === 1) {
-      params.month = allMonths[0];
-    } else if (allMonths.length >= 2) {
-      params.monthStart = allMonths[0];
-      params.monthEnd = allMonths[allMonths.length - 1];
-    }
-  }
-  
-  if (context.contextType === 'CONFIRMATION' && context.entities.employeeName) {
-    params.employeeName = context.entities.employeeName;
-  }
-  
-  if (context.contextType === 'VOUCHER_CONFIRMATION_PENDING' && context.entities) {
-    if (context.entities.employeeName) {
-      params.employeeName = context.entities.employeeName;
-    }
-    if (context.entities.employeeId) {
-      params.employeeId = context.entities.employeeId;
-    }
-  }
-  
-  return {
-    intentType: context.contextType,
-    params
-  };
-}
+// Legacy context detection moved to core/context-enricher.ts
 
-// Legacy context detection for backward compatibility
-function legacyContextDetection(conversation: any[]): { intentType: string | null; params: any } {
-  const assistantMessages = conversation.filter(msg => msg.role === 'assistant').slice(-3);
-  if (assistantMessages.length === 0) return { intentType: null, params: {} };
-  
-  const lastAssistantMessage = assistantMessages[assistantMessages.length - 1]?.content || '';
-  
-  // Detect PENDING_EMAIL_FOR_VOUCHER context
-  if (/¿A\s+qué\s+email\s+deseas\s+enviar\s+el\s+comprobante\s+de\s+\*\*(.+?)\*\*\?/i.test(lastAssistantMessage)) {
-    const employeeMatch = lastAssistantMessage.match(/\*\*(.+?)\*\*/);
-    return { 
-      intentType: 'PENDING_EMAIL_FOR_VOUCHER', 
-      params: { employeeName: employeeMatch?.[1] || null }
-    };
-  }
+// Intent inference moved to core/context-enricher.ts
 
-  // Detect PENDING_SAVE_EMAIL_CONFIRMATION context
-  if (/¿Deseas\s+guardar.*como\s+el\s+email\s+de\s+\*\*(.+?)\*\*\?/i.test(lastAssistantMessage)) {
-    const emailMatch = lastAssistantMessage.match(/guardar\s+([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i);
-    const employeeNameMatch = lastAssistantMessage.match(/de\s+\*\*(.+?)\*\*\?/);
-    return { 
-      intentType: 'PENDING_SAVE_EMAIL_CONFIRMATION', 
-      params: { 
-        employeeName: employeeNameMatch?.[1] || null,
-        email: emailMatch?.[1] || null
-      }
-    };
-  }
-  
-  return { intentType: null, params: {} };
-}
-
-// Infer intent based on follow-up query and context
-// Now using SmartContextInferencer for intelligent intent inference
-function inferIntentFromContext(followUpName: string, context: { intentType: string | null; params: any }): any {
-  if (!context.intentType) {
-    return null;
-  }
-  
-  console.log(`🧠 [INFERENCE] Follow-up for "${followUpName}" with context: ${context.intentType}`);
-  
-  // Use intelligent inferencer
-  const contextForInferencer = ConversationContextAnalyzer.analyze([
-    { role: 'assistant', content: `Context: ${context.intentType}` }
-  ]);
-  
-  const inferredIntent = SmartContextInferencer.infer(
-    followUpName,
-    contextForInferencer,
-    followUpName
-  );
-  
-  if (inferredIntent) {
-    // Convert to legacy format for compatibility
-    return {
-      type: inferredIntent.type,
-      method: getMethodForIntent(inferredIntent.type),
-      params: inferredIntent.parameters,
-      confidence: inferredIntent.confidence
-    };
-  }
-  
-  // Fallback to legacy mapping
-  return legacyIntentMapping(followUpName, context);
-}
-
-// Legacy intent mapping for backward compatibility
-function legacyIntentMapping(followUpName: string, context: { intentType: string | null; params: any }): any {
-  switch (context.intentType) {
-    case 'EMPLOYEE_INFO':
-    case 'EMPLOYEE_SEARCH':
-      return {
-        type: 'EMPLOYEE_SEARCH',
-        method: 'searchEmployee',
-        params: { name: followUpName },
-        confidence: 0.95
-      };
-      
-    case 'SALARY_INFO':
-      return {
-        type: 'EMPLOYEE_SALARY',
-        method: 'getEmployeeSalary',
-        params: { name: followUpName },
-        confidence: 0.95
-      };
-    
-    case 'PAYROLL_INFO':
-      return {
-        type: 'EMPLOYEE_PAID_TOTAL',
-        method: 'getEmployeePaidTotal',
-        params: {
-          name: followUpName,
-          year: context.params.year,
-          month: context.params.month
-        },
-        confidence: 0.95
-      };
-      
-    default:
-      return null;
-  }
-}
-
-// Helper to get method name from intent type
-function getMethodForIntent(intentType: string): string {
-  const methodMap: Record<string, string> = {
-    'EMPLOYEE_SEARCH': 'searchEmployee',
-    'EMPLOYEE_SALARY': 'getEmployeeSalary',
-    'EMPLOYEE_PAID_TOTAL': 'getEmployeePaidTotal',
-    'EMPLOYEE_DETAILS': 'getEmployeeDetails',
-    'BENEFIT_QUERY': 'getBenefitInfo',
-    'REPORT_GENERATE': 'generateReport',
-    'BENEFIT_PROVISION_QUERY': 'getEmployeeBenefitProvision'
-  };
-  return methodMap[intentType] || 'searchEmployee';
-}
+// Legacy mapping and helper functions moved to core/context-enricher.ts
 
 // Helper to map aggregation intent types to service method names
 function getMethodForAggregationIntent(intentType: string): string | null {
@@ -246,32 +55,7 @@ function getMethodForAggregationIntent(intentType: string): string | null {
   return methodMap[intentType] || null;
 }
 
-// Helper function to extract employee names from salary queries
-function extractNameFromSalaryQuery(text: string): string | null {
-  const lowerText = text.toLowerCase().trim();
-  
-  // Pattern 1: "cual es el salario de eliana"
-  const pattern1Match = lowerText.match(/(?:cuál|cual|cuánto|cuanto|qué|que)\s+(?:es\s+el\s+)?(?:salario|sueldo|gana|cobra)\s+de\s+([a-záéíóúñ\s]+)/i);
-  if (pattern1Match) {
-    return pattern1Match[1]?.trim().replace(/[?.,!]+$/, '') || null;
-  }
-  
-  // Pattern 2: "salario de eliana"
-  const pattern2Match = lowerText.match(/(?:salario|sueldo|gana|cobra)\s+(?:de|del|de\s+la)\s+([a-záéíóúñ\s]+)/i);
-  if (pattern2Match) {
-    return pattern2Match[1]?.trim().replace(/[?.,!]+$/, '') || null;
-  }
-  
-  // Pattern 3: "sueldo eliana" (without preposition, avoid general terms)
-  if (!/nomina|total|cuanto|mes|año|periodo/i.test(lowerText)) {
-    const pattern3Match = lowerText.match(/(?:salario|sueldo)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)/i);
-    if (pattern3Match) {
-      return pattern3Match[1]?.trim().replace(/[?.,!]+$/, '') || null;
-    }
-  }
-  
-  return null;
-}
+// Employee name extraction moved to core/context-enricher.ts
 
 // Extract employee name from last assistant messages
 function extractLastEmployeeFromContext(conversation: any[]): string | null {
@@ -1599,112 +1383,44 @@ serve(async (req) => {
         response = await listAllEmployees(userSupabase);
         break;
         
+      // ============================================================================
+      // EMPLOYEE & PAYROLL QUERIES (Using IntentRouter for modularity)
+      // ============================================================================
       case 'searchEmployee':
-        // Additional validation for employee search
-        if (intent.params?.name) {
-          const validation = await validateEmployeeExists(userSupabase, intent.params.name);
-          if (!validation.exists) {
-            response = {
-              message: `No encontré un empleado llamado "${intent.params.name}" en tu empresa. ¿Podrías verificar la ortografía?`,
-              emotionalState: 'neutral'
-            };
-            break;
-          }
-        }
-        response = await searchEmployee(userSupabase, intent.params?.name);
+      case 'getEmployeeSalary':
+      case 'getEmployeePaidTotal':
+      case 'getEmployeeBenefitProvision':
+      case 'getEmployeeDetails':
+      case 'getTotalPayrollCost':
+      case 'getSecurityContributions':
+      case 'getHighestCostEmployees':
+      case 'getLowestCostEmployees':
+      case 'getTotalIncapacityDays':
+      case 'getTotalOvertimeHours': {
+        console.log(`🔀 [ROUTER] Routing ${intent.method} to IntentRouter`);
+        
+        const logger: MayaLogger = {
+          info: (msg: string, data?: any) => console.log(`[INFO] ${msg}`, data || ''),
+          warn: (msg: string, data?: any) => console.warn(`[WARN] ${msg}`, data || ''),
+          error: (msg: string, data?: any) => console.error(`[ERROR] ${msg}`, data || '')
+        };
+        
+        const router = new IntentRouter(logger, userSupabase);
+        const routeContext = {
+          userSupabase,
+          conversation,
+          sessionId,
+          lastMessage,
+          logger
+        };
+        
+        response = await router.route(intent, routeContext);
         break;
+      }
         
       case 'getSalaryReport':
         response = await getSalaryReport(userSupabase);
         break;
-        
-      case 'getEmployeeSalary':
-        // Additional validation for employee salary
-        if (intent.params?.name) {
-          const validation = await validateEmployeeExists(userSupabase, intent.params.name);
-          if (!validation.exists) {
-            response = {
-              message: `No encontré un empleado llamado "${intent.params.name}" en tu empresa. ¿Podrías verificar la ortografía?`,
-              emotionalState: 'neutral'
-            };
-            break;
-          }
-        }
-        response = await getEmployeeSalary(userSupabase, intent.params?.name);
-        break;
-
-      case 'getEmployeePaidTotal':
-        // Additional validation for employee paid total
-        if (intent.params?.name) {
-          const validation = await validateEmployeeExists(userSupabase, intent.params.name);
-          if (!validation.exists) {
-            response = {
-              message: `No encontré un empleado llamado "${intent.params.name}" en tu empresa. ¿Podrías verificar la ortografía?`,
-              emotionalState: 'neutral'  
-            };
-            break;
-          }
-        }
-        response = await getEmployeePaidTotal(userSupabase, intent.params);
-        break;
-        
-      case 'getEmployeeBenefitProvision':
-        // Additional validation for employee benefit provision
-        if (intent.params?.name) {
-          const validation = await validateEmployeeExists(userSupabase, intent.params.name);
-          if (!validation.exists) {
-            response = {
-              message: `No encontré un empleado llamado "${intent.params.name}" en tu empresa. ¿Podrías verificar la ortografía?`,
-              emotionalState: 'neutral'
-            };
-            break;
-          }
-        }
-        response = await getEmployeeBenefitProvision(userSupabase, intent.params);
-        break;
-        
-      case 'getEmployeeDetails': {
-        // Handle "más información" requests
-        let employeeName = intent.params?.name;
-        
-        // If no name provided, extract from conversation context
-        if (!employeeName) {
-          employeeName = extractLastEmployeeFromContext(conversation);
-          console.log(`🧠 [CONTEXT] Extracted employee name from context: "${employeeName}"`);
-        }
-        
-        if (!employeeName) {
-          response = {
-            message: "¿De qué empleado necesitas más información? Por favor especifica el nombre.",
-            emotionalState: 'neutral'
-          };
-          break;
-        }
-        
-        // Validate employee exists
-        const detailsValidation = await validateEmployeeExists(userSupabase, employeeName);
-        if (!detailsValidation.exists) {
-          response = {
-            message: `No encontré un empleado llamado "${employeeName}" en tu empresa. ¿Podrías verificar la ortografía?`,
-            emotionalState: 'neutral'
-          };
-          break;
-        }
-        
-        if (detailsValidation.multiple) {
-          const employeeList = Array.isArray(detailsValidation.employee) 
-            ? detailsValidation.employee.map((emp: any) => `• **${emp.nombre} ${emp.apellido}**`).join('\n')
-            : '';
-          response = {
-            message: `Encontré varios empleados con "${employeeName}":\n\n${employeeList}\n\n¿Podrías ser más específico?`,
-            emotionalState: 'neutral'
-          };
-          break;
-        }
-        
-        response = await getEmployeeDetails(userSupabase, employeeName);
-        break;
-      }
       
       case 'getPayrollTotals':
         response = await getPayrollTotals(userSupabase);
@@ -1885,38 +1601,36 @@ serve(async (req) => {
     // STRUCTURED JSON RESPONSE FORMAT
     // ============================================================================
     
-    // Build structured response
-    const structuredResponse = buildStructuredResponse(intent, response, lastMessage);
+    // ============================================================================
+    // RESPONSE ORCHESTRATION (Using ResponseOrchestrator)
+    // ============================================================================
     
-    // Log actions for debugging
-    console.log(`🎬 [ACTIONS] Response has ${(response.actions || []).length} actions`);
+    console.log(`🎭 [ORCHESTRATOR] Building final response...`);
+    const orchestratedResponse = ResponseOrchestrator.orchestrate(intent, response, lastMessage, {
+      sessionId,
+      timestamp: new Date().toISOString()
+    });
+    
+    // Validate response
+    if (!ResponseOrchestrator.validate(orchestratedResponse)) {
+      console.error('🚨 [ORCHESTRATOR] Response validation failed, returning fallback');
+      return new Response(JSON.stringify({
+        message: 'Error procesando respuesta. Por favor intenta de nuevo.',
+        emotionalState: 'confused',
+        sessionId,
+        timestamp: new Date().toISOString()
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+    // Sanitize response
+    const sanitizedResponse = ResponseOrchestrator.sanitize(orchestratedResponse);
     
     // Return enhanced JSON response with backward compatibility
     return new Response(JSON.stringify({
-      // STRUCTURED FIELDS (NEW)
-      accion: structuredResponse.accion,
-      periodo: structuredResponse.periodo,
-      empleados: structuredResponse.empleados,
-      conceptos: structuredResponse.conceptos,
-      parametros_extra: structuredResponse.parametros_extra,
-      observaciones: structuredResponse.observaciones,
-      incompleto: structuredResponse.incompleto,
-      
-      // EXECUTABLE ACTIONS (CRITICAL FOR UI)
-      executableActions: response.actions || [],
-      executable_actions: response.actions || [], // Backward compatibility
-      
-      // QUICK REPLIES (FOR EMPLOYEE CRUD)
-      quickReplies: response.quickReplies || [],
-      fieldName: response.fieldName,
-      conversationState: response.conversationState,
-      
-      // ORIGINAL FIELDS (BACKWARD COMPATIBILITY)
-      message: response.message,
-      respuesta_natural: response.message, // Natural language response
-      emotionalState: response.emotionalState || 'neutral',
+      ...sanitizedResponse,
       sessionId,
-      timestamp: new Date().toISOString(),
       requestId: `maya-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
