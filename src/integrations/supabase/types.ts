@@ -468,6 +468,59 @@ export type Database = {
         }
         Relationships: []
       }
+      conversation_events: {
+        Row: {
+          company_id: string
+          created_at: string
+          error_data: Json | null
+          event_type: string
+          flow_type: string | null
+          id: string
+          metadata: Json | null
+          session_id: string
+          state_after: Json | null
+          state_before: Json | null
+          transition_reason: string | null
+          user_id: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          error_data?: Json | null
+          event_type: string
+          flow_type?: string | null
+          id?: string
+          metadata?: Json | null
+          session_id: string
+          state_after?: Json | null
+          state_before?: Json | null
+          transition_reason?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          error_data?: Json | null
+          event_type?: string
+          flow_type?: string | null
+          id?: string
+          metadata?: Json | null
+          session_id?: string
+          state_after?: Json | null
+          state_before?: Json | null
+          transition_reason?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cost_centers: {
         Row: {
           active: boolean
@@ -2072,6 +2125,44 @@ export type Database = {
         }
         Relationships: []
       }
+      processed_commands: {
+        Row: {
+          company_id: string
+          expires_at: string
+          idempotency_key: string
+          processed_at: string
+          request_data: Json
+          response_data: Json
+          session_id: string
+        }
+        Insert: {
+          company_id: string
+          expires_at?: string
+          idempotency_key: string
+          processed_at?: string
+          request_data: Json
+          response_data: Json
+          session_id: string
+        }
+        Update: {
+          company_id?: string
+          expires_at?: string
+          idempotency_key?: string
+          processed_at?: string
+          request_data?: Json
+          response_data?: Json
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "processed_commands_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -2157,6 +2248,59 @@ export type Database = {
           violation_type?: string
         }
         Relationships: []
+      }
+      session_states: {
+        Row: {
+          accumulated_data: Json
+          checksum: string
+          company_id: string
+          created_at: string
+          current_state: Json
+          flow_type: string
+          last_activity_at: string
+          metadata: Json
+          session_id: string
+          updated_at: string
+          user_id: string | null
+          version: number
+        }
+        Insert: {
+          accumulated_data?: Json
+          checksum: string
+          company_id: string
+          created_at?: string
+          current_state?: Json
+          flow_type: string
+          last_activity_at?: string
+          metadata?: Json
+          session_id: string
+          updated_at?: string
+          user_id?: string | null
+          version?: number
+        }
+        Update: {
+          accumulated_data?: Json
+          checksum?: string
+          company_id?: string
+          created_at?: string
+          current_state?: Json
+          flow_type?: string
+          last_activity_at?: string
+          metadata?: Json
+          session_id?: string
+          updated_at?: string
+          user_id?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_states_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       social_benefit_calculations: {
         Row: {
@@ -2523,6 +2667,10 @@ export type Database = {
         Args: { p_company_id?: string }
         Returns: Json
       }
+      cleanup_expired_commands: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       complete_incomplete_registration: {
         Args: { p_company_name?: string; p_nit?: string; p_user_email: string }
         Returns: Json
@@ -2633,6 +2781,7 @@ export type Database = {
           cedula: string
           employee_id: string
           nombre: string
+          tipo_documento: string
         }[]
       }
       get_employee_identity_for_period_v2: {

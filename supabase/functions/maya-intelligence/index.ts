@@ -31,6 +31,14 @@ import { ResponseOrchestrator } from './core/response-orchestrator.ts';
 import { ConversationStateManager, FlowType } from './core/conversation-state-manager.ts';
 
 // ============================================================================
+// MVE SERVICES (Phase 1 & 2)
+// ============================================================================
+import { EventLogger } from './services/event-logger.ts';
+import { SessionManager } from './services/session-manager.ts';
+import { IdempotencyHandler } from './services/idempotency-handler.ts';
+import { CircuitBreaker } from './services/circuit-breaker.ts';
+
+// ============================================================================
 // CONVERSATIONAL CONTEXT SYSTEM
 // ============================================================================
 // Functions moved to core/context-enricher.ts for better modularity
@@ -368,6 +376,19 @@ const corsHeaders = {
 const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
 const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
 
+// ============================================================================
+// MVE SERVICE INITIALIZATION
+// ============================================================================
+const eventLogger = new EventLogger(supabaseUrl, supabaseKey);
+const sessionManager = new SessionManager(supabaseUrl, supabaseKey);
+const idempotencyHandler = new IdempotencyHandler(supabaseUrl, supabaseKey, 24);
+const llmCircuitBreaker = new CircuitBreaker({
+  failureThreshold: 5,
+  successThreshold: 2,
+  timeout: 30000,
+  resetTimeout: 60000
+});
+
 // 🔒 SECURITY HELPERS (KISS)
 async function getCurrentCompanyId(client: any): Promise<string | null> {
   try {
@@ -406,8 +427,9 @@ serve(async (req) => {
       global: { headers: { Authorization: authHeader } }
     });
 
-    const { conversation, sessionId, richContext, metadata } = await req.json();
+    const { conversation, sessionId, richContext, metadata, idempotencyKey } = await req.json();
     console.log(`📦 [METADATA] Received metadata:`, metadata ? 'present' : 'missing');
+    console.log(`🔑 [IDEMPOTENCY] Received key:`, idempotencyKey ? 'present' : 'missing');
     
     if (!conversation || !Array.isArray(conversation)) {
       return new Response(JSON.stringify({
@@ -448,52 +470,115 @@ serve(async (req) => {
     const lastMessage = conversation[conversation.length - 1]?.content || '';
     console.log(`[MAYA-KISS] Processing: "${lastMessage}"`);
     
+    // ============================================================================
+    // IDEMPOTENCY CHECK (Phase 2 - Day 4)
+    // ============================================================================
+    const companyId = richContext?.companyId || '';
+    if (idempotencyKey && companyId) {
+      const idempotencyResult = await idempotencyHandler.checkAndStore(
+        idempotencyKey,
+        companyId,
+        sessionId || 'unknown',
+        { message: lastMessage, timestamp: new Date().toISOString() }
+      );
+      
+      if (idempotencyResult.isDuplicate) {
+        console.log(`⚠️ [IDEMPOTENCY] Duplicate request detected, returning cached response`);
+        return new Response(
+          JSON.stringify(idempotencyResult.previousResponse),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+    
+    // Log user message event
+    await eventLogger.logUserMessage(
+      sessionId || 'unknown',
+      companyId,
+      undefined,
+      lastMessage,
+      { richContext }
+    );
+    
     // Declare intent variable
     let intent: any = null;
 
-    // STATE GATE: Force EMPLOYEE_CREATE if a pending creation flow exists
+    // ============================================================================
+    // BACKEND SESSION STATE LOADING (Phase 1 - Day 2-3)
+    // ============================================================================
     let stateGateActive = false;
     let preservedContext: any = null;
+    
     try {
-      const lastStateRaw = metadata?.lastConversationState;
-      console.log(`🔍 [STATE_GATE] Checking metadata.lastConversationState: ${typeof lastStateRaw}`, lastStateRaw ? 'present' : 'missing');
+      // Load context from backend storage (single source of truth)
+      const loadedContext = await sessionManager.loadContext(sessionId || '');
       
-      if (lastStateRaw) {
-        let ctx: any = null;
-        if (typeof lastStateRaw === 'string') {
-          ctx = ConversationStateManager.deserialize(lastStateRaw);
-        } else if (lastStateRaw?.context && typeof lastStateRaw.context === 'string') {
-          ctx = ConversationStateManager.deserialize(lastStateRaw.context);
-        } else if (lastStateRaw?.state && lastStateRaw?.flowType) {
-          ctx = lastStateRaw;
+      if (loadedContext && loadedContext.flowType === FlowType.EMPLOYEE_CREATE && !ConversationStateManager.isFlowComplete(loadedContext)) {
+        console.log(`🚨 [STATE_GATE] ACTIVE - Forcing EMPLOYEE_CREATE (state: ${loadedContext.currentState})`);
+        stateGateActive = true;
+        preservedContext = loadedContext;
+        
+        // Log state transition event
+        await eventLogger.logStateTransition(
+          loadedContext,
+          loadedContext.currentState,
+          loadedContext.currentState,
+          'User message in active flow',
+          { message: lastMessage }
+        );
+        
+        // SHORT-CIRCUIT: Skip all classification and jump directly to CRUD handler
+        const crudResponse = await crudHandlerRegistry.handleIntent({
+          type: 'EMPLOYEE_CREATE',
+          method: 'createEmployee',
+          confidence: 0.99,
+          entities: [],
+          parameters: {
+            originalMessage: lastMessage,
+            conversationState: loadedContext
+          }
+        }, richContext);
+        
+        // Save updated context to backend
+        if (crudResponse.conversationState) {
+          await sessionManager.saveContext(crudResponse.conversationState);
         }
         
-        if (ctx && ctx.flowType === FlowType.EMPLOYEE_CREATE && !ConversationStateManager.isFlowComplete(ctx)) {
-          console.log(`🚨 [STATE_GATE] ACTIVE - Forcing EMPLOYEE_CREATE (state: ${ctx.state})`);
-          stateGateActive = true;
-          preservedContext = ctx;
-          
-          // SHORT-CIRCUIT: Skip all classification and jump directly to CRUD handler
-          const crudResponse = await crudHandlerRegistry.handleIntent({
-            type: 'EMPLOYEE_CREATE',
-            method: 'createEmployee',
-            confidence: 0.99,
-            entities: [],
-            parameters: {
-              originalMessage: lastMessage,
-              conversationState: metadata?.lastConversationState
-            }
-          }, richContext);
-          
-          console.log(`✅ [STATE_GATE] Handler processed, returning response`);
-          return new Response(
-            JSON.stringify(crudResponse),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        // Log assistant response
+        await eventLogger.logAssistantResponse(
+          sessionId || 'unknown',
+          companyId,
+          undefined,
+          crudResponse,
+          { flowActive: true }
+        );
+        
+        // Store idempotency response
+        if (idempotencyKey && companyId) {
+          await idempotencyHandler.checkAndStore(
+            idempotencyKey,
+            companyId,
+            sessionId || 'unknown',
+            { message: lastMessage },
+            crudResponse
           );
         }
+        
+        console.log(`✅ [STATE_GATE] Handler processed, returning response`);
+        return new Response(
+          JSON.stringify(crudResponse),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
     } catch (e) {
-      console.warn('⚠️ [STATE_GATE] Failed to process lastConversationState', e);
+      console.warn('⚠️ [STATE_GATE] Failed to load session state', e);
+      await eventLogger.logError(
+        sessionId || 'unknown',
+        companyId,
+        e as Error,
+        undefined,
+        { stage: 'STATE_GATE' }
+      );
     }
     
     // ============================================================================

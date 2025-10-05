@@ -88,15 +88,10 @@ export class MayaChatService {
   }
 
   /**
-   * Extract conversation state from the last assistant message
-   * Used to restore state machine context in backend
+   * Generate unique idempotency key for request deduplication
    */
-  private getLastAssistantState(): Record<string, any> | undefined {
-    const assistantMessages = this.currentConversation.messages.filter(m => m.role === 'assistant');
-    if (assistantMessages.length === 0) return undefined;
-    
-    const lastAssistant = assistantMessages[assistantMessages.length - 1];
-    return lastAssistant.conversationState;
+  private generateIdempotencyKey(): string {
+    return `${this.currentConversation.sessionId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
   async sendMessage(userMessage: string, context?: RichContext): Promise<ChatMessage> {
@@ -118,38 +113,32 @@ export class MayaChatService {
     
     this.currentConversation.messages.push(userChatMessage);
 
+    // Generate idempotency key for this request
+    const idempotencyKey = this.generateIdempotencyKey();
+
     try {
       console.log('🤖 MAYA Chat: Calling maya-intelligence function...');
       
-      // Enrich conversation with full metadata for state machine
-      const enrichedConversation = this.currentConversation.messages.map(msg => ({
+      // Simplified conversation - no conversationState needed (backend manages state)
+      const simplifiedConversation = this.currentConversation.messages.map(msg => ({
         role: msg.role,
-        content: msg.content,
-        ...(msg.conversationState && { conversationState: msg.conversationState }),
-        ...(msg.fieldName && { fieldName: msg.fieldName }),
-        ...(msg.quickReplies && { quickReplies: msg.quickReplies }),
-        ...(msg.executableActions && { executableActions: msg.executableActions })
+        content: msg.content
       }));
 
-      // Extract last assistant state for state machine continuity
-      const lastConversationState = this.getLastAssistantState();
-
-      console.log('🔄 [FRONTEND] State Sync:', {
-        messageCount: enrichedConversation.length,
-        lastStateExists: !!lastConversationState,
-        lastStateType: typeof lastConversationState,
-        lastStateKeys: lastConversationState ? Object.keys(lastConversationState) : [],
-        lastStateSample: lastConversationState ? JSON.stringify(lastConversationState).substring(0, 200) : null
+      console.log('🔄 [FRONTEND] Simplified Request:', {
+        messageCount: simplifiedConversation.length,
+        hasIdempotencyKey: !!idempotencyKey,
+        sessionId: this.currentConversation.sessionId
       });
 
-      // Call MAYA intelligence with full state context
+      // Call MAYA intelligence with idempotency key
       const { data, error } = await supabase.functions.invoke('maya-intelligence', {
         body: {
-          conversation: enrichedConversation,
+          conversation: simplifiedConversation,
           sessionId: this.currentConversation.sessionId,
           richContext: context,
+          idempotencyKey,
           metadata: {
-            lastConversationState,
             messageCount: this.currentConversation.messages.length,
             companyId: this.currentConversation.companyId,
             lastUpdated: this.currentConversation.lastUpdated
