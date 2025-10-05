@@ -55,21 +55,38 @@ export class EmployeeCrudHandlerV2 extends BaseHandler {
     console.log(`🆕 [V2] Starting employee creation flow`);
     
     // 1. Get or create conversation context
-    const existingContextString = intent.parameters?.conversationState?.context;
+    const existingContext = intent.parameters?.conversationState;
     let convContext: ConversationContext;
     
-    if (existingContextString && typeof existingContextString === 'string') {
+    console.log(`📦 [V2] Received conversationState:`, existingContext ? typeof existingContext : 'missing');
+    
+    if (existingContext) {
       try {
-        convContext = ConversationStateManager.deserialize(existingContextString);
-        console.log(`🔄 [V2] Restored existing context, state: ${convContext.state}`);
+        // Handle different formats of conversationState
+        if (typeof existingContext === 'string') {
+          // Format 1: Direct serialized string
+          convContext = ConversationStateManager.deserialize(existingContext);
+          console.log(`🔄 [V2] Deserialized from string, state: ${convContext.state}`);
+        } else if (existingContext.context && typeof existingContext.context === 'string') {
+          // Format 2: Wrapped in .context property
+          convContext = ConversationStateManager.deserialize(existingContext.context);
+          console.log(`🔄 [V2] Deserialized from .context property, state: ${convContext.state}`);
+        } else if (existingContext.state) {
+          // Format 3: Already a deserialized ConversationContext object
+          convContext = existingContext as ConversationContext;
+          console.log(`🔄 [V2] Using existing object, state: ${convContext.state}`);
+        } else {
+          throw new Error('Unknown conversationState format');
+        }
       } catch (error) {
-        console.error(`❌ [V2] Failed to deserialize context:`, error);
+        console.error(`❌ [V2] Failed to process context:`, error);
         convContext = ConversationStateManager.createNewContext(
           'EMPLOYEE_CREATE' as FlowType,
           context?.companyId,
           context?.userId,
           context?.sessionId
         );
+        console.log(`🆕 [V2] Created fallback context`);
       }
     } else {
       convContext = ConversationStateManager.createNewContext(
@@ -78,6 +95,8 @@ export class EmployeeCrudHandlerV2 extends BaseHandler {
         context?.userId,
         context?.sessionId
       );
+      console.log(`🆕 [V2] Created new context`);
+    }
       console.log(`🆕 [V2] Created new context`);
     }
     

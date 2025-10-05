@@ -23,6 +23,10 @@ export interface RouteContext {
   sessionId: string;
   lastMessage: string;
   logger: MayaLogger;
+  metadata?: {
+    lastConversationState?: any;
+    [key: string]: any;
+  };
 }
 
 export interface RouteResponse {
@@ -126,10 +130,11 @@ export class IntentRouter {
           ...intent.params,
           employee_name: intent.params?.name || intent.params?.employee_name,
           originalMessage: context.lastMessage,
-          conversationState: context.conversation.length > 0 ?
-            context.conversation[context.conversation.length - 1] : undefined
+          conversationState: context.metadata?.lastConversationState
         }
       };
+      
+      this.logger.info(`[ROUTER] Using conversationState from metadata:`, context.metadata?.lastConversationState ? 'present' : 'missing');
 
       const richContext = {
         userId: (await context.userSupabase.auth.getUser()).data.user?.id || '',

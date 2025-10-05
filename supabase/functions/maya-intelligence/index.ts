@@ -405,7 +405,8 @@ serve(async (req) => {
       global: { headers: { Authorization: authHeader } }
     });
 
-    const { conversation, sessionId, richContext } = await req.json();
+    const { conversation, sessionId, richContext, metadata } = await req.json();
+    console.log(`📦 [METADATA] Received metadata:`, metadata ? 'present' : 'missing');
     
     if (!conversation || !Array.isArray(conversation)) {
       return new Response(JSON.stringify({
@@ -1411,8 +1412,10 @@ serve(async (req) => {
           conversation,
           sessionId,
           lastMessage,
-          logger
+          logger,
+          metadata
         };
+        console.log(`📦 [ROUTE_CONTEXT] Passing metadata to router:`, metadata?.lastConversationState ? 'has state' : 'no state');
         
         response = await router.route(intent, routeContext);
         break;

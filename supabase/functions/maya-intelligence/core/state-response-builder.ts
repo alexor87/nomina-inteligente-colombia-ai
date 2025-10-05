@@ -8,7 +8,7 @@
  * @phase Phase-1-Infrastructure
  */
 
-import { ConversationState, FlowType, ConversationContext } from './conversation-state-manager.ts';
+import { ConversationState, FlowType, ConversationContext, ConversationStateManager } from './conversation-state-manager.ts';
 import { HandlerResponse, EmotionalState, ExecutableAction } from './types.ts';
 
 /**
@@ -184,7 +184,7 @@ export class StateResponseBuilder {
       response: additionalMessage ? `${additionalMessage}\n\n${message}` : message,
       emotionalState,
       requiresFollowUp: !this.isTerminalState(state),
-      conversationState: context
+      conversationState: ConversationStateManager.serialize(context)
     };
 
     // Agregar quick replies si existen
