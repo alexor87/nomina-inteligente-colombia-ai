@@ -181,7 +181,7 @@ export class StateResponseBuilder {
     const emotionalState = this.getEmotionalStateForState(state);
     
     let response: HandlerResponse = {
-      message: additionalMessage ? `${additionalMessage}\n\n${message}` : message,
+      response: additionalMessage ? `${additionalMessage}\n\n${message}` : message,
       emotionalState,
       requiresFollowUp: !this.isTerminalState(state),
       conversationState: context
@@ -335,7 +335,7 @@ export class StateResponseBuilder {
     reason: string
   ): HandlerResponse {
     return {
-      message: `❌ No puedo realizar esa acción ahora.\n\n${reason}`,
+      response: `❌ No puedo realizar esa acción ahora.\n\n${reason}`,
       emotionalState: 'concerned',
       requiresFollowUp: true,
       quickReplies: [
@@ -368,7 +368,7 @@ export class StateResponseBuilder {
     const missingLabels = missingFields.map(field => fieldLabels[field] || field);
 
     return {
-      message: `📋 Para continuar, necesito la siguiente información:\n\n${missingLabels.map(label => `• ${label}`).join('\n')}`,
+      response: `📋 Para continuar, necesito la siguiente información:\n\n${missingLabels.map(label => `• ${label}`).join('\n')}`,
       emotionalState: 'analyzing',
       requiresFollowUp: true
     };
@@ -382,7 +382,7 @@ export class StateResponseBuilder {
     context: ConversationContext
   ): HandlerResponse {
     return {
-      message: action.confirmationMessage || '¿Confirmas esta acción?',
+      response: action.confirmationMessage || '¿Confirmas esta acción?',
       emotionalState: 'neutral',
       requiresFollowUp: true,
       actions: [action],
@@ -410,7 +410,7 @@ export class StateResponseBuilder {
     };
 
     return {
-      message: `❌ He cancelado la ${flowLabels[flowType]}. ¿En qué más puedo ayudarte?`,
+      response: `❌ He cancelado la ${flowLabels[flowType]}. ¿En qué más puedo ayudarte?`,
       emotionalState: 'neutral',
       requiresFollowUp: false
     };

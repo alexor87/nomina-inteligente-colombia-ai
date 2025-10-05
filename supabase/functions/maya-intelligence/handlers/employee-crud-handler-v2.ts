@@ -154,14 +154,25 @@ export class EmployeeCrudHandlerV2 extends BaseHandler {
       // 9. Build response for the new state
       const stateResponse = StateResponseBuilder.buildStateResponse(nextState, currentContext);
       
-      // 10. Check if this state requires user input (has quick replies or is terminal)
+      // 10. Check if this state requires user input
       const hasQuickReplies = stateResponse.quickReplies && stateResponse.quickReplies.length > 0;
       const isTerminalState = nextState.endsWith('_READY') || nextState === 'READY';
-      const hasMessage = stateResponse.message && stateResponse.message.trim().length > 0;
       
-      // If state requires user input, stop auto-advancing
-      if (hasQuickReplies || isTerminalState || hasMessage) {
-        console.log(`🛑 [V2] Stopped auto-advance at: ${nextState} (quickReplies: ${hasQuickReplies}, terminal: ${isTerminalState}, message: ${hasMessage})`);
+      // States that require free text input (no quick replies but need user response)
+      const freeTextStates: ConversationState[] = [
+        ConversationState.AWAITING_EMPLOYEE_NAME,
+        ConversationState.AWAITING_ID_NUMBER,
+        ConversationState.AWAITING_SALARY,
+        ConversationState.AWAITING_POSITION
+      ];
+      const requiresFreeTextInput = freeTextStates.includes(nextState as ConversationState);
+      
+      // Stop auto-advancing if:
+      // - State has quick replies (user must select)
+      // - State is terminal (flow complete)
+      // - State requires free text input (user must type)
+      if (hasQuickReplies || isTerminalState || requiresFreeTextInput) {
+        console.log(`🛑 [V2] Stopped auto-advance at: ${nextState} (quickReplies: ${hasQuickReplies}, terminal: ${isTerminalState}, freeText: ${requiresFreeTextInput})`);
         console.log(`💬 [V2] Response: ${stateResponse.quickReplies?.length || 0} quick replies`);
         return stateResponse;
       }

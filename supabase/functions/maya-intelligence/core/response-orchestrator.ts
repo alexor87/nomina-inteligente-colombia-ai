@@ -57,8 +57,8 @@ export class ResponseOrchestrator {
       conceptos: structuredResponse.conceptos,
       totales: structuredResponse.totales,
       
-      // Backward compatibility
-      message: response.message || structuredResponse.mensaje || 'No pude procesar tu solicitud.',
+      // Backward compatibility - check response.response first, then response.message
+      message: response.response || response.message || structuredResponse.mensaje || 'No pude procesar tu solicitud.',
       emotionalState: response.emotionalState || 'neutral',
       actions: response.actions || [],
       quickReplies: response.quickReplies || [],
