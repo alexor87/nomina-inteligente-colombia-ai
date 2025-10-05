@@ -27,8 +27,8 @@ export const MayaMessage: React.FC<MayaMessageProps> = ({
         animate={{ opacity: 1, scale: 1 }}
         className="flex justify-center my-4"
       >
-        <div className="bg-slate-800/40 backdrop-blur-sm border border-white/5 rounded-xl px-4 py-2 max-w-md">
-          <p className="text-xs text-slate-400 text-center">{message.content}</p>
+        <div className="bg-gray-100 backdrop-blur-sm border border-gray-200 rounded-xl px-4 py-2 max-w-md">
+          <p className="text-xs text-gray-600 text-center">{message.content}</p>
         </div>
       </motion.div>
     );
@@ -58,8 +58,8 @@ export const MayaMessage: React.FC<MayaMessageProps> = ({
           whileHover={{ scale: 1.01 }}
           className={`rounded-2xl px-5 py-3.5 ${
             isUser 
-              ? 'bg-gradient-to-br from-purple-600 via-purple-500 to-pink-600 text-white shadow-lg shadow-purple-500/20' 
-              : 'bg-slate-800/60 backdrop-blur-xl text-slate-100 border border-white/5 shadow-lg'
+              ? 'bg-primary text-white shadow-lg' 
+              : 'bg-gray-100 backdrop-blur-sm text-gray-900 border border-gray-200 shadow-sm'
           }`}
         >
           {isUser ? (
@@ -70,7 +70,7 @@ export const MayaMessage: React.FC<MayaMessageProps> = ({
         </motion.div>
         
         {/* Timestamp - subtle */}
-        <span className="text-[10px] text-slate-500 mt-1 px-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <span className="text-[10px] text-gray-500 mt-1 px-1 opacity-0 group-hover:opacity-100 transition-opacity">
           {new Date(message.timestamp).toLocaleTimeString('es-ES', { 
             hour: '2-digit', 
             minute: '2-digit' 
@@ -85,7 +85,7 @@ export const MayaMessage: React.FC<MayaMessageProps> = ({
                 key={idx}
                 variant="ghost"
                 size="sm"
-                className="bg-slate-800/40 backdrop-blur-sm border border-white/10 text-slate-300 hover:bg-white/5 hover:text-white hover:border-white/20 text-xs h-8 px-3 transition-all"
+                className="bg-white backdrop-blur-sm border border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900 hover:border-gray-300 text-xs h-8 px-3 transition-all"
               >
                 {reply.label}
               </Button>
@@ -95,8 +95,8 @@ export const MayaMessage: React.FC<MayaMessageProps> = ({
       </div>
 
       {isUser && (
-        <div className="flex-shrink-0 w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center mt-1 shadow-lg">
-          <User className="h-4 w-4 text-white" />
+        <div className="flex-shrink-0 w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center mt-1 shadow-sm">
+          <User className="h-4 w-4 text-gray-600" />
         </div>
       )}
     </motion.div>
