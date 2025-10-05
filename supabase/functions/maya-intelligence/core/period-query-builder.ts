@@ -106,7 +106,9 @@ export class PeriodQueryBuilder {
     companyId: string,
     monthCount: number
   ): Promise<ResolvedPeriods | null> {
-    const endDate = new Date();
+    // Calculate date range excluding current month if not closed
+    const currentDate = new Date();
+    const endDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 0); // Last day of previous month
     const startDate = new Date(endDate.getFullYear(), endDate.getMonth() - monthCount + 1, 1);
     
     const startDateStr = startDate.toISOString().split('T')[0];
@@ -119,8 +121,8 @@ export class PeriodQueryBuilder {
       .select('id, periodo, fecha_inicio, fecha_fin')
       .eq('company_id', companyId)
       .eq('estado', 'cerrado')
-      .gte('fecha_inicio', startDateStr)
-      .lte('fecha_fin', endDateStr)
+      .gte('fecha_fin', startDateStr)    // Periods ending after or on range start
+      .lte('fecha_inicio', endDateStr)   // Periods starting before or on range end
       .order('fecha_inicio', { ascending: true });
     
     if (error) {
