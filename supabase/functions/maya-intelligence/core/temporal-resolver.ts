@@ -141,6 +141,34 @@ export class TemporalResolver {
       };
     }
     
+    // Month range (monthStart + monthEnd)
+    if (params.monthStart && params.monthEnd) {
+      return {
+        type: TemporalType.MONTH_RANGE,
+        startDate: params.monthStart,
+        endDate: params.monthEnd,
+        year: params.year || new Date().getFullYear()
+      };
+    }
+    
+    // Quarter
+    if (params.quarter) {
+      return {
+        type: TemporalType.QUARTER,
+        quarter: params.quarter,
+        year: params.year || new Date().getFullYear()
+      };
+    }
+    
+    // Semester
+    if (params.semester) {
+      return {
+        type: TemporalType.SEMESTER,
+        semester: params.semester,
+        year: params.year || new Date().getFullYear()
+      };
+    }
+    
     // monthCount for range queries
     if (params.monthCount) {
       return {

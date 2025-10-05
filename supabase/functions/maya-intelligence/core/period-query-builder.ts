@@ -36,6 +36,19 @@ export class PeriodQueryBuilder {
         case TemporalType.SEMESTER:
           return await this.getSemesterPeriods(client, companyId, params.semester!, params.year!);
           
+        case TemporalType.MONTH_RANGE:
+          if (!params.startDate || !params.endDate || !params.year) {
+            console.error('❌ [PERIOD_BUILDER] MONTH_RANGE requires startDate, endDate and year');
+            return null;
+          }
+          return await this.getMonthRangePeriods(
+            client, 
+            companyId, 
+            params.startDate, 
+            params.endDate, 
+            params.year
+          );
+          
         case TemporalType.SPECIFIC_PERIOD:
           return await this.getMostRecentPeriod(client, companyId, params.periodIds?.[0]);
           
@@ -269,6 +282,58 @@ export class PeriodQueryBuilder {
       periods,
       displayName: `Semestre ${semester} ${year}`,
       temporalType: TemporalType.SEMESTER
+    };
+  }
+  
+  /**
+   * Get periods for a month range
+   */
+  private static async getMonthRangePeriods(
+    client: any,
+    companyId: string,
+    monthStart: string,
+    monthEnd: string,
+    year: number
+  ): Promise<ResolvedPeriods | null> {
+    const startMonthNum = MONTH_NAMES[monthStart.toLowerCase()];
+    const endMonthNum = MONTH_NAMES[monthEnd.toLowerCase()];
+    
+    if (!startMonthNum || !endMonthNum) {
+      console.error('❌ [PERIOD_BUILDER] Invalid month names:', monthStart, monthEnd);
+      return null;
+    }
+    
+    const startDate = `${year}-${String(startMonthNum).padStart(2, '0')}-01`;
+    const endDate = new Date(year, endMonthNum, 0).toISOString().split('T')[0];
+    
+    const { data: periods, error } = await client
+      .from('payroll_periods_real')
+      .select('id, periodo, fecha_inicio, fecha_fin')
+      .eq('company_id', companyId)
+      .eq('estado', 'cerrado')
+      .gte('fecha_inicio', startDate)
+      .lte('fecha_fin', endDate)
+      .order('fecha_inicio', { ascending: true });
+    
+    if (error) {
+      console.error('❌ [PERIOD_BUILDER] Error fetching month range periods:', error);
+      return null;
+    }
+    
+    if (!periods || periods.length === 0) {
+      console.warn(`⚠️ [PERIOD_BUILDER] No periods found from ${monthStart} to ${monthEnd} ${year}`);
+      return null;
+    }
+    
+    console.log(`✅ [PERIOD_BUILDER] Found ${periods.length} periods from ${monthStart} to ${monthEnd} ${year}`);
+    
+    const monthStartCap = monthStart.charAt(0).toUpperCase() + monthStart.slice(1);
+    const monthEndCap = monthEnd.charAt(0).toUpperCase() + monthEnd.slice(1);
+    
+    return {
+      periods,
+      displayName: `${monthStartCap} a ${monthEndCap} ${year}`,
+      temporalType: TemporalType.MONTH_RANGE
     };
   }
   

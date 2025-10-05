@@ -54,256 +54,12 @@ function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
-// Helper: Get period ID from params (month/year or latest)
-async function getPeriodId(
-  client: any, 
-  companyId: string, 
-  params: { month?: string; year?: number }
-): Promise<{ id: string; periodo: string } | null> {
-  try {
-    let query = client
-      .from('payroll_periods_real')
-      .select('id, periodo, fecha_inicio, fecha_fin')
-      .eq('company_id', companyId)
-      .eq('estado', 'cerrado');
-    
-    // Filter by year if provided
-    if (params.year) {
-      const yearStr = params.year.toString();
-      query = query.like('periodo', `%${yearStr}%`);
-    }
-    
-    // Filter by month if provided
-    if (params.month) {
-      const monthCapitalized = params.month.charAt(0).toUpperCase() + params.month.slice(1);
-      query = query.like('periodo', `%${monthCapitalized}%`);
-    }
-    
-    query = query.order('fecha_fin', { ascending: false }).limit(1);
-    
-    const { data, error } = await query;
-    
-    if (error) {
-      console.error('❌ [AGGREGATION] Error fetching period:', error);
-      return null;
-    }
-    
-    return data?.[0] ? { id: data[0].id, periodo: data[0].periodo } : null;
-  } catch (e) {
-    console.error('❌ [AGGREGATION] getPeriodId failed:', e);
-    return null;
-  }
-}
-
-// Helper: Get ALL periods for a specific month (for full month aggregations)
-async function getPeriodsByMonth(
-  client: any,
-  companyId: string,
-  params: { month: string; year: number }
-): Promise<Array<{ id: string; periodo: string }> | null> {
-  try {
-    const monthCapitalized = params.month.charAt(0).toUpperCase() + params.month.slice(1);
-    const yearStr = params.year.toString();
-    
-    const { data, error } = await client
-      .from('payroll_periods_real')
-      .select('id, periodo, fecha_inicio, fecha_fin')
-      .eq('company_id', companyId)
-      .eq('estado', 'cerrado')
-      .like('periodo', `%${monthCapitalized}%`)
-      .like('periodo', `%${yearStr}%`)
-      .order('fecha_inicio', { ascending: true });
-    
-    if (error) {
-      console.error('❌ [AGGREGATION] Error fetching periods by month:', error);
-      return null;
-    }
-    
-    return data && data.length > 0 ? data : null;
-  } catch (e) {
-    console.error('❌ [AGGREGATION] getPeriodsByMonth failed:', e);
-    return null;
-  }
-}
-
-// Helper to get periods by year
-async function getPeriodsByYear(
-  client: any,
-  companyId: string,
-  year: number
-): Promise<any[]> {
-  try {
-    const { data: periods, error } = await client
-      .from('payroll_periods_real')
-      .select('id, periodo, fecha_inicio, fecha_fin, total_devengado, total_deducciones, total_neto')
-      .eq('company_id', companyId)
-      .eq('estado', 'cerrado')
-      .gte('fecha_inicio', `${year}-01-01`)
-      .lte('fecha_fin', `${year}-12-31`)
-      .order('fecha_inicio', { ascending: true });
-    
-    if (error) {
-      console.error('❌ [AGGREGATION] Error fetching periods by year:', error);
-      return [];
-    }
-    
-    console.log(`✅ [AGGREGATION] Found ${periods?.length || 0} periods for year ${year}`);
-    return periods || [];
-  } catch (e) {
-    console.error('❌ [AGGREGATION] getPeriodsByYear failed:', e);
-    return [];
-  }
-}
-
-// Helper to get last N months periods
-async function getLastNMonthsPeriods(
-  client: any,
-  companyId: string,
-  monthCount: number
-): Promise<any[]> {
-  try {
-    const endDate = new Date();
-    const startDate = new Date(endDate.getFullYear(), endDate.getMonth() - monthCount + 1, 1);
-    
-    const { data: periods, error } = await client
-      .from('payroll_periods_real')
-      .select('id, periodo, fecha_inicio, fecha_fin, total_devengado, total_deducciones, total_neto')
-      .eq('company_id', companyId)
-      .eq('estado', 'cerrado')
-      .gte('fecha_inicio', startDate.toISOString().split('T')[0])
-      .lte('fecha_fin', endDate.toISOString().split('T')[0])
-      .order('fecha_inicio', { ascending: true });
-    
-    if (error) {
-      console.error('❌ [AGGREGATION] Error fetching last N months:', error);
-      return [];
-    }
-    
-    console.log(`✅ [AGGREGATION] Found ${periods?.length || 0} periods for last ${monthCount} months`);
-    return periods || [];
-  } catch (e) {
-    console.error('❌ [AGGREGATION] getLastNMonthsPeriods failed:', e);
-    return [];
-  }
-}
-
-// Helper to get quarter periods
-async function getQuarterPeriods(
-  client: any,
-  companyId: string,
-  quarter: number,
-  year?: number
-): Promise<any[]> {
-  try {
-    const targetYear = year || new Date().getFullYear();
-    const startMonth = (quarter - 1) * 3 + 1;
-    const endMonth = quarter * 3;
-    
-    const { data: periods, error } = await client
-      .from('payroll_periods_real')
-      .select('id, periodo, fecha_inicio, fecha_fin, total_devengado, total_deducciones, total_neto')
-      .eq('company_id', companyId)
-      .eq('estado', 'cerrado')
-      .gte('fecha_inicio', `${targetYear}-${String(startMonth).padStart(2, '0')}-01`)
-      .lte('fecha_fin', `${targetYear}-${String(endMonth).padStart(2, '0')}-31`)
-      .order('fecha_inicio', { ascending: true });
-    
-    if (error) {
-      console.error('❌ [AGGREGATION] Error fetching quarter periods:', error);
-      return [];
-    }
-    
-    console.log(`✅ [AGGREGATION] Found ${periods?.length || 0} periods for Q${quarter} ${targetYear}`);
-    return periods || [];
-  } catch (e) {
-    console.error('❌ [AGGREGATION] getQuarterPeriods failed:', e);
-    return [];
-  }
-}
-
-// Helper to get semester periods
-async function getSemesterPeriods(
-  client: any,
-  companyId: string,
-  semester: number,
-  year?: number
-): Promise<any[]> {
-  try {
-    const targetYear = year || new Date().getFullYear();
-    const startMonth = semester === 1 ? 1 : 7;
-    const endMonth = semester === 1 ? 6 : 12;
-    
-    const { data: periods, error } = await client
-      .from('payroll_periods_real')
-      .select('id, periodo, fecha_inicio, fecha_fin, total_devengado, total_deducciones, total_neto')
-      .eq('company_id', companyId)
-      .eq('estado', 'cerrado')
-      .gte('fecha_inicio', `${targetYear}-${String(startMonth).padStart(2, '0')}-01`)
-      .lte('fecha_fin', `${targetYear}-${String(endMonth).padStart(2, '0')}-31`)
-      .order('fecha_inicio', { ascending: true });
-    
-    if (error) {
-      console.error('❌ [AGGREGATION] Error fetching semester periods:', error);
-      return [];
-    }
-    
-    console.log(`✅ [AGGREGATION] Found ${periods?.length || 0} periods for Semester ${semester} ${targetYear}`);
-    return periods || [];
-  } catch (e) {
-    console.error('❌ [AGGREGATION] getSemesterPeriods failed:', e);
-    return [];
-  }
-}
-
-// Helper to get month range periods
-async function getMonthRangePeriods(
-  client: any,
-  companyId: string,
-  monthStart: string,
-  monthEnd: string,
-  year?: number
-): Promise<any[]> {
-  try {
-    const targetYear = year || new Date().getFullYear();
-    const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 
-                       'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-    
-    const startMonthIndex = monthNames.indexOf(monthStart.toLowerCase()) + 1;
-    const endMonthIndex = monthNames.indexOf(monthEnd.toLowerCase()) + 1;
-    
-    if (startMonthIndex === 0 || endMonthIndex === 0) {
-      console.error('❌ [AGGREGATION] Invalid month names:', monthStart, monthEnd);
-      return [];
-    }
-    
-    const { data: periods, error } = await client
-      .from('payroll_periods_real')
-      .select('id, periodo, fecha_inicio, fecha_fin, total_devengado, total_deducciones, total_neto')
-      .eq('company_id', companyId)
-      .eq('estado', 'cerrado')
-      .gte('fecha_inicio', `${targetYear}-${String(startMonthIndex).padStart(2, '0')}-01`)
-      .lte('fecha_fin', `${targetYear}-${String(endMonthIndex).padStart(2, '0')}-31`)
-      .order('fecha_inicio', { ascending: true });
-    
-    if (error) {
-      console.error('❌ [AGGREGATION] Error fetching month range periods:', error);
-      return [];
-    }
-    
-    console.log(`✅ [AGGREGATION] Found ${periods?.length || 0} periods from ${monthStart} to ${monthEnd} ${targetYear}`);
-    return periods || [];
-  } catch (e) {
-    console.error('❌ [AGGREGATION] getMonthRangePeriods failed:', e);
-    return [];
-  }
-}
-
 // ============================================================================
-// 1. TOTAL PAYROLL COST
+// 1. TOTAL PAYROLL COST (Refactored with PeriodQueryBuilder)
 // ============================================================================
 export async function getTotalPayrollCost(
   client: any,
-  params: { month?: string; year?: number; periodId?: string }
+  params: TemporalParams | { month?: string; year?: number; periodId?: string }
 ): Promise<AggregationResult> {
   console.log('💰 [AGGREGATION] getTotalPayrollCost called with params:', params);
   
@@ -316,141 +72,63 @@ export async function getTotalPayrollCost(
       };
     }
     
-    // 🆕 INFER YEAR IF ONLY MONTH PROVIDED
-    let targetYear = params.year;
+    // Convert legacy params if needed
+    const temporalParams = TemporalResolver.isLegacyFormat(params)
+      ? TemporalResolver.fromLegacy(params)
+      : params as TemporalParams;
     
-    if (params.month && !params.year && !params.periodId) {
-      // User asked for a month without year - find most recent period with that month
-      const recentPeriod = await getPeriodId(client, companyId, { month: params.month });
-      if (recentPeriod) {
-        // Extract year from period name (e.g., "16 - 31 Enero 2025" -> 2025)
-        const yearMatch = recentPeriod.periodo.match(/(\d{4})/);
-        targetYear = yearMatch ? parseInt(yearMatch[1]) : null;
-      }
-    }
+    // Resolve periods using centralized builder
+    const resolved = await PeriodQueryBuilder.resolvePeriods(client, companyId, temporalParams);
     
-    // 🆕 DETECT FULL MONTH QUERY
-    const isFullMonthQuery = params.month && targetYear && !params.periodId;
-    
-    if (isFullMonthQuery) {
-      // Get ALL periods for the month
-      const periods = await getPeriodsByMonth(client, companyId, {
-        month: params.month!,
-        year: targetYear!
-      });
-      
-      if (!periods || periods.length === 0) {
-        return {
-          message: `❌ No encontré períodos cerrados para ${params.month} ${targetYear}`,
-          emotionalState: 'concerned'
-        };
-      }
-      
-      // Sum totals from ALL periods of the month
-      let totalDevengado = 0;
-      let totalDeducciones = 0;
-      let totalNeto = 0;
-      const employeeSet = new Set<string>();
-      
-      for (const period of periods) {
-        const { data: payrolls } = await client
-          .from('payrolls')
-          .select('total_devengado, total_deducciones, neto_pagado, employee_id')
-          .eq('company_id', companyId)
-          .eq('period_id', period.id);
-        
-        if (payrolls) {
-          payrolls.forEach((p: any) => {
-            totalDevengado += p.total_devengado || 0;
-            totalDeducciones += p.total_deducciones || 0;
-            totalNeto += p.neto_pagado || 0;
-            employeeSet.add(p.employee_id);
-          });
-        }
-      }
-      
-      const employerContributions = totalDevengado * 0.25;
-      const totalCost = totalDevengado + employerContributions;
-      const periodNames = periods.map(p => p.periodo).join(', ');
-      const monthCapitalized = params.month.charAt(0).toUpperCase() + params.month.slice(1);
-      
+    if (!resolved || resolved.periods.length === 0) {
       return {
-        message: `📊 **Costo Total de Nómina - ${monthCapitalized} ${targetYear} (Mes Completo)**\n\n` +
-          `📅 **${periods.length} período${periods.length > 1 ? 's' : ''} sumado${periods.length > 1 ? 's' : ''}**: ${periodNames}\n` +
-          `👥 **${employeeSet.size}** empleados\n` +
-          `💰 **Devengado Total**: ${formatCurrency(totalDevengado)}\n` +
-          `📉 **Deducciones Totales**: ${formatCurrency(totalDeducciones)}\n` +
-          `💵 **Neto Pagado Total**: ${formatCurrency(totalNeto)}\n` +
-          `🏢 **Aportes Patronales**: ${formatCurrency(employerContributions)}\n\n` +
-          `🎯 **COSTO TOTAL DEL MES**: ${formatCurrency(totalCost)}`,
-        emotionalState: 'professional',
-        data: {
-          period: `${monthCapitalized} ${targetYear}`,
-          periodsCount: periods.length,
-          periodNames: periods.map(p => p.periodo),
-          employeeCount: employeeSet.size,
-          totalDevengado,
-          totalDeducciones,
-          totalNeto,
-          employerContributions,
-          totalCost
-        }
-      };
-    }
-    
-    // ORIGINAL LOGIC: Specific period query
-    let periodId = params.periodId;
-    let periodName = '';
-    
-    if (!periodId) {
-      const period = await getPeriodId(client, companyId, params);
-      if (!period) {
-        return {
-          message: params.month || params.year 
-            ? `❌ No encontré períodos cerrados para ${params.month || ''} ${params.year || ''}`
-            : '❌ No encontré períodos cerrados en tu empresa.',
-          emotionalState: 'concerned'
-        };
-      }
-      periodId = period.id;
-      periodName = period.periodo;
-    }
-    
-    // Query payrolls for the period
-    const { data: payrolls, error } = await client
-      .from('payrolls')
-      .select('total_devengado, total_deducciones, neto_pagado, employee_id')
-      .eq('company_id', companyId)
-      .eq('period_id', periodId);
-    
-    if (error) {
-      console.error('❌ [AGGREGATION] Error querying payrolls:', error);
-      return {
-        message: '❌ Hubo un error al consultar la nómina.',
+        message: `❌ No encontré períodos cerrados para ${TemporalResolver.getDisplayName(temporalParams)}`,
         emotionalState: 'concerned'
       };
     }
     
-    if (!payrolls || payrolls.length === 0) {
+    // Aggregate payrolls from all resolved periods
+    let totalDevengado = 0;
+    let totalDeducciones = 0;
+    let totalNeto = 0;
+    const employeeSet = new Set<string>();
+    
+    for (const period of resolved.periods) {
+      const { data: payrolls } = await client
+        .from('payrolls')
+        .select('total_devengado, total_deducciones, neto_pagado, employee_id')
+        .eq('company_id', companyId)
+        .eq('period_id', period.id);
+      
+      if (payrolls) {
+        payrolls.forEach((p: any) => {
+          totalDevengado += p.total_devengado || 0;
+          totalDeducciones += p.total_deducciones || 0;
+          totalNeto += p.neto_pagado || 0;
+          employeeSet.add(p.employee_id);
+        });
+      }
+    }
+    
+    if (totalDevengado === 0) {
       return {
-        message: `No encontré registros de nómina para el período ${periodName || 'solicitado'}.`,
+        message: `No encontré registros de nómina para ${resolved.displayName}.`,
         emotionalState: 'neutral'
       };
     }
-    
-    // Calculate totals
-    const totalDevengado = payrolls.reduce((sum, p) => sum + (p.total_devengado || 0), 0);
-    const totalDeducciones = payrolls.reduce((sum, p) => sum + (p.total_deducciones || 0), 0);
-    const totalNeto = payrolls.reduce((sum, p) => sum + (p.neto_pagado || 0), 0);
-    const employeeCount = payrolls.length;
     
     // Calculate employer contributions (approximate: 25% of devengado)
     const employerContributions = totalDevengado * 0.25;
     const totalCost = totalDevengado + employerContributions;
     
+    const periodInfo = resolved.periods.length > 1 
+      ? `📅 **${resolved.periods.length} períodos**: ${resolved.periods.map(p => p.periodo).join(', ')}\n`
+      : '';
+    
     return {
-      message: `📊 **Costo Total de Nómina - ${periodName}**\n\n` +
-        `👥 **${employeeCount}** empleados\n` +
+      message: `📊 **Costo Total de Nómina - ${resolved.displayName}**\n\n` +
+        periodInfo +
+        `👥 **${employeeSet.size}** empleados\n` +
         `💰 **Devengado**: ${formatCurrency(totalDevengado)}\n` +
         `📉 **Deducciones**: ${formatCurrency(totalDeducciones)}\n` +
         `💵 **Neto Pagado**: ${formatCurrency(totalNeto)}\n` +
@@ -458,8 +136,9 @@ export async function getTotalPayrollCost(
         `🎯 **COSTO TOTAL**: ${formatCurrency(totalCost)}`,
       emotionalState: 'professional',
       data: {
-        period: periodName,
-        employeeCount,
+        period: resolved.displayName,
+        periodsCount: resolved.periods.length,
+        employeeCount: employeeSet.size,
         totalDevengado,
         totalDeducciones,
         totalNeto,
@@ -471,7 +150,7 @@ export async function getTotalPayrollCost(
         data: {
           title: 'Costo Total de Nómina',
           value: totalCost,
-          subtitle: periodName,
+          subtitle: resolved.displayName,
           breakdown: [
             { label: 'Devengado', value: totalDevengado },
             { label: 'Aportes Patronales', value: employerContributions },
@@ -490,11 +169,11 @@ export async function getTotalPayrollCost(
 }
 
 // ============================================================================
-// 2. SECURITY CONTRIBUTIONS
+// 2. SECURITY CONTRIBUTIONS (Refactored with PeriodQueryBuilder)
 // ============================================================================
 export async function getSecurityContributions(
   client: any,
-  params: { month?: string; year?: number; periodId?: string; monthCount?: number; quarter?: number; semester?: number; monthStart?: string; monthEnd?: string }
+  params: TemporalParams | { month?: string; year?: number; periodId?: string; monthCount?: number; quarter?: number; semester?: number; monthStart?: string; monthEnd?: string }
 ): Promise<AggregationResult> {
   console.log('🏥 [AGGREGATION] getSecurityContributions called with params:', params);
   
@@ -507,159 +186,41 @@ export async function getSecurityContributions(
       };
     }
     
-    const targetYear = params.year || new Date().getFullYear();
-    let periods: any[] | null = null;
-    let periodDescription = '';
+    // Convert legacy params if needed
+    const temporalParams = TemporalResolver.isLegacyFormat(params)
+      ? TemporalResolver.fromLegacy(params)
+      : params as TemporalParams;
     
-    // 🆕 DETECT FULL YEAR QUERY
-    if (params.year && !params.month && !params.periodId && !params.monthCount && !params.quarter && !params.semester) {
-      console.log(`📅 [AGGREGATION] Full year query detected for: ${params.year}`);
-      periods = await getPeriodsByYear(client, companyId, params.year);
-      periodDescription = `Año ${params.year}`;
-    }
-    // 🆕 DETECT LAST N MONTHS QUERY
-    else if (params.monthCount) {
-      console.log(`📅 [AGGREGATION] Last ${params.monthCount} months query detected`);
-      periods = await getLastNMonthsPeriods(client, companyId, params.monthCount);
-      periodDescription = `Últimos ${params.monthCount} meses`;
-    }
-    // 🆕 DETECT QUARTER QUERY
-    else if (params.quarter) {
-      console.log(`📅 [AGGREGATION] Quarter ${params.quarter} query detected`);
-      periods = await getQuarterPeriods(client, companyId, params.quarter, params.year);
-      periodDescription = `Trimestre ${params.quarter} ${params.year || new Date().getFullYear()}`;
-    }
-    // 🆕 DETECT SEMESTER QUERY
-    else if (params.semester) {
-      console.log(`📅 [AGGREGATION] Semester ${params.semester} query detected`);
-      periods = await getSemesterPeriods(client, companyId, params.semester, params.year);
-      periodDescription = `Semestre ${params.semester} ${params.year || new Date().getFullYear()}`;
-    }
-    // 🆕 DETECT MONTH RANGE QUERY
-    else if (params.monthStart && params.monthEnd) {
-      console.log(`📅 [AGGREGATION] Month range query detected: ${params.monthStart} to ${params.monthEnd}`);
-      periods = await getMonthRangePeriods(client, companyId, params.monthStart, params.monthEnd, params.year);
-      periodDescription = `${params.monthStart.charAt(0).toUpperCase() + params.monthStart.slice(1)} a ${params.monthEnd} ${params.year || new Date().getFullYear()}`;
-    }
-    // DETECT FULL MONTH QUERY
-    else if (params.month) {
-      let yearForMonth = params.year;
-      if (!yearForMonth && !params.periodId) {
-        const recentPeriod = await getPeriodId(client, companyId, { month: params.month });
-        if (recentPeriod) {
-          const yearMatch = recentPeriod.periodo.match(/(\d{4})/);
-          yearForMonth = yearMatch ? parseInt(yearMatch[1]) : null;
-        }
-      }
-      
-      if (yearForMonth) {
-        periods = await getPeriodsByMonth(client, companyId, {
-          month: params.month!,
-          year: yearForMonth!
-        });
-        periodDescription = `${params.month.charAt(0).toUpperCase() + params.month.slice(1)} ${yearForMonth}`;
-      }
-    }
+    // Resolve periods using centralized builder
+    const resolved = await PeriodQueryBuilder.resolvePeriods(client, companyId, temporalParams);
     
-    // If we have multiple periods, aggregate them
-    if (periods && periods.length > 0) {
-      let totalDevengado = 0;
-      
-      for (const period of periods) {
-        const { data: payrolls } = await client
-          .from('payrolls')
-          .select('total_devengado')
-          .eq('company_id', companyId)
-          .eq('period_id', period.id);
-        
-        if (payrolls) {
-          payrolls.forEach((p: any) => {
-            totalDevengado += p.total_devengado || 0;
-          });
-        }
-      }
-      
-      if (totalDevengado === 0) {
-        return {
-          message: `❌ No encontré datos de nómina para ${periodDescription}`,
-          emotionalState: 'concerned'
-        };
-      }
-      
-      // Calculate contributions
-      const epsEmployee = totalDevengado * 0.04;
-      const epsEmployer = totalDevengado * 0.085;
-      const epsTotal = epsEmployee + epsEmployer;
-      
-      const pensionEmployee = totalDevengado * 0.04;
-      const pensionEmployer = totalDevengado * 0.12;
-      const pensionTotal = pensionEmployee + pensionEmployer;
-      
-      const arl = totalDevengado * 0.00522;
-      const totalContributions = epsTotal + pensionTotal + arl;
-      
+    if (!resolved || resolved.periods.length === 0) {
       return {
-        message: `🏥 **Aportes a Seguridad Social - ${periodDescription}**\n\n` +
-          `📅 **${periods.length} período${periods.length > 1 ? 's' : ''} procesado${periods.length > 1 ? 's' : ''}**\n\n` +
-          `**EPS (Salud)**\n` +
-          `👤 Empleado: ${formatCurrency(epsEmployee)} (4%)\n` +
-          `🏢 Empleador: ${formatCurrency(epsEmployer)} (8.5%)\n` +
-          `📊 Total EPS: ${formatCurrency(epsTotal)}\n\n` +
-          `**Pensión**\n` +
-          `👤 Empleado: ${formatCurrency(pensionEmployee)} (4%)\n` +
-          `🏢 Empleador: ${formatCurrency(pensionEmployer)} (12%)\n` +
-          `📊 Total Pensión: ${formatCurrency(pensionTotal)}\n\n` +
-          `**ARL**\n` +
-          `🏢 Empleador: ${formatCurrency(arl)} (0.522%)\n\n` +
-          `🎯 **TOTAL APORTES**: ${formatCurrency(totalContributions)}`,
-        emotionalState: 'professional',
-        data: {
-          period: periodDescription,
-          periodsCount: periods.length,
-          eps: { employee: epsEmployee, employer: epsEmployer, total: epsTotal },
-          pension: { employee: pensionEmployee, employer: pensionEmployer, total: pensionTotal },
-          arl,
-          totalContributions
-        }
-      };
-    }
-    
-    // ORIGINAL LOGIC: Specific period query
-    let periodId = params.periodId;
-    let periodName = '';
-    
-    if (!periodId) {
-      const period = await getPeriodId(client, companyId, params);
-      if (!period) {
-        return {
-          message: params.month || params.year 
-            ? `❌ No encontré períodos cerrados para ${params.month || ''} ${params.year || ''}`
-            : '❌ No encontré períodos cerrados en tu empresa.',
-          emotionalState: 'concerned'
-        };
-      }
-      periodId = period.id;
-      periodName = period.periodo;
-    }
-    
-    // Query payrolls for the period
-    const { data: payrolls, error } = await client
-      .from('payrolls')
-      .select('salario_base, total_devengado')
-      .eq('company_id', companyId)
-      .eq('period_id', periodId);
-    
-    if (error) {
-      console.error('❌ [AGGREGATION] Error querying payrolls:', error);
-      return {
-        message: '❌ Hubo un error al consultar la nómina.',
+        message: `❌ No encontré períodos cerrados para ${TemporalResolver.getDisplayName(temporalParams)}`,
         emotionalState: 'concerned'
       };
     }
     
-    if (!payrolls || payrolls.length === 0) {
+    // Aggregate payrolls from all resolved periods
+    let totalDevengado = 0;
+    
+    for (const period of resolved.periods) {
+      const { data: payrolls } = await client
+        .from('payrolls')
+        .select('total_devengado')
+        .eq('company_id', companyId)
+        .eq('period_id', period.id);
+      
+      if (payrolls) {
+        payrolls.forEach((p: any) => {
+          totalDevengado += p.total_devengado || 0;
+        });
+      }
+    }
+    
+    if (totalDevengado === 0) {
       return {
-        message: `No encontré registros de nómina para el período ${periodName || 'solicitado'}.`,
+        message: `No encontré registros de nómina para ${resolved.displayName}.`,
         emotionalState: 'neutral'
       };
     }
@@ -668,8 +229,6 @@ export async function getSecurityContributions(
     // EPS: 12.5% total (8.5% empleador, 4% empleado)
     // Pensión: 16% total (12% empleador, 4% empleado)
     // ARL: ~0.522% empleador (promedio)
-    
-    const totalDevengado = payrolls.reduce((sum, p) => sum + (p.total_devengado || 0), 0);
     
     const epsEmployee = totalDevengado * 0.04;
     const epsEmployer = totalDevengado * 0.085;
@@ -680,11 +239,15 @@ export async function getSecurityContributions(
     const pensionTotal = pensionEmployee + pensionEmployer;
     
     const arl = totalDevengado * 0.00522;
-    
     const totalContributions = epsTotal + pensionTotal + arl;
     
+    const periodInfo = resolved.periods.length > 1 
+      ? `📅 **${resolved.periods.length} períodos procesados**\n\n`
+      : '';
+    
     return {
-      message: `🏥 **Aportes a Seguridad Social - ${periodName}**\n\n` +
+      message: `🏥 **Aportes a Seguridad Social - ${resolved.displayName}**\n\n` +
+        periodInfo +
         `**EPS (Salud)**\n` +
         `👤 Empleado: ${formatCurrency(epsEmployee)} (4%)\n` +
         `🏢 Empleador: ${formatCurrency(epsEmployer)} (8.5%)\n` +
@@ -698,7 +261,8 @@ export async function getSecurityContributions(
         `🎯 **TOTAL APORTES**: ${formatCurrency(totalContributions)}`,
       emotionalState: 'professional',
       data: {
-        period: periodName,
+        period: resolved.displayName,
+        periodsCount: resolved.periods.length,
         eps: { employee: epsEmployee, employer: epsEmployer, total: epsTotal },
         pension: { employee: pensionEmployee, employer: pensionEmployer, total: pensionTotal },
         arl,
@@ -708,7 +272,7 @@ export async function getSecurityContributions(
         type: 'chart',
         data: {
           title: 'Aportes a Seguridad Social',
-          subtitle: periodName,
+          subtitle: resolved.displayName,
           type: 'bar',
           categories: ['EPS', 'Pensión', 'ARL'],
           series: [
