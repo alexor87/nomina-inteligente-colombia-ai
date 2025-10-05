@@ -159,8 +159,8 @@ export class SimpleIntentMatcher {
     // ============================================================================
 
     // 1️⃣ EMPLOYEE_CREATE (confidence: 0.96 - MAYOR que EMPLOYEE_SEARCH)
-    // Pattern 1: "crea a [nombre]" / "crear a [nombre]" (direct name pattern)
-    const directCreatePattern = /(?:crea|crear|agrega|agregar|registra|registrar|añade|añadir)\s+(?:a|al)\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)+/i;
+    // Pattern 1: "crea a [nombre]" / "crear a [nombre]" (direct name pattern) - CASE INSENSITIVE
+    const directCreatePattern = /(?:crea|crear|agrega|agregar|registra|registrar|añade|añadir)\s+(?:a|al)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)+)/i;
     
     // Pattern 2: Traditional patterns with "empleado" keyword
     const traditionalCreatePattern = /(?:crea|crear|agrega|agregar|registra|registrar|añade|añadir|añad[ií]|da\s+de\s+alta|dar\s+de\s+alta)\s+(?:un|una)?\s*(?:nuevo|nueva)?\s*(?:empleado|trabajador|colaborador|empleada|trabajadora|colaboradora)/i;
@@ -171,22 +171,22 @@ export class SimpleIntentMatcher {
       // Extract employee name with multiple fallback patterns
       let employeeName = null;
       
-      // Pattern 1: "crea a [nombre]" or "crear a [nombre]" (highest priority)
-      const directPattern = /(?:crea|crear|agrega|agregar|registra|registrar|añade|añadir)\s+(?:a|al)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)+)/i;
+      // Pattern 1: "crea a [nombre]" or "crear a [nombre]" (highest priority) - CASE INSENSITIVE
+      const directPattern = /(?:crea|crear|agrega|agregar|registra|registrar|añade|añadir)\s+(?:a|al)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)+)/i;
       const directMatch = text.match(directPattern);
       
       if (directMatch) {
         employeeName = directMatch[1].trim();
       } else {
-        // Pattern 2: "llamado/llamada" pattern
-        const namedPattern = /(?:llamad[oa]|de\s+nombre)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)*)/i;
+        // Pattern 2: "llamado/llamada" pattern - CASE INSENSITIVE
+        const namedPattern = /(?:llamad[oa]|de\s+nombre)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*)/i;
         const namedMatch = text.match(namedPattern);
         
         if (namedMatch) {
           employeeName = namedMatch[1].trim();
         } else {
-          // Pattern 3: After trigger word "empleado/trabajador"
-          const afterTriggerPattern = /(?:empleado|trabajador|colaborador|empleada|trabajadora|colaboradora)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)*)/i;
+          // Pattern 3: After trigger word "empleado/trabajador" - CASE INSENSITIVE
+          const afterTriggerPattern = /(?:empleado|trabajador|colaborador|empleada|trabajadora|colaboradora)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*)/i;
           const afterMatch = text.match(afterTriggerPattern);
           if (afterMatch) {
             employeeName = afterMatch[1].trim();

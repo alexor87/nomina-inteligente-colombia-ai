@@ -10,7 +10,8 @@ import { ContextManager } from '../core/context-manager.ts';
 export class EmployeeHandler extends BaseHandler {
   
   canHandle(intent: Intent): boolean {
-    return ['EMPLOYEE_SEARCH', 'EMPLOYEE_CREATE', 'EMPLOYEE_UPDATE', 'EMPLOYEE_DELETE'].includes(intent.type);
+    // Only handle search operations - CRUD is handled by EmployeeCrudHandler
+    return intent.type === 'EMPLOYEE_SEARCH';
   }
   
   async handleIntent(intent: Intent, context?: RichContext): Promise<HandlerResponse> {

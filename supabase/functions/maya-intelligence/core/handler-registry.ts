@@ -22,12 +22,12 @@ export class HandlerRegistry {
   }
   
   private initializeHandlers(openaiKey?: string, supabaseClient?: any): void {
-    // Register all available handlers
+    // Register all available handlers - ORDER MATTERS: More specific handlers first
     this.handlers = [
       new VoucherHandler(this.logger, openaiKey),
       new MassVoucherHandler(this.logger, openaiKey),
+      new EmployeeCrudHandler(this.logger, openaiKey), // CRUD before Search
       new EmployeeHandler(this.logger, openaiKey),
-      new EmployeeCrudHandler(this.logger, openaiKey),
       new PayrollCrudHandler(this.logger, openaiKey),
       new DatabaseQueryHandler(this.logger, openaiKey, supabaseClient),
       // Future handlers can be added here:

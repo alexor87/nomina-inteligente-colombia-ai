@@ -772,12 +772,34 @@ serve(async (req) => {
                 break;
               
               case LLMQueryType.EMPLOYEE_FOLLOWUP:
-                // Handle employee follow-up (keep existing logic)
+                // Handle employee follow-up
                 const employeeName = llmClassification.extractedContext.employeeName;
                 if (employeeName) {
                   console.log(`🔄 [EMPLOYEE_FOLLOWUP] Detected for: "${employeeName}"`);
                   
-                  // Validate employee exists
+                  // 🔧 CHECK: Is this a follow-up for employee CREATION?
+                  // Look for previous assistant messages asking for employee name for creation
+                  const recentAssistantMsgs = conversation.filter(m => m.role === 'assistant').slice(-2);
+                  const isCreationFollowup = recentAssistantMsgs.some(msg => 
+                    msg.content && (
+                      /necesito.*nombre.*empleado/i.test(msg.content) ||
+                      /cuál es el nombre del nuevo empleado/i.test(msg.content) ||
+                      msg.metadata?.fieldName === 'employeeName'
+                    )
+                  );
+                  
+                  if (isCreationFollowup) {
+                    console.log(`✅ [EMPLOYEE_FOLLOWUP] This is a creation follow-up, mapping to EMPLOYEE_CREATE`);
+                    intent = {
+                      type: 'EMPLOYEE_CREATE',
+                      method: 'createEmployee',
+                      params: { name: employeeName, employee_name: employeeName },
+                      confidence: 0.96
+                    };
+                    break;
+                  }
+                  
+                  // Otherwise, validate employee exists (for search/query operations)
                   const validation = await validateEmployeeExists(userSupabase, employeeName);
                   
                   if (!validation.exists) {
