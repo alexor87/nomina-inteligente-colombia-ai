@@ -75,6 +75,6 @@ export async function getLowestCostEmployees(
 }
 
 // Export types and constants for external use
-export type { AggregationType } from './AggregationServiceFactory.ts';
+
 export { NOVEDAD_TYPES, NOVEDAD_GROUPS } from './constants/NovedadTypes.ts';
 export { CONTRIBUTION_RATES, LEGAL_VALUES } from './constants/ContributionRates.ts';
