@@ -22,9 +22,9 @@ export class EmployeeCrudHandlerV2 extends BaseHandler {
    * Determines if this handler can process the given intent
    */
   canHandle(intent: Intent): boolean {
-    return intent.type === 'createEmployee' || 
-           intent.type === 'updateEmployee' || 
-           intent.type === 'deleteEmployee';
+    return intent.type === 'EMPLOYEE_CREATE' || 
+           intent.type === 'EMPLOYEE_UPDATE' || 
+           intent.type === 'EMPLOYEE_DELETE';
   }
 
   /**
@@ -33,13 +33,13 @@ export class EmployeeCrudHandlerV2 extends BaseHandler {
   async handleIntent(intent: Intent, context?: RichContext): Promise<HandlerResponse> {
     console.log(`🎯 [V2] Handling intent: ${intent.type}`);
     
-    if (intent.type === 'createEmployee') {
+    if (intent.type === 'EMPLOYEE_CREATE') {
       return this.handleCreate(intent, context);
-    } else if (intent.type === 'updateEmployee') {
+    } else if (intent.type === 'EMPLOYEE_UPDATE') {
       // V2 only handles create for now, delegate update to V1
       console.log(`⚠️ [V2] Update not implemented, should use V1`);
       return ResponseBuilder.buildErrorResponse('Update operation not available in V2 yet');
-    } else if (intent.type === 'deleteEmployee') {
+    } else if (intent.type === 'EMPLOYEE_DELETE') {
       // V2 only handles create for now, delegate delete to V1
       console.log(`⚠️ [V2] Delete not implemented, should use V1`);
       return ResponseBuilder.buildErrorResponse('Delete operation not available in V2 yet');
