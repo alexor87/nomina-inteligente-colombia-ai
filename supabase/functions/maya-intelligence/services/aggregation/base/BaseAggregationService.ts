@@ -3,9 +3,9 @@
  * Provides common functionality for all aggregation services
  */
 
-import { TemporalParams } from '../../../core/temporal/types.ts';
-import { PeriodQueryBuilder } from '../../../core/temporal/PeriodQueryBuilder.ts';
-import { TemporalResolver } from '../../../core/temporal/TemporalResolver.ts';
+import { TemporalParams } from '../../../core/temporal-types.ts';
+import { PeriodQueryBuilder } from '../../../core/period-query-builder.ts';
+import { TemporalResolver } from '../../../core/temporal-resolver.ts';
 
 export interface AggregationResult {
   message: string;

@@ -4,7 +4,7 @@
  */
 
 import { AggregationServiceFactory } from './AggregationServiceFactory.ts';
-import { TemporalParams } from '../../core/temporal/types.ts';
+import { TemporalParams } from '../../core/temporal-types.ts';
 import { EmployeeCostService } from './services/EmployeeCostService.ts';
 
 /**

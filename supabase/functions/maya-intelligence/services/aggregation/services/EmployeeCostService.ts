@@ -4,7 +4,7 @@
  */
 
 import { BaseAggregationService, AggregationResult } from '../base/BaseAggregationService.ts';
-import { TemporalParams } from '../../../core/temporal/types.ts';
+import { TemporalParams } from '../../../core/temporal-types.ts';
 
 export class EmployeeCostService extends BaseAggregationService {
   async aggregateHighest(

@@ -4,7 +4,7 @@
  */
 
 import { BaseAggregationService, AggregationResult } from '../base/BaseAggregationService.ts';
-import { TemporalParams } from '../../../core/temporal/types.ts';
+import { TemporalParams } from '../../../core/temporal-types.ts';
 import { NOVEDAD_TYPES, INCAPACITY_SUBTYPES } from '../constants/NovedadTypes.ts';
 
 export class IncapacityService extends BaseAggregationService {
