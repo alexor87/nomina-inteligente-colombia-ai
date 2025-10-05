@@ -388,4 +388,105 @@ export class PeriodQueryBuilder {
       temporalType: TemporalType.SPECIFIC_PERIOD
     };
   }
+
+  /**
+   * Get a single most recent period matching the provided criteria
+   * Used for queries that don't require full month aggregation
+   */
+  static async getMostRecentMatchingPeriod(
+    client: any,
+    companyId: string,
+    params: { month?: string; year?: number; periodId?: string }
+  ): Promise<{ id: string; periodo: string; year: number } | null> {
+    console.log('🔍 [PERIOD_BUILDER] getMostRecentMatchingPeriod called:', params);
+
+    // If periodId is provided, fetch that specific period
+    if (params.periodId) {
+      const { data: period, error } = await client
+        .from('payroll_periods_real')
+        .select('id, periodo, fecha_inicio')
+        .eq('company_id', companyId)
+        .eq('id', params.periodId)
+        .eq('estado', 'cerrado')
+        .single();
+      
+      if (error || !period) {
+        console.warn('⚠️ [PERIOD_BUILDER] Specific period not found:', params.periodId);
+        return null;
+      }
+      
+      const year = new Date(period.fecha_inicio).getFullYear();
+      return { id: period.id, periodo: period.periodo, year };
+    }
+
+    // If month is provided (with or without year), find most recent period for that month
+    if (params.month) {
+      const monthNum = MONTH_NAMES[params.month.toLowerCase()];
+      if (!monthNum) {
+        console.warn('⚠️ [PERIOD_BUILDER] Invalid month name:', params.month);
+        return null;
+      }
+
+      let query = client
+        .from('payroll_periods_real')
+        .select('id, periodo, fecha_inicio')
+        .eq('company_id', companyId)
+        .eq('estado', 'cerrado')
+        .gte('fecha_inicio', `${params.year || '2000'}-${String(monthNum).padStart(2, '0')}-01`)
+        .lt('fecha_inicio', `${params.year || '9999'}-${String(monthNum + 1).padStart(2, '0')}-01`)
+        .order('fecha_fin', { ascending: false })
+        .limit(1);
+
+      const { data: period, error } = await query.single();
+      
+      if (error || !period) {
+        console.warn('⚠️ [PERIOD_BUILDER] No period found for month:', params.month, params.year);
+        return null;
+      }
+      
+      const year = new Date(period.fecha_inicio).getFullYear();
+      console.log(`✅ [PERIOD_BUILDER] Found period for ${params.month} ${year}: ${period.periodo}`);
+      return { id: period.id, periodo: period.periodo, year };
+    }
+
+    // If only year is provided, get most recent period from that year
+    if (params.year) {
+      const { data: period, error } = await client
+        .from('payroll_periods_real')
+        .select('id, periodo, fecha_inicio')
+        .eq('company_id', companyId)
+        .eq('estado', 'cerrado')
+        .gte('fecha_inicio', `${params.year}-01-01`)
+        .lt('fecha_inicio', `${params.year + 1}-01-01`)
+        .order('fecha_fin', { ascending: false })
+        .limit(1)
+        .single();
+      
+      if (error || !period) {
+        console.warn('⚠️ [PERIOD_BUILDER] No period found for year:', params.year);
+        return null;
+      }
+      
+      return { id: period.id, periodo: period.periodo, year: params.year };
+    }
+
+    // Default: get most recent closed period
+    const { data: period, error } = await client
+      .from('payroll_periods_real')
+      .select('id, periodo, fecha_inicio')
+      .eq('company_id', companyId)
+      .eq('estado', 'cerrado')
+      .order('fecha_fin', { ascending: false })
+      .limit(1)
+      .single();
+    
+    if (error || !period) {
+      console.warn('⚠️ [PERIOD_BUILDER] No closed periods found');
+      return null;
+    }
+    
+    const year = new Date(period.fecha_inicio).getFullYear();
+    console.log(`✅ [PERIOD_BUILDER] Using most recent period: ${period.periodo}`);
+    return { id: period.id, periodo: period.periodo, year };
+  }
 }
