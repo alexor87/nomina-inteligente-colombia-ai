@@ -96,7 +96,7 @@ Clasifica esta query y extrae los parámetros relevantes.`;
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-5-mini-2025-08-07',
+          model: 'gpt-4o-mini',
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt }
@@ -178,10 +178,27 @@ Clasifica esta query y extrae los parámetros relevantes.`;
       }
 
       const data = await response.json();
+      
+      // Logging detallado para debugging
+      console.log('🔍 [LLM_CLASSIFIER] Full response:', {
+        model: data.model,
+        hasToolCalls: !!data.choices?.[0]?.message?.tool_calls,
+        hasContent: !!data.choices?.[0]?.message?.content,
+        finishReason: data.choices?.[0]?.finish_reason
+      });
+      
       const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
       
       if (!toolCall) {
-        console.error('❌ [LLM_CLASSIFIER] No tool call in response');
+        console.warn('⚠️ [LLM_CLASSIFIER] No tool call, attempting text fallback...');
+        
+        // Fallback: analizar el texto de respuesta si existe
+        const textContent = data.choices?.[0]?.message?.content;
+        if (textContent) {
+          return this.parseTextFallback(query, textContent, lastContext);
+        }
+        
+        console.error('❌ [LLM_CLASSIFIER] No tool call and no text in response');
         throw new Error('No tool call in OpenAI response');
       }
 
@@ -209,6 +226,65 @@ Clasifica esta query y extrae los parámetros relevantes.`;
         reasoning: 'Fallback due to LLM error'
       };
     }
+  }
+  
+  /**
+   * Parse response text manually as fallback when tool calling fails
+   */
+  private static parseTextFallback(
+    query: string,
+    responseText: string,
+    lastContext: any
+  ): LLMClassification {
+    console.log('🔄 [LLM_CLASSIFIER] Using text fallback parser');
+    
+    // Detectar "año pasado" manualmente
+    if (/(?:y\s+)?(?:el\s+)?año\s+pasado/i.test(query)) {
+      return {
+        queryType: LLMQueryType.TEMPORAL_FOLLOWUP,
+        confidence: 0.85,
+        extractedContext: {
+          temporalModifier: "LAST_YEAR",
+          year: new Date().getFullYear() - 1
+        },
+        reasoning: 'Text fallback: detected "año pasado"'
+      };
+    }
+    
+    // Detectar "este año" manualmente
+    if (/(?:y\s+)?(?:el\s+)?(?:este|actual)\s+año/i.test(query)) {
+      return {
+        queryType: LLMQueryType.TEMPORAL_FOLLOWUP,
+        confidence: 0.85,
+        extractedContext: {
+          temporalModifier: "THIS_YEAR",
+          year: new Date().getFullYear()
+        },
+        reasoning: 'Text fallback: detected "este año"'
+      };
+    }
+    
+    // Detectar "últimos X meses"
+    const monthsMatch = query.match(/(?:últimos?|ultimos?)\s+(\d+)\s+meses/i);
+    if (monthsMatch) {
+      return {
+        queryType: LLMQueryType.TEMPORAL_FOLLOWUP,
+        confidence: 0.80,
+        extractedContext: {
+          temporalModifier: "LAST_MONTH",
+          year: new Date().getFullYear()
+        },
+        reasoning: `Text fallback: detected "últimos ${monthsMatch[1]} meses"`
+      };
+    }
+    
+    // Fallback genérico
+    return {
+      queryType: LLMQueryType.DIRECT_INTENT,
+      confidence: 0.4,
+      extractedContext: {},
+      reasoning: 'Text fallback: no pattern matched'
+    };
   }
   
   /**
