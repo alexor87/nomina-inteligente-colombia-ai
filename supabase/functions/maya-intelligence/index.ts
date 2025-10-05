@@ -416,6 +416,81 @@ function scopeToCompany(query: any, companyId: string) {
   return query.eq('company_id', companyId);
 }
 
+// 🧩 Context normalization helper
+function normalizeContext(
+  raw: any,
+  opts: { sessionId?: string; companyId?: string; defaultFlowType?: FlowType } = {}
+) {
+  try {
+    let parsed: any = raw;
+
+    // If wrapped or stringified, unwrap/parse
+    if (parsed && typeof parsed === 'object' && 'conversationState' in parsed && parsed.conversationState) {
+      parsed = (parsed as any).conversationState;
+    }
+    if (typeof parsed === 'string') {
+      try {
+        // Prefer using ConversationStateManager if available
+        parsed = ConversationStateManager.deserialize(parsed);
+      } catch {
+        try {
+          parsed = JSON.parse(parsed);
+        } catch {
+          // keep as raw string
+        }
+      }
+    }
+
+    const transitionHistory = parsed?.transitionHistory ?? parsed?.history ?? [];
+    const flowType = parsed?.flowType ?? opts.defaultFlowType ?? FlowType.EMPLOYEE_CREATE;
+    const currentState = parsed?.currentState ?? parsed?.state ?? null;
+    const accumulatedData = parsed?.accumulatedData ?? {};
+
+    const metadata = {
+      ...(parsed?.metadata || {}),
+      sessionId: opts.sessionId ?? parsed?.metadata?.sessionId,
+      companyId: opts.companyId ?? parsed?.metadata?.companyId,
+      startedAt: parsed?.metadata?.startedAt ?? new Date().toISOString(),
+      lastTransition: parsed?.metadata?.lastTransition ?? new Date().toISOString(),
+      transitionCount:
+        parsed?.metadata?.transitionCount ?? (Array.isArray(transitionHistory) ? transitionHistory.length : 0),
+    };
+
+    const normalized = {
+      ...((parsed && typeof parsed === 'object') ? parsed : {}),
+      flowType,
+      currentState,
+      accumulatedData,
+      transitionHistory,
+      metadata,
+    } as any;
+
+    if (!normalized.flowType || normalized.currentState == null) {
+      console.warn(
+        '⚠️ [NORMALIZE] Missing critical fields after normalization',
+        { hasFlowType: !!normalized.flowType, hasCurrentState: normalized.currentState != null }
+      );
+    }
+
+    return normalized;
+  } catch (e) {
+    console.warn('⚠️ [NORMALIZE] Failed to normalize context, using fallback', e);
+    return {
+      flowType: opts.defaultFlowType ?? FlowType.EMPLOYEE_CREATE,
+      currentState: null,
+      accumulatedData: {},
+      transitionHistory: [],
+      metadata: {
+        sessionId: opts.sessionId,
+        companyId: opts.companyId,
+        startedAt: new Date().toISOString(),
+        lastTransition: new Date().toISOString(),
+        transitionCount: 0,
+      },
+    } as any;
+  }
+}
+
 serve(async (req) => {
   // Handle CORS
   if (req.method === 'OPTIONS') {
