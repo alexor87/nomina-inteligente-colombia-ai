@@ -15,10 +15,13 @@ import {
   Menu,
   Calendar,
   PiggyBank,
-  Building2
+  Building2,
+  Brain,
+  Sparkles
 } from 'lucide-react';
 
 const navigation = [
+  { name: 'MAYA', href: '/app/maya', icon: Brain, module: 'maya', badge: 'IA', animated: true },
   { name: 'Dashboard', href: '/app/dashboard', icon: LayoutDashboard, module: 'dashboard' },
   { name: 'Empleados', href: '/app/employees', icon: Users, module: 'employees' },
   { name: 'Liquidar Nómina', href: '/app/payroll', icon: Calculator, module: 'payroll' },
@@ -71,7 +74,7 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
 
     // Por defecto, mostrar módulos esenciales (incluye rol optimista)
     return navigation.filter(item => 
-      ['dashboard', 'employees', 'payroll-history', 'prestaciones-sociales', 'reports'].includes(item.module)
+      ['maya', 'dashboard', 'employees', 'payroll-history', 'prestaciones-sociales', 'reports'].includes(item.module)
     );
   };
 
@@ -125,33 +128,68 @@ export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
               key={item.name}
               to={item.href}
               className={cn(
-                "group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200",
+                "group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 relative",
                 "hover:bg-gray-50 active:scale-[0.98]",
                 isActive
                   ? "bg-blue-50 text-blue-700 shadow-sm border border-blue-100"
                   : "text-gray-700 hover:text-gray-900",
-                collapsed ? "justify-center" : "justify-start"
+                collapsed ? "justify-center" : "justify-start",
+                item.module === 'maya' && !isActive && "hover:bg-purple-50/50"
               )}
               title={collapsed ? item.name : undefined}
             >
+              {/* MAYA special effects */}
+              {item.module === 'maya' && (
+                <>
+                  {/* Animated background glow */}
+                  <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-purple-500/10 via-pink-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 animate-pulse" />
+                  
+                  {/* Sparkles */}
+                  {!collapsed && (
+                    <Sparkles className="absolute right-2 top-2 h-3 w-3 text-purple-500 animate-pulse" />
+                  )}
+                </>
+              )}
+              
               <div className={cn(
-                "flex items-center justify-center rounded-md transition-colors duration-200",
+                "flex items-center justify-center rounded-md transition-all duration-200 relative",
                 collapsed ? "w-8 h-8" : "w-6 h-6 mr-3",
-                isActive 
-                  ? "text-blue-600" 
-                  : "text-gray-500 group-hover:text-gray-700"
+                item.module === 'maya' 
+                  ? isActive
+                    ? "text-purple-600"
+                    : "text-purple-500 group-hover:text-purple-600 animate-pulse"
+                  : isActive 
+                    ? "text-blue-600" 
+                    : "text-gray-500 group-hover:text-gray-700"
               )}>
                 <item.icon className="h-4 w-4" />
               </div>
               
               {!collapsed && (
-                <span className="truncate font-medium">{item.name}</span>
+                <span className={cn(
+                  "truncate font-medium flex-1",
+                  item.module === 'maya' && !isActive && "bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent"
+                )}>
+                  {item.name}
+                </span>
+              )}
+              
+              {/* Badge for MAYA */}
+              {!collapsed && item.badge && (
+                <span className="ml-2 px-2 py-0.5 text-xs font-semibold rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-sm">
+                  {item.badge}
+                </span>
               )}
               
               {/* Tooltip for collapsed sidebar */}
               {collapsed && (
                 <div className="absolute left-full ml-3 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none whitespace-nowrap z-50 shadow-lg">
                   {item.name}
+                  {item.badge && (
+                    <span className="ml-2 px-2 py-0.5 text-xs font-semibold rounded-full bg-gradient-to-r from-purple-500 to-pink-500">
+                      {item.badge}
+                    </span>
+                  )}
                   <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1 w-2 h-2 bg-gray-900 rotate-45"></div>
                 </div>
               )}
