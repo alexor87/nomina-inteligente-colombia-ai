@@ -13,6 +13,8 @@ import { ConversationContextAnalyzer } from './core/conversation-context-analyze
 import { SmartContextInferencer } from './core/smart-context-inferencer.ts';
 import * as AggregationService from './services/AggregationService.ts';
 import { QueryClassifier, QueryType } from './core/query-classifier.ts';
+import { LLMQueryClassifier, LLMQueryType } from './core/llm-query-classifier.ts';
+import { handleTemporalFollowUp, canHandleTemporalFollowUp } from './handlers/temporal-followup-handler.ts';
 
 // ============================================================================
 // CONVERSATIONAL CONTEXT SYSTEM
@@ -334,6 +336,16 @@ function extractNameFromShortReply(text: string): string | null {
   return null;
 }
 
+// ============================================================================
+// DEPRECATED: detectTemporalFollowUp - Replaced by LLM-based classification
+// ============================================================================
+// This function has been replaced by the LLMQueryClassifier and 
+// handleTemporalFollowUp handler for better accuracy and maintainability.
+// Kept for reference but should not be used in new code.
+// 
+// Migration: Use LLMQueryClassifier.classify() + handleTemporalFollowUp() instead
+// ============================================================================
+/*
 // Detect temporal follow-up queries like "y de todo el año?"
 async function detectTemporalFollowUp(text: string): Promise<{ type: string | null; params: any } | null> {
   const lowerText = text.toLowerCase().trim();
@@ -547,6 +559,10 @@ async function detectTemporalFollowUp(text: string): Promise<{ type: string | nu
   
   return null;
 }
+*/
+// ============================================================================
+// END DEPRECATED: detectTemporalFollowUp
+// ============================================================================
 
 // CORS headers
 const corsHeaders = {
@@ -700,61 +716,103 @@ serve(async (req) => {
       }
     }
     
-    // PRIORITY 2: Check for temporal follow-up queries (HIGHEST PRIORITY FOR TEMPORAL CHANGES)
     if (!intent) {
-      const temporalFollowUp = await detectTemporalFollowUp(lastMessage);
+      // Try fast path first
+      intent = SimpleIntentMatcher.match(lastMessage);
       
-      if (temporalFollowUp) {
-        console.log(`📅 [TEMPORAL_CONTEXT] Temporal follow-up detected: ${temporalFollowUp.type}`);
+      // If fast path has low confidence or no match, use LLM classification
+      if (!intent || intent.confidence < 0.85) {
+        console.log(`🤖 [HYBRID] Fast path confidence low (${intent?.confidence || 0}), using LLM classification...`);
         
-        // Analyze conversation context to find last aggregation intent
-        const context = analyzeConversationContext(conversation);
-        
-        // Enhanced logging for debugging
-        console.log(`🔍 [TEMPORAL_CONTEXT] Context analysis result:`, {
-          contextType: context.contextType,
-          confidence: context.confidence,
-          patterns: context.detectedPatterns,
-          lastResponsePreview: context.lastResponseText?.substring(0, 100)
-        });
-        
-        // Import context patterns
-        const { CONTEXT_TO_INTENT_MAP } = await import('./config/context-patterns.ts');
-        
-        // Check if context is an aggregation type
-        if (context.intentType && context.intentType.startsWith('AGGREGATION_')) {
-          const mapping = CONTEXT_TO_INTENT_MAP[context.intentType];
+        // Initialize LLM classifier with OpenAI key
+        const openaiKey = Deno.env.get('OPENAI_API_KEY');
+        if (openaiKey) {
+          LLMQueryClassifier.initialize(openaiKey);
           
-          if (mapping) {
-            const aggregationIntent = mapping.intentType;
-            const method = getMethodForAggregationIntent(aggregationIntent);
+          try {
+            // Get LLM classification with last 3 messages for context
+            const llmClassification = await LLMQueryClassifier.classify(
+              lastMessage,
+              conversation.slice(-3)
+            );
             
-            if (method) {
-              console.log(`✅ [TEMPORAL_CONTEXT] Applying temporal follow-up to ${aggregationIntent}`);
+            console.log(`🤖 [LLM] Classification: ${llmClassification.queryType} (${llmClassification.confidence.toFixed(2)})`);
+            
+            // Handle based on classification type
+            switch (llmClassification.queryType) {
+              case LLMQueryType.TEMPORAL_FOLLOWUP:
+                // Use intelligent temporal follow-up handler
+                if (canHandleTemporalFollowUp(llmClassification, conversation)) {
+                  const temporalIntent = await handleTemporalFollowUp(llmClassification, conversation);
+                  
+                  if (temporalIntent) {
+                    console.log(`✅ [TEMPORAL_FOLLOWUP] Intent resolved: ${temporalIntent.type}`);
+                    intent = temporalIntent;
+                  } else {
+                    console.log(`❌ [TEMPORAL_FOLLOWUP] Could not resolve intent from context`);
+                    return new Response(JSON.stringify({
+                      message: `¿De qué consulta te refieres? Necesito más contexto para entender qué información buscas para ese período.`,
+                      emotionalState: 'neutral',
+                      sessionId,
+                      timestamp: new Date().toISOString()
+                    }), {
+                      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                    });
+                  }
+                }
+                break;
               
-              intent = {
-                type: aggregationIntent,
-                method: method,
-                params: temporalFollowUp.params,
-                confidence: 0.96
-              };
+              case LLMQueryType.EMPLOYEE_FOLLOWUP:
+                // Handle employee follow-up (keep existing logic)
+                const employeeName = llmClassification.extractedContext.employeeName;
+                if (employeeName) {
+                  console.log(`🔄 [EMPLOYEE_FOLLOWUP] Detected for: "${employeeName}"`);
+                  
+                  // Validate employee exists
+                  const validation = await validateEmployeeExists(userSupabase, employeeName);
+                  
+                  if (!validation.exists) {
+                    return new Response(JSON.stringify({
+                      message: `No encontré un empleado llamado "${employeeName}" en tu empresa. ¿Podrías verificar la ortografía o el nombre completo?`,
+                      emotionalState: 'neutral',
+                      sessionId,
+                      timestamp: new Date().toISOString()
+                    }), {
+                      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                    });
+                  }
+                  
+                  // Infer intent from context
+                  const context = analyzeConversationContext(conversation);
+                  const inferredIntent = inferIntentFromContext(employeeName, context);
+                  
+                  if (inferredIntent) {
+                    intent = inferredIntent;
+                  }
+                }
+                break;
+              
+              case LLMQueryType.AGGREGATION:
+              case LLMQueryType.DIRECT_INTENT:
+                // Use fast path result if available, otherwise keep low confidence
+                if (!intent || intent.confidence < 0.5) {
+                  console.log(`❓ [LLM] No clear intent from classification, keeping fast path or low confidence`);
+                }
+                break;
             }
+          } catch (error) {
+            console.error('❌ [LLM] Classification error:', error);
+            // Fallback to fast path result
           }
         } else {
-          console.log(`❓ [TEMPORAL_CONTEXT] No aggregation context found for temporal follow-up`);
-          return new Response(JSON.stringify({
-            message: `¿De qué consulta te refieres? Necesito más contexto para entender qué información buscas para ese período.`,
-            emotionalState: 'neutral',
-            sessionId,
-            timestamp: new Date().toISOString()
-          }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          });
+          console.warn('⚠️ [LLM] OpenAI API key not configured, falling back to fast path only');
         }
+      } else {
+        console.log(`🚀 [HYBRID] Fast path success: ${intent.type} (${intent.confidence.toFixed(2)})`);
       }
     }
     
-    // PRIORITY 3: Check if this is a follow-up query like "y a [name]?"
+    // PRIORITY 3: Check if this is a follow-up query like "y a [name]?" (legacy fallback)
     if (!intent) {
       const followUpName = detectFollowUpQuery(lastMessage);
       
