@@ -97,8 +97,6 @@ export class EmployeeCrudHandlerV2 extends BaseHandler {
       );
       console.log(`🆕 [V2] Created new context`);
     }
-      console.log(`🆕 [V2] Created new context`);
-    }
     
     // 2. Extract employee name from intent
     const employeeName = intent.parameters?.employee_name || intent.parameters?.name;
