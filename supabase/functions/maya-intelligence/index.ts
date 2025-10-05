@@ -1768,7 +1768,23 @@ serve(async (req) => {
     if (sanitizedResponse?.conversationState) {
       console.log(`💾 [SESSION_MANAGER] Saving conversation state for session: ${sessionId}`);
       try {
-        await sessionManager.saveContext(sanitizedResponse.conversationState);
+        // Enrich context with required metadata for backend storage
+        const cs: any = sanitizedResponse.conversationState;
+        const enrichedContext: any = {
+          ...cs,
+          currentState: cs?.currentState ?? cs?.state,
+          transitionHistory: cs?.transitionHistory ?? cs?.history ?? [],
+          metadata: {
+            ...(cs?.metadata || {}),
+            sessionId,
+            companyId,
+            startedAt: cs?.metadata?.startedAt ?? new Date().toISOString(),
+            lastTransition: cs?.metadata?.lastTransition ?? new Date().toISOString(),
+            transitionCount: cs?.metadata?.transitionCount ?? (cs?.history?.length ?? 0),
+          },
+        };
+
+        await sessionManager.saveContext(enrichedContext);
         console.log(`✅ [SESSION_MANAGER] Context saved successfully`);
       } catch (saveError) {
         console.error('🚨 [SESSION_MANAGER] Error saving context:', saveError);
