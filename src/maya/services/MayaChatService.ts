@@ -87,6 +87,18 @@ export class MayaChatService {
     return `maya_chat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
+  /**
+   * Extract conversation state from the last assistant message
+   * Used to restore state machine context in backend
+   */
+  private getLastAssistantState(): Record<string, any> | undefined {
+    const assistantMessages = this.currentConversation.messages.filter(m => m.role === 'assistant');
+    if (assistantMessages.length === 0) return undefined;
+    
+    const lastAssistant = assistantMessages[assistantMessages.length - 1];
+    return lastAssistant.conversationState;
+  }
+
   async sendMessage(userMessage: string, context?: RichContext): Promise<ChatMessage> {
     console.log('🤖 MAYA Chat: Sending message:', userMessage);
     
@@ -109,22 +121,46 @@ export class MayaChatService {
     try {
       console.log('🤖 MAYA Chat: Calling maya-intelligence function...');
       
-      // Filter conversation for OpenAI (only role and content)
-      const filteredConversation = this.currentConversation.messages.map(msg => ({
+      // Enrich conversation with full metadata for state machine
+      const enrichedConversation = this.currentConversation.messages.map(msg => ({
         role: msg.role,
-        content: msg.content
+        content: msg.content,
+        ...(msg.conversationState && { conversationState: msg.conversationState }),
+        ...(msg.fieldName && { fieldName: msg.fieldName }),
+        ...(msg.quickReplies && { quickReplies: msg.quickReplies }),
+        ...(msg.executableActions && { executableActions: msg.executableActions })
       }));
 
-      // Call MAYA intelligence with simplified KISS architecture
+      // Extract last assistant state for state machine continuity
+      const lastConversationState = this.getLastAssistantState();
+
+      console.log('🔄 State Sync:', {
+        messageCount: enrichedConversation.length,
+        lastStateExists: !!lastConversationState,
+        lastStateKeys: lastConversationState ? Object.keys(lastConversationState) : []
+      });
+
+      // Call MAYA intelligence with full state context
       const { data, error } = await supabase.functions.invoke('maya-intelligence', {
         body: {
-          conversation: filteredConversation,
+          conversation: enrichedConversation,
           sessionId: this.currentConversation.sessionId,
-          richContext: context
+          richContext: context,
+          metadata: {
+            lastConversationState,
+            messageCount: this.currentConversation.messages.length,
+            companyId: this.currentConversation.companyId,
+            lastUpdated: this.currentConversation.lastUpdated
+          }
         }
       });
 
-      console.log('🤖 MAYA Chat: Function response:', { data, error });
+      console.log('🤖 MAYA Chat: Function response:', { 
+        hasData: !!data, 
+        hasError: !!error,
+        conversationStateReturned: !!data?.conversationState,
+        actionCount: (data?.executableActions || data?.executable_actions || []).length
+      });
 
       if (error) {
         console.error('🤖 MAYA Chat: Function error:', error);
