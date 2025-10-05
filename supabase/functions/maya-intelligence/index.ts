@@ -1741,35 +1741,77 @@ serve(async (req) => {
           error: (message: string, data?: any) => console.error(`[ERROR] ${message}`, data || '')
         };
         
-        // Initialize HandlerRegistry
-        const handlerRegistry = new HandlerRegistry(logger, undefined, userSupabase);
+        // ⚙️ FEATURE FLAG: Enable State Machine for Employee Create
+        const USE_STATE_MACHINE_EMPLOYEE = Deno.env.get('USE_STATE_MACHINE_EMPLOYEE') === 'true';
         
-        // Build Intent object for handler
-        const handlerIntent = {
-          type: intent.type,
-          confidence: intent.confidence,
-          entities: intent.entities || [],
-          parameters: {
-            ...intent.params,
-            employee_name: intent.params?.name || intent.params?.employee_name,
-            conversationParams: conversation.length > 0 ? 
-              conversation[conversation.length - 1]?.conversationState : undefined
-          }
-        };
+        let handlerResponse;
         
-        // Build rich context
-        const richContext = {
-          userId: (await userSupabase.auth.getUser()).data.user?.id || '',
-          companyId: await getCurrentCompanyId(userSupabase) || '',
-          conversationHistory: conversation,
-          currentPage: 'maya-chat',
-          sessionId
-        };
+        if (intent.method === 'createEmployee' && USE_STATE_MACHINE_EMPLOYEE) {
+          console.log(`🆕 [STATE_MACHINE] Using EmployeeCrudHandlerV2 for createEmployee`);
+          
+          // Import and use V2 handler
+          const { EmployeeCrudHandlerV2 } = await import('./handlers/employee-crud-handler-v2.ts');
+          const handlerV2 = new EmployeeCrudHandlerV2(logger, undefined, userSupabase);
+          
+          // Build Intent object for handler V2
+          const handlerIntent = {
+            type: intent.type,
+            confidence: intent.confidence,
+            entities: intent.entities || [],
+            parameters: {
+              ...intent.params,
+              employee_name: intent.params?.name || intent.params?.employee_name,
+              originalMessage: lastMessage, // 🔥 CRITICAL: Pass original message
+              conversationState: conversation.length > 0 ?
+                conversation[conversation.length - 1] : undefined // 🔥 CRITICAL: Pass full conversation state
+            }
+          };
+          
+          // Build rich context
+          const richContext = {
+            userId: (await userSupabase.auth.getUser()).data.user?.id || '',
+            companyId: await getCurrentCompanyId(userSupabase) || '',
+            conversationHistory: conversation,
+            currentPage: 'maya-chat',
+            sessionId
+          };
+          
+          handlerResponse = await handlerV2.process(handlerIntent, richContext);
+          
+        } else {
+          console.log(`🔧 [LEGACY] Using EmployeeCrudHandler V1 for ${intent.method}`);
+          
+          // Initialize HandlerRegistry for V1
+          const handlerRegistry = new HandlerRegistry(logger, undefined, userSupabase);
+          
+          // Build Intent object for handler V1
+          const handlerIntent = {
+            type: intent.type,
+            confidence: intent.confidence,
+            entities: intent.entities || [],
+            parameters: {
+              ...intent.params,
+              employee_name: intent.params?.name || intent.params?.employee_name,
+              originalMessage: lastMessage, // 🔥 Also pass to V1 for improved parsing
+              conversationParams: conversation.length > 0 ? 
+                conversation[conversation.length - 1]?.conversationState : undefined
+            }
+          };
+          
+          // Build rich context
+          const richContext = {
+            userId: (await userSupabase.auth.getUser()).data.user?.id || '',
+            companyId: await getCurrentCompanyId(userSupabase) || '',
+            conversationHistory: conversation,
+            currentPage: 'maya-chat',
+            sessionId
+          };
+          
+          // Process via HandlerRegistry
+          handlerResponse = await handlerRegistry.processIntent(handlerIntent, richContext);
+        }
         
-        // Process via HandlerRegistry
-        const handlerResponse = await handlerRegistry.processIntent(handlerIntent, richContext);
-        
-        // Map HandlerResponse to standard response format
+        // Map HandlerResponse to standard response format (common for V1 and V2)
         response = {
           message: handlerResponse.response,
           emotionalState: handlerResponse.emotionalState || 'neutral',
