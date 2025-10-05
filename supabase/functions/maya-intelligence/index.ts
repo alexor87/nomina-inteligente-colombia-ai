@@ -747,6 +747,7 @@ serve(async (req) => {
                   
                   if (temporalIntent) {
                     console.log(`✅ [TEMPORAL_FOLLOWUP] Intent resolved: ${temporalIntent.type}`);
+                    temporalIntent.resolvedByLLM = true; // Mark as resolved by LLM to skip legacy validations
                     intent = temporalIntent;
                   } else {
                     console.log(`❌ [TEMPORAL_FOLLOWUP] Could not resolve intent from context`);
@@ -1230,7 +1231,7 @@ serve(async (req) => {
     
     // Enhanced Safety Override: Detect ANY employee name in query and force validation
     const detectedEmployeeName = detectEmployeeNameInQuery(lastMessage);
-    if (detectedEmployeeName && !['EMPLOYEE_SEARCH', 'EMPLOYEE_SALARY', 'EMPLOYEE_PAID_TOTAL'].includes(intent.type)) {
+    if (detectedEmployeeName && !intent.resolvedByLLM && !['EMPLOYEE_SEARCH', 'EMPLOYEE_SALARY', 'EMPLOYEE_PAID_TOTAL'].includes(intent.type)) {
       console.log(`🚨 [SECURITY] Employee name "${detectedEmployeeName}" detected in non-employee query - validating`);
       
       const validation = await validateEmployeeExists(userSupabase, detectedEmployeeName);
@@ -1859,6 +1860,8 @@ function detectEmployeeNameInQuery(text: string): string | null {
     /^(?:y\s+)?anual(?:mente)?\??$/i,
     /^(?:y\s+)?(?:el\s+)?trimestre\s+\d+\??$/i,
     /^(?:y\s+)?(?:el\s+)?semestre\s+\d+\??$/i,
+    /^(?:y\s+)?(?:el|la)\s+año\s+(?:pasado|anterior|actual)\??$/i, // "y el año pasado?"
+    /^(?:y\s+)?(?:el|la)\s+mes\s+(?:pasado|anterior|actual)\??$/i, // "y el mes pasado?"
   ];
   
   // Check if query matches any temporal exclusion pattern
