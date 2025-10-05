@@ -1,11 +1,20 @@
 import { ExecutableAction } from './types/ExecutableAction';
 
+export interface QuickReplyOption {
+  value: string;
+  label: string;
+  icon?: string;
+}
+
 export interface MayaMessage {
   id: string;
   message: string;
   emotionalState: EmotionalState;
   contextualActions?: string[];
   executableActions?: ExecutableAction[];
+  quickReplies?: QuickReplyOption[];
+  fieldName?: string;
+  conversationState?: Record<string, any>;
   timestamp: string;
   isVisible: boolean;
 }

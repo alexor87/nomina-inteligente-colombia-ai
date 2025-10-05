@@ -125,6 +125,21 @@ export interface HandlerResponse {
   action?: ExecutableAction;
   emotionalState?: EmotionalState;
   requiresFollowUp?: boolean;
+  quickReplies?: QuickReplyOption[];
+  fieldName?: string;
+  conversationState?: Record<string, any>;
+}
+
+export interface QuickReplyOption {
+  value: string;
+  label: string;
+  icon?: string;
+}
+
+export interface QuickReplyResponse extends HandlerResponse {
+  quickReplies: QuickReplyOption[];
+  fieldName: string;
+  conversationState?: Record<string, any>;
 }
 
 export interface ExecutableAction {

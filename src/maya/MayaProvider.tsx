@@ -16,7 +16,7 @@ interface MayaProviderValue {
   hideMessage: () => void;
   showMessage: () => void;
   setChatMode: (enabled: boolean) => void;
-  sendMessage: (message: string) => Promise<void>;
+  sendMessage: (message: string, conversationState?: Record<string, any>) => Promise<void>;
   addActionMessage: (message: string, executableActions: any[]) => void;
   setPhase: (phase: PayrollPhase, additionalData?: Partial<MayaContextType>) => Promise<void>;
   performIntelligentValidation: (companyId: string, periodId?: string, employees?: any[]) => Promise<any>;
@@ -249,12 +249,20 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
     return comprehensiveContext;
   }, [location.pathname, companyId, dashboardLoading, employeesLoading, metrics, recentEmployees, recentActivity, payrollTrends, efficiencyMetrics, employees]);
 
-  const sendMessage = useCallback(async (message: string) => {
+  const sendMessage = useCallback(async (message: string, conversationState?: Record<string, any>) => {
+    console.log('📨 MAYA: Sending message with state', { message, conversationState });
+    
     try {
       // Generate rich contextual data
       const richContext = generatePageContext();
       
-      const response = await chatService.sendMessage(message, richContext);
+      // Enrich context with conversation state if provided
+      const enrichedContext = conversationState ? {
+        ...richContext,
+        conversationParams: conversationState
+      } : richContext;
+      
+      const response = await chatService.sendMessage(message, enrichedContext);
       
       // Update chat history
       setChatHistory([...chatService.getConversation().messages]);
@@ -265,7 +273,10 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
         message: response.content,
         emotionalState: 'neutral',
         contextualActions: [],
-        executableActions: Array.isArray(response.executableActions) ? response.executableActions : [], // Ensure it's always an array
+        executableActions: Array.isArray(response.executableActions) ? response.executableActions : [],
+        quickReplies: response.quickReplies,
+        fieldName: response.fieldName,
+        conversationState: response.conversationState,
         timestamp: response.timestamp,
         isVisible: true
       };

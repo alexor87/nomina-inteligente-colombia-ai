@@ -37,10 +37,86 @@ export class EmployeeCrudHandler extends BaseHandler {
       );
     }
     
-    // Extract basic information from the user message if available
-    const basicInfo = this.extractBasicEmployeeInfo(intent, employeeName);
+    if (!context?.companyId) {
+      return ResponseBuilder.buildErrorResponse('No se pudo identificar la empresa');
+    }
     
-    // Create executable action for employee creation
+    // Extract basic employee information and conversation state
+    const basicInfo = this.extractBasicEmployeeInfo(intent, employeeName);
+    const conversationState = intent.parameters?.conversationParams || {};
+    
+    // ✅ QUICK REPLIES FLOW: Validate structured fields step by step
+    
+    // Step 1: Check for tipo de documento
+    if (!basicInfo.tipoDocumento && !conversationState.tipoDocumento) {
+      return ResponseBuilder.buildQuickReplyResponse(
+        ResponseBuilder.StructuredFields.tipoDocumento.question,
+        'tipoDocumento',
+        ResponseBuilder.StructuredFields.tipoDocumento.options,
+        { 
+          ...conversationState, 
+          employeeName, 
+          basicInfo,
+          step: 'tipo_documento'
+        }
+      );
+    }
+
+    // Step 2: Check for tipo de contrato
+    if (!basicInfo.tipoContrato && !conversationState.tipoContrato) {
+      return ResponseBuilder.buildQuickReplyResponse(
+        ResponseBuilder.StructuredFields.tipoContrato.question,
+        'tipoContrato',
+        ResponseBuilder.StructuredFields.tipoContrato.options,
+        {
+          ...conversationState,
+          tipoDocumento: basicInfo.tipoDocumento || conversationState.tipoDocumento,
+          employeeName,
+          basicInfo,
+          step: 'tipo_contrato'
+        }
+      );
+    }
+
+    // Step 3: Check for periodicidad de pago
+    if (!basicInfo.periodicidadPago && !conversationState.periodicidadPago) {
+      return ResponseBuilder.buildQuickReplyResponse(
+        ResponseBuilder.StructuredFields.periodicidadPago.question,
+        'periodicidadPago',
+        ResponseBuilder.StructuredFields.periodicidadPago.options,
+        {
+          ...conversationState,
+          tipoDocumento: basicInfo.tipoDocumento || conversationState.tipoDocumento,
+          tipoContrato: basicInfo.tipoContrato || conversationState.tipoContrato,
+          employeeName,
+          basicInfo,
+          step: 'periodicidad_pago'
+        }
+      );
+    }
+
+    // All structured fields collected, merge with conversation state
+    const finalBasicInfo = {
+      ...basicInfo,
+      tipoDocumento: basicInfo.tipoDocumento || conversationState.tipoDocumento,
+      tipoContrato: basicInfo.tipoContrato || conversationState.tipoContrato,
+      periodicidadPago: basicInfo.periodicidadPago || conversationState.periodicidadPago
+    };
+
+    // Check for remaining mandatory fields (cedula, salario)
+    const missingFields = [];
+    if (!finalBasicInfo.cedula) missingFields.push('número de documento');
+    if (!finalBasicInfo.salario_base) missingFields.push('salario base');
+
+    if (missingFields.length > 0) {
+      return ResponseBuilder.buildClarificationResponse(
+        `Para crear el empleado necesito: **${missingFields.join(', ')}**. ¿Puedes proporcionarlos?`,
+        [],
+        'thinking'
+      );
+    }
+    
+    // All data collected, create executable action
     const action: ExecutableAction = {
       id: `create_employee_${Date.now()}`,
       type: 'create_employee',
@@ -48,7 +124,7 @@ export class EmployeeCrudHandler extends BaseHandler {
       description: `Crear nuevo empleado con la información proporcionada`,
       parameters: {
         employeeName: employeeName,
-        basicInfo: basicInfo,
+        basicInfo: finalBasicInfo,
         companyId: context?.companyId
       },
       requiresConfirmation: true,
@@ -56,7 +132,7 @@ export class EmployeeCrudHandler extends BaseHandler {
     };
     
     return ResponseBuilder.buildExecutableResponse(
-      `Perfecto! Voy a crear el empleado "${employeeName}" con la información que proporcionaste.\n\n**Datos a registrar:**\n${this.formatEmployeeInfo(basicInfo)}\n\n⚠️ **Importante:** Después de crear el empleado podrás completar información adicional como salario, datos bancarios, EPS, etc.`,
+      `Perfecto! Voy a crear el empleado "${employeeName}" con la información que proporcionaste.\n\n**Datos a registrar:**\n${this.formatEmployeeInfo(finalBasicInfo)}\n\n⚠️ **Importante:** Después de crear el empleado podrás completar información adicional como salario, datos bancarios, EPS, etc.`,
       [action],
       'encouraging'
     );
@@ -162,6 +238,27 @@ export class EmployeeCrudHandler extends BaseHandler {
     
     // Look for additional information in entities or parameters
     const entities = intent.entities;
+    const conversationParams = intent.parameters?.conversationParams || {};
+    
+    // Extract structured fields from conversation state
+    if (conversationParams.tipoDocumento) {
+      basicInfo.tipoDocumento = conversationParams.tipoDocumento;
+    }
+    if (conversationParams.tipoContrato) {
+      basicInfo.tipoContrato = conversationParams.tipoContrato;
+    }
+    if (conversationParams.periodicidadPago) {
+      basicInfo.periodicidadPago = conversationParams.periodicidadPago;
+    }
+    
+    // Extract cedula from message or conversation state
+    const cedulaMatch = intent.parameters.originalMessage?.match(/c[ée]dula.*?(\d{5,15})/i) ||
+                       intent.parameters.originalMessage?.match(/documento.*?(\d{5,15})/i);
+    if (cedulaMatch) {
+      basicInfo.cedula = cedulaMatch[1];
+    } else if (conversationParams.cedula) {
+      basicInfo.cedula = conversationParams.cedula;
+    }
     
     // Extract salary if mentioned
     const salaryMatch = intent.parameters.originalMessage?.match(/\$?([\d,.]+)/);
@@ -228,8 +325,12 @@ export class EmployeeCrudHandler extends BaseHandler {
     const lines = [];
     if (basicInfo.nombre) lines.push(`• **Nombre:** ${basicInfo.nombre}`);
     if (basicInfo.apellido) lines.push(`• **Apellido:** ${basicInfo.apellido}`);
+    if (basicInfo.tipoDocumento) lines.push(`• **Tipo de documento:** ${basicInfo.tipoDocumento}`);
+    if (basicInfo.cedula) lines.push(`• **Documento:** ${basicInfo.cedula}`);
     if (basicInfo.cargo) lines.push(`• **Cargo:** ${basicInfo.cargo}`);
     if (basicInfo.salario_base) lines.push(`• **Salario:** $${basicInfo.salario_base.toLocaleString()}`);
+    if (basicInfo.tipoContrato) lines.push(`• **Tipo de contrato:** ${basicInfo.tipoContrato}`);
+    if (basicInfo.periodicidadPago) lines.push(`• **Periodicidad de pago:** ${basicInfo.periodicidadPago}`);
     
     return lines.length > 0 ? lines.join('\n') : '• **Información básica:** Solo nombre';
   }

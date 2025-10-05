@@ -360,4 +360,56 @@ export class ResponseBuilder {
       icon: '📧'
     };
   }
+
+  // ============================================================================
+  // QUICK REPLIES SUPPORT (2028 UX Pattern)
+  // ============================================================================
+
+  static buildQuickReplyResponse(
+    question: string,
+    fieldName: string,
+    options: any[],
+    conversationState?: Record<string, any>,
+    emotionalState: EmotionalState = 'thinking'
+  ): any {
+    return {
+      hasExecutableAction: false,
+      response: this.formatMessage(`🤔 ${question}`),
+      quickReplies: options,
+      fieldName,
+      conversationState,
+      emotionalState,
+      requiresFollowUp: true
+    };
+  }
+
+  static readonly StructuredFields = {
+    tipoDocumento: {
+      question: '¿Qué tipo de documento tiene el empleado?',
+      options: [
+        { value: 'CC', label: 'Cédula de Ciudadanía', icon: '🪪' },
+        { value: 'CE', label: 'Cédula de Extranjería', icon: '🌍' },
+        { value: 'TI', label: 'Tarjeta de Identidad', icon: '👶' },
+        { value: 'PA', label: 'Pasaporte', icon: '✈️' },
+        { value: 'RC', label: 'Registro Civil', icon: '📋' },
+        { value: 'NIT', label: 'NIT', icon: '🏢' }
+      ]
+    },
+    tipoContrato: {
+      question: '¿Qué tipo de contrato tendrá?',
+      options: [
+        { value: 'indefinido', label: 'Indefinido', icon: '♾️' },
+        { value: 'fijo', label: 'Término Fijo', icon: '📅' },
+        { value: 'obra', label: 'Obra o Labor', icon: '🏗️' },
+        { value: 'aprendizaje', label: 'Aprendizaje', icon: '🎓' }
+      ]
+    },
+    periodicidadPago: {
+      question: '¿Con qué frecuencia se le pagará?',
+      options: [
+        { value: 'quincenal', label: 'Quincenal', icon: '📆' },
+        { value: 'mensual', label: 'Mensual', icon: '📅' }
+      ]
+    }
+  };
 }

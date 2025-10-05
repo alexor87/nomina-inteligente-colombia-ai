@@ -7,6 +7,13 @@ export interface ChatMessage {
   content: string;
   timestamp: string;
   executableActions?: any[];
+  quickReplies?: Array<{
+    value: string;
+    label: string;
+    icon?: string;
+  }>;
+  fieldName?: string;
+  conversationState?: Record<string, any>;
 }
 
 export interface ChatConversation {

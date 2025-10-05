@@ -9,6 +9,7 @@ import { useMaya } from './MayaProvider';
 import { MayaReactivationButton } from './MayaReactivationButton';
 import { MayaActionExecutor } from './components/MayaActionExecutor';
 import { MayaTypingIndicator } from './components/MayaTypingIndicator';
+import { MayaQuickReplies } from './components/MayaQuickReplies';
 
 export const MayaFloatingAssistant: React.FC = () => {
   const { 
@@ -155,6 +156,30 @@ export const MayaFloatingAssistant: React.FC = () => {
                             </div>
                          </div>
                          
+                          {/* Quick Replies for structured fields */}
+                          {msg.role === 'assistant' && msg.quickReplies && msg.quickReplies.length > 0 && (
+                            <div className="mt-2 pl-4">
+                              <MayaQuickReplies
+                                options={msg.quickReplies}
+                                onSelect={async (selectedValue) => {
+                                  // Find the selected option label
+                                  const selectedOption = msg.quickReplies?.find(opt => opt.value === selectedValue);
+                                  const userResponse = selectedOption?.label || selectedValue;
+                                  
+                                  // Build conversation state with selected value
+                                  const updatedState = {
+                                    ...(msg.conversationState || {}),
+                                    [msg.fieldName || 'field']: selectedValue
+                                  };
+                                  
+                                  // Send user selection with enriched context
+                                  await sendMessage(userResponse, updatedState);
+                                }}
+                                disabled={isLoading}
+                              />
+                            </div>
+                          )}
+                          
                           {/* Executable Actions for Assistant Messages */}
                           {msg.role === 'assistant' && Array.isArray(msg.executableActions) && msg.executableActions.length > 0 && (
                             <div className="mt-2 pl-4">
