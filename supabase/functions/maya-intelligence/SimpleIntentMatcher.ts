@@ -593,6 +593,22 @@ export class SimpleIntentMatcher {
       };
     }
     
+    // 6. PAYROLL MONTHLY VARIATION
+    if (/(?:variaci[oó]n|diferencia|cambio|comparar|comparaci[oó]n)\s+(?:del?\s+)?(?:costo|total|pago)?.*(?:n[oó]mina|payroll)/i.test(text) ||
+        /(?:n[oó]mina|costo|total|pago).*(?:variaci[oó]n|diferencia|cambio|comparar)/i.test(text) ||
+        /(?:cu[aá]nto|cuanto)\s+(?:vari[oó]|cambi[oó]|aument[oó]|disminuy[oó]).*(?:n[oó]mina|costo)/i.test(text) ||
+        /(?:frente\s+al?|versus|vs\.?|comparado\s+con)\s+(?:mes|periodo).*(?:anterior|pasado)/i.test(text)) {
+      
+      console.log('📊 [PAYROLL_VARIATION] Monthly variation query detected');
+      
+      return {
+        type: 'PAYROLL_MONTHLY_VARIATION',
+        confidence: 0.95,
+        method: 'getPayrollMonthlyVariation',
+        params: {}
+      };
+    }
+    
     // ============================================================================
     // END PHASE 1: AGGREGATION INTENTS
     // ============================================================================

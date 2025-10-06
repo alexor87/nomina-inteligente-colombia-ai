@@ -59,7 +59,8 @@ function getMethodForAggregationIntent(intentType: string): string | null {
     'HIGHEST_COST_EMPLOYEES': 'getHighestCostEmployees',
     'LOWEST_COST_EMPLOYEES': 'getLowestCostEmployees',
     'TOTAL_INCAPACITY_DAYS': 'getTotalIncapacityDays',
-    'TOTAL_OVERTIME_HOURS': 'getTotalOvertimeHours'
+    'TOTAL_OVERTIME_HOURS': 'getTotalOvertimeHours',
+    'PAYROLL_MONTHLY_VARIATION': 'getPayrollMonthlyVariation'
   };
   return methodMap[intentType] || null;
 }
@@ -1583,6 +1584,10 @@ serve(async (req) => {
       case 'getTotalOvertimeHours':
         response = await handleTotalOvertimeHours(userSupabase, intent.params);
         break;
+        
+      case 'getPayrollMonthlyVariation':
+        response = await handlePayrollMonthlyVariation(userSupabase, intent.params);
+        break;
       // ============================================================================
       // END PHASE 1: AGGREGATION HANDLERS
       // ============================================================================
@@ -1621,7 +1626,8 @@ serve(async (req) => {
       case 'getHighestCostEmployees':
       case 'getLowestCostEmployees':
       case 'getTotalIncapacityDays':
-      case 'getTotalOvertimeHours': {
+      case 'getTotalOvertimeHours':
+      case 'getPayrollMonthlyVariation': {
         console.log(`🔀 [ROUTER] Routing ${intent.method} to IntentRouter`);
         
         const logger: MayaLogger = {
@@ -3407,6 +3413,48 @@ async function handleTotalOvertimeHours(supabase: any, params: any) {
     temporalParams = { ...temporalParams, type: 'specific_period' };
   }
   
+  console.log('📊 [OVERTIME_HANDLER] Final temporalParams:', JSON.stringify(temporalParams));
+  return await AggregationService.getTotalOvertimeHours(supabase, temporalParams);
+}
+
+async function handlePayrollMonthlyVariation(supabase: any, params: any) {
+  try {
+    console.log('📊 [VARIATION_HANDLER] Calculating monthly payroll variation');
+    const result = await AggregationService.getPayrollMonthlyVariation(supabase, {});
+    
+    const formatter = new Intl.NumberFormat('es-CO', {
+      style: 'currency',
+      currency: 'COP',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    });
+    
+    const trendEmoji = result.trend === 'increase' ? '📈' : result.trend === 'decrease' ? '📉' : '➡️';
+    const trendText = result.trend === 'increase' ? 'aumentó' : result.trend === 'decrease' ? 'disminuyó' : 'se mantuvo estable';
+    const percentageText = Math.abs(result.percentageChange).toFixed(2);
+    
+    let message = `${trendEmoji} **Variación de Nómina**\n\n`;
+    message += `**${result.currentMonth}:**\n`;
+    message += `💰 ${formatter.format(result.currentTotal)}\n\n`;
+    message += `**${result.previousMonth}:**\n`;
+    message += `💰 ${formatter.format(result.previousTotal)}\n\n`;
+    message += `**Variación:**\n`;
+    message += `${result.difference >= 0 ? '➕' : '➖'} ${formatter.format(Math.abs(result.difference))} (${percentageText}%)\n\n`;
+    message += `El costo de nómina ${trendText} un **${percentageText}%** frente al mes anterior.`;
+    
+    return {
+      message,
+      emotionalState: 'professional'
+    };
+  } catch (error) {
+    console.error('[VARIATION_HANDLER] Error:', error);
+    return {
+      message: 'No pude calcular la variación de nómina. Asegúrate de tener períodos cerrados en los últimos dos meses.',
+      emotionalState: 'concerned'
+    };
+  }
+}
+  
   console.log('📊 [OVERTIME_HANDLER] Final temporalParams:', {
     type: temporalParams.type,
     year: temporalParams.year,
@@ -3585,7 +3633,9 @@ Uso de Fuentes Legales (CRÍTICO con RAG):
 Limitaciones CRÍTICAS:
 - NUNCA menciones Venezuela, Perú, México u otro país
 - Si no tienes certeza sobre un cambio legislativo, reconócelo y sugiere verificar con el Ministerio del Trabajo
-- NUNCA inventes datos o estadísticas
+- NUNCA inventes datos o estadísticas de nómina sin acceso a datos reales
+- Si te preguntan sobre totales, variaciones o estadísticas de nómina y NO tienes contexto legal relevante, responde HONESTAMENTE que no tienes acceso a esos datos específicos
+- Cuando NO sepas la respuesta, di claramente: "No tengo acceso a esa información específica. ¿Podrías reformular tu pregunta?"
 - Usa exclusivamente terminología colombiana
 
 Emociones disponibles: professional, thoughtful, excited, happy
