@@ -141,6 +141,17 @@ export async function simulateHiringCost(
 }
 
 /**
+ * Simulate salary increase cost impact for a specific employee
+ */
+export async function simulateSalaryIncrease(
+  client: any,
+  params: { employeeName: string; increaseAmount: number }
+) {
+  const service = AggregationServiceFactory.getService('salary_increase_simulation');
+  return await service.aggregate(client, params);
+}
+
+/**
  * Compare payroll periods (flexible comparison)
  * Supports comparisons between any two periods: months, quarters, semesters, years
  */

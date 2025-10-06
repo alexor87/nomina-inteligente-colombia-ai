@@ -91,6 +91,7 @@ export class IntentRouter {
         case 'getTotalOvertimeHours':
         case 'getPayrollProjection':
         case 'simulateHiringCost':
+        case 'simulateSalaryIncrease':
           return await this.routeAggregation(intent, context);
 
         default:
@@ -345,6 +346,13 @@ export class IntentRouter {
         break;
       case 'simulateHiringCost':
         result = await AggregationService.simulateHiringCost(context.userSupabase, intent.params);
+        break;
+      case 'simulateSalaryIncrease':
+        this.logger.info('[INFO] [ROUTER] TemporalParams after conversion:', intent.params);
+        result = await AggregationService.simulateSalaryIncrease(
+          context.userSupabase,
+          intent.params as { employeeName: string; increaseAmount: number }
+        );
         break;
       default:
         return {

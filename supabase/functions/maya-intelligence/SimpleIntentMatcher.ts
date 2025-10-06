@@ -66,7 +66,10 @@ function normalizePayrollTerm(text: string): string {
 function sanitizeEmployeeName(name: string, fullText?: string): string {
   let cleaned = name.trim();
   
-  // Remove leading prepositions: "a juan", "para maria", "de carlos"
+  // ⭐ CRITICAL FIX: Remove leading prepositions FIRST: "A Alicia" -> "Alicia"
+  cleaned = cleaned.replace(/^(?:A|Al|Del|De|La|El|Para|Por)\s+/i, '');
+  
+  // Remove leading lowercase prepositions: "a juan", "para maria", "de carlos"
   cleaned = cleaned.replace(/^(?:a|para|de)\s+/i, '');
   
   // Special handling: if fullText contains email address, remove trailing "a" or "al"
@@ -271,6 +274,36 @@ export class SimpleIntentMatcher {
         params: {
           employee_name: employeeName,
           name: employeeName
+        }
+      };
+    }
+
+    // ============================================================================
+    // 🔥 SALARY_INCREASE_SIMULATION - Must be BEFORE EMPLOYEE_UPDATE
+    // ============================================================================
+    
+    // SALARY_INCREASE_SIMULATION - Simular incremento salarial
+    if (/(?:cuál|cual|cuánto|cuanto).*(?:costo|costaría).*(subir|aumentar|incrementar).*salario/i.test(text) ||
+        /(?:subir|aumentar|incrementar).*salario\s+(?:a|de)/i.test(text) ||
+        /(?:impacto|efecto).*(?:subir|aumentar|incrementar).*salario/i.test(text)) {
+      
+      // Extract employee name
+      const nameMatch = text.match(/\b(?:a|de|para)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)*)/i);
+      const employeeName = nameMatch ? sanitizeEmployeeName(nameMatch[1]) : null;
+      
+      // Extract increase amount
+      const amountMatch = text.match(/(?:en\s+)?(?:\$|cop\s*)?(\d{1,3}(?:[.,]\d{3})*)/i);
+      const increaseAmount = amountMatch ? parseFloat(amountMatch[1].replace(/[.,]/g, '')) : null;
+      
+      console.log('💰 [SALARY_INCREASE_SIMULATION] Detected:', { employeeName, increaseAmount });
+      
+      return {
+        type: 'SALARY_INCREASE_SIMULATION',
+        confidence: 0.97,
+        method: 'simulateSalaryIncrease',
+        params: {
+          employeeName: employeeName,
+          increaseAmount: increaseAmount
         }
       };
     }
