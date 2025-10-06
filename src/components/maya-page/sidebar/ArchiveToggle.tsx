@@ -61,7 +61,7 @@ export const ArchiveToggle: React.FC<ArchiveToggleProps> = ({
         }`}
       >
         <span>Activas</span>
-        <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">
+        <Badge variant="secondary" className="h-4 px-1.5 text-[11px]">
           {activeCount}
         </Badge>
         {mode === 'active' && (
@@ -83,7 +83,7 @@ export const ArchiveToggle: React.FC<ArchiveToggleProps> = ({
       >
         <span>Archivadas</span>
         {archivedCount > 0 && (
-          <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">
+          <Badge variant="secondary" className="h-4 px-1.5 text-[11px]">
             {archivedCount}
           </Badge>
         )}

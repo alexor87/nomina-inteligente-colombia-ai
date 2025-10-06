@@ -254,7 +254,14 @@ export const UnifiedSidebar: React.FC = () => {
 
           {/* SECCIÓN INFERIOR: MÓDULOS */}
           <div className="flex-1 flex flex-col min-h-0">
-            <nav className="flex-1 px-3 py-4 overflow-y-auto">
+            {!collapsed && (
+              <div className="px-3 pt-3 pb-2">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Módulos
+                </p>
+              </div>
+            )}
+            <nav className="flex-1 px-3 pb-3 overflow-y-auto">
               <ModuleNavigation collapsed={collapsed} />
             </nav>
 
@@ -323,7 +330,13 @@ export const UnifiedSidebar: React.FC = () => {
 
                 <SidebarDivider />
 
-                <nav className="flex-1 px-3 py-4 overflow-y-auto">
+                <div className="px-3 pt-3 pb-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Módulos
+                  </p>
+                </div>
+
+                <nav className="flex-1 px-3 pb-3 overflow-y-auto">
                   <ModuleNavigation collapsed={false} />
                 </nav>
 

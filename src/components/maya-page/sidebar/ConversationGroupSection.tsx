@@ -32,16 +32,16 @@ export const ConversationGroupSection: React.FC<ConversationGroupSectionProps> =
     <div className="mb-2">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between px-3 py-2 hover:bg-muted/50 rounded-md transition-colors group"
+        className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-transparent rounded-md transition-colors group"
       >
         <div className="flex items-center gap-2">
           {isOpen ? (
-            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
           ) : (
-            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
           )}
-          <span className="text-sm font-medium text-foreground">{title}</span>
-          <span className="text-xs text-muted-foreground">({count})</span>
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{title}</span>
+          <span className="text-[11px] text-muted-foreground/60">{count}</span>
         </div>
       </button>
 

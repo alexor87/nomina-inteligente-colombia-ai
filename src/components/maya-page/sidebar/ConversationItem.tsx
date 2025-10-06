@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Edit2, Archive, Trash2, ArchiveRestore } from 'lucide-react';
+import { Edit2, Archive, Trash2, ArchiveRestore, MoreHorizontal } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { ConversationSummary } from '@/maya/types';
 import { formatRelativeTime, truncateText } from '@/maya/utils/conversationHelpers';
 
@@ -66,11 +73,11 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         className={`
-          relative px-3 py-2.5 rounded-lg cursor-pointer transition-all
+          relative px-3 py-2 rounded-lg cursor-pointer transition-colors
           ${mode === 'archived' ? 'opacity-70' : ''}
           ${isActive 
-            ? 'bg-primary/10 border-l-4 border-primary' 
-            : 'hover:bg-muted/50 border-l-4 border-transparent'
+            ? 'bg-muted text-foreground' 
+            : 'hover:bg-muted/30'
           }
         `}
         onClick={onClick}
@@ -87,91 +94,89 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
           />
         ) : (
           <>
-            <div className="flex items-start justify-between gap-2">
+            <div className="flex items-start gap-2">
+              {/* Visual indicator */}
+              <div className="w-2 h-2 rounded-full bg-primary/60 mt-1.5 flex-shrink-0" />
+              
               <div className="flex-1 min-w-0">
-                <h4 className="text-sm font-medium text-foreground truncate">
+                <h4 className="text-sm font-normal text-foreground truncate">
                   {conversation.title}
                 </h4>
-                <p className="text-xs text-muted-foreground truncate mt-0.5">
+                <p className="text-xs text-muted-foreground/80 truncate mt-0.5">
                   {truncateText(conversation.lastMessage, 50)}
                 </p>
               </div>
               
-              {isHovered && !isActive && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="flex items-center gap-1"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {mode === 'archived' ? (
-                    <>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 text-primary hover:text-primary"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onUnarchive?.(conversation.id);
-                        }}
-                        title="Restaurar"
-                      >
-                        <ArchiveRestore className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 text-destructive hover:text-destructive"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setShowDeleteDialog(true);
-                        }}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setIsEditing(true);
-                        }}
-                      >
-                        <Edit2 className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onArchive(conversation.id);
-                        }}
-                      >
-                        <Archive className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 text-destructive hover:text-destructive"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setShowDeleteDialog(true);
-                        }}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </>
-                  )}
-                </motion.div>
+              {isHovered && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    {mode === 'archived' ? (
+                      <>
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onUnarchive?.(conversation.id);
+                          }}
+                        >
+                          <ArchiveRestore className="h-4 w-4 mr-2" />
+                          Restaurar
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowDeleteDialog(true);
+                          }}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Eliminar
+                        </DropdownMenuItem>
+                      </>
+                    ) : (
+                      <>
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIsEditing(true);
+                          }}
+                        >
+                          <Edit2 className="h-4 w-4 mr-2" />
+                          Renombrar
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onArchive(conversation.id);
+                          }}
+                        >
+                          <Archive className="h-4 w-4 mr-2" />
+                          Archivar
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowDeleteDialog(true);
+                          }}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Eliminar
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
             </div>
             
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-xs text-muted-foreground/70 mt-1 ml-4">
               {formatRelativeTime(conversation.updated_at)}
             </p>
           </>

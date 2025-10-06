@@ -18,7 +18,7 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({ collapsed }) => {
             <Sparkles className="h-5 w-5 text-primary" />
           </motion.div>
           <div>
-            <h1 className="font-bold text-lg text-foreground">MAYA</h1>
+            <h1 className="font-semibold text-base text-foreground">MAYA</h1>
             <p className="text-xs text-muted-foreground">Tu asistente de RRHH</p>
           </div>
         </>
