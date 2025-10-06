@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useMaya } from '@/maya/MayaProvider';
 import { useAuth } from '@/contexts/AuthContext';
 import { MayaConversationManager } from '@/maya/services/MayaConversationManager';
@@ -18,6 +19,8 @@ const STORAGE_KEY = 'unified_sidebar_collapsed';
 export const UnifiedSidebar: React.FC = () => {
   const { user } = useAuth();
   const { clearConversation, currentConversationId } = useMaya();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [collapsed, setCollapsed] = useState(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
     return stored === 'true';
@@ -57,6 +60,10 @@ export const UnifiedSidebar: React.FC = () => {
   const handleNewConversation = () => {
     clearConversation();
     loadConversations();
+    // Navigate to Maya if not already there
+    if (location.pathname !== '/maya') {
+      navigate('/maya');
+    }
   };
 
   const handleSelectConversation = async (id: string) => {

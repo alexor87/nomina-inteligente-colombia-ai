@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { NewConversationButton } from './NewConversationButton';
 import { ConversationSearch } from './ConversationSearch';
@@ -16,6 +17,8 @@ const STORAGE_KEY = 'maya_sidebar_collapsed';
 export const MayaHistorySidebar: React.FC = () => {
   const { user } = useAuth();
   const { clearConversation, currentConversationId } = useMaya();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [collapsed, setCollapsed] = useState(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
     return stored === 'true';
@@ -55,7 +58,11 @@ export const MayaHistorySidebar: React.FC = () => {
 
   const handleNewConversation = () => {
     clearConversation();
-    loadConversations(); // Refresh list
+    loadConversations();
+    // Navigate to Maya if not already there
+    if (location.pathname !== '/maya') {
+      navigate('/maya');
+    }
   };
 
   const handleSelectConversation = async (id: string) => {

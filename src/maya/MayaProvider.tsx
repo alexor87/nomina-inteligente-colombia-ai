@@ -8,6 +8,7 @@ import { useDashboard } from '@/hooks/useDashboard';
 import { useEmployeeData } from '@/hooks/useEmployeeData';
 import { useCurrentCompany } from '@/hooks/useCurrentCompany';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface MayaProviderValue {
   currentMessage: MayaMessage | null;
@@ -460,30 +461,30 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
   }, [setPhase]);
 
   const clearConversation = useCallback(async () => {
-    // NUEVO: Crear nueva conversación en lugar de solo limpiar
     try {
       const newConvId = await createNewConversation();
       setChatHistory([]);
       setIsChatMode(false);
-      
-      // Reinicializar con mensaje de bienvenida
       await setPhase('initial');
       
-      import('@/hooks/use-toast').then(({ toast }) => {
-        toast({
-          title: '🔄 Nueva conversación',
-          description: 'Puedes iniciar una conversación fresca',
-          duration: 3000
-        });
+      toast.success('Nueva conversación', {
+        description: 'Tu conversación anterior ha sido guardada',
       });
     } catch (error) {
-      console.error('Error creating new conversation', error);
-      // Fallback a limpieza simple
-      chatService.clearConversation();
+      console.error('❌ MAYA: Error creating new conversation', error);
+      
+      // Fallback: limpiar sin crear en BD
       setChatHistory([]);
       setIsChatMode(false);
+      setCurrentConversationId(null);
+      chatService.clearConversation();
+      await setPhase('initial');
+      
+      toast.warning('Nueva conversación (modo local)', {
+        description: 'La conversación no se guardará en el historial permanente',
+      });
     }
-  }, [createNewConversation, chatService, setPhase]);
+  }, [createNewConversation, setPhase, chatService, setCurrentConversationId]);
 
   // NUEVO: Inicialización completa con migración y carga de conversaciones
   useEffect(() => {
