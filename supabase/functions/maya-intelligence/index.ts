@@ -61,7 +61,8 @@ function getMethodForAggregationIntent(intentType: string): string | null {
     'TOTAL_INCAPACITY_DAYS': 'getTotalIncapacityDays',
     'TOTAL_OVERTIME_HOURS': 'getTotalOvertimeHours',
     'PAYROLL_COMPARISON': 'comparePayrollPeriods',
-    'HIGHEST_PAYROLL_PERIOD': 'getHighestPayrollPeriod'
+    'HIGHEST_PAYROLL_PERIOD': 'getHighestPayrollPeriod',
+    'LOWEST_PAYROLL_PERIOD': 'getLowestPayrollPeriod'
   };
   return methodMap[intentType] || null;
 }
@@ -1592,6 +1593,10 @@ serve(async (req) => {
         
       case 'getHighestPayrollPeriod':
         response = await handleHighestPayrollPeriod(userSupabase, intent.params);
+        break;
+        
+      case 'getLowestPayrollPeriod':
+        response = await handleLowestPayrollPeriod(userSupabase, intent.params);
         break;
       // ============================================================================
       // END PHASE 1: AGGREGATION HANDLERS
@@ -3463,6 +3468,52 @@ async function handleHighestPayrollPeriod(supabase: any, params: any) {
     console.error('❌ [HIGHEST_PERIOD_HANDLER] Error:', error);
     return {
       message: 'No pude determinar el período con mayor nómina. Verifica que existan períodos cerrados.',
+      emotionalState: 'concerned'
+    };
+  }
+}
+
+async function handleLowestPayrollPeriod(supabase: any, params: any) {
+  try {
+    const temporalParams = TemporalResolver.isLegacyFormat(params)
+      ? TemporalResolver.fromLegacy(params)
+      : params;
+    
+    console.log('📉 [LOWEST_PERIOD_HANDLER] Searching for lowest payroll period:', temporalParams);
+    const result = await AggregationService.getLowestPayrollPeriod(supabase, temporalParams);
+    
+    // If service returned data, enhance the message
+    if (result.data) {
+      const { lowestPeriod, context } = result.data;
+      
+      // Format currency
+      const formatter = new Intl.NumberFormat('es-CO', {
+        style: 'currency',
+        currency: 'COP',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      });
+      
+      const message = `📉 **Período con Menor Nómina**\n\n` +
+        `El período con menor nómina en **${context.searchRange}** fue:\n\n` +
+        `📅 **${lowestPeriod.name}**\n` +
+        `💰 **Total pagado:** ${formatter.format(lowestPeriod.total)}\n` +
+        `👥 **Empleados:** ${lowestPeriod.employeeCount}\n` +
+        `📊 **% del total:** ${context.percentageOfTotal.toFixed(1)}%\n\n` +
+        `Este fue el ${context.percentageOfTotal < 10 ? 'menor' : 'uno de los menores'} pagos del rango analizado (${context.totalPeriods} período${context.totalPeriods > 1 ? 's' : ''}).`;
+      
+      return {
+        message,
+        emotionalState: 'professional',
+        data: result.data
+      };
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('❌ [LOWEST_PERIOD_HANDLER] Error:', error);
+    return {
+      message: 'No pude determinar el período con menor nómina. Verifica que existan períodos cerrados.',
       emotionalState: 'concerned'
     };
   }

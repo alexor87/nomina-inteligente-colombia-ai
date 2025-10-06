@@ -629,6 +629,43 @@ export class SimpleIntentMatcher {
       };
     }
     
+    // 8. LOWEST PAYROLL PERIOD (New - Priority 0.96)
+    if (/(?:cuál|cual|qué|que)\s+(?:ha\s+sido|fue|es)\s+(?:la|el)\s+(?:nómin|nomin|período|periodo|mes|quincena)\s+(?:más|mas)\s+(?:baja|bajo|barata|barato|económica|economico)/i.test(text) ||
+        /(?:período|periodo|mes|quincena)\s+(?:con|de)\s+(?:menor|más\s+baj[oa])\s+(?:nómin|nomin|costo|pago)/i.test(text) ||
+        /(?:cuándo|cuando)\s+(?:pagué|pague|pagamos)\s+(?:menos)/i.test(text) ||
+        /(?:mínim[oa]|menor)\s+(?:de\s+)?(?:nómin|nomin|pago)/i.test(text) ||
+        /(?:nómin|nomin).*(?:más|mas)\s+(?:baja|bajo)/i.test(text) ||
+        /(?:período|periodo|mes)\s+(?:donde|que)\s+(?:pagué|pague|pagamos)\s+menos/i.test(text)) {
+      
+      const monthRegex = /(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/gi;
+      const allMonthMatches = [...text.matchAll(monthRegex)];
+      const allMonths = allMonthMatches.map(m => m[1].toLowerCase());
+      let yearMatch = text.match(/(\d{4})/);
+      
+      // Default to current year if not specified
+      if (!yearMatch) {
+        const currentYear = new Date().getFullYear();
+        yearMatch = [String(currentYear), String(currentYear)] as RegExpMatchArray;
+      }
+      
+      const params: any = { year: yearMatch ? parseInt(yearMatch[1]) : null };
+      if (allMonths.length === 1) {
+        params.month = allMonths[0];
+      } else if (allMonths.length >= 2) {
+        params.monthStart = allMonths[0];
+        params.monthEnd = allMonths[allMonths.length - 1];
+      }
+      
+      console.log('[LOWEST_PAYROLL_PERIOD] Detected:', params);
+      
+      return {
+        type: 'LOWEST_PAYROLL_PERIOD',
+        confidence: 0.96, // Same priority as HIGHEST
+        method: 'getLowestPayrollPeriod',
+        params
+      };
+    }
+    
     // 6. PAYROLL COMPARISON (Flexible period comparisons)
     if (/(?:variaci[oó]n|diferencia|cambio|comparar|comparaci[oó]n)\s+(?:del?\s+)?(?:costo|total|pago)?.*(?:n[oó]mina|payroll)/i.test(text) ||
         /(?:n[oó]mina|costo|total|pago).*(?:variaci[oó]n|diferencia|cambio|comparar)/i.test(text) ||
