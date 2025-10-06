@@ -28,7 +28,7 @@ export class ContributionReportService extends BaseAggregationService {
 
       // Extract contribution type filter if provided
       const contributionType = (params as any).contributionType || null;
-      console.log(`📋 [CONTRIBUTION_REPORT] Contribution type filter: ${contributionType || 'all'}`);
+      console.log(`📋 [CONTRIBUTION_REPORT] Contribution type filter: ${contributionType || 'all'}, Query params:`, JSON.stringify({ contributionType: (params as any).contributionType, hasEps: /\beps\b/i.test(JSON.stringify(params)), hasPension: /\bpensión\b/i.test(JSON.stringify(params)) }));
 
       // Query all payrolls for the resolved periods
       const { data: payrolls, error } = await client
