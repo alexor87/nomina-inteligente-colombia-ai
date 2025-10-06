@@ -309,6 +309,9 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
       await loadConversations(); // Refresh list
       await loadConversation(newConv.id);
       
+      // 🆕 Sincronizar con chatService
+      chatService.setCurrentConversation(newConv.id);
+      
       console.log('✨ MAYA Provider: Created new conversation', { id: newConv.id });
       return newConv.id;
     } catch (error) {
@@ -319,6 +322,18 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
 
   const sendMessage = useCallback(async (message: string, conversationState?: Record<string, any>) => {
     console.log('📨 MAYA: Sending message with state', { message, conversationState });
+    
+    // 🆕 Auto-crear conversación si es el primer mensaje
+    if (!currentConversationId) {
+      console.log('🎬 MAYA: Primera interacción, creando conversación automáticamente...');
+      try {
+        await createNewConversation();
+        console.log('✅ MAYA: Conversación creada automáticamente');
+      } catch (error) {
+        console.error('❌ MAYA: Error creando conversación, continuando sin BD', error);
+        // Continuar sin BD (fallback a localStorage)
+      }
+    }
     
     try {
       // Generate rich contextual data
