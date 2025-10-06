@@ -7,6 +7,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
 export enum LLMQueryType {
+  EXPLANATION = "EXPLANATION",
   TEMPORAL_FOLLOWUP = "TEMPORAL_FOLLOWUP",
   EMPLOYEE_FOLLOWUP = "EMPLOYEE_FOLLOWUP",
   AGGREGATION = "AGGREGATION",
@@ -14,6 +15,9 @@ export enum LLMQueryType {
 }
 
 export interface ExtractedContext {
+  // Explanation context
+  concept?: string;
+  
   // Temporal context
   temporalModifier?: "LAST_YEAR" | "THIS_YEAR" | "SPECIFIC_MONTH" | "QUARTER" | "SEMESTER" | "LAST_MONTH" | "FULL_YEAR";
   year?: number;
@@ -59,19 +63,31 @@ export class LLMQueryClassifier {
     // Build system prompt with classification instructions
     const systemPrompt = `Eres un clasificador experto de queries de nómina colombiana.
 
-Tu tarea es clasificar queries de usuarios en 4 categorías:
-1. **TEMPORAL_FOLLOWUP**: Follow-up temporal (ej: "y el año pasado?", "y este año?", "y en diciembre?")
-2. **EMPLOYEE_FOLLOWUP**: Follow-up de empleado (ej: "y a María?", "y Juan?", "y para Carlos?")
-3. **AGGREGATION**: Query de agregación sin follow-up (ej: "cuántos empleados hay?", "total de salarios")
-4. **DIRECT_INTENT**: Intent directo (ej: "liquidar nómina", "enviar voucher")
+Tu tarea es clasificar queries de usuarios en 5 categorías:
+1. **EXPLANATION**: Preguntas teóricas sobre legislación, conceptos o procedimientos (ej: "cómo se liquidan horas extras", "qué es prima de servicios", "explícame las cesantías")
+2. **TEMPORAL_FOLLOWUP**: Follow-up temporal (ej: "y el año pasado?", "y este año?", "y en diciembre?")
+3. **EMPLOYEE_FOLLOWUP**: Follow-up de empleado (ej: "y a María?", "y Juan?", "y para Carlos?")
+4. **AGGREGATION**: Query de agregación sin follow-up (ej: "cuántos empleados hay?", "total de salarios")
+5. **DIRECT_INTENT**: Intent directo (ej: "liquidar nómina", "enviar voucher")
 
 **PRIORIDADES ESTRICTAS:**
-- TEMPORAL_FOLLOWUP > EMPLOYEE_FOLLOWUP > AGGREGATION > DIRECT_INTENT
+- EXPLANATION > TEMPORAL_FOLLOWUP > EMPLOYEE_FOLLOWUP > AGGREGATION > DIRECT_INTENT
 
 **Contexto de conversación previa:**
 ${lastContext ? `Última consulta fue sobre: ${lastContext.summary}` : 'No hay contexto previo'}
 
-**Reglas críticas:**
+**Reglas críticas para EXPLANATION:**
+- "cómo se liquida(n)..." → EXPLANATION
+- "qué es..." → EXPLANATION
+- "explícame..." → EXPLANATION
+- "cuáles son los pasos para..." → EXPLANATION
+- "cómo funciona..." → EXPLANATION
+- "cómo se calcula(n)..." → EXPLANATION
+- "qué porcentaje..." → EXPLANATION (si no menciona empleado específico)
+- "cuánto es el salario mínimo" → EXPLANATION
+- Preguntas sobre teoría/legislación sin mencionar datos específicos → EXPLANATION
+
+**Reglas para otras categorías:**
 - "y el año pasado?" → TEMPORAL_FOLLOWUP (LAST_YEAR)
 - "y este año?" → TEMPORAL_FOLLOWUP (THIS_YEAR)
 - "y en enero?" → TEMPORAL_FOLLOWUP (SPECIFIC_MONTH: enero)
@@ -82,6 +98,7 @@ ${lastContext ? `Última consulta fue sobre: ${lastContext.summary}` : 'No hay c
 - "liquidar nómina" → DIRECT_INTENT
 
 **Extracción de parámetros:**
+- Para EXPLANATION: extraer concepto/tema (horas extras, prima, cesantías, etc.)
 - Para temporales: extraer year, month, quarter, semester, monthCount (para "últimos N meses")
 - Para empleados: extraer nombre completo
 - Para agregaciones: extraer métrica (salario, incapacidad, etc.)`;
@@ -114,7 +131,7 @@ Clasifica esta query y extrae los parámetros relevantes.`;
                   properties: {
                     queryType: {
                       type: "string",
-                      enum: ["TEMPORAL_FOLLOWUP", "EMPLOYEE_FOLLOWUP", "AGGREGATION", "DIRECT_INTENT"],
+                      enum: ["EXPLANATION", "TEMPORAL_FOLLOWUP", "EMPLOYEE_FOLLOWUP", "AGGREGATION", "DIRECT_INTENT"],
                       description: "The type of query classification"
                     },
                     confidence: {
@@ -126,6 +143,10 @@ Clasifica esta query y extrae los parámetros relevantes.`;
                     extractedContext: {
                       type: "object",
                       properties: {
+                        concept: {
+                          type: "string",
+                          description: "Concept or topic being asked about in EXPLANATION queries (e.g., horas extras, prima, cesantías)"
+                        },
                         temporalModifier: {
                           type: "string",
                           enum: ["LAST_YEAR", "THIS_YEAR", "SPECIFIC_MONTH", "QUARTER", "SEMESTER", "LAST_N_MONTHS", "FULL_YEAR"],

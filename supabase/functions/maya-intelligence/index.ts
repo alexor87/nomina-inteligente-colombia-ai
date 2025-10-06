@@ -765,6 +765,21 @@ serve(async (req) => {
                 }
                 break;
               
+              case LLMQueryType.EXPLANATION:
+                // Preguntas teóricas/explicativas sobre legislación laboral colombiana
+                console.log(`📚 [EXPLANATION] Theoretical question detected`);
+                console.log(`   Concept: ${llmClassification.extractedContext.concept || 'general'}`);
+                console.log(`   Confidence: ${llmClassification.confidence.toFixed(2)}`);
+                
+                // Usar handleConversation directamente con el prompt maestro
+                // que incluye la personalidad de abogado laboral experto
+                // y la fecha actual dinámica (octubre 2025)
+                const explanationResponse = await handleConversation(lastMessage, conversation);
+                
+                return new Response(JSON.stringify(explanationResponse), {
+                  headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+              
               case LLMQueryType.EMPLOYEE_FOLLOWUP:
                 // Handle employee follow-up
                 const employeeName = llmClassification.extractedContext.employeeName;
