@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useMaya } from '@/maya/MayaProvider';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCurrentCompany } from '@/hooks/useCurrentCompany';
 import { MayaConversationManager } from '@/maya/services/MayaConversationManager';
 import { ConversationSummary } from '@/maya/types';
 import { toast } from 'sonner';
@@ -18,6 +19,7 @@ const STORAGE_KEY = 'unified_sidebar_collapsed';
 
 export const UnifiedSidebar: React.FC = () => {
   const { user } = useAuth();
+  const { companyId } = useCurrentCompany();
   const { clearConversation, currentConversationId } = useMaya();
   const navigate = useNavigate();
   const location = useLocation();
@@ -31,20 +33,44 @@ export const UnifiedSidebar: React.FC = () => {
 
   const conversationManager = MayaConversationManager.getInstance();
 
+  // ✅ Cargar conversaciones cuando user y companyId estén disponibles
   useEffect(() => {
-    loadConversations();
-  }, [user]);
+    if (user?.id && companyId) {
+      console.log('🔄 UnifiedSidebar: user y company listos, cargando conversaciones...', {
+        userId: user.id,
+        companyId
+      });
+      loadConversations();
+    }
+  }, [user?.id, companyId]);
+
+  // ⚡ Recargar conversaciones cuando cambia currentConversationId
+  useEffect(() => {
+    if (currentConversationId && user?.id && companyId) {
+      loadConversations();
+    }
+  }, [currentConversationId, user?.id, companyId]);
 
   const loadConversations = async () => {
-    if (!user?.id) return;
+    console.log('📋 UnifiedSidebar: loadConversations llamado', {
+      hasUser: !!user?.id,
+      hasCompanyId: !!companyId,
+      userId: user?.id,
+      companyId
+    });
+    
+    if (!user?.id || !companyId) {
+      console.warn('⚠️ UnifiedSidebar: No se puede cargar, falta user o companyId');
+      return;
+    }
     
     setIsLoading(true);
     try {
-      const companyId = user.user_metadata?.company_id;
       const convs = await conversationManager.getConversations(user.id, companyId);
+      console.log('✅ UnifiedSidebar: Conversaciones cargadas:', convs.length);
       setConversations(convs);
     } catch (error) {
-      console.error('Error loading conversations:', error);
+      console.error('❌ UnifiedSidebar: Error loading conversations:', error);
       toast.error('Error al cargar conversaciones');
     } finally {
       setIsLoading(false);
@@ -57,9 +83,9 @@ export const UnifiedSidebar: React.FC = () => {
     localStorage.setItem(STORAGE_KEY, String(newValue));
   };
 
-  const handleNewConversation = () => {
-    clearConversation();
-    loadConversations();
+  const handleNewConversation = async () => {
+    await clearConversation();
+    await loadConversations();
     // Navigate to Maya if not already there
     if (location.pathname !== '/maya') {
       navigate('/maya');
