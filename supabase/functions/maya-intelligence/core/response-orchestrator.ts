@@ -16,7 +16,7 @@ export interface OrchestratedResponse {
   // Backward compatibility
   message: string;
   emotionalState: string;
-  actions?: any[];
+  executableActions?: any[];
   quickReplies?: string[];
   fieldName?: string;
   conversationState?: any;
@@ -60,7 +60,7 @@ export class ResponseOrchestrator {
       // Backward compatibility - check response.response first, then response.message
       message: response.response || response.message || structuredResponse.mensaje || 'No pude procesar tu solicitud.',
       emotionalState: response.emotionalState || 'neutral',
-      actions: response.actions || [],
+      executableActions: response.actions || [],
       quickReplies: response.quickReplies || [],
       fieldName: response.fieldName,
       conversationState: response.conversationState,
@@ -72,7 +72,7 @@ export class ResponseOrchestrator {
     };
     
     console.log(`✅ [ORCHESTRATOR] Response ready:`, {
-      hasActions: orchestrated.actions!.length > 0,
+      hasActions: orchestrated.executableActions!.length > 0,
       hasQuickReplies: orchestrated.quickReplies!.length > 0,
       hasConversationState: !!orchestrated.conversationState,
       messageLength: orchestrated.message.length
@@ -102,7 +102,7 @@ export class ResponseOrchestrator {
       
       message: 'Lo siento, ocurrió un error procesando tu solicitud. Por favor intenta de nuevo.',
       emotionalState: 'confused',
-      actions: [],
+      executableActions: [],
       quickReplies: ['Ayuda', 'Reintentar'],
       
       timestamp: new Date().toISOString(),
@@ -135,7 +135,7 @@ export class ResponseOrchestrator {
       
       message,
       emotionalState: 'thoughtful',
-      actions: [],
+      executableActions: [],
       quickReplies: [
         'Buscar empleado',
         'Ver nómina',
@@ -165,8 +165,8 @@ export class ResponseOrchestrator {
     }
     
     // Validate actions if present
-    if (response.actions && !Array.isArray(response.actions)) {
-      console.error('🚨 [ORCHESTRATOR] Invalid response: actions must be array');
+    if (response.executableActions && !Array.isArray(response.executableActions)) {
+      console.error('🚨 [ORCHESTRATOR] Invalid response: executableActions must be array');
       return false;
     }
     
