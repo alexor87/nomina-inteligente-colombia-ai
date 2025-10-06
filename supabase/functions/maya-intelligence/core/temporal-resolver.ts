@@ -135,73 +135,84 @@ export class TemporalResolver {
   
   /**
    * Convert legacy params to TemporalParams
+   * ✅ FIXED: Now preserves non-temporal fields (e.g., contributionType, limit, etc.)
    */
   static fromLegacy(params: any): TemporalParams {
+    let result: TemporalParams;
+    
     // periodId takes precedence
     if (params.periodId) {
-      return {
+      result = {
         type: TemporalType.SPECIFIC_PERIOD,
         periodIds: [params.periodId]
       };
     }
-    
     // Month range (monthStart + monthEnd)
-    if (params.monthStart && params.monthEnd) {
-      return {
+    else if (params.monthStart && params.monthEnd) {
+      result = {
         type: TemporalType.MONTH_RANGE,
         startDate: params.monthStart,
         endDate: params.monthEnd,
         year: params.year || new Date().getFullYear()
       };
     }
-    
     // Quarter
-    if (params.quarter) {
-      return {
+    else if (params.quarter) {
+      result = {
         type: TemporalType.QUARTER,
         quarter: params.quarter,
         year: params.year || new Date().getFullYear()
       };
     }
-    
     // Semester
-    if (params.semester) {
-      return {
+    else if (params.semester) {
+      result = {
         type: TemporalType.SEMESTER,
         semester: params.semester,
         year: params.year || new Date().getFullYear()
       };
     }
-    
     // monthCount for range queries
-    if (params.monthCount) {
-      return {
+    else if (params.monthCount) {
+      result = {
         type: TemporalType.LAST_N_MONTHS,
         monthCount: params.monthCount,
         year: params.year || new Date().getFullYear()
       };
     }
-    
     // Specific month
-    if (params.month) {
-      return {
+    else if (params.month) {
+      result = {
         type: TemporalType.SPECIFIC_MONTH,
         month: params.month,
         year: params.year || new Date().getFullYear()
       };
     }
-    
     // Full year
-    if (params.year && !params.month) {
-      return {
+    else if (params.year && !params.month) {
+      result = {
         type: TemporalType.FULL_YEAR,
         year: params.year
       };
     }
-    
     // Default to most recent period
-    return {
-      type: TemporalType.SPECIFIC_PERIOD
-    };
+    else {
+      result = {
+        type: TemporalType.SPECIFIC_PERIOD
+      };
+    }
+    
+    // 🔥 CRITICAL: Preserve non-temporal fields from original params
+    // This ensures contributionType, limit, and other service-specific params are not lost
+    const temporalKeys = ['type', 'year', 'month', 'quarter', 'semester', 'monthCount', 
+                          'startDate', 'endDate', 'periodIds', 'monthStart', 'monthEnd', 'periodId'];
+    
+    Object.keys(params).forEach(key => {
+      if (!temporalKeys.includes(key) && params[key] !== undefined) {
+        (result as any)[key] = params[key];
+      }
+    });
+    
+    return result;
   }
 }

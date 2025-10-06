@@ -84,6 +84,7 @@ export class IntentRouter {
         // Aggregation queries
         case 'getTotalPayrollCost':
         case 'getSecurityContributions':
+        case 'getContributionReport':
         case 'getHighestCostEmployees':
         case 'getLowestCostEmployees':
         case 'getTotalIncapacityDays':
@@ -309,6 +310,9 @@ export class IntentRouter {
     const temporalParams = TemporalResolver.isLegacyFormat(intent.params)
       ? TemporalResolver.fromLegacy(intent.params)
       : intent.params;
+    
+    // 🔥 Log to verify contributionType is preserved
+    this.logger.info(`[ROUTER] TemporalParams after conversion:`, temporalParams);
 
     let result;
     
@@ -318,6 +322,9 @@ export class IntentRouter {
         break;
       case 'getSecurityContributions':
         result = await AggregationService.getSecurityContributions(context.userSupabase, temporalParams);
+        break;
+      case 'getContributionReport':
+        result = await AggregationService.getContributionReport(context.userSupabase, temporalParams);
         break;
       case 'getHighestCostEmployees':
         result = await AggregationService.getHighestCostEmployees(context.userSupabase, temporalParams);
