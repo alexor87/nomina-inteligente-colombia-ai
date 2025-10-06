@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Mic, Paperclip, MoreVertical } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { motion } from 'framer-motion';
@@ -30,48 +30,16 @@ export const MayaHeaderActions: React.FC<MayaHeaderActionsProps> = ({ onNewConve
         </Badge>
       </motion.div>
 
-      {/* Action buttons */}
-      <div className="flex items-center gap-1">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onNewConversation}
-          className="text-gray-600 hover:text-gray-900 hover:bg-gray-100 h-8 px-3"
-        >
-          <Plus className="h-4 w-4 mr-1.5" />
-          <span className="text-xs font-medium">Nueva</span>
-        </Button>
-
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 h-8 w-8 p-0"
-          disabled
-          title="Próximamente"
-        >
-          <Mic className="h-4 w-4" />
-        </Button>
-
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 h-8 w-8 p-0"
-          disabled
-          title="Próximamente"
-        >
-          <Paperclip className="h-4 w-4" />
-        </Button>
-
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 h-8 w-8 p-0"
-          disabled
-          title="Próximamente"
-        >
-          <MoreVertical className="h-4 w-4" />
-        </Button>
-      </div>
+      {/* Action button */}
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={onNewConversation}
+        className="text-gray-600 hover:text-gray-900 hover:bg-gray-100 h-8 px-3"
+      >
+        <Plus className="h-4 w-4 mr-1.5" />
+        <span className="text-xs font-medium">Nueva</span>
+      </Button>
     </div>
   );
 };
