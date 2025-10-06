@@ -5,6 +5,7 @@
 
 import { OvertimeService } from './services/OvertimeService.ts';
 import { IncapacityService } from './services/IncapacityService.ts';
+import { IncapacityReportService } from './services/IncapacityReportService.ts';
 import { PayrollCostService } from './services/PayrollCostService.ts';
 import { SecurityContributionsService } from './services/SecurityContributionsService.ts';
 import { EmployeeCostService } from './services/EmployeeCostService.ts';
@@ -15,6 +16,7 @@ import { BaseAggregationService } from './base/BaseAggregationService.ts';
 export type AggregationType = 
   | 'overtime'
   | 'incapacity'
+  | 'incapacity_report'
   | 'payroll_cost'
   | 'security_contributions'
   | 'highest_cost_employees'
@@ -45,6 +47,9 @@ export class AggregationServiceFactory {
       
       case 'incapacity':
         return new IncapacityService();
+      
+      case 'incapacity_report':
+        return new IncapacityReportService();
       
       case 'payroll_cost':
         return new PayrollCostService();

@@ -555,6 +555,47 @@ export class SimpleIntentMatcher {
       };
     }
     
+    // 4.5. INCAPACITY REPORT BY EMPLOYEE (New - Priority 0.95)
+    if (/(?:reporte|listado|informe)\s+(?:de\s+)?incapacidades\s+(?:por|de)\s+empleado/i.test(text) ||
+        /(?:genera|crea|dame)\s+(?:un\s+)?reporte\s+(?:de\s+)?incapacidades/i.test(text) ||
+        /incapacidades\s+(?:de|por)\s+cada\s+empleado/i.test(text) ||
+        /(?:cuántas|cuantas)\s+incapacidades\s+tiene\s+cada\s+empleado/i.test(text) ||
+        /empleados\s+con\s+incapacidades/i.test(text) ||
+        /(?:quiénes|quienes)\s+(?:tuvieron|tienen)\s+incapacidades/i.test(text)) {
+      
+      const monthRegex = /(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/gi;
+      const allMonthMatches = [...text.matchAll(monthRegex)];
+      const allMonths = allMonthMatches.map(m => m[1].toLowerCase());
+      let yearMatch = text.match(/(\d{4})/);
+      
+      // PRIORITY 1: Detect "año pasado", "año anterior" FIRST
+      if (!yearMatch && /(?:año\s+pasado|año\s+anterior|pasado\s+año)/i.test(text)) {
+        const lastYear = new Date().getFullYear() - 1;
+        yearMatch = [String(lastYear), String(lastYear)] as RegExpMatchArray;
+      }
+      
+      // PRIORITY 2: Detect "este año", "año actual", "el año" (but NOT "el año pasado")
+      if (!yearMatch && /(?:este|actual|el)\s+año(?!\s+(?:pasado|anterior))/i.test(text)) {
+        const currentYear = new Date().getFullYear();
+        yearMatch = [String(currentYear), String(currentYear)] as RegExpMatchArray;
+      }
+      
+      const params: any = { year: yearMatch ? parseInt(yearMatch[1]) : null };
+      if (allMonths.length === 1) {
+        params.month = allMonths[0];
+      } else if (allMonths.length >= 2) {
+        params.monthStart = allMonths[0];
+        params.monthEnd = allMonths[allMonths.length - 1];
+      }
+      
+      return {
+        type: 'INCAPACITY_REPORT',
+        confidence: 0.95,
+        method: 'getIncapacityReport',
+        params
+      };
+    }
+    
     // 5. TOTAL OVERTIME HOURS
     if (/(?:cuántas|cuantas|qué|que)\s+horas\s+extra/i.test(text) ||
         /(?:total|cantidad)\s+(?:de\s+)?horas\s+extra/i.test(text) ||

@@ -59,6 +59,7 @@ function getMethodForAggregationIntent(intentType: string): string | null {
     'HIGHEST_COST_EMPLOYEES': 'getHighestCostEmployees',
     'LOWEST_COST_EMPLOYEES': 'getLowestCostEmployees',
     'TOTAL_INCAPACITY_DAYS': 'getTotalIncapacityDays',
+    'INCAPACITY_REPORT': 'getIncapacityReport',
     'TOTAL_OVERTIME_HOURS': 'getTotalOvertimeHours',
     'PAYROLL_COMPARISON': 'comparePayrollPeriods',
     'HIGHEST_PAYROLL_PERIOD': 'getHighestPayrollPeriod',
@@ -1583,6 +1584,10 @@ serve(async (req) => {
         response = await handleTotalIncapacityDays(userSupabase, intent.params);
         break;
         
+      case 'getIncapacityReport':
+        response = await handleIncapacityReport(userSupabase, intent.params);
+        break;
+        
       case 'getTotalOvertimeHours':
         response = await handleTotalOvertimeHours(userSupabase, intent.params);
         break;
@@ -1636,6 +1641,7 @@ serve(async (req) => {
       case 'getHighestCostEmployees':
       case 'getLowestCostEmployees':
       case 'getTotalIncapacityDays':
+      case 'getIncapacityReport':
       case 'getTotalOvertimeHours':
       case 'getPayrollMonthlyVariation': {
         console.log(`🔀 [ROUTER] Routing ${intent.method} to IntentRouter`);
@@ -3410,6 +3416,13 @@ async function handleTotalIncapacityDays(supabase: any, params: any) {
     ? TemporalResolver.fromLegacy(params)
     : params;
   return await AggregationService.getTotalIncapacityDays(supabase, temporalParams);
+}
+
+async function handleIncapacityReport(supabase: any, params: any) {
+  const temporalParams = TemporalResolver.isLegacyFormat(params)
+    ? TemporalResolver.fromLegacy(params)
+    : params;
+  return await AggregationService.getIncapacityReport(supabase, temporalParams);
 }
 
 async function handleTotalOvertimeHours(supabase: any, params: any) {

@@ -31,6 +31,17 @@ export async function getTotalIncapacityDays(
 }
 
 /**
+ * Get incapacity report by employee
+ */
+export async function getIncapacityReport(
+  client: any,
+  params: TemporalParams
+) {
+  const service = AggregationServiceFactory.getService('incapacity_report');
+  return await service.aggregate(client, params);
+}
+
+/**
  * Get total payroll cost including employer contributions
  */
 export async function getTotalPayrollCost(
