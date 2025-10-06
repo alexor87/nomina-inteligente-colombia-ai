@@ -1,6 +1,7 @@
 import React from 'react';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 interface NewConversationButtonProps {
   onClick: () => void;
@@ -15,7 +16,10 @@ export const NewConversationButton: React.FC<NewConversationButtonProps> = ({
     <Button
       onClick={onClick}
       variant="outline"
-      className="w-full justify-start hover:bg-muted/50 border-border/50"
+      className={cn(
+        "w-full hover:bg-muted/50 border-border/50",
+        collapsed ? "justify-center" : "justify-start"
+      )}
       size={collapsed ? "icon" : "default"}
     >
       <Plus className="h-4 w-4" />
