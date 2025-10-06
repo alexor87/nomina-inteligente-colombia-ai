@@ -36,9 +36,11 @@ export const MayaFullScreenLayout: React.FC = () => {
         <UnifiedSidebar />
         
         {/* Área principal (derecha) */}
-        <div className="flex-1 flex flex-col relative z-10">
+        <div className="flex-1 flex flex-col relative z-10 overflow-hidden">
           <DynamicHeader />
-          <Outlet />
+          <div className="flex-1 overflow-y-auto overflow-x-hidden">
+            <Outlet />
+          </div>
         </div>
         
         {/* Componentes MAYA Globales */}
