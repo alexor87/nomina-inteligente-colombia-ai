@@ -192,7 +192,7 @@ export const UnifiedSidebar: React.FC = () => {
         <div className="flex flex-col h-full">
           {/* SECCIÓN SUPERIOR: MAYA */}
           <div className="flex-none flex flex-col border-b border-border" style={{ maxHeight: '45vh' }}>
-            <SidebarHeader collapsed={collapsed} />
+            <SidebarHeader collapsed={collapsed} onToggle={handleToggleCollapse} />
             
             <div className="px-3 py-2">
               <NewConversationButton 
@@ -257,13 +257,6 @@ export const UnifiedSidebar: React.FC = () => {
             <nav className="flex-1 px-3 py-4 overflow-y-auto">
               <ModuleNavigation collapsed={collapsed} />
             </nav>
-
-            <div className="p-2 border-t border-border flex-shrink-0">
-              <ToggleButton 
-                collapsed={collapsed} 
-                onToggle={handleToggleCollapse} 
-              />
-            </div>
           </div>
         </div>
       </motion.aside>
@@ -287,7 +280,7 @@ export const UnifiedSidebar: React.FC = () => {
               className="md:hidden fixed left-0 top-0 bottom-0 w-72 bg-background border-r border-border z-50 flex flex-col"
             >
               <div className="flex flex-col h-full">
-                <SidebarHeader collapsed={false} />
+                <SidebarHeader collapsed={false} onToggle={handleToggleCollapse} />
                 
                 <div className="p-3 border-b border-border">
                   <NewConversationButton onClick={handleNewConversation} />
@@ -326,13 +319,6 @@ export const UnifiedSidebar: React.FC = () => {
                 <nav className="flex-1 px-3 py-4 overflow-y-auto">
                   <ModuleNavigation collapsed={false} />
                 </nav>
-
-                <div className="p-2 border-t border-border">
-                  <ToggleButton 
-                    collapsed={false} 
-                    onToggle={handleToggleCollapse} 
-                  />
-                </div>
               </div>
             </motion.aside>
           </>
