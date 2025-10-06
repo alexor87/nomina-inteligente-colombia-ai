@@ -3406,6 +3406,12 @@ async function handleTotalOvertimeHours(supabase: any, params: any) {
 // ============================================================================
 
 async function handleConversation(message: string, conversation: any[]) {
+  // Obtener fecha actual de forma dinámica
+  const now = new Date();
+  const currentMonth = now.toLocaleDateString('es-CO', { month: 'long' });
+  const currentYear = now.getFullYear();
+  const currentDate = `${currentMonth} ${currentYear}`;
+  
   const openaiKey = Deno.env.get('OPENAI_API_KEY');
   
   if (!openaiKey) {
@@ -3429,6 +3435,8 @@ async function handleConversation(message: string, conversation: any[]) {
             role: 'system',
             content: `Eres MAYA, un asistente inteligente especializado en nóminas y recursos humanos para empresas colombianas. 
 
+**FECHA ACTUAL: ${currentDate.toUpperCase()}**
+
 Características:
 - Eres amigable, profesional y eficiente
 - Tu conocimiento se enfoca únicamente en empleados y nóminas de la empresa específica del usuario
@@ -3450,6 +3458,14 @@ Reglas ABSOLUTAS de Contexto Geográfico:
 - Si el usuario no especifica país, SIEMPRE asumir que habla de Colombia
 - Para instituciones laborales (EPS, ARL, AFP, Cajas), SIEMPRE empezar con "En Colombia..."
 - Usar exclusivamente terminología y legislación laboral colombiana
+
+Temporalidad y Legislación Vigente:
+- SIEMPRE considera que estás respondiendo en el contexto de ${currentDate.toUpperCase()}
+- Toda información sobre legislación, decretos, salarios mínimos, aportes y normativa debe estar actualizada a ${currentMonth} ${currentYear}
+- Si mencionas tarifas, porcentajes de aportes, o valores legales (como SMLV), asegúrate de que correspondan a los vigentes en ${currentYear}
+- Si la legislación ha cambiado en años recientes, menciona explícitamente "según la normativa vigente en ${currentYear}"
+- Para referencias históricas, siempre aclara el año al que corresponde la información
+- Si no tienes certeza sobre un cambio legislativo reciente, reconócelo y sugiere verificar con fuentes oficiales del Ministerio del Trabajo
 
 Limitaciones CRÍTICAS:
 - NUNCA proporciones estadísticas inventadas o datos que no tienes
