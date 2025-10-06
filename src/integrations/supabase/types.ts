@@ -1195,11 +1195,17 @@ export type Database = {
           created_at: string | null
           document_type: string
           embedding: string | null
+          embedding_hint: string | null
+          examples: string[] | null
           id: string
           keywords: string[] | null
           metadata: Json | null
+          note: string | null
           reference: string | null
           source_url: string | null
+          sources: string[] | null
+          summary: string | null
+          temporal_validity: string | null
           title: string
           topic: string | null
           updated_at: string | null
@@ -1210,11 +1216,17 @@ export type Database = {
           created_at?: string | null
           document_type: string
           embedding?: string | null
+          embedding_hint?: string | null
+          examples?: string[] | null
           id?: string
           keywords?: string[] | null
           metadata?: Json | null
+          note?: string | null
           reference?: string | null
           source_url?: string | null
+          sources?: string[] | null
+          summary?: string | null
+          temporal_validity?: string | null
           title: string
           topic?: string | null
           updated_at?: string | null
@@ -1225,11 +1237,17 @@ export type Database = {
           created_at?: string | null
           document_type?: string
           embedding?: string | null
+          embedding_hint?: string | null
+          examples?: string[] | null
           id?: string
           keywords?: string[] | null
           metadata?: Json | null
+          note?: string | null
           reference?: string | null
           source_url?: string | null
+          sources?: string[] | null
+          summary?: string | null
+          temporal_validity?: string | null
           title?: string
           topic?: string | null
           updated_at?: string | null
@@ -2906,7 +2924,6 @@ export type Database = {
           cedula: string
           employee_id: string
           nombre: string
-          tipo_documento: string
         }[]
       }
       get_employee_identity_for_period_v2: {
@@ -3114,11 +3131,18 @@ export type Database = {
         Returns: number
       }
       search_legal_knowledge: {
-        Args: {
-          match_count?: number
-          match_threshold?: number
-          query_embedding: string
-        }
+        Args:
+          | {
+              filter_validity?: string
+              match_count?: number
+              match_threshold?: number
+              query_embedding: string
+            }
+          | {
+              match_count?: number
+              match_threshold?: number
+              query_embedding: string
+            }
         Returns: {
           content: string
           document_type: string
