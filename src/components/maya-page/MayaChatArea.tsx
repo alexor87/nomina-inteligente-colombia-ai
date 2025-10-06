@@ -4,9 +4,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Zap, FileText, Users, TrendingUp } from 'lucide-react';
 import { MayaMessage } from './MayaMessage';
 import { TypingIndicator } from './TypingIndicator';
+import { FlowType } from '@/maya/types/GuidedFlow';
 
 export const MayaChatArea: React.FC = () => {
-  const { chatHistory } = useMaya();
+  const { chatHistory, startGuidedFlow } = useMaya();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isLoading] = React.useState(false); // Will be connected to actual loading state
 
@@ -39,10 +40,31 @@ export const MayaChatArea: React.FC = () => {
   }, [chatHistory]);
 
   const quickActions = [
-    { icon: Users, title: "Gestionar empleados", desc: "Crear, editar o consultar empleados", color: "from-blue-500 to-cyan-500" },
-    { icon: Zap, title: "Calcular nómina", desc: "Liquidar nómina del período", color: "from-purple-500 to-pink-500" },
-    { icon: FileText, title: "Ver reportes", desc: "Análisis y estadísticas", color: "from-emerald-500 to-teal-500" },
-    { icon: TrendingUp, title: "Prestaciones", desc: "Consultar liquidaciones", color: "from-orange-500 to-amber-500" },
+    { 
+      icon: Users, 
+      title: "Gestionar empleados", 
+      desc: "Crear, editar o consultar empleados", 
+      color: "from-blue-500 to-cyan-500",
+      flowType: FlowType.EMPLOYEE_CREATE
+    },
+    { 
+      icon: Zap, 
+      title: "Calcular nómina", 
+      desc: "Liquidar nómina del período", 
+      color: "from-purple-500 to-pink-500"
+    },
+    { 
+      icon: FileText, 
+      title: "Ver reportes", 
+      desc: "Análisis y estadísticas", 
+      color: "from-emerald-500 to-teal-500"
+    },
+    { 
+      icon: TrendingUp, 
+      title: "Prestaciones", 
+      desc: "Consultar liquidaciones", 
+      color: "from-orange-500 to-amber-500"
+    },
   ];
 
   return (
@@ -108,7 +130,13 @@ export const MayaChatArea: React.FC = () => {
                     transition={{ delay: 0.4 + idx * 0.08 }}
                     whileHover={{ scale: 1.02, y: -2 }}
                     whileTap={{ scale: 0.98 }}
-                    className="group relative bg-white border border-gray-200 rounded-xl p-4 text-left transition-all hover:bg-gray-50 hover:border-gray-300 hover:shadow-md"
+                    onClick={() => {
+                      if (action.flowType) {
+                        startGuidedFlow(action.flowType);
+                      }
+                    }}
+                    disabled={!action.flowType}
+                    className="group relative bg-white border border-gray-200 rounded-xl p-4 text-left transition-all hover:bg-gray-50 hover:border-gray-300 hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <div className="flex items-start gap-3">
                       <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${action.color} flex items-center justify-center shadow-sm flex-shrink-0`}>
@@ -122,6 +150,9 @@ export const MayaChatArea: React.FC = () => {
                         <p className="text-xs text-gray-600 leading-snug">
                           {action.desc}
                         </p>
+                        {!action.flowType && (
+                          <span className="text-[10px] text-gray-400 mt-0.5 block">Próximamente</span>
+                        )}
                       </div>
                     </div>
                   </motion.button>
@@ -135,12 +166,15 @@ export const MayaChatArea: React.FC = () => {
             {groupedMessages.map((group, groupIdx) => (
               <div key={groupIdx} className="space-y-2">
                 {group.messages.map((msg, msgIdx) => (
-                  <MayaMessage
-                    key={msg.id || `${groupIdx}-${msgIdx}`}
-                    message={msg}
-                    isLatest={groupIdx === groupedMessages.length - 1 && msgIdx === group.messages.length - 1}
-                    showAvatar={msgIdx === 0 && group.showAvatar}
-                  />
+                    <MayaMessage
+                      key={msg.id || `${groupIdx}-${msgIdx}`}
+                      message={msg}
+                      isLatest={groupIdx === groupedMessages.length - 1 && msgIdx === group.messages.length - 1}
+                      showAvatar={msgIdx === 0 && group.showAvatar}
+                      onQuickReply={(value) => {
+                        // Quick reply will be handled by MayaMessage
+                      }}
+                    />
                 ))}
               </div>
             ))}

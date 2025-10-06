@@ -3,7 +3,7 @@ import { FunctionsHttpError, FunctionsRelayError, FunctionsFetchError } from '@s
 
 export interface ChatMessage {
   id: string;
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: string;
   executableActions?: any[];
@@ -14,6 +14,9 @@ export interface ChatMessage {
   }>;
   fieldName?: string;
   conversationState?: Record<string, any>;
+  isFlowMessage?: boolean;
+  flowId?: string;
+  stepId?: string;
 }
 
 export interface ChatConversation {
@@ -326,6 +329,11 @@ export class MayaChatService {
     };
     
     this.currentConversation.messages.push(systemMessage);
+    this.saveToStorage(); // Persist to localStorage
+  }
+
+  addMessage(message: ChatMessage): void {
+    this.currentConversation.messages.push(message);
     this.saveToStorage(); // Persist to localStorage
   }
 

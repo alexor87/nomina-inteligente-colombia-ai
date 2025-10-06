@@ -6,18 +6,22 @@ import { MarkdownRenderer } from './MarkdownRenderer';
 import { Button } from '@/components/ui/button';
 import { MayaActionExecutor } from '@/maya/components/MayaActionExecutor';
 import type { ChatMessage } from '@/maya/services/MayaChatService';
+import { useMaya } from '@/maya/MayaProvider';
 
 interface MayaMessageProps {
   message: ChatMessage;
   isLatest?: boolean;
   showAvatar?: boolean;
+  onQuickReply?: (value: string) => void;
 }
 
 export const MayaMessage: React.FC<MayaMessageProps> = ({ 
   message, 
   isLatest = false,
-  showAvatar = true 
+  showAvatar = true,
+  onQuickReply
 }) => {
+  const { sendMessage, activeFlow } = useMaya();
   const isUser = message.role === 'user';
   const isSystem = message.role !== 'user' && message.role !== 'assistant';
   
@@ -86,8 +90,13 @@ export const MayaMessage: React.FC<MayaMessageProps> = ({
                 key={idx}
                 variant="ghost"
                 size="sm"
+                onClick={() => {
+                  sendMessage(reply.value);
+                  if (onQuickReply) onQuickReply(reply.value);
+                }}
                 className="bg-white backdrop-blur-sm border border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900 hover:border-gray-300 text-xs h-8 px-3 transition-all"
               >
+                {reply.icon && <span className="mr-1.5">{reply.icon}</span>}
                 {reply.label}
               </Button>
             ))}

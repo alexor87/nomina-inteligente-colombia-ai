@@ -9,6 +9,8 @@ import { useEmployeeData } from '@/hooks/useEmployeeData';
 import { useCurrentCompany } from '@/hooks/useCurrentCompany';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { GuidedFlowManager } from './services/GuidedFlowManager';
+import type { FlowState, FlowType } from './types/GuidedFlow';
 
 interface MayaProviderValue {
   currentMessage: MayaMessage | null;
@@ -18,6 +20,7 @@ interface MayaProviderValue {
   conversations: ConversationSummary[];
   currentConversationId: string | null;
   isLoadingConversations: boolean;
+  activeFlow: FlowState | null;
   updateContext: (context: MayaContextType) => Promise<void>;
   hideMessage: () => void;
   showMessage: () => void;
@@ -31,6 +34,10 @@ interface MayaProviderValue {
   loadConversations: () => Promise<void>;
   loadConversation: (conversationId: string) => Promise<void>;
   createNewConversation: () => Promise<string>;
+  startGuidedFlow: (flowType: FlowType) => void;
+  advanceFlow: (userInput: string) => Promise<void>;
+  goBackInFlow: () => void;
+  cancelFlow: () => void;
 }
 
 const MayaContext = createContext<MayaProviderValue | null>(null);
@@ -66,11 +73,15 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
   const [mayaEngine] = useState(() => MayaEngine.getInstance());
   const [chatService] = useState(() => MayaChatService.getInstance());
   const [conversationManager] = useState(() => MayaConversationManager.getInstance());
+  const [flowManager] = useState(() => GuidedFlowManager.getInstance());
   
   // NUEVO: Estado de conversaciones
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [isLoadingConversations, setIsLoadingConversations] = useState(false);
+  
+  // NUEVO: Estado de flujos guiados
+  const [activeFlow, setActiveFlow] = useState<FlowState | null>(null);
   
   // Initialize chatHistory from persisted conversation
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>(() => {
@@ -321,8 +332,138 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
     }
   }, [conversationManager, companyId, loadConversations, loadConversation]);
 
+  // Guided Flow functions
+  const startGuidedFlow = useCallback((flowType: FlowType) => {
+    const flowState = flowManager.startFlow(flowType);
+    setActiveFlow(flowState);
+    
+    const initialStep = flowManager.getCurrentStep(flowState);
+    
+    // Add flow start message to chat
+    const flowMessage: ChatMessage = {
+      id: Date.now().toString(),
+      role: 'assistant',
+      content: initialStep.message,
+      timestamp: new Date().toISOString(),
+      quickReplies: initialStep.quickReplies,
+      isFlowMessage: true,
+      flowId: flowType,
+      stepId: initialStep.id
+    };
+    
+    chatService.addMessage(flowMessage);
+    setChatHistory([...chatService.getConversation().messages]);
+    
+    console.log('🚀 Flow started:', flowType, initialStep);
+  }, [flowManager, chatService]);
+
+  const advanceFlow = useCallback(async (userInput: string) => {
+    if (!activeFlow) return;
+    
+    const result = await flowManager.advance(activeFlow, userInput);
+    
+    if (result.validationError) {
+      // Show validation error
+      const errorMessage: ChatMessage = {
+        id: Date.now().toString(),
+        role: 'system',
+        content: `❌ ${result.validationError}`,
+        timestamp: new Date().toISOString()
+      };
+      chatService.addMessage(errorMessage);
+      setChatHistory([...chatService.getConversation().messages]);
+      return;
+    }
+    
+    setActiveFlow(result.flowState);
+    
+    // Add next step message
+    const stepMessage: ChatMessage = {
+      id: Date.now().toString(),
+      role: 'assistant',
+      content: result.currentStep.message,
+      timestamp: new Date().toISOString(),
+      quickReplies: result.currentStep.quickReplies,
+      isFlowMessage: true,
+      flowId: result.flowState.flowId,
+      stepId: result.currentStep.id
+    };
+    
+    chatService.addMessage(stepMessage);
+    setChatHistory([...chatService.getConversation().messages]);
+    
+    // Handle execution step
+    if (result.currentStep.type === 'execution') {
+      try {
+        await flowManager.executeFlowAction(result.flowState);
+        // Auto-advance to result
+        await advanceFlow('executed');
+      } catch (error) {
+        console.error('Flow execution error:', error);
+        toast.error('Error ejecutando acción');
+      }
+    }
+    
+    // Handle completion
+    if (result.currentStep.id === 'completed' || result.currentStep.id === 'result') {
+      flowManager.completeFlow(result.flowState);
+      setActiveFlow(null);
+    }
+  }, [activeFlow, flowManager, chatService]);
+
+  const goBackInFlow = useCallback(() => {
+    if (!activeFlow) return;
+    
+    const previousState = flowManager.goBack(activeFlow);
+    if (!previousState) {
+      toast.error('No se puede retroceder más');
+      return;
+    }
+    
+    setActiveFlow(previousState);
+    const currentStep = flowManager.getCurrentStep(previousState);
+    
+    const backMessage: ChatMessage = {
+      id: Date.now().toString(),
+      role: 'assistant',
+      content: currentStep.message,
+      timestamp: new Date().toISOString(),
+      quickReplies: currentStep.quickReplies,
+      isFlowMessage: true,
+      flowId: previousState.flowId,
+      stepId: currentStep.id
+    };
+    
+    chatService.addMessage(backMessage);
+    setChatHistory([...chatService.getConversation().messages]);
+  }, [activeFlow, flowManager, chatService]);
+
+  const cancelFlow = useCallback(() => {
+    if (!activeFlow) return;
+    
+    flowManager.cancelFlow(activeFlow);
+    setActiveFlow(null);
+    
+    const cancelMessage: ChatMessage = {
+      id: Date.now().toString(),
+      role: 'system',
+      content: 'Flujo cancelado',
+      timestamp: new Date().toISOString()
+    };
+    
+    chatService.addMessage(cancelMessage);
+    setChatHistory([...chatService.getConversation().messages]);
+    toast.success('Flujo cancelado');
+  }, [activeFlow, flowManager, chatService]);
+
   const sendMessage = useCallback(async (message: string, conversationState?: Record<string, any>) => {
     console.log('📨 MAYA: Sending message with state', { message, conversationState });
+    
+    // If we're in a flow, advance it instead of sending regular message
+    if (activeFlow) {
+      await advanceFlow(message);
+      return;
+    }
     
     // 🆕 Auto-crear conversación si es el primer mensaje
     if (!currentConversationId) {
@@ -381,7 +522,7 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
       console.error('Error sending message to MAYA:', error);
       throw error;
     }
-  }, [chatService, generatePageContext, currentConversationId, conversationManager, loadConversations, createNewConversation]);
+  }, [chatService, generatePageContext, currentConversationId, conversationManager, loadConversations, createNewConversation, activeFlow, advanceFlow]);
 
   const addActionMessage = useCallback((message: string, executableActions: any[]) => {
     const actionMessage: ChatMessage = {
@@ -608,6 +749,7 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
     conversations,
     currentConversationId,
     isLoadingConversations,
+    activeFlow,
     updateContext,
     hideMessage,
     showMessage,
@@ -620,7 +762,11 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
     clearConversation,
     loadConversations,
     loadConversation,
-    createNewConversation
+    createNewConversation,
+    startGuidedFlow,
+    advanceFlow,
+    goBackInFlow,
+    cancelFlow
   };
 
   return (
