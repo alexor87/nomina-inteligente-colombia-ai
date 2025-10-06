@@ -465,6 +465,38 @@ export class SimpleIntentMatcher {
       };
     }
     
+    // 6. PAYROLL PROJECTION (High Priority - 0.97)
+    if (/(?:proyecc?ión|proyecta[dr]o?|estim[ao](?:ción|do?)?)\s+(?:de\s+)?(?:nómin|nomin|gasto|costo)\s+(?:anual|del?\s+año)/i.test(text) ||
+        /(?:costo|gasto)\s+(?:anual|del?\s+año)\s+(?:proyecta[dr]o?|estim[ao]do?)/i.test(text) ||
+        /(?:cuánto|cuanto)\s+(?:voy\s+a\s+|vamos\s+a\s+)?(?:gastar|pagar)\s+(?:en|de)\s+(?:nómin|nomin).*(?:año|anual)/i.test(text) ||
+        /(?:presupuesto|budget)\s+(?:de\s+)?(?:nómin|nomin)\s+(?:para\s+)?(?:\d{4}|este\s+año|próximo\s+año)/i.test(text)) {
+      
+      let yearMatch = text.match(/(\d{4})/);
+      
+      // Default to current year if not specified
+      if (!yearMatch && /(?:este|actual|el)\s+año/i.test(text)) {
+        const currentYear = new Date().getFullYear();
+        yearMatch = [String(currentYear), String(currentYear)] as RegExpMatchArray;
+      } else if (!yearMatch && /(?:próximo|siguiente)\s+año/i.test(text)) {
+        const nextYear = new Date().getFullYear() + 1;
+        yearMatch = [String(nextYear), String(nextYear)] as RegExpMatchArray;
+      }
+      
+      const params: any = { 
+        year: yearMatch ? parseInt(yearMatch[1]) : new Date().getFullYear(),
+        projectionType: 'annual'
+      };
+      
+      console.log('[PAYROLL_PROJECTION] Detected:', params);
+      
+      return {
+        type: 'PAYROLL_PROJECTION',
+        confidence: 0.97,
+        method: 'getPayrollProjection',
+        params
+      };
+    }
+
     // 7. HIGHEST PAYROLL PERIOD (New - Priority 0.96)
     if (/(?:cuál|cual|qué|que)\s+(?:ha\s+sido|fue|es)\s+(?:la|el)\s+(?:nómin|nomin|período|periodo|mes|quincena)\s+(?:más|mas)\s+(?:alta|alto|cara|caro|costosa|costoso)/i.test(text) ||
         /(?:período|periodo|mes|quincena)\s+(?:con|de)\s+(?:mayor|más\s+alta?)\s+(?:nómin|nomin|costo|pago)/i.test(text) ||

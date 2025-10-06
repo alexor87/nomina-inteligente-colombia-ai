@@ -89,6 +89,7 @@ export class IntentRouter {
         case 'getLowestCostEmployees':
         case 'getTotalIncapacityDays':
         case 'getTotalOvertimeHours':
+        case 'getPayrollProjection':
           return await this.routeAggregation(intent, context);
 
         default:
@@ -337,6 +338,9 @@ export class IntentRouter {
         break;
       case 'getTotalOvertimeHours':
         result = await AggregationService.getTotalOvertimeHours(context.userSupabase, temporalParams);
+        break;
+      case 'getPayrollProjection':
+        result = await AggregationService.getPayrollProjection(context.userSupabase, temporalParams);
         break;
       default:
         return {

@@ -119,6 +119,17 @@ export async function getLowestPayrollPeriod(
 }
 
 /**
+ * Get annual payroll projection using component-based methodology
+ */
+export async function getPayrollProjection(
+  client: any,
+  params: TemporalParams
+) {
+  const service = AggregationServiceFactory.getService('payroll_projection');
+  return await service.aggregate(client, params);
+}
+
+/**
  * Compare payroll periods (flexible comparison)
  * Supports comparisons between any two periods: months, quarters, semesters, years
  */
