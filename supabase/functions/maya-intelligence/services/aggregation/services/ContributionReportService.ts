@@ -60,12 +60,12 @@ export class ContributionReportService extends BaseAggregationService {
         .in('id', employeeIds);
 
       if (empError) {
-        console.error('❌ [CONTRIBUTION_REPORT] Error fetching employees:', error);
+        console.error('❌ [CONTRIBUTION_REPORT] Error fetching employees:', empError);
         return this.createErrorResponse('Error al obtener información de empleados');
       }
 
-      // Build employee map
-      const employeeMap = new Map(employees.map(e => [e.id, `${e.nombre} ${e.apellido}`]));
+      // Build employee map (with null safety)
+      const employeeMap = new Map((employees || []).map(e => [e.id, `${e.nombre} ${e.apellido}`]));
 
       // Aggregate contributions per employee
       interface EmployeeContributions {
