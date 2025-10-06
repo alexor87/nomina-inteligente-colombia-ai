@@ -328,8 +328,18 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
     if (!currentConversationId) {
       console.log('🎬 MAYA: Primera interacción, creando conversación automáticamente...');
       try {
-        await createNewConversation();
-        console.log('✅ MAYA: Conversación creada automáticamente');
+        const newConvId = await createNewConversation();
+        
+        // ✨ Título instantáneo: usar las primeras palabras del mensaje
+        const instantTitle = message.length > 40 
+          ? message.substring(0, 40) + '...' 
+          : message;
+        
+        await conversationManager.updateConversationTitle(newConvId, instantTitle);
+        await loadConversations(); // ⚡ Actualizar sidebar INMEDIATAMENTE
+        
+        toast.success('Nueva conversación iniciada');
+        console.log('✅ MAYA: Conversación creada con título instantáneo', { title: instantTitle });
       } catch (error) {
         console.error('❌ MAYA: Error creando conversación, continuando sin BD', error);
         // Continuar sin BD (fallback a localStorage)
@@ -351,19 +361,6 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
       // Update chat history
       setChatHistory([...chatService.getConversation().messages]);
       
-      // NUEVO: Auto-generar título si es la primera interacción
-      if (currentConversationId && chatHistory.length === 0) {
-        try {
-          const allMessages = chatService.getConversation().messages;
-          const title = await conversationManager.generateTitle(allMessages);
-          await conversationManager.updateConversationTitle(currentConversationId, title);
-          await loadConversations(); // Refresh para mostrar nuevo título
-          console.log('📝 MAYA Provider: Generated conversation title', { title });
-        } catch (titleError) {
-          console.error('❌ MAYA Provider: Failed to generate title', titleError);
-        }
-      }
-      
       // Also create a contextual message for non-chat mode
       const contextualMessage: MayaMessage = {
         id: response.id,
@@ -384,7 +381,7 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
       console.error('Error sending message to MAYA:', error);
       throw error;
     }
-  }, [chatService, generatePageContext, currentConversationId, chatHistory.length, conversationManager, loadConversations]);
+  }, [chatService, generatePageContext, currentConversationId, conversationManager, loadConversations, createNewConversation]);
 
   const addActionMessage = useCallback((message: string, executableActions: any[]) => {
     const actionMessage: ChatMessage = {

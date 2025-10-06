@@ -34,6 +34,13 @@ export const MayaHistorySidebar: React.FC = () => {
     loadConversations();
   }, [user]);
 
+  // ⚡ Recargar conversaciones cuando cambia currentConversationId
+  useEffect(() => {
+    if (currentConversationId) {
+      loadConversations();
+    }
+  }, [currentConversationId]);
+
   const loadConversations = async () => {
     if (!user?.id || !profile?.company_id) return;
     
