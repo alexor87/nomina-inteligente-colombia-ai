@@ -3421,13 +3421,13 @@ async function handleTotalOvertimeHours(supabase: any, params: any) {
 // ============================================================================
 
 async function handleConversation(message: string, conversation: any[]) {
-  // Obtener fecha actual de forma dinámica
   const now = new Date();
   const currentMonth = now.toLocaleDateString('es-CO', { month: 'long' });
   const currentYear = now.getFullYear();
   const currentDate = `${currentMonth} ${currentYear}`;
   
   const openaiKey = Deno.env.get('OPENAI_API_KEY');
+  const lovableKey = Deno.env.get('LOVABLE_API_KEY');
   
   if (!openaiKey) {
     return {
@@ -3436,19 +3436,68 @@ async function handleConversation(message: string, conversation: any[]) {
     };
   }
   
+  // ============================================================================
+  // RAG: Búsqueda de contexto legal relevante
+  // ============================================================================
+  let legalContext = '';
+  
+  if (lovableKey) {
+    try {
+      console.log('[RAG] Generando embedding para búsqueda...');
+      
+      // Generar embedding del mensaje del usuario
+      const embeddingResponse = await fetch('https://ai.gateway.lovable.dev/v1/embeddings', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${lovableKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'text-embedding-ada-002',
+          input: message,
+        }),
+      });
+      
+      if (embeddingResponse.ok) {
+        const embeddingData = await embeddingResponse.json();
+        const queryEmbedding = embeddingData.data[0].embedding;
+        
+        console.log('[RAG] Buscando documentos relevantes...');
+        
+        // Buscar documentos relevantes usando búsqueda semántica
+        const supabase = createClient(supabaseUrl, serviceRoleKey);
+        const { data: relevantDocs, error: searchError } = await supabase
+          .rpc('search_legal_knowledge', {
+            query_embedding: queryEmbedding,
+            match_threshold: 0.7,
+            match_count: 3
+          });
+        
+        if (!searchError && relevantDocs && relevantDocs.length > 0) {
+          console.log(`[RAG] Encontrados ${relevantDocs.length} documentos relevantes`);
+          
+          // Construir contexto legal con los documentos encontrados
+          legalContext = '\n\n**CONTEXTO LEGAL ACTUALIZADO:**\n\n';
+          relevantDocs.forEach((doc: any, index: number) => {
+            legalContext += `**${index + 1}. ${doc.title}** (${doc.document_type})\n${doc.content}\n\n`;
+          });
+          
+          console.log('[RAG] Contexto legal agregado al prompt');
+        } else {
+          console.log('[RAG] No se encontraron documentos relevantes o error:', searchError);
+        }
+      }
+    } catch (ragError) {
+      console.error('[RAG] Error en búsqueda:', ragError);
+      // Continuar sin RAG en caso de error
+    }
+  }
+  
+  // ============================================================================
+  // Llamada a OpenAI con contexto enriquecido
+  // ============================================================================
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openaiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: `**FECHA ACTUAL: ${currentDate.toUpperCase()}**
+    const systemPrompt = `**FECHA ACTUAL: ${currentDate.toUpperCase()}**
 
 Eres MAYA, un abogado laboralista colombiano con más de 15 años de experiencia en derecho del trabajo, especializado en:
 - Código Sustantivo del Trabajo colombiano
@@ -3461,6 +3510,7 @@ Personalidad y estilo:
 - Usas un tono profesional pero cercano y comprensible
 - Siempre estructuras tus respuestas de forma clara y pedagógica
 - Incluyes ejemplos prácticos cuando explicas conceptos
+- IMPORTANTE: Cuando tengas contexto legal actualizado, úsalo como fuente principal y cita las leyes/decretos correspondientes
 
 Contexto Laboral Colombiano (tu especialidad):
 - EPS, AFP, ARL: Sistemas de seguridad social colombianos
@@ -3491,9 +3541,23 @@ Limitaciones CRÍTICAS:
 - NUNCA inventes datos o estadísticas
 - Usa exclusivamente terminología colombiana
 
-Emociones disponibles: professional, thoughtful, excited, happy`
+Emociones disponibles: professional, thoughtful, excited, happy
+
+${legalContext}`;
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openaiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt
           },
-          // Filter conversation history to remove non-Colombian references
           ...conversation.slice(-5).filter((msg: any) => {
             if (msg.role === 'user') return true;
             const lowerContent = msg.content?.toLowerCase() || '';
@@ -3506,8 +3570,8 @@ Emociones disponibles: professional, thoughtful, excited, happy`
           }),
           { role: 'user', content: message }
         ],
-        max_tokens: 800, // Suficiente para respuestas teóricas completas
-        temperature: 0.7
+        max_tokens: 1000,
+        temperature: 0.3 // Reducida para mayor precisión con RAG
       }),
     });
     
