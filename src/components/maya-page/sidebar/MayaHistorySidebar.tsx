@@ -15,7 +15,7 @@ import { toast } from 'sonner';
 const STORAGE_KEY = 'maya_sidebar_collapsed';
 
 export const MayaHistorySidebar: React.FC = () => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { clearConversation, currentConversationId } = useMaya();
   const navigate = useNavigate();
   const location = useLocation();
@@ -35,12 +35,11 @@ export const MayaHistorySidebar: React.FC = () => {
   }, [user]);
 
   const loadConversations = async () => {
-    if (!user?.id) return;
+    if (!user?.id || !profile?.company_id) return;
     
     setIsLoading(true);
     try {
-      const companyId = user.user_metadata?.company_id;
-      const convs = await conversationManager.getConversations(user.id, companyId);
+      const convs = await conversationManager.getConversations(user.id, profile.company_id);
       setConversations(convs);
     } catch (error) {
       console.error('Error loading conversations:', error);
