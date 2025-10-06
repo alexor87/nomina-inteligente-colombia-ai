@@ -74,7 +74,7 @@ const PayrollLiquidationPageSimple = () => {
 
   const handleSuccessModalClose = () => {
     closeSuccessModal();
-    navigate('/app/dashboard');
+    navigate('/modules/dashboard');
   };
 
   return (

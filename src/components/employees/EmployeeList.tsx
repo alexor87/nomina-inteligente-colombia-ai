@@ -79,7 +79,7 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
     if (selectionMode && onEmployeeSelect) {
       onEmployeeSelect(employee);
     } else {
-      navigate(`/app/employees/${employee.id}/edit`);
+      navigate(`/modules/employees/${employee.id}/edit`);
     }
   };
 
@@ -301,7 +301,7 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
                 <Upload className="w-4 h-4 mr-2" />
                 Importar Excel
               </Button>
-              <Button onClick={() => navigate('/app/employees/create')}>
+              <Button onClick={() => navigate('/modules/employees/create')}>
                 <Plus className="w-4 h-4 mr-2" />
                 Nuevo Empleado
               </Button>
@@ -491,7 +491,7 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
                             </DropdownMenuItem>
                           ) : (
                             <>
-                              <DropdownMenuItem onClick={() => navigate(`/app/employees/${employee.id}/edit`)}>
+                              <DropdownMenuItem onClick={() => navigate(`/modules/employees/${employee.id}/edit`)}>
                                 <Edit className="w-4 h-4 mr-2" />
                                 Editar
                               </DropdownMenuItem>

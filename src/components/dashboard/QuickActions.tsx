@@ -24,12 +24,12 @@ export const QuickActions: React.FC = () => {
     {
       title: 'Nuevo Empleado',
       icon: <Plus className="h-5 w-5" />,
-      action: () => navigate('/app/employees/create'),
+      action: () => navigate('/modules/employees/create'),
     },
     {
       title: 'Ver Empleados',
       icon: <Users className="h-5 w-5" />,
-      action: () => navigate('/app/employees'),
+      action: () => navigate('/modules/employees'),
     },
     {
       title: 'Reportes',

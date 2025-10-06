@@ -31,7 +31,7 @@ const PlaceholderPage = () => {
             El módulo de novedades se ha conservado para uso futuro.
           </p>
           <Button 
-            onClick={() => navigate('/app/dashboard')}
+            onClick={() => navigate('/modules/dashboard')}
             className="w-full"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />

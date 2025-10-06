@@ -6,11 +6,11 @@ const CreateEmployeeModernPage = () => {
   const navigate = useNavigate();
 
   const handleSuccess = () => {
-    navigate('/app/employees');
+    navigate('/modules/employees');
   };
 
   const handleCancel = () => {
-    navigate('/app/employees');
+    navigate('/modules/employees');
   };
 
   return (

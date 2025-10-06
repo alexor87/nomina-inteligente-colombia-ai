@@ -58,7 +58,7 @@ const AuthPage = () => {
         return;
       }
       
-      navigate('/app/dashboard');
+      navigate('/maya');
     } catch (error: any) {
       toast({
         title: "Error inesperado",

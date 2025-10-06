@@ -28,7 +28,7 @@ export const AuthDialog = ({ open, onOpenChange }: AuthDialogProps) => {
         description: "Funcionalidad de login en desarrollo",
       });
       onOpenChange(false);
-      navigate('/app/dashboard');
+      navigate('/maya');
     } catch (error) {
       toast({
         title: "Error",

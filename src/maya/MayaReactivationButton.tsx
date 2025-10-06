@@ -10,7 +10,7 @@ export const MayaReactivationButton: React.FC = () => {
   const { isVisible, showMessage, currentMessage, setPhase } = useMaya();
 
   // No mostrar el botón si estamos en la página de MAYA o si MAYA está visible
-  if (isVisible || location.pathname === '/app/maya') {
+  if (isVisible || location.pathname === '/maya') {
     return null;
   }
 

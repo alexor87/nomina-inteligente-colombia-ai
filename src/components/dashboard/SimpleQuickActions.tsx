@@ -23,13 +23,13 @@ export const SimpleQuickActions: React.FC = () => {
     {
       title: 'Nuevo Empleado',
       icon: <Plus className="h-4 w-4" />,
-      action: () => navigate('/app/employees/create'),
+      action: () => navigate('/modules/employees/create'),
       primary: false,
     },
     {
       title: 'Ver Empleados',
       icon: <Users className="h-4 w-4" />,
-      action: () => navigate('/app/employees'),
+      action: () => navigate('/modules/employees'),
       primary: false,
     },
     {

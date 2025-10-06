@@ -7,12 +7,12 @@ const CreateEmployeePage = () => {
 
   const handleSuccess = () => {
     console.log('✅ Employee created successfully, navigating to employees list');
-    navigate('/app/employees');
+    navigate('/modules/employees');
   };
 
   const handleCancel = () => {
     console.log('🔙 Employee creation cancelled, navigating back to employees list');
-    navigate('/app/employees');
+    navigate('/modules/employees');
   };
 
   return (

@@ -17,12 +17,12 @@ const EditEmployeePage = () => {
 
   const handleSuccess = () => {
     console.log('✅ Employee updated successfully, navigating to employees list');
-    navigate('/app/employees');
+    navigate('/modules/employees');
   };
 
   const handleCancel = () => {
     console.log('🔙 Employee edit cancelled, navigating back to employees list');
-    navigate('/app/employees');
+    navigate('/modules/employees');
   };
 
   const handleDataRefresh = (updatedEmployee: any) => {
@@ -49,7 +49,7 @@ const EditEmployeePage = () => {
             {error ? 'Error cargando el empleado' : 'Empleado no encontrado'}
           </p>
           <button
-            onClick={() => navigate('/app/employees')}
+            onClick={() => navigate('/modules/employees')}
             className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
           >
             Volver a Empleados

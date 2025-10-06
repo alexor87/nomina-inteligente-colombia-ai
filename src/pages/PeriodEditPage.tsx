@@ -324,7 +324,7 @@ export const PeriodEditPage = () => {
   };
 
   const handleBack = () => {
-    navigate('/app/dashboard');
+    navigate('/modules/dashboard');
   };
 
   if (isLoading) {

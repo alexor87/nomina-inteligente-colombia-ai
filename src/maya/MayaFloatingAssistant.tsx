@@ -37,7 +37,7 @@ export const MayaFloatingAssistant: React.FC = () => {
   }, [chatHistory]);
 
   // No mostrar el flotante si estamos en la página de MAYA
-  if (location.pathname === '/app/maya') {
+  if (location.pathname === '/maya') {
     return null;
   }
 
