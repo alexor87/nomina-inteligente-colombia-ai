@@ -2854,6 +2854,7 @@ export type Database = {
           cedula: string
           employee_id: string
           nombre: string
+          tipo_documento: string
         }[]
       }
       get_employee_identity_for_period_v2: {
