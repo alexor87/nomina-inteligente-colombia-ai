@@ -78,7 +78,7 @@ export class LowestPayrollPeriodService extends BaseAggregationService {
         if (total > 0 && total < lowestTotal) {
           lowestTotal = total;
           lowestPeriodId = period.id;
-          lowestPeriodName = period.displayName;
+          lowestPeriodName = period.periodo;
         }
       }
 
@@ -112,7 +112,7 @@ export class LowestPayrollPeriodService extends BaseAggregationService {
       const allPeriodTotals = periods
         .map(p => ({
           periodId: p.id,
-          periodName: p.displayName,
+          periodName: p.periodo,
           total: periodTotals.get(p.id) || 0,
           employeeCount: periodEmployeeCounts.get(p.id)?.size || 0
         }))
