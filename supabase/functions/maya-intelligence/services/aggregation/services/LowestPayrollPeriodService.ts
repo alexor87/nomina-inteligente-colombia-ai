@@ -102,6 +102,14 @@ export class LowestPayrollPeriodService extends BaseAggregationService {
 
       const employeeCount = periodEmployeeCounts.get(lowestPeriodId)?.size || 0;
 
+      // Resolve period name with fallback chain
+      const resolvedName = lowestPeriodName 
+        || periodDetails?.periodo 
+        || periods.find(p => p.id === lowestPeriodId)?.periodo 
+        || 'Período sin nombre';
+
+      console.log(`🔍 [LOWEST_PERIOD] Period resolution: lowestPeriodName="${lowestPeriodName}", periodDetails.periodo="${periodDetails?.periodo}", resolvedName="${resolvedName}"`);
+
       // Calculate percentage of total
       const totalAllPeriods = Array.from(periodTotals.values()).reduce((sum, val) => sum + val, 0);
       const percentageOfTotal = totalAllPeriods > 0 
@@ -119,15 +127,15 @@ export class LowestPayrollPeriodService extends BaseAggregationService {
         .filter(p => p.total > 0)
         .sort((a, b) => a.total - b.total);
 
-      console.log(`✅ [LOWEST_PERIOD] Found: ${lowestPeriodName} - ${this.formatCurrency(lowestTotal)}`);
+      console.log(`✅ [LOWEST_PERIOD] Found: ${resolvedName} - ${this.formatCurrency(lowestTotal)}`);
 
       return {
-        message: `El período con menor nómina en ${displayName} fue **${lowestPeriodName}** con un total de **${this.formatCurrency(lowestTotal)}** (${percentageOfTotal}% del total). Este período tuvo ${employeeCount} empleado${employeeCount !== 1 ? 's' : ''} en nómina.`,
+        message: `El período con menor nómina en ${displayName} fue **${resolvedName}** con un total de **${this.formatCurrency(lowestTotal)}** (${percentageOfTotal}% del total). Este período tuvo ${employeeCount} empleado${employeeCount !== 1 ? 's' : ''} en nómina.`,
         emotionalState: 'informative',
         data: {
           lowestPeriod: {
             id: lowestPeriodId,
-            name: lowestPeriodName,
+            name: resolvedName,
             total: lowestTotal,
             employeeCount: employeeCount,
             startDate: periodDetails?.fecha_inicio,
