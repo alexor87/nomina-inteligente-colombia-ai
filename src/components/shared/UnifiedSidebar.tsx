@@ -21,7 +21,7 @@ const STORAGE_KEY = 'unified_sidebar_collapsed';
 export const UnifiedSidebar: React.FC = () => {
   const { user } = useAuth();
   const { companyId } = useCurrentCompany();
-  const { clearConversation, currentConversationId } = useMaya();
+  const { clearConversation, currentConversationId, loadConversation } = useMaya();
   const navigate = useNavigate();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(() => {
@@ -111,9 +111,17 @@ export const UnifiedSidebar: React.FC = () => {
 
   const handleSelectConversation = async (id: string) => {
     try {
-      const messages = await conversationManager.loadConversationMessages(id);
       conversationManager.setCurrentConversationId(id);
-      window.location.reload();
+      
+      // Navegar a MAYA si no estamos ahí
+      if (location.pathname !== '/maya') {
+        navigate('/maya');
+      }
+      
+      // Cargar la conversación en el provider
+      await loadConversation(id);
+      
+      toast.success('Conversación cargada');
     } catch (error) {
       console.error('Error loading conversation:', error);
       toast.error('Error al cargar la conversación');

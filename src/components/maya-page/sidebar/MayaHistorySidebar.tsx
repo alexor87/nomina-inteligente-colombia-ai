@@ -17,7 +17,7 @@ const STORAGE_KEY = 'maya_sidebar_collapsed';
 
 export const MayaHistorySidebar: React.FC = () => {
   const { user, profile } = useAuth();
-  const { clearConversation, currentConversationId } = useMaya();
+  const { clearConversation, currentConversationId, loadConversation } = useMaya();
   const navigate = useNavigate();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(() => {
@@ -107,10 +107,17 @@ export const MayaHistorySidebar: React.FC = () => {
 
   const handleSelectConversation = async (id: string) => {
     try {
-      const messages = await conversationManager.loadConversationMessages(id);
       conversationManager.setCurrentConversationId(id);
-      // The MayaProvider will handle loading the messages
-      window.location.reload(); // Simple reload to load new conversation
+      
+      // Navegar a MAYA si no estamos ahí
+      if (location.pathname !== '/maya') {
+        navigate('/maya');
+      }
+      
+      // Cargar la conversación en el provider
+      await loadConversation(id);
+      
+      toast.success('Conversación cargada');
     } catch (error) {
       console.error('Error loading conversation:', error);
       toast.error('Error al cargar la conversación');
