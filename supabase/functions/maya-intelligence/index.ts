@@ -1588,6 +1588,10 @@ serve(async (req) => {
         response = await handleIncapacityReport(userSupabase, intent.params);
         break;
         
+      case 'getContributionReport':
+        response = await handleContributionReport(userSupabase, intent.params);
+        break;
+        
       case 'getTotalOvertimeHours':
         response = await handleTotalOvertimeHours(userSupabase, intent.params);
         break;
@@ -1642,6 +1646,7 @@ serve(async (req) => {
       case 'getLowestCostEmployees':
       case 'getTotalIncapacityDays':
       case 'getIncapacityReport':
+      case 'getContributionReport':
       case 'getTotalOvertimeHours':
       case 'getPayrollMonthlyVariation': {
         console.log(`🔀 [ROUTER] Routing ${intent.method} to IntentRouter`);
@@ -3423,6 +3428,13 @@ async function handleIncapacityReport(supabase: any, params: any) {
     ? TemporalResolver.fromLegacy(params)
     : params;
   return await AggregationService.getIncapacityReport(supabase, temporalParams);
+}
+
+async function handleContributionReport(supabase: any, params: any) {
+  const temporalParams = TemporalResolver.isLegacyFormat(params)
+    ? TemporalResolver.fromLegacy(params)
+    : params;
+  return await AggregationService.getContributionReport(supabase, temporalParams);
 }
 
 async function handleTotalOvertimeHours(supabase: any, params: any) {

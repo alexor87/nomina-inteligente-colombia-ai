@@ -64,6 +64,17 @@ export async function getSecurityContributions(
 }
 
 /**
+ * Get contribution report by employee (EPS, Pension, ARL)
+ */
+export async function getContributionReport(
+  client: any,
+  params: TemporalParams
+) {
+  const service = AggregationServiceFactory.getService('contribution_report');
+  return await service.aggregate(client, params);
+}
+
+/**
  * Get highest cost employees
  */
 export async function getHighestCostEmployees(

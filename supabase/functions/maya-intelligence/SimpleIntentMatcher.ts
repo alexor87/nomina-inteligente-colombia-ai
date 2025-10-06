@@ -596,6 +596,55 @@ export class SimpleIntentMatcher {
       };
     }
     
+    // 4.6. CONTRIBUTION REPORT BY EMPLOYEE (New - Priority 0.96)
+    if (/(?:detalle|desglose|reporte|listado|informe)\s+(?:de\s+)?(?:aportes?|contribuciones?)\s+(?:a\s+)?(?:eps|pensión|pension|arl|seguridad\s+social)\s+(?:por|de)\s+empleado/i.test(text) ||
+        /(?:muestra|dame|genera|crea)\s+(?:el\s+)?(?:detalle|desglose|reporte)\s+(?:de\s+)?(?:aportes?|contribuciones?)\s+(?:a\s+)?(?:eps|pensión|pension|arl)\s+(?:por|de)\s+empleado/i.test(text) ||
+        /(?:aportes?|contribuciones?)\s+(?:a\s+)?(?:eps|pensión|pension|arl)\s+(?:de|por)\s+cada\s+empleado/i.test(text) ||
+        /(?:cuánto|cuanto)\s+(?:aporta|cotiza)\s+cada\s+empleado\s+(?:a|en)\s+(?:eps|pensión|pension|arl)/i.test(text) ||
+        /empleados\s+(?:con|y)\s+(?:sus\s+)?(?:aportes?|contribuciones?)\s+(?:a\s+)?(?:eps|pensión|pension|arl)/i.test(text)) {
+      
+      // Extract contribution type (eps, pension, arl)
+      let contributionType = null;
+      if (/\beps\b/i.test(text)) contributionType = 'eps';
+      else if (/\bpensión\b|\bpension\b/i.test(text)) contributionType = 'pension';
+      else if (/\barl\b/i.test(text)) contributionType = 'arl';
+      
+      const monthRegex = /(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/gi;
+      const allMonthMatches = [...text.matchAll(monthRegex)];
+      const allMonths = allMonthMatches.map(m => m[1].toLowerCase());
+      let yearMatch = text.match(/(\d{4})/);
+      
+      // PRIORITY 1: Detect "año pasado", "año anterior" FIRST
+      if (!yearMatch && /(?:año\s+pasado|año\s+anterior|pasado\s+año)/i.test(text)) {
+        const lastYear = new Date().getFullYear() - 1;
+        yearMatch = [String(lastYear), String(lastYear)] as RegExpMatchArray;
+      }
+      
+      // PRIORITY 2: Detect "este año", "año actual", "el año" (but NOT "el año pasado")
+      if (!yearMatch && /(?:este|actual|el)\s+año(?!\s+(?:pasado|anterior))/i.test(text)) {
+        const currentYear = new Date().getFullYear();
+        yearMatch = [String(currentYear), String(currentYear)] as RegExpMatchArray;
+      }
+      
+      const params: any = { 
+        year: yearMatch ? parseInt(yearMatch[1]) : null,
+        contributionType
+      };
+      if (allMonths.length === 1) {
+        params.month = allMonths[0];
+      } else if (allMonths.length >= 2) {
+        params.monthStart = allMonths[0];
+        params.monthEnd = allMonths[allMonths.length - 1];
+      }
+      
+      return {
+        type: 'CONTRIBUTION_REPORT',
+        confidence: 0.96,
+        method: 'getContributionReport',
+        params
+      };
+    }
+    
     // 5. TOTAL OVERTIME HOURS
     if (/(?:cuántas|cuantas|qué|que)\s+horas\s+extra/i.test(text) ||
         /(?:total|cantidad)\s+(?:de\s+)?horas\s+extra/i.test(text) ||
@@ -1266,7 +1315,8 @@ export class SimpleIntentMatcher {
     // EMPLOYEE SEARCH - Natural language patterns (HIGH PRIORITY)
     // ============================================================================
     // Supports: "busca a eliana", "busca eliana", "dame info de carlos", "quién es maria", etc. (accent-insensitive)
-    const employeeSearchPattern = /(?:busca|encuentra|muestra|dame\s+(?:info|informaci[oó]n)|qui[eé]n\s+es|informaci[oó]n\s+(?:de|sobre)|buscar|empleado)(?:\s+(?:a|al|el\s+empleado|empleado))?\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*)/i;
+    // FIXED: Added negative lookahead to prevent matching report-like queries
+    const employeeSearchPattern = /(?:busca|encuentra|muestra(?!\s+(?:el\s+)?(?:detalle|reporte|listado|informe|desglose))|dame\s+(?:info|informaci[oó]n)|qui[eé]n\s+es|informaci[oó]n\s+(?:de|sobre)|buscar|empleado)(?:\s+(?:a|al|el\s+empleado|empleado))?\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*)/i;
     const employeeSearchMatch = text.match(employeeSearchPattern);
     
     if (employeeSearchMatch) {

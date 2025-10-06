@@ -8,6 +8,7 @@ import { IncapacityService } from './services/IncapacityService.ts';
 import { IncapacityReportService } from './services/IncapacityReportService.ts';
 import { PayrollCostService } from './services/PayrollCostService.ts';
 import { SecurityContributionsService } from './services/SecurityContributionsService.ts';
+import { ContributionReportService } from './services/ContributionReportService.ts';
 import { EmployeeCostService } from './services/EmployeeCostService.ts';
 import { HighestPayrollPeriodService } from './services/HighestPayrollPeriodService.ts';
 import { LowestPayrollPeriodService } from './services/LowestPayrollPeriodService.ts';
@@ -19,6 +20,7 @@ export type AggregationType =
   | 'incapacity_report'
   | 'payroll_cost'
   | 'security_contributions'
+  | 'contribution_report'
   | 'highest_cost_employees'
   | 'lowest_cost_employees'
   | 'highest_payroll_period'
@@ -56,6 +58,9 @@ export class AggregationServiceFactory {
       
       case 'security_contributions':
         return new SecurityContributionsService();
+      
+      case 'contribution_report':
+        return new ContributionReportService();
       
       case 'highest_cost_employees':
       case 'lowest_cost_employees':
