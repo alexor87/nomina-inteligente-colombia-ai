@@ -71,6 +71,30 @@ export function extractComparisonPeriods(query: string): ComparisonParams {
     };
   }
   
+  // Pattern 2b: "entre febrero y abril" / "diferencia entre ... y ..."
+  const monthEntrePattern = /(?:entre|diferencia\s+entre)\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\s+y\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i;
+  const monthEntreMatch = text.match(monthEntrePattern);
+  
+  if (monthEntreMatch) {
+    const month1 = monthEntreMatch[1].toLowerCase();
+    const month2 = monthEntreMatch[2].toLowerCase();
+    const yearMatch = text.match(/(\d{4})/);
+    const year = yearMatch ? parseInt(yearMatch[1]) : currentYear;
+    
+    return {
+      period1: {
+        type: TemporalType.SPECIFIC_MONTH,
+        month: month1,
+        year
+      },
+      period2: {
+        type: TemporalType.SPECIFIC_MONTH,
+        month: month2,
+        year
+      }
+    };
+  }
+  
   // Pattern 3: "primer trimestre vs segundo" / "Q1 vs Q2"
   const quarterVsPattern = /(?:primer|1er|q1|primero)\s+trimestre\s+(?:vs\.?|versus|contra|comparado\s+con)\s+(?:segundo|2do|q2)/i;
   if (quarterVsPattern.test(text)) {

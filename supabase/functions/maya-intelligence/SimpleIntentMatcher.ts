@@ -599,9 +599,12 @@ export class SimpleIntentMatcher {
         /(?:cu[aá]nto|cuanto)\s+(?:vari[oó]|cambi[oó]|aument[oó]|disminuy[oó]).*(?:n[oó]mina|costo)/i.test(text) ||
         /(?:frente\s+al?|versus|vs\.?|comparado\s+con)\s+(?:mes|periodo|año|trimestre|semestre)/i.test(text) ||
         /(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\s+(?:vs\.?|versus|contra)\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i.test(text) ||
-        /(?:primer|segundo|tercer|cuarto)\s+trimestre\s+(?:vs\.?|versus|contra)/i.test(text) ||
-        /(?:primer|segundo)\s+semestre\s+(?:vs\.?|versus|contra)/i.test(text) ||
-        /(\d{4})\s+(?:vs\.?|versus|contra)\s+(\d{4})/i.test(text)) {
+        /(?:entre|diferencia\s+entre)\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\s+y\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i.test(text) ||
+        /(?:primer|segundo|tercer|cuarto)\s+trimestre\s+(?:vs\.?|versus|contra|y)/i.test(text) ||
+        /(?:entre|diferencia\s+entre)\s+(?:el\s+)?(?:primer|segundo|tercer|cuarto)\s+trimestre\s+y\s+(?:el\s+)?(?:primer|segundo|tercer|cuarto)\s+trimestre/i.test(text) ||
+        /(?:primer|segundo)\s+semestre\s+(?:vs\.?|versus|contra|y)/i.test(text) ||
+        /(?:entre|diferencia\s+entre)\s+(?:el\s+)?(?:primer|segundo)\s+semestre\s+y\s+(?:el\s+)?(?:primer|segundo)\s+semestre/i.test(text) ||
+        /(\d{4})\s+(?:vs\.?|versus|contra|y)\s+(\d{4})/i.test(text)) {
       
       console.log('📊 [PAYROLL_COMPARISON] Comparison query detected');
       

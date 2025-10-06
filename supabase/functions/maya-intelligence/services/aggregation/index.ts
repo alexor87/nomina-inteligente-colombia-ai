@@ -4,7 +4,7 @@
  */
 
 import { AggregationServiceFactory } from './AggregationServiceFactory.ts';
-import { TemporalParams } from '../../core/temporal-types.ts';
+import { TemporalParams, TemporalType } from '../../core/temporal-types.ts';
 import { EmployeeCostService } from './services/EmployeeCostService.ts';
 
 /**
@@ -83,7 +83,7 @@ export async function comparePayrollPeriods(
   params: { period1: TemporalParams; period2: TemporalParams }
 ) {
   try {
-    const { PeriodQueryBuilder } = await import('../core/period-query-builder.ts');
+    const { PeriodQueryBuilder } = await import('../../core/period-query-builder.ts');
     
     // Get company ID from context
     const { data: profile } = await client
@@ -100,21 +100,65 @@ export async function comparePayrollPeriods(
       period2: params.period2
     });
     
-    // Resolve both periods using PeriodQueryBuilder
-    const resolved1 = await PeriodQueryBuilder.resolvePeriods(
+    // Resolve periods with intelligent fallback
+    let resolved1 = await PeriodQueryBuilder.resolvePeriods(
       client,
       profile.company_id,
       params.period1
     );
     
-    const resolved2 = await PeriodQueryBuilder.resolvePeriods(
+    let resolved2 = await PeriodQueryBuilder.resolvePeriods(
       client,
       profile.company_id,
       params.period2
     );
     
-    if (!resolved1 || !resolved2) {
-      throw new Error('No se pudieron resolver los períodos solicitados');
+    // Intelligent fallback for SPECIFIC_MONTH when no closed periods found
+    if (!resolved1 && params.period1.type === TemporalType.SPECIFIC_MONTH && params.period1.month) {
+      console.log('🔍 [COMPARISON] No closed periods for period1, trying most recent match...');
+      const recentPeriod = await PeriodQueryBuilder.getMostRecentMatchingPeriod(
+        client,
+        profile.company_id,
+        { month: params.period1.month, year: params.period1.year }
+      );
+      
+      if (recentPeriod) {
+        resolved1 = await PeriodQueryBuilder.resolvePeriods(
+          client,
+          profile.company_id,
+          { type: TemporalType.SPECIFIC_PERIOD, periodIds: [recentPeriod.id] }
+        );
+        console.log('✅ [COMPARISON] Fallback successful for period1:', recentPeriod.periodo);
+      }
+    }
+    
+    if (!resolved2 && params.period2.type === TemporalType.SPECIFIC_MONTH && params.period2.month) {
+      console.log('🔍 [COMPARISON] No closed periods for period2, trying most recent match...');
+      const recentPeriod = await PeriodQueryBuilder.getMostRecentMatchingPeriod(
+        client,
+        profile.company_id,
+        { month: params.period2.month, year: params.period2.year }
+      );
+      
+      if (recentPeriod) {
+        resolved2 = await PeriodQueryBuilder.resolvePeriods(
+          client,
+          profile.company_id,
+          { type: TemporalType.SPECIFIC_PERIOD, periodIds: [recentPeriod.id] }
+        );
+        console.log('✅ [COMPARISON] Fallback successful for period2:', recentPeriod.periodo);
+      }
+    }
+    
+    // Check if we have both periods after fallback attempts
+    if (!resolved1) {
+      const periodName = params.period1.month || 'el período solicitado';
+      throw new Error(`No encontré períodos cerrados para ${periodName}${params.period1.year ? ` ${params.period1.year}` : ''}. ¿Quieres intentar con otro período?`);
+    }
+    
+    if (!resolved2) {
+      const periodName = params.period2.month || 'el período solicitado';
+      throw new Error(`No encontré períodos cerrados para ${periodName}${params.period2.year ? ` ${params.period2.year}` : ''}. ¿Quieres intentar con otro período?`);
     }
     
     console.log('✅ [COMPARISON] Periods resolved:', {
@@ -122,14 +166,14 @@ export async function comparePayrollPeriods(
       period2: resolved2.displayName
     });
     
-    // Calculate totals for each period
-    const total1 = resolved1.periods.reduce((sum: number, p: any) => 
-      sum + (Number(p.total_neto) || 0), 0
-    );
+    // Calculate totals using PayrollCostService for accuracy
+    const result1 = await getTotalPayrollCost(client, params.period1);
+    const result2 = await getTotalPayrollCost(client, params.period2);
     
-    const total2 = resolved2.periods.reduce((sum: number, p: any) => 
-      sum + (Number(p.total_neto) || 0), 0
-    );
+    const total1 = result1.data?.totalCost || 0;
+    const total2 = result2.data?.totalCost || 0;
+    
+    console.log('💰 [COMPARISON] Totals calculated:', { total1, total2 });
     
     // Calculate difference and percentage
     const difference = total1 - total2;
