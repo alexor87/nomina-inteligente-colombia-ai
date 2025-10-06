@@ -593,19 +593,23 @@ export class SimpleIntentMatcher {
       };
     }
     
-    // 6. PAYROLL MONTHLY VARIATION
+    // 6. PAYROLL COMPARISON (Flexible period comparisons)
     if (/(?:variaci[oó]n|diferencia|cambio|comparar|comparaci[oó]n)\s+(?:del?\s+)?(?:costo|total|pago)?.*(?:n[oó]mina|payroll)/i.test(text) ||
         /(?:n[oó]mina|costo|total|pago).*(?:variaci[oó]n|diferencia|cambio|comparar)/i.test(text) ||
         /(?:cu[aá]nto|cuanto)\s+(?:vari[oó]|cambi[oó]|aument[oó]|disminuy[oó]).*(?:n[oó]mina|costo)/i.test(text) ||
-        /(?:frente\s+al?|versus|vs\.?|comparado\s+con)\s+(?:mes|periodo).*(?:anterior|pasado)/i.test(text)) {
+        /(?:frente\s+al?|versus|vs\.?|comparado\s+con)\s+(?:mes|periodo|año|trimestre|semestre)/i.test(text) ||
+        /(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\s+(?:vs\.?|versus|contra)\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i.test(text) ||
+        /(?:primer|segundo|tercer|cuarto)\s+trimestre\s+(?:vs\.?|versus|contra)/i.test(text) ||
+        /(?:primer|segundo)\s+semestre\s+(?:vs\.?|versus|contra)/i.test(text) ||
+        /(\d{4})\s+(?:vs\.?|versus|contra)\s+(\d{4})/i.test(text)) {
       
-      console.log('📊 [PAYROLL_VARIATION] Monthly variation query detected');
+      console.log('📊 [PAYROLL_COMPARISON] Comparison query detected');
       
       return {
-        type: 'PAYROLL_MONTHLY_VARIATION',
+        type: 'PAYROLL_COMPARISON',
         confidence: 0.95,
-        method: 'getPayrollMonthlyVariation',
-        params: {}
+        method: 'comparePayrollPeriods',
+        params: { query: text }
       };
     }
     

@@ -60,7 +60,7 @@ function getMethodForAggregationIntent(intentType: string): string | null {
     'LOWEST_COST_EMPLOYEES': 'getLowestCostEmployees',
     'TOTAL_INCAPACITY_DAYS': 'getTotalIncapacityDays',
     'TOTAL_OVERTIME_HOURS': 'getTotalOvertimeHours',
-    'PAYROLL_MONTHLY_VARIATION': 'getPayrollMonthlyVariation'
+    'PAYROLL_COMPARISON': 'comparePayrollPeriods'
   };
   return methodMap[intentType] || null;
 }
@@ -1585,8 +1585,8 @@ serve(async (req) => {
         response = await handleTotalOvertimeHours(userSupabase, intent.params);
         break;
         
-      case 'getPayrollMonthlyVariation':
-        response = await handlePayrollMonthlyVariation(userSupabase, intent.params);
+      case 'comparePayrollPeriods':
+        response = await handlePayrollComparison(userSupabase, intent.params);
         break;
       // ============================================================================
       // END PHASE 1: AGGREGATION HANDLERS
@@ -3417,11 +3417,29 @@ async function handleTotalOvertimeHours(supabase: any, params: any) {
   return await AggregationService.getTotalOvertimeHours(supabase, temporalParams);
 }
 
-async function handlePayrollMonthlyVariation(supabase: any, params: any) {
+/**
+ * Handle payroll period comparison (flexible)
+ */
+async function handlePayrollComparison(supabase: any, params: any) {
   try {
-    console.log('📊 [VARIATION_HANDLER] Calculating monthly payroll variation');
-    const result = await AggregationService.getPayrollMonthlyVariation(supabase, {});
+    console.log('📊 [COMPARISON_HANDLER] Processing payroll comparison');
     
+    // Extract comparison periods from query
+    const { extractComparisonPeriods } = await import('./extractors/ComparisonExtractor.ts');
+    const query = params?.query || '';
+    
+    console.log('🔍 [COMPARISON_HANDLER] Extracting periods from:', query);
+    const comparisonParams = extractComparisonPeriods(query);
+    
+    console.log('✅ [COMPARISON_HANDLER] Extracted periods:', comparisonParams);
+    
+    // Compare periods
+    const result = await AggregationService.comparePayrollPeriods(
+      supabase,
+      comparisonParams
+    );
+    
+    // Format currency
     const formatter = new Intl.NumberFormat('es-CO', {
       style: 'currency',
       currency: 'COP',
@@ -3429,27 +3447,30 @@ async function handlePayrollMonthlyVariation(supabase: any, params: any) {
       maximumFractionDigits: 0
     });
     
-    const trendEmoji = result.trend === 'increase' ? '📈' : result.trend === 'decrease' ? '📉' : '➡️';
-    const trendText = result.trend === 'increase' ? 'aumentó' : result.trend === 'decrease' ? 'disminuyó' : 'se mantuvo estable';
-    const percentageText = Math.abs(result.percentageChange).toFixed(2);
+    // Determine trend emoji
+    const trendEmoji = result.comparison.trend === 'increase' ? '📈' : 
+                       result.comparison.trend === 'decrease' ? '📉' : '➡️';
     
-    let message = `${trendEmoji} **Variación de Nómina**\n\n`;
-    message += `**${result.currentMonth}:**\n`;
-    message += `💰 ${formatter.format(result.currentTotal)}\n\n`;
-    message += `**${result.previousMonth}:**\n`;
-    message += `💰 ${formatter.format(result.previousTotal)}\n\n`;
-    message += `**Variación:**\n`;
-    message += `${result.difference >= 0 ? '➕' : '➖'} ${formatter.format(Math.abs(result.difference))} (${percentageText}%)\n\n`;
-    message += `El costo de nómina ${trendText} un **${percentageText}%** frente al mes anterior.`;
+    const trendText = result.comparison.trend === 'increase' ? 'incrementó' :
+                      result.comparison.trend === 'decrease' ? 'disminuyó' : 'se mantuvo igual';
+    
+    const message = `${trendEmoji} **Comparación de Nómina**\n\n` +
+      `**${result.period1.name}**: ${formatter.format(result.period1.total)} (${result.period1.periodsCount} período${result.period1.periodsCount > 1 ? 's' : ''})\n` +
+      `**${result.period2.name}**: ${formatter.format(result.period2.total)} (${result.period2.periodsCount} período${result.period2.periodsCount > 1 ? 's' : ''})\n\n` +
+      `📊 **Diferencia**: ${formatter.format(Math.abs(result.comparison.difference))}\n` +
+      `📈 **Cambio**: ${result.comparison.percentageChange >= 0 ? '+' : ''}${result.comparison.percentageChange.toFixed(2)}%\n\n` +
+      `El costo de nómina ${trendText} en ${Math.abs(result.comparison.percentageChange).toFixed(2)}% ` +
+      `al comparar **${result.period1.name}** con **${result.period2.name}**.`;
     
     return {
       message,
-      emotionalState: 'professional'
+      emotionalState: 'professional',
+      data: result
     };
   } catch (error) {
-    console.error('[VARIATION_HANDLER] Error:', error);
+    console.error('❌ [COMPARISON_HANDLER] Error:', error);
     return {
-      message: 'No pude calcular la variación de nómina. Asegúrate de tener períodos cerrados en los últimos dos meses.',
+      message: 'No pude realizar la comparación. Por favor, verifica que existan períodos cerrados para los períodos solicitados.',
       emotionalState: 'concerned'
     };
   }

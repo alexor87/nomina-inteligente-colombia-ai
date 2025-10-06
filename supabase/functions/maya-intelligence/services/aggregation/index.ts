@@ -75,68 +75,122 @@ export async function getLowestCostEmployees(
 }
 
 /**
- * Get payroll monthly variation
- * Calculates the difference between current and previous month
+ * Compare payroll periods (flexible comparison)
+ * Supports comparisons between any two periods: months, quarters, semesters, years
+ */
+export async function comparePayrollPeriods(
+  client: any,
+  params: { period1: TemporalParams; period2: TemporalParams }
+) {
+  try {
+    const { PeriodQueryBuilder } = await import('../core/period-query-builder.ts');
+    
+    // Get company ID from context
+    const { data: profile } = await client
+      .from('profiles')
+      .select('company_id')
+      .single();
+    
+    if (!profile?.company_id) {
+      throw new Error('No se pudo determinar la empresa');
+    }
+    
+    console.log('📊 [COMPARISON] Resolving periods:', {
+      period1: params.period1,
+      period2: params.period2
+    });
+    
+    // Resolve both periods using PeriodQueryBuilder
+    const resolved1 = await PeriodQueryBuilder.resolvePeriods(
+      client,
+      profile.company_id,
+      params.period1
+    );
+    
+    const resolved2 = await PeriodQueryBuilder.resolvePeriods(
+      client,
+      profile.company_id,
+      params.period2
+    );
+    
+    if (!resolved1 || !resolved2) {
+      throw new Error('No se pudieron resolver los períodos solicitados');
+    }
+    
+    console.log('✅ [COMPARISON] Periods resolved:', {
+      period1: resolved1.displayName,
+      period2: resolved2.displayName
+    });
+    
+    // Calculate totals for each period
+    const total1 = resolved1.periods.reduce((sum: number, p: any) => 
+      sum + (Number(p.total_neto) || 0), 0
+    );
+    
+    const total2 = resolved2.periods.reduce((sum: number, p: any) => 
+      sum + (Number(p.total_neto) || 0), 0
+    );
+    
+    // Calculate difference and percentage
+    const difference = total1 - total2;
+    const percentageChange = total2 > 0 ? ((difference / total2) * 100) : 0;
+    const trend = difference > 0 ? 'increase' : difference < 0 ? 'decrease' : 'stable';
+    
+    return {
+      period1: {
+        name: resolved1.displayName,
+        total: total1,
+        periodsCount: resolved1.periods.length
+      },
+      period2: {
+        name: resolved2.displayName,
+        total: total2,
+        periodsCount: resolved2.periods.length
+      },
+      comparison: {
+        difference,
+        percentageChange,
+        trend
+      }
+    };
+  } catch (error) {
+    console.error('[AGGREGATION] Error comparing payroll periods:', error);
+    throw error;
+  }
+}
+
+/**
+ * @deprecated Use comparePayrollPeriods instead
+ * Legacy function for backward compatibility
  */
 export async function getPayrollMonthlyVariation(
   client: any,
   params: TemporalParams
 ) {
-  try {
-    const now = new Date();
-    const currentMonth = now.getMonth(); // 0-11
-    const currentYear = now.getFullYear();
-    
-    // Get current month dates
-    const currentMonthStart = new Date(currentYear, currentMonth, 1);
-    const currentMonthEnd = new Date(currentYear, currentMonth + 1, 0);
-    
-    // Get previous month dates
-    const prevMonthStart = new Date(currentYear, currentMonth - 1, 1);
-    const prevMonthEnd = new Date(currentYear, currentMonth, 0);
-    
-    // Query current month payroll
-    const { data: currentData, error: currentError } = await client
-      .from('payroll_periods_real')
-      .select('total_neto, periodo')
-      .gte('fecha_inicio', currentMonthStart.toISOString().split('T')[0])
-      .lte('fecha_fin', currentMonthEnd.toISOString().split('T')[0])
-      .eq('estado', 'cerrado');
-    
-    if (currentError) throw currentError;
-    
-    // Query previous month payroll
-    const { data: prevData, error: prevError } = await client
-      .from('payroll_periods_real')
-      .select('total_neto, periodo')
-      .gte('fecha_inicio', prevMonthStart.toISOString().split('T')[0])
-      .lte('fecha_fin', prevMonthEnd.toISOString().split('T')[0])
-      .eq('estado', 'cerrado');
-    
-    if (prevError) throw prevError;
-    
-    const currentTotal = currentData?.reduce((sum: number, p: any) => sum + (Number(p.total_neto) || 0), 0) || 0;
-    const prevTotal = prevData?.reduce((sum: number, p: any) => sum + (Number(p.total_neto) || 0), 0) || 0;
-    
-    const difference = currentTotal - prevTotal;
-    const percentageChange = prevTotal > 0 ? ((difference / prevTotal) * 100) : 0;
-    
-    const currentMonthName = new Intl.DateTimeFormat('es-CO', { month: 'long', year: 'numeric' }).format(currentMonthStart);
-    const prevMonthName = new Intl.DateTimeFormat('es-CO', { month: 'long', year: 'numeric' }).format(prevMonthStart);
-    
-    return {
-      currentMonth: currentMonthName,
-      currentTotal,
-      previousMonth: prevMonthName,
-      previousTotal: prevTotal,
-      difference,
-      percentageChange,
-      trend: difference > 0 ? 'increase' : difference < 0 ? 'decrease' : 'stable'
-    };
-  } catch (error) {
-    console.error('[AGGREGATION] Error calculating monthly variation:', error);
-    throw error;
-  }
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
+  const lastMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+  const lastYear = currentMonth === 1 ? currentYear - 1 : currentYear;
+  
+  const getMonthName = (m: number) => {
+    const months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+                    'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+    return months[m - 1];
+  };
+  
+  return comparePayrollPeriods(client, {
+    period1: {
+      type: TemporalType.SPECIFIC_MONTH,
+      month: getMonthName(currentMonth),
+      year: currentYear
+    },
+    period2: {
+      type: TemporalType.SPECIFIC_MONTH,
+      month: getMonthName(lastMonth),
+      year: lastYear
+    }
+  });
 }
 
 // Export types and constants for external use
