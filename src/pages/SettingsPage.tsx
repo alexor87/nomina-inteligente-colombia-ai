@@ -10,6 +10,7 @@ import { ContratoNominaSettings } from '@/components/settings/ContratoNominaSett
 import { NotificacionesSettings } from '@/components/settings/NotificacionesSettings';
 import { IntegracionesSettings } from '@/components/settings/IntegracionesSettings';
 import { FacturacionPlanSettings } from '@/components/settings/FacturacionPlanSettings';
+import { EmbeddingsGenerator } from '@/components/admin/EmbeddingsGenerator';
 
 const SettingsPage = () => {
   return (
@@ -20,7 +21,7 @@ const SettingsPage = () => {
       </div>
       
       <Tabs defaultValue="empresa" className="w-full">
-        <TabsList className="grid w-full grid-cols-5 lg:grid-cols-9 mb-6">
+        <TabsList className="grid w-full grid-cols-5 lg:grid-cols-10 mb-6">
           <TabsTrigger value="empresa">🏢 Empresa</TabsTrigger>
           <TabsTrigger value="empleados">👥 Empleados</TabsTrigger>
           <TabsTrigger value="aportes">💰 Aportes</TabsTrigger>
@@ -30,6 +31,7 @@ const SettingsPage = () => {
           <TabsTrigger value="notificaciones">✉️ Alertas</TabsTrigger>
           <TabsTrigger value="integraciones">🔌 Integraciones</TabsTrigger>
           <TabsTrigger value="facturacion">📦 Facturación</TabsTrigger>
+          <TabsTrigger value="rag-ia">🤖 Maya RAG</TabsTrigger>
         </TabsList>
 
         <TabsContent value="empresa">
@@ -66,6 +68,18 @@ const SettingsPage = () => {
 
         <TabsContent value="facturacion">
           <FacturacionPlanSettings />
+        </TabsContent>
+
+        <TabsContent value="rag-ia">
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-xl font-semibold mb-2">Sistema RAG de Maya</h2>
+              <p className="text-muted-foreground">
+                Gestiona la base de conocimiento legal y los embeddings vectoriales que permiten a Maya responder preguntas sobre legislación laboral colombiana.
+              </p>
+            </div>
+            <EmbeddingsGenerator />
+          </div>
         </TabsContent>
       </Tabs>
     </div>
