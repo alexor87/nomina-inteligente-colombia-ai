@@ -8,6 +8,7 @@ import { IncapacityService } from './services/IncapacityService.ts';
 import { PayrollCostService } from './services/PayrollCostService.ts';
 import { SecurityContributionsService } from './services/SecurityContributionsService.ts';
 import { EmployeeCostService } from './services/EmployeeCostService.ts';
+import { HighestPayrollPeriodService } from './services/HighestPayrollPeriodService.ts';
 import { BaseAggregationService } from './base/BaseAggregationService.ts';
 
 export type AggregationType = 
@@ -16,7 +17,8 @@ export type AggregationType =
   | 'payroll_cost'
   | 'security_contributions'
   | 'highest_cost_employees'
-  | 'lowest_cost_employees';
+  | 'lowest_cost_employees'
+  | 'highest_payroll_period';
 
 export class AggregationServiceFactory {
   private static instances = new Map<AggregationType, BaseAggregationService>();
@@ -51,6 +53,9 @@ export class AggregationServiceFactory {
       case 'highest_cost_employees':
       case 'lowest_cost_employees':
         return new EmployeeCostService();
+      
+      case 'highest_payroll_period':
+        return new HighestPayrollPeriodService();
       
       default:
         throw new Error(`Unknown aggregation type: ${type}`);

@@ -60,7 +60,8 @@ function getMethodForAggregationIntent(intentType: string): string | null {
     'LOWEST_COST_EMPLOYEES': 'getLowestCostEmployees',
     'TOTAL_INCAPACITY_DAYS': 'getTotalIncapacityDays',
     'TOTAL_OVERTIME_HOURS': 'getTotalOvertimeHours',
-    'PAYROLL_COMPARISON': 'comparePayrollPeriods'
+    'PAYROLL_COMPARISON': 'comparePayrollPeriods',
+    'HIGHEST_PAYROLL_PERIOD': 'getHighestPayrollPeriod'
   };
   return methodMap[intentType] || null;
 }
@@ -1587,6 +1588,10 @@ serve(async (req) => {
         
       case 'comparePayrollPeriods':
         response = await handlePayrollComparison(userSupabase, intent.params);
+        break;
+        
+      case 'getHighestPayrollPeriod':
+        response = await handleHighestPayrollPeriod(userSupabase, intent.params);
         break;
       // ============================================================================
       // END PHASE 1: AGGREGATION HANDLERS
@@ -3415,6 +3420,52 @@ async function handleTotalOvertimeHours(supabase: any, params: any) {
   
   console.log('📊 [OVERTIME_HANDLER] Final temporalParams:', JSON.stringify(temporalParams));
   return await AggregationService.getTotalOvertimeHours(supabase, temporalParams);
+}
+
+async function handleHighestPayrollPeriod(supabase: any, params: any) {
+  try {
+    const temporalParams = TemporalResolver.isLegacyFormat(params)
+      ? TemporalResolver.fromLegacy(params)
+      : params;
+    
+    console.log('🏆 [HIGHEST_PERIOD_HANDLER] Searching for highest payroll period:', temporalParams);
+    const result = await AggregationService.getHighestPayrollPeriod(supabase, temporalParams);
+    
+    // If service returned data, enhance the message
+    if (result.data) {
+      const { highestPeriod, context } = result.data;
+      
+      // Format currency
+      const formatter = new Intl.NumberFormat('es-CO', {
+        style: 'currency',
+        currency: 'COP',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      });
+      
+      const message = `🏆 **Período con Mayor Nómina**\n\n` +
+        `El período con mayor nómina en **${context.searchRange}** fue:\n\n` +
+        `📅 **${highestPeriod.name}**\n` +
+        `💰 **Total pagado:** ${formatter.format(highestPeriod.total)}\n` +
+        `👥 **Empleados:** ${highestPeriod.employeeCount}\n` +
+        `📊 **% del total:** ${context.percentageOfTotal.toFixed(1)}%\n\n` +
+        `Este fue el ${context.percentageOfTotal > 50 ? 'mayor' : 'uno de los mayores'} pagos del rango analizado (${context.totalPeriods} período${context.totalPeriods > 1 ? 's' : ''}).`;
+      
+      return {
+        message,
+        emotionalState: 'professional',
+        data: result.data
+      };
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('❌ [HIGHEST_PERIOD_HANDLER] Error:', error);
+    return {
+      message: 'No pude determinar el período con mayor nómina. Verifica que existan períodos cerrados.',
+      emotionalState: 'concerned'
+    };
+  }
 }
 
 /**

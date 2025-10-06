@@ -75,6 +75,17 @@ export async function getLowestCostEmployees(
 }
 
 /**
+ * Get the period with the highest payroll cost
+ */
+export async function getHighestPayrollPeriod(
+  client: any,
+  params: TemporalParams
+) {
+  const service = AggregationServiceFactory.getService('highest_payroll_period');
+  return await service.aggregate(client, params);
+}
+
+/**
  * Compare payroll periods (flexible comparison)
  * Supports comparisons between any two periods: months, quarters, semesters, years
  */
