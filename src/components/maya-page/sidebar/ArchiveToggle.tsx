@@ -51,18 +51,17 @@ export const ArchiveToggle: React.FC<ArchiveToggleProps> = ({
   }
 
   return (
-    <div className="relative bg-muted/50 rounded-lg p-1 flex gap-1">
+    <div className="relative bg-muted/50 rounded-lg p-0.5 flex gap-0.5">
       <button
         onClick={() => onModeChange('active')}
-        className={`relative flex-1 px-3 py-2 rounded-md text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+        className={`relative flex-1 px-2 py-1.5 rounded-md text-xs font-medium transition-all flex items-center justify-center gap-1 ${
           mode === 'active'
             ? 'text-foreground'
             : 'text-muted-foreground hover:text-foreground'
         }`}
       >
-        <MessageSquare className="h-4 w-4" />
         <span>Activas</span>
-        <Badge variant="secondary" className="ml-1">
+        <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">
           {activeCount}
         </Badge>
         {mode === 'active' && (
@@ -76,16 +75,15 @@ export const ArchiveToggle: React.FC<ArchiveToggleProps> = ({
       
       <button
         onClick={() => onModeChange('archived')}
-        className={`relative flex-1 px-3 py-2 rounded-md text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+        className={`relative flex-1 px-2 py-1.5 rounded-md text-xs font-medium transition-all flex items-center justify-center gap-1 ${
           mode === 'archived'
             ? 'text-foreground'
             : 'text-muted-foreground hover:text-foreground'
         }`}
       >
-        <Archive className="h-4 w-4" />
         <span>Archivadas</span>
         {archivedCount > 0 && (
-          <Badge variant="secondary" className="ml-1">
+          <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">
             {archivedCount}
           </Badge>
         )}
