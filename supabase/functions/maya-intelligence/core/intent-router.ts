@@ -92,6 +92,7 @@ export class IntentRouter {
         case 'getPayrollProjection':
         case 'simulateHiringCost':
         case 'simulateSalaryIncrease':
+        case 'simulateBonusImpact':
           return await this.routeAggregation(intent, context);
 
         default:
@@ -352,6 +353,13 @@ export class IntentRouter {
         result = await AggregationService.simulateSalaryIncrease(
           context.userSupabase,
           intent.params as { employeeName: string; increaseAmount: number }
+        );
+        break;
+      case 'simulateBonusImpact':
+        this.logger.info('[INFO] [ROUTER] Bonus impact params:', intent.params);
+        result = await AggregationService.simulateBonusImpact(
+          context.userSupabase,
+          intent.params as { bonusAmount: number }
         );
         break;
       default:

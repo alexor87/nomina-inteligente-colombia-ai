@@ -152,6 +152,17 @@ export async function simulateSalaryIncrease(
 }
 
 /**
+ * Simulate bonus impact for all active employees
+ */
+export async function simulateBonusImpact(
+  client: any,
+  params: { bonusAmount: number }
+) {
+  const service = AggregationServiceFactory.getService('bonus_impact_simulation');
+  return await service.aggregate(client, params);
+}
+
+/**
  * Compare payroll periods (flexible comparison)
  * Supports comparisons between any two periods: months, quarters, semesters, years
  */

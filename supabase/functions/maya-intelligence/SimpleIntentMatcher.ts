@@ -279,6 +279,32 @@ export class SimpleIntentMatcher {
     }
 
     // ============================================================================
+    // 🎁 BONUS_IMPACT_SIMULATION - Must be BEFORE SALARY_INCREASE_SIMULATION
+    // ============================================================================
+    
+    // BONUS_IMPACT_SIMULATION - Simular impacto de bonos masivos
+    if (/(?:qué|que)\s+impacto.*(?:dar|otorgar|pagar).*bono/i.test(text) ||
+        /(?:cuánto|cuanto).*(?:costaría|cuesta).*(?:bono|bonificar)/i.test(text) ||
+        /(?:costo|impacto).*(?:dar|otorgar).*bono.*(?:cada|todos)/i.test(text) ||
+        /(?:dar|otorgar|pagar).*bono.*(?:\$|cop\s*)?\d/i.test(text)) {
+      
+      // Extract bonus amount
+      const amountMatch = text.match(/(?:bono|bonificar|bonificación).*?(?:de\s+)?(?:\$|cop\s*)?(\d{1,3}(?:[.,]\d{3})*)/i);
+      const bonusAmount = amountMatch ? parseFloat(amountMatch[1].replace(/[.,]/g, '')) : null;
+      
+      console.log('🎁 [BONUS_IMPACT_SIMULATION] Detected:', { bonusAmount });
+      
+      return {
+        type: 'BONUS_IMPACT_SIMULATION',
+        confidence: 0.97,
+        method: 'simulateBonusImpact',
+        params: {
+          bonusAmount: bonusAmount
+        }
+      };
+    }
+
+    // ============================================================================
     // 🔥 SALARY_INCREASE_SIMULATION - Must be BEFORE EMPLOYEE_UPDATE
     // ============================================================================
     

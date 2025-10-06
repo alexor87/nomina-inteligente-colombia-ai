@@ -1650,6 +1650,7 @@ serve(async (req) => {
       case 'getPayrollProjection':
       case 'simulateHiringCost':
       case 'simulateSalaryIncrease':
+      case 'simulateBonusImpact':
       case 'getTotalOvertimeHours':
       case 'getPayrollMonthlyVariation': {
         console.log(`🔀 [ROUTER] Routing ${intent.method} to IntentRouter`);
