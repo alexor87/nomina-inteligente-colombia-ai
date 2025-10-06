@@ -287,8 +287,11 @@ export class SimpleIntentMatcher {
         /(?:subir|aumentar|incrementar).*salario\s+(?:a|de)/i.test(text) ||
         /(?:impacto|efecto).*(?:subir|aumentar|incrementar).*salario/i.test(text)) {
       
-      // Extract employee name
-      const nameMatch = text.match(/\b(?:a|de|para)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)*)/i);
+      // Extract employee name - FIX: buscar en contexto específico
+      const nameMatch = 
+        text.match(/salario\s+(?:a|de|para)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ]?[a-záéíóúñ]+)*)/i) ||
+        text.match(/(?:aumento|incremento|subir|aumentar)\s+(?:a|de|para)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ]?[a-záéíóúñ]+)*)/i) ||
+        text.match(/\ba\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ]?[a-záéíóúñ]+)*)\s+en\s+\$/i);
       const employeeName = nameMatch ? sanitizeEmployeeName(nameMatch[1]) : null;
       
       // Extract increase amount
