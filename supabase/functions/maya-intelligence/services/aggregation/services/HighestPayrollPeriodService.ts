@@ -3,9 +3,8 @@
  * Finds the period with the highest payroll cost within a temporal range
  */
 
-import { BaseAggregationService } from '../base/BaseAggregationService.ts';
+import { BaseAggregationService, AggregationResult } from '../base/BaseAggregationService.ts';
 import { TemporalParams, TemporalType } from '../../../core/temporal-types.ts';
-import { AggregationResult } from '../base/types.ts';
 
 export class HighestPayrollPeriodService extends BaseAggregationService {
   async aggregate(client: any, params: TemporalParams): Promise<AggregationResult> {
