@@ -56,9 +56,9 @@ export const MayaHistorySidebar: React.FC = () => {
     localStorage.setItem(STORAGE_KEY, String(newValue));
   };
 
-  const handleNewConversation = () => {
-    clearConversation();
-    loadConversations();
+  const handleNewConversation = async () => {
+    await clearConversation();
+    await loadConversations();
     // Navigate to Maya if not already there
     if (location.pathname !== '/maya') {
       navigate('/maya');
