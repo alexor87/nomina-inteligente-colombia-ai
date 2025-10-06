@@ -4,6 +4,7 @@ import { User } from 'lucide-react';
 import { MayaAvatar } from '@/maya/MayaAvatar';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { Button } from '@/components/ui/button';
+import { MayaActionExecutor } from '@/maya/components/MayaActionExecutor';
 import type { ChatMessage } from '@/maya/services/MayaChatService';
 
 interface MayaMessageProps {
@@ -90,6 +91,18 @@ export const MayaMessage: React.FC<MayaMessageProps> = ({
                 {reply.label}
               </Button>
             ))}
+          </div>
+        )}
+
+        {/* Executable Actions for assistant messages */}
+        {!isUser && message.executableActions && message.executableActions.length > 0 && (
+          <div className="mt-3">
+            <MayaActionExecutor 
+              actions={message.executableActions}
+              onActionExecuted={(action, result) => {
+                console.log('🎯 Action executed:', action.type, result);
+              }}
+            />
           </div>
         )}
       </div>
