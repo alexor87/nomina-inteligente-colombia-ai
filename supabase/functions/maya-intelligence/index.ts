@@ -3454,15 +3454,6 @@ async function handlePayrollMonthlyVariation(supabase: any, params: any) {
     };
   }
 }
-  
-  console.log('📊 [OVERTIME_HANDLER] Final temporalParams:', {
-    type: temporalParams.type,
-    year: temporalParams.year,
-    month: temporalParams.month
-  });
-  
-  return await AggregationService.getTotalOvertimeHours(supabase, temporalParams);
-}
 
 // ============================================================================
 // END PHASE 1: AGGREGATION HANDLERS
