@@ -1189,6 +1189,79 @@ export type Database = {
         }
         Relationships: []
       }
+      maya_conversations: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          is_archived: boolean
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          is_archived?: boolean
+          title?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          is_archived?: boolean
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maya_conversations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      maya_messages: {
+        Row: {
+          content: string
+          conversation_id: string
+          created_at: string
+          id: string
+          metadata: Json | null
+          role: string
+        }
+        Insert: {
+          content: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          role: string
+        }
+        Update: {
+          content?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maya_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "maya_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payroll_adjustments: {
         Row: {
           amount: number
@@ -2781,7 +2854,6 @@ export type Database = {
           cedula: string
           employee_id: string
           nombre: string
-          tipo_documento: string
         }[]
       }
       get_employee_identity_for_period_v2: {
@@ -2950,6 +3022,10 @@ export type Database = {
       }
       user_has_access_to_company: {
         Args: { p_company_id: string; p_user_id: string }
+        Returns: boolean
+      }
+      user_owns_maya_conversation: {
+        Args: { p_conversation_id: string }
         Returns: boolean
       }
       validate_employee_company_access: {
