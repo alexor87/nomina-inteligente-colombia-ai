@@ -47,9 +47,6 @@ function AppContent() {
         {/* Root redirects to Maya */}
         <Route path="/" element={<Navigate to="/maya" replace />} />
         
-        {/* MAYA Full-Screen Experience (outside traditional Layout) */}
-        <Route path="/maya" element={<MayaFullScreenLayout />} />
-        
         {/* Public routes */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
@@ -61,20 +58,24 @@ function AppContent() {
         {/* Legacy landing (redirect to Maya) */}
         <Route path="/app" element={<Navigate to="/maya" replace />} />
         
-        {/* Modules (inside traditional Layout) */}
-        <Route path="/modules" element={<Layout />}>
-          <Route path="dashboard" element={<DashboardPage />} />
-          <Route path="employees" element={<EmployeesPage />} />
-          <Route path="employees/create" element={<CreateEmployeeModernPage />} />
-          <Route path="employees/:employeeId/edit" element={<EditEmployeePage />} />
-          <Route path="payroll" element={<PayrollLiquidationPageSimplified />} />
-          <Route path="payroll-history" element={<PayrollHistoryPage />} />
-          <Route path="payroll-history/:periodId" element={<PayrollHistoryDetailPage />} />
-          <Route path="prestaciones-sociales" element={<SocialBenefitsPage />} />
-          <Route path="vacations-absences" element={<VacationsAbsencesPage />} />
-          <Route path="reports" element={<ReportsPage />} />
-          <Route path="settings" element={<SettingsPage />} />
-          <Route path="profile" element={<ProfilePage />} />
+        {/* UNIFIED EXPERIENCE - All routes use MayaFullScreenLayout with UnifiedSidebar */}
+        <Route element={<MayaFullScreenLayout />}>
+          {/* MAYA Chat */}
+          <Route path="/maya" element={<Index />} />
+          
+          {/* Modules - Now share the same layout with UnifiedSidebar */}
+          <Route path="/modules/dashboard" element={<DashboardPage />} />
+          <Route path="/modules/employees" element={<EmployeesPage />} />
+          <Route path="/modules/employees/create" element={<CreateEmployeeModernPage />} />
+          <Route path="/modules/employees/:employeeId/edit" element={<EditEmployeePage />} />
+          <Route path="/modules/payroll" element={<PayrollLiquidationPageSimplified />} />
+          <Route path="/modules/payroll-history" element={<PayrollHistoryPage />} />
+          <Route path="/modules/payroll-history/:periodId" element={<PayrollHistoryDetailPage />} />
+          <Route path="/modules/prestaciones-sociales" element={<SocialBenefitsPage />} />
+          <Route path="/modules/vacations-absences" element={<VacationsAbsencesPage />} />
+          <Route path="/modules/reports" element={<ReportsPage />} />
+          <Route path="/modules/settings" element={<SettingsPage />} />
+          <Route path="/modules/profile" element={<ProfilePage />} />
         </Route>
       </Routes>
     </div>

@@ -1,15 +1,15 @@
 import React from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { MayaProvider } from '@/maya/MayaProvider';
 import { useAuth } from '@/contexts/AuthContext';
 import { LoadingWithTimeout } from '@/components/ui/LoadingWithTimeout';
 import { MayaBackground } from '../MayaBackground';
 import { UnifiedSidebar } from '@/components/shared/UnifiedSidebar';
-import { MayaPageHeader } from '../MayaPageHeader';
-import MayaPage from '@/pages/MayaPage';
+import { DynamicHeader } from '@/components/shared/DynamicHeader';
 
 export const MayaFullScreenLayout: React.FC = () => {
   const { user, loading } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -26,7 +26,7 @@ export const MayaFullScreenLayout: React.FC = () => {
   }
 
   return (
-    <MayaProvider autoShow={true}>
+    <MayaProvider autoShow={location.pathname === '/maya'}>
       <div className="flex h-screen w-full bg-white overflow-hidden">
         <MayaBackground />
         
@@ -35,8 +35,8 @@ export const MayaFullScreenLayout: React.FC = () => {
         
         {/* Área principal (derecha) */}
         <div className="flex-1 flex flex-col relative z-10">
-          <MayaPageHeader />
-          <MayaPage />
+          <DynamicHeader />
+          <Outlet />
         </div>
       </div>
     </MayaProvider>
