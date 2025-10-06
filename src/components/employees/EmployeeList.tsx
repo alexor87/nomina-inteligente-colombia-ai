@@ -44,6 +44,20 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
     statistics
   } = useEmployeeList();
 
+  // Listen for employee created from Maya
+  React.useEffect(() => {
+    const handleEmployeeCreated = (event: any) => {
+      console.log('🔄 Employee created via Maya, refreshing list...', event.detail);
+      refreshEmployees();
+    };
+    
+    window.addEventListener('employee-created', handleEmployeeCreated);
+    
+    return () => {
+      window.removeEventListener('employee-created', handleEmployeeCreated);
+    };
+  }, [refreshEmployees]);
+
   const [showFilters, setShowFilters] = useState(false);
   const [showDeleted, setShowDeleted] = useState(false);
   const [deletedEmployees, setDeletedEmployees] = useState<EmployeeUnified[]>([]);

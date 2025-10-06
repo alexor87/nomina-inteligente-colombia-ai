@@ -437,15 +437,40 @@ ${data.arl ? `• ARL: ${data.arl}` : ''}
     result: {
       id: 'result',
       type: FlowStepType.RESULT,
-      message: (data) => `¡Empleado creado exitosamente! ✅
+      message: (data) => {
+        const name = `${data.first_name} ${data.last_name}`;
+        const executionResult = data._executionResult || {};
+        const salary = Number(data.salary).toLocaleString('es-CO');
+        
+        return `✅ **¡Empleado creado exitosamente!**
 
-**${data.first_name} ${data.last_name}** ha sido agregado a tu empresa.`,
+**${name}** ha sido agregado a tu empresa.
+
+📄 **Documento:** ${data.document_type} ${data.document_number}
+💰 **Salario:** $${salary}
+📅 **Fecha de ingreso:** ${data.start_date}
+📋 **Contrato:** ${data.contract_type}
+
+El empleado ya está visible en el módulo de empleados.`;
+      },
       quickReplies: [
-        { label: '👀 Ver empleado', value: 'view' },
+        { label: '📋 Ver en lista de empleados', value: 'go_to_employees' },
         { label: '➕ Crear otro empleado', value: 'create_another' },
-        { label: '📋 Ir a empleados', value: 'go_to_employees' }
+        { label: '✅ Listo', value: 'completed' }
       ],
-      nextStep: 'completed',
+      nextStep: (data, input) => {
+        if (input === 'go_to_employees') {
+          // Trigger navigation
+          setTimeout(() => {
+            window.location.href = '/modules/employees';
+          }, 500);
+          return 'completed';
+        }
+        if (input === 'create_another') {
+          return 'greeting';
+        }
+        return 'completed';
+      },
       canGoBack: false
     },
 

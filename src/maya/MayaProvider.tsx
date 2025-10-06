@@ -395,12 +395,53 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
     // Handle execution step
     if (result.currentStep.type === 'execution') {
       try {
-        await flowManager.executeFlowAction(result.flowState);
+        const executionResult = await flowManager.executeFlowAction(result.flowState);
+        
+        // Store execution result in flow state
+        result.flowState.accumulatedData._executionResult = executionResult;
+        
+        // Trigger employee refresh
+        if (window.dispatchEvent) {
+          window.dispatchEvent(new CustomEvent('employee-created', { 
+            detail: executionResult 
+          }));
+        }
+        
         // Auto-advance to result
         await advanceFlow('executed');
-      } catch (error) {
+        
+        toast.success('Empleado creado', {
+          description: `${executionResult.employeeName} ha sido agregado exitosamente`
+        });
+        
+      } catch (error: any) {
         console.error('Flow execution error:', error);
-        toast.error('Error ejecutando acción');
+        
+        // Handle specific errors
+        if (error.message?.includes('ya existe')) {
+          toast.error('Empleado duplicado', {
+            description: 'Ya existe un empleado con este número de documento'
+          });
+        } else {
+          toast.error('Error al crear empleado', {
+            description: error.message || 'Ocurrió un error inesperado'
+          });
+        }
+        
+        // Send error message to chat
+        const errorMsg: ChatMessage = {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: `❌ Hubo un error al crear el empleado: ${error.message}. ¿Quieres intentar nuevamente?`,
+          timestamp: new Date().toISOString(),
+          quickReplies: [
+            { label: '🔄 Intentar de nuevo', value: 'retry' },
+            { label: '❌ Cancelar', value: 'cancel' }
+          ]
+        };
+        
+        chatService.addMessage(errorMsg);
+        setChatHistory([...chatService.getConversation().messages]);
       }
     }
     

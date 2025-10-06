@@ -231,15 +231,66 @@ export class GuidedFlowManager {
   }
 
   async executeFlowAction(flowState: FlowState): Promise<any> {
-    // This will be called when execution step is reached
-    // Here we'll integrate with the actual backend to create the employee
     console.log(`🎯 Executing flow action for ${flowState.flowId}`, flowState.accumulatedData);
     
-    // TODO: Implement actual backend call based on flow type
-    // For now, return success simulation
+    try {
+      switch (flowState.flowId) {
+        case FlowType.EMPLOYEE_CREATE:
+          return await this.executeEmployeeCreation(flowState.accumulatedData);
+        
+        default:
+          throw new Error(`No executor for flow type: ${flowState.flowId}`);
+      }
+    } catch (error) {
+      console.error('❌ Flow execution failed:', error);
+      throw error;
+    }
+  }
+
+  private async executeEmployeeCreation(data: Record<string, any>): Promise<any> {
+    const { EmployeeCRUDService } = await import('@/services/EmployeeCRUDService');
+    
+    // Map flow data to EmployeeCRUDService format
+    const employeeData: any = {
+      cedula: data.document_number,
+      tipoDocumento: data.document_type,
+      nombre: data.first_name,
+      segundoNombre: data.second_name_input || undefined,
+      apellido: data.last_name,
+      salarioBase: Number(data.salary),
+      tipoContrato: data.contract_type === 'indefinido' ? 'indefinido' : 
+                    data.contract_type === 'fijo' ? 'fijo' : 
+                    data.contract_type === 'obra_labor' ? 'obra_labor' : 'aprendizaje',
+      fechaIngreso: data.start_date,
+      periodicidadPago: data.payment_frequency === 'mensual' ? 'mensual' : 'quincenal',
+      estado: 'activo',
+      tipoJornada: 'completa',
+      
+      // Optional fields
+      email: data.email_input || undefined,
+      telefono: data.phone_input || undefined,
+      cargo: data.position_input || undefined,
+      nivelRiesgoArl: data.arl_level_select || 'I',
+      banco: data.bank_select || undefined,
+      tipoCuenta: data.account_type_select || 'ahorros',
+      numeroCuenta: data.account_number_input || undefined,
+      eps: data.eps_input || undefined,
+      afp: data.afp_input || undefined,
+      arl: data.arl_input || undefined
+    };
+    
+    console.log('📤 Creating employee with data:', employeeData);
+    
+    // Call CRUD service
+    const createdEmployee = await EmployeeCRUDService.create(employeeData);
+    
+    console.log('✅ Employee created:', createdEmployee);
+    
     return {
       success: true,
-      data: flowState.accumulatedData
+      employeeId: createdEmployee.id,
+      employeeName: `${createdEmployee.nombre} ${createdEmployee.apellido}`,
+      data: createdEmployee
     };
   }
 }
