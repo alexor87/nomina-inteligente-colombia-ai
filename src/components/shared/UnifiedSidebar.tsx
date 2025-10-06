@@ -265,7 +265,7 @@ export const UnifiedSidebar: React.FC = () => {
               <ModuleNavigation collapsed={collapsed} />
             </nav>
 
-            <div className="p-2 border-t border-border flex-shrink-0">
+            <div className="p-2 border-t border-border flex-shrink-0 flex">
               <ToggleButton 
                 collapsed={collapsed} 
                 onToggle={handleToggleCollapse} 
@@ -340,7 +340,7 @@ export const UnifiedSidebar: React.FC = () => {
                   <ModuleNavigation collapsed={false} />
                 </nav>
 
-                <div className="p-2 border-t border-border">
+                <div className="p-2 border-t border-border flex">
                   <ToggleButton 
                     collapsed={false} 
                     onToggle={handleToggleCollapse} 

@@ -13,7 +13,7 @@ export const ToggleButton: React.FC<ToggleButtonProps> = ({ collapsed, onToggle 
       variant="ghost"
       size="icon"
       onClick={onToggle}
-      className="w-full hover:bg-muted"
+      className="ml-auto hover:bg-muted"
       title={collapsed ? 'Expandir' : 'Colapsar'}
     >
       {collapsed ? (
