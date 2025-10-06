@@ -11,15 +11,15 @@ export const ToggleButton: React.FC<ToggleButtonProps> = ({ collapsed, onToggle 
   return (
     <Button
       variant="ghost"
-      size="icon"
+      size="sm"
       onClick={onToggle}
-      className="w-full hover:bg-muted"
+      className="opacity-50 hover:opacity-100 hover:bg-muted transition-all h-7 w-7 p-0"
       title={collapsed ? 'Expandir' : 'Colapsar'}
     >
       {collapsed ? (
-        <PanelLeftOpen className="h-4 w-4" />
+        <PanelLeftOpen className="h-3.5 w-3.5" />
       ) : (
-        <PanelLeftClose className="h-4 w-4" />
+        <PanelLeftClose className="h-3.5 w-3.5" />
       )}
     </Button>
   );

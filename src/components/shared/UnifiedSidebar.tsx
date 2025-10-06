@@ -191,10 +191,10 @@ export const UnifiedSidebar: React.FC = () => {
       >
         <div className="flex flex-col h-full">
           {/* SECCIÓN SUPERIOR: MAYA */}
-          <div className="flex-none flex flex-col border-b border-border" style={{ maxHeight: '45vh' }}>
+          <div className="flex-none flex flex-col border-b border-border bg-muted/30" style={{ maxHeight: '45vh' }}>
             <SidebarHeader collapsed={collapsed} onToggle={handleToggleCollapse} />
             
-            <div className="px-3 py-2">
+            <div className="px-2.5 py-2">
               <NewConversationButton 
                 onClick={handleNewConversation} 
                 collapsed={collapsed}
@@ -202,7 +202,7 @@ export const UnifiedSidebar: React.FC = () => {
             </div>
 
             {!collapsed && (
-              <div className="px-3 pb-2">
+              <div className="px-2.5 pb-2">
                 <ArchiveToggle
                   mode={viewMode}
                   onModeChange={setViewMode}
@@ -213,7 +213,7 @@ export const UnifiedSidebar: React.FC = () => {
             )}
 
             {!collapsed && (
-              <div className="px-3 pb-2">
+              <div className="px-2.5 pb-2">
                 <ConversationSearch 
                   onSearch={setSearchQuery} 
                   collapsed={collapsed}
@@ -254,7 +254,7 @@ export const UnifiedSidebar: React.FC = () => {
 
           {/* SECCIÓN INFERIOR: MÓDULOS */}
           <div className="flex-1 flex flex-col min-h-0">
-            <nav className="flex-1 px-3 py-4 overflow-y-auto">
+            <nav className="flex-1 px-2.5 py-3 overflow-y-auto">
               <ModuleNavigation collapsed={collapsed} />
             </nav>
           </div>
