@@ -89,10 +89,10 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
           <>
             <div className="flex items-start justify-between gap-2">
               <div className="flex-1 min-w-0">
-                <h4 className="text-xs font-medium text-foreground truncate leading-tight">
+                <h4 className="text-sm font-medium text-foreground truncate leading-tight">
                   {conversation.title}
                 </h4>
-                <p className="text-[11px] text-muted-foreground truncate mt-0.5 leading-tight">
+                <p className="text-xs text-muted-foreground truncate mt-0.5 leading-tight">
                   {truncateText(conversation.lastMessage, 45)}
                 </p>
               </div>
@@ -171,7 +171,7 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
               )}
             </div>
             
-            <p className="text-[10px] text-muted-foreground/70 mt-1">
+            <p className="text-xs text-muted-foreground/70 mt-1">
               {formatRelativeTime(conversation.updated_at)}
             </p>
           </>

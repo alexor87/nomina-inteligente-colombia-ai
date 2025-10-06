@@ -20,7 +20,7 @@ export const SidebarHeader: React.FC<SidebarHeaderProps> = ({ collapsed, onToggl
             <Sparkles className="h-4 w-4 text-primary" />
           </motion.div>
           <div className="flex-1 min-w-0">
-            <h1 className="font-semibold text-sm text-foreground">MAYA</h1>
+            <h1 className="font-semibold text-base text-foreground">MAYA</h1>
           </div>
           <ToggleButton collapsed={collapsed} onToggle={onToggle} />
         </>

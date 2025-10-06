@@ -54,7 +54,7 @@ export const ArchiveToggle: React.FC<ArchiveToggleProps> = ({
     <div className="relative bg-muted/30 rounded-md p-0.5 flex gap-0.5">
       <button
         onClick={() => onModeChange('active')}
-        className={`relative flex-1 px-2 py-1 rounded text-[11px] font-medium transition-colors flex items-center justify-center gap-1.5 ${
+        className={`relative flex-1 px-2 py-1 rounded text-xs font-medium transition-colors flex items-center justify-center gap-1.5 ${
           mode === 'active'
             ? 'text-foreground'
             : 'text-muted-foreground hover:text-foreground'
@@ -72,7 +72,7 @@ export const ArchiveToggle: React.FC<ArchiveToggleProps> = ({
       
       <button
         onClick={() => onModeChange('archived')}
-        className={`relative flex-1 px-2 py-1 rounded text-[11px] font-medium transition-colors flex items-center justify-center gap-1.5 ${
+        className={`relative flex-1 px-2 py-1 rounded text-xs font-medium transition-colors flex items-center justify-center gap-1.5 ${
           mode === 'archived'
             ? 'text-foreground'
             : 'text-muted-foreground hover:text-foreground'

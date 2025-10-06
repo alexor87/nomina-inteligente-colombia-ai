@@ -19,11 +19,11 @@ export const NewConversationButton: React.FC<NewConversationButtonProps> = ({
     >
       <Button
         onClick={onClick}
-        className="w-full bg-muted hover:bg-muted/80 text-foreground border border-border/50"
+        className="w-full bg-muted hover:bg-muted/80 text-foreground border border-border/50 py-2.5"
         size={collapsed ? "icon" : "sm"}
       >
-        <Plus className="h-3.5 w-3.5" />
-        {!collapsed && <span className="ml-1.5 text-xs">Nueva conversación</span>}
+        <Plus className="h-4 w-4" />
+        {!collapsed && <span className="ml-1.5 text-sm">Nueva conversación</span>}
       </Button>
     </motion.div>
   );

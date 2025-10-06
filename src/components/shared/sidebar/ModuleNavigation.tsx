@@ -57,7 +57,7 @@ export const ModuleNavigation: React.FC<ModuleNavigationProps> = ({ collapsed })
   const filteredNavigation = getFilteredNavigation();
 
   return (
-    <div className="space-y-0.5">
+    <div className="space-y-1">
       {filteredNavigation.map((item) => {
         const isActive = location.pathname === item.href;
         
@@ -66,7 +66,7 @@ export const ModuleNavigation: React.FC<ModuleNavigationProps> = ({ collapsed })
             key={item.name}
             to={item.href}
             className={cn(
-              "group flex items-center px-2 py-1.5 text-xs font-medium rounded-md transition-colors",
+              "group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors",
               "hover:bg-muted/40 active:scale-[0.98]",
               isActive
                 ? "bg-primary/5 text-primary border-l-2 border-primary"
@@ -82,7 +82,7 @@ export const ModuleNavigation: React.FC<ModuleNavigationProps> = ({ collapsed })
                 ? "text-primary" 
                 : "text-muted-foreground group-hover:text-foreground"
             )}>
-              <item.icon className="h-3.5 w-3.5" />
+              <item.icon className="h-4 w-4" />
             </div>
             
             {!collapsed && (
