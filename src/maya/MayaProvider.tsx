@@ -459,7 +459,13 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
 
   const clearConversation = useCallback(async () => {
     try {
+      // ✅ PASO 1: Limpiar el estado interno del chatService PRIMERO
+      chatService.clearConversation();
+      
+      // PASO 2: Crear nueva conversación
       const newConvId = await createNewConversation();
+      
+      // PASO 3: Limpiar React state
       setChatHistory([]);
       setIsChatMode(false);
       await setPhase('initial');
@@ -471,10 +477,10 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
       console.error('❌ MAYA: Error creating new conversation', error);
       
       // Fallback: limpiar sin crear en BD
+      chatService.clearConversation();
       setChatHistory([]);
       setIsChatMode(false);
       setCurrentConversationId(null);
-      chatService.clearConversation();
       await setPhase('initial');
       
       toast.warning('Nueva conversación (modo local)', {
