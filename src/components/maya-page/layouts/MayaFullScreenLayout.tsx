@@ -6,6 +6,8 @@ import { LoadingWithTimeout } from '@/components/ui/LoadingWithTimeout';
 import { MayaBackground } from '../MayaBackground';
 import { UnifiedSidebar } from '@/components/shared/UnifiedSidebar';
 import { DynamicHeader } from '@/components/shared/DynamicHeader';
+import { MayaFloatingAssistant } from '@/maya/MayaFloatingAssistant';
+import { MayaGlobalManager } from '@/maya/MayaGlobalManager';
 
 export const MayaFullScreenLayout: React.FC = () => {
   const { user, loading } = useAuth();
@@ -38,6 +40,10 @@ export const MayaFullScreenLayout: React.FC = () => {
           <DynamicHeader />
           <Outlet />
         </div>
+        
+        {/* Componentes MAYA Globales */}
+        <MayaFloatingAssistant />
+        <MayaGlobalManager />
       </div>
     </MayaProvider>
   );
