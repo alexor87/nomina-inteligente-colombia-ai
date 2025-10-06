@@ -3469,20 +3469,59 @@ async function handleConversation(message: string, conversation: any[]) {
         const { data: relevantDocs, error: searchError } = await supabase
           .rpc('search_legal_knowledge', {
             query_embedding: queryEmbedding,
-            match_threshold: 0.7,
-            match_count: 3
+            match_threshold: 0.75,
+            match_count: 5
           });
         
         if (!searchError && relevantDocs && relevantDocs.length > 0) {
-          console.log(`[RAG] Encontrados ${relevantDocs.length} documentos relevantes`);
-          
-          // Construir contexto legal con los documentos encontrados
-          legalContext = '\n\n**CONTEXTO LEGAL ACTUALIZADO:**\n\n';
-          relevantDocs.forEach((doc: any, index: number) => {
-            legalContext += `**${index + 1}. ${doc.title}** (${doc.document_type})\n${doc.content}\n\n`;
+          console.log(`[RAG] ✅ ${relevantDocs.length} documentos encontrados:`);
+          relevantDocs.forEach((doc: any, i: number) => {
+            console.log(`  ${i + 1}. ${doc.title} (${(doc.similarity * 100).toFixed(1)}% relevancia)`);
+            console.log(`     - Sources: ${doc.sources?.length || 0}, Examples: ${doc.examples?.length || 0}`);
           });
           
-          console.log('[RAG] Contexto legal agregado al prompt');
+          // Construir contexto legal enriquecido con todos los campos disponibles
+          legalContext = '\n\n**CONTEXTO LEGAL ACTUALIZADO:**\n\n';
+          relevantDocs.forEach((doc: any, index: number) => {
+            // Encabezado con metadata
+            legalContext += `### 📚 ${index + 1}. ${doc.title}\n`;
+            legalContext += `**Tipo:** ${doc.document_type} | **Relevancia:** ${(doc.similarity * 100).toFixed(1)}%\n`;
+            
+            // Resumen ejecutivo (si existe)
+            if (doc.summary) {
+              legalContext += `**Resumen:** ${doc.summary}\n\n`;
+            }
+            
+            // Fuentes legales específicas (si existen)
+            if (doc.sources && doc.sources.length > 0) {
+              legalContext += `**📋 Fuentes legales:**\n`;
+              doc.sources.forEach((source: string) => {
+                legalContext += `- ${source}\n`;
+              });
+              legalContext += '\n';
+            }
+            
+            // Contenido principal
+            legalContext += `${doc.content}\n\n`;
+            
+            // Ejemplos prácticos (si existen)
+            if (doc.examples && doc.examples.length > 0) {
+              legalContext += `**💡 Ejemplos de aplicación:**\n`;
+              doc.examples.forEach((example: string, i: number) => {
+                legalContext += `${i + 1}. ${example}\n`;
+              });
+              legalContext += '\n';
+            }
+            
+            // Notas especiales (si existen)
+            if (doc.note) {
+              legalContext += `⚠️ **Nota importante:** ${doc.note}\n\n`;
+            }
+            
+            legalContext += '---\n\n';
+          });
+          
+          console.log('[RAG] Contexto legal enriquecido agregado al prompt');
         } else {
           console.log('[RAG] No se encontraron documentos relevantes o error:', searchError);
         }
@@ -3534,6 +3573,14 @@ Estructura de Respuestas Teóricas:
 3. **Fórmulas y cálculos**: Presenta las fórmulas oficiales
 4. **Ejemplo práctico**: Ilustra con números reales
 5. **Consideraciones especiales**: Menciona casos particulares si aplican
+
+Uso de Fuentes Legales (CRÍTICO con RAG):
+- Cuando el contexto legal incluye fuentes específicas (📋 Fuentes legales), SIEMPRE cítalas en tu respuesta
+- Formato de citación requerido: "según el [Ley/Decreto/Artículo específico]"
+- Si hay ejemplos prácticos (💡) en el contexto, úsalos para ilustrar tus explicaciones
+- Si hay notas importantes (⚠️) en el contexto, DEBES incluirlas en tu respuesta
+- PRIORIZA la información del contexto RAG sobre tu conocimiento base
+- Si el contexto RAG contradice tu conocimiento base, usa SIEMPRE el contexto RAG
 
 Limitaciones CRÍTICAS:
 - NUNCA menciones Venezuela, Perú, México u otro país
