@@ -85,7 +85,7 @@ function sanitizeEmployeeName(name: string, fullText?: string): string {
   }
   
   // Remove trailing prepositions: "juan al", "maria del", "carlos de", "ana la", "pedro el", "eliana a"
-  cleaned = cleaned.replace(/\s+(?:a|al|del|de|la|el)\s*$/i, '');
+  cleaned = cleaned.replace(/\s+(?:a|al|del|de|la|el|en)\s*$/i, '');
   
   return cleaned.trim();
 }
@@ -289,8 +289,8 @@ export class SimpleIntentMatcher {
       
       // Extract employee name - FIX: buscar en contexto específico
       const nameMatch = 
-        text.match(/salario\s+(?:a|de|para)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ]?[a-záéíóúñ]+)*)/i) ||
-        text.match(/(?:aumento|incremento|subir|aumentar)\s+(?:a|de|para)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ]?[a-záéíóúñ]+)*)/i) ||
+        text.match(/salario\s+(?:a|de|para)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*?)(?=\s+en\s+\$|$)/i) ||
+        text.match(/(?:aumento|incremento|subir|aumentar)\s+(?:a|de|para)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*?)(?=\s+en\s+\$|$)/i) ||
         text.match(/\ba\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)*)(?=\s+en\s+\$)/i);
       const employeeName = nameMatch ? sanitizeEmployeeName(nameMatch[1]) : null;
       
