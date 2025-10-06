@@ -290,7 +290,9 @@ export class SalaryIncreaseSimulationService extends BaseAggregationService {
 ### ⚠️ Consideraciones Importantes
 
 1. **Proporcionalidad**: El aumento del ${increasePercentage.toFixed(1)}% en salario genera un incremento del ${costPercentageIncrease}% en todos los costos laborales.
-2. **IBC**: ${newSalary >= LEGAL_VALUES.SALARIO_MINIMO * 25 ? '⚠️ Con este salario, el empleado puede requerir ajuste de IBC (supera límites).' : '✅ El empleado NO requiere ajuste de IBC (está dentro del rango normal).'}
+2. **IBC (Base de Cotización)**: ${newSalary >= LEGAL_VALUES.SALARIO_MINIMO * 25 
+  ? `⚠️ El nuevo salario supera el tope legal de IBC (25 SMMLV = ${this.formatCurrency(LEGAL_VALUES.SALARIO_MINIMO * 25)}). Las cotizaciones se calcularán sobre el máximo legal, no sobre el salario completo.`
+  : `✅ Las cotizaciones se calcularán sobre el nuevo salario completo de ${this.formatCurrency(newSalary)}.`}
 3. **Auxilio de Transporte**: ${newSalary <= LEGAL_VALUES.SALARIO_MINIMO * 2 ? `✅ Aplica auxilio de transporte (${this.formatCurrency(LEGAL_VALUES.AUXILIO_TRANSPORTE)}/mes)` : '❌ No aplica para este nivel salarial (> 2 SMMLV).'}
 4. **Parafiscales**: Calculados asumiendo que la empresa aplica régimen normal.
 
