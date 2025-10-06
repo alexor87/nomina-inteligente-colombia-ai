@@ -448,7 +448,11 @@ export class SimpleIntentMatcher {
     // 5. TOTAL INCAPACITY DAYS
     if (/(?:cuántos|cuantos|qué|que)\s+días\s+de\s+incapacidad/i.test(text) ||
         /(?:total|cantidad)\s+(?:de\s+)?(?:días|dia)\s+(?:de\s+)?incapacidad/i.test(text) ||
-        /(?:incapacidades|incapacitados)\s+(?:en|del|de)/i.test(text)) {
+        /(?:incapacidades|incapacitados)\s+(?:en|del|de)/i.test(text) ||
+        // NUEVOS PATRONES: preguntas generales sobre incapacidades sin mencionar "días"
+        /(?:cuántas|cuantas|qué|que)\s+incapacidades/i.test(text) ||
+        /(?:número|cantidad|total)\s+de\s+incapacidades/i.test(text) ||
+        (/(?:hemos|han)\s+(?:tenido|tuvimos|hubo)/.test(text) && /incapacidad/i.test(text))) {
       
       const monthRegex = /(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/gi;
       const allMonthMatches = [...text.matchAll(monthRegex)];
