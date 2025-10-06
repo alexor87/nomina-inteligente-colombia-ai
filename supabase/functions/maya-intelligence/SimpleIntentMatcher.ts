@@ -828,8 +828,27 @@ export class SimpleIntentMatcher {
       };
     }
     
-    // Employee count queries
-    if (/cuántos?|cuantos?/.test(text) && /empleado/.test(text)) {
+    // HIRING_COST_SIMULATION - Simular costo de contratar empleado (ANTES de EMPLOYEE_COUNT para prioridad)
+    if (/(?:cuánto|cuanto)\s+(?:me\s+)?(?:costaría|cuesta|costaré)\s+contratar/i.test(text) ||
+        /(?:cuál|cual)\s+es\s+el\s+costo\s+(?:real|total)\s+de\s+contratar/i.test(text) ||
+        /simula(?:r|ción)?\s+(?:contratación|contratar)/i.test(text)) {
+      
+      // Extract salary from text
+      const salaryMatch = text.match(/(?:\$|cop\s*)?(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?)/i);
+      const salary = salaryMatch ? parseFloat(salaryMatch[1].replace(/[.,]/g, '')) : null;
+      
+      return {
+        type: 'HIRING_COST_SIMULATION',
+        confidence: 0.96,
+        method: 'simulateHiringCost',
+        params: {
+          salary: salary
+        }
+      };
+    }
+
+    // Employee count queries (CORREGIDO: más específico para evitar "cuánto")
+    if (/cuántos\s+empleados?|cuantos\s+empleados?/i.test(text)) {
       return {
         type: 'EMPLOYEE_COUNT',
         confidence: 0.95,

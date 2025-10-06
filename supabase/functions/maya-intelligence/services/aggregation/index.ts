@@ -130,6 +130,17 @@ export async function getPayrollProjection(
 }
 
 /**
+ * Simulate hiring cost for a given salary
+ */
+export async function simulateHiringCost(
+  client: any,
+  params: { salary?: number }
+) {
+  const service = AggregationServiceFactory.getService('hiring_cost_simulation');
+  return await service.aggregate(client, params);
+}
+
+/**
  * Compare payroll periods (flexible comparison)
  * Supports comparisons between any two periods: months, quarters, semesters, years
  */
