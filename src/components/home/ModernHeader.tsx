@@ -19,10 +19,10 @@ const ModernHeader = () => {
     <header className="fixed top-0 w-full bg-white/95 backdrop-blur-sm border-b border-gray-200 z-50">
       <nav className="container mx-auto px-6">
         <div className="flex justify-between items-center h-16">
-          <div className="flex items-center">
+          <a href="/home" className="flex items-center">
             <Building2 className="h-8 w-8 text-blue-600" />
             <span className="ml-2 text-xl font-bold text-gray-900">Nómina Inteligente</span>
-          </div>
+          </a>
           
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-8">

@@ -30,6 +30,8 @@ import PayrollHistoryDetailPage from "./pages/PayrollHistoryDetailPage";
 import CompanyRegistrationPage from "./pages/CompanyRegistrationPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import SocialBenefitsPage from "./pages/SocialBenefitsPage";
+import MayaPage from "./pages/MayaPage";
+import { RootRedirect } from "@/components/routing/RootRedirect";
 
 const queryClient = new QueryClient();
 
@@ -44,8 +46,11 @@ function AppContent() {
   return (
     <div className="min-h-screen bg-background">
       <Routes>
-        {/* Root redirects to Maya */}
-        <Route path="/" element={<Navigate to="/maya" replace />} />
+        {/* Root - Smart redirect based on auth */}
+        <Route path="/" element={<RootRedirect />} />
+        
+        {/* Public landing page */}
+        <Route path="/home" element={<Index />} />
         
         {/* Public routes */}
         <Route path="/login" element={<LoginPage />} />
@@ -61,7 +66,7 @@ function AppContent() {
         {/* UNIFIED EXPERIENCE - All routes use MayaFullScreenLayout with UnifiedSidebar */}
         <Route element={<MayaFullScreenLayout />}>
           {/* MAYA Chat */}
-          <Route path="/maya" element={<Index />} />
+          <Route path="/maya" element={<MayaPage />} />
           
           {/* Modules - Now share the same layout with UnifiedSidebar */}
           <Route path="/modules/dashboard" element={<DashboardPage />} />
