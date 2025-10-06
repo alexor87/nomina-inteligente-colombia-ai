@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { NewConversationButton } from './NewConversationButton';
 import { ConversationSearch } from './ConversationSearch';
 import { ConversationList } from './ConversationList';
+import { ArchiveToggle } from './ArchiveToggle';
 import { useMaya } from '@/maya/MayaProvider';
 import { useAuth } from '@/contexts/AuthContext';
 import { MayaConversationManager } from '@/maya/services/MayaConversationManager';
@@ -24,6 +25,8 @@ export const MayaHistorySidebar: React.FC = () => {
     return stored === 'true';
   });
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+  const [archivedConversations, setArchivedConversations] = useState<ConversationSummary[]>([]);
+  const [viewMode, setViewMode] = useState<'active' | 'archived'>('active');
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -37,6 +40,7 @@ export const MayaHistorySidebar: React.FC = () => {
         companyId: profile.company_id
       });
       loadConversations();
+      loadArchivedConversations();
     }
   }, [user?.id, profile?.company_id]);
 
@@ -44,6 +48,7 @@ export const MayaHistorySidebar: React.FC = () => {
   useEffect(() => {
     if (currentConversationId) {
       loadConversations();
+      loadArchivedConversations();
     }
   }, [currentConversationId]);
 
@@ -70,6 +75,18 @@ export const MayaHistorySidebar: React.FC = () => {
       toast.error('Error al cargar conversaciones');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadArchivedConversations = async () => {
+    if (!user?.id || !profile?.company_id) return;
+    
+    try {
+      const archived = await conversationManager.getArchivedConversations(user.id, profile.company_id);
+      console.log('📦 Sidebar: Conversaciones archivadas cargadas:', archived.length);
+      setArchivedConversations(archived);
+    } catch (error) {
+      console.error('❌ Sidebar: Error loading archived conversations:', error);
     }
   };
 
@@ -115,13 +132,16 @@ export const MayaHistorySidebar: React.FC = () => {
     try {
       await conversationManager.archiveConversation(id);
       await loadConversations();
+      await loadArchivedConversations();
+      
       toast.success('Conversación archivada', {
         action: {
           label: 'Deshacer',
-          onClick: () => {
-            // TODO: Implement unarchive
+          onClick: async () => {
+            await handleUnarchiveConversation(id);
           }
-        }
+        },
+        duration: 5000
       });
     } catch (error) {
       console.error('Error archiving conversation:', error);
@@ -129,10 +149,23 @@ export const MayaHistorySidebar: React.FC = () => {
     }
   };
 
+  const handleUnarchiveConversation = async (id: string) => {
+    try {
+      await conversationManager.unarchiveConversation(id);
+      await loadConversations();
+      await loadArchivedConversations();
+      toast.success('Conversación restaurada');
+    } catch (error) {
+      console.error('Error unarchiving conversation:', error);
+      toast.error('Error al restaurar');
+    }
+  };
+
   const handleDeleteConversation = async (id: string) => {
     try {
       await conversationManager.deleteConversation(id);
       await loadConversations();
+      await loadArchivedConversations();
       if (id === currentConversationId) {
         clearConversation();
       }
@@ -142,6 +175,8 @@ export const MayaHistorySidebar: React.FC = () => {
       toast.error('Error al eliminar');
     }
   };
+
+  const currentConversations = viewMode === 'active' ? conversations : archivedConversations;
 
   return (
     <>
@@ -160,6 +195,18 @@ export const MayaHistorySidebar: React.FC = () => {
             />
           </div>
 
+          {/* Archive Toggle */}
+          {!collapsed && (
+            <div className="p-3 border-b border-border">
+              <ArchiveToggle
+                mode={viewMode}
+                onModeChange={setViewMode}
+                activeCount={conversations.length}
+                archivedCount={archivedConversations.length}
+              />
+            </div>
+          )}
+
           {/* Search */}
           {!collapsed && (
             <div className="p-3 border-b border-border">
@@ -174,18 +221,26 @@ export const MayaHistorySidebar: React.FC = () => {
           <div className="flex-1 overflow-hidden">
             {!collapsed ? (
               <ConversationList
-                conversations={conversations}
+                conversations={currentConversations}
                 currentConversationId={currentConversationId}
                 onSelectConversation={handleSelectConversation}
                 onRenameConversation={handleRenameConversation}
                 onArchiveConversation={handleArchiveConversation}
                 onDeleteConversation={handleDeleteConversation}
+                onUnarchiveConversation={handleUnarchiveConversation}
                 isLoading={isLoading}
                 searchQuery={searchQuery}
+                mode={viewMode}
               />
             ) : (
-              <div className="flex items-center justify-center py-4">
-                <span className="text-xs text-muted-foreground">{conversations.length}</span>
+              <div className="flex flex-col gap-2 items-center py-4">
+                <ArchiveToggle
+                  mode={viewMode}
+                  onModeChange={setViewMode}
+                  activeCount={conversations.length}
+                  archivedCount={archivedConversations.length}
+                  collapsed
+                />
               </div>
             )}
           </div>
@@ -232,19 +287,30 @@ export const MayaHistorySidebar: React.FC = () => {
                 </div>
 
                 <div className="p-3 border-b border-border">
+                  <ArchiveToggle
+                    mode={viewMode}
+                    onModeChange={setViewMode}
+                    activeCount={conversations.length}
+                    archivedCount={archivedConversations.length}
+                  />
+                </div>
+
+                <div className="p-3 border-b border-border">
                   <ConversationSearch onSearch={setSearchQuery} />
                 </div>
 
                 <div className="flex-1 overflow-hidden">
                   <ConversationList
-                    conversations={conversations}
+                    conversations={currentConversations}
                     currentConversationId={currentConversationId}
                     onSelectConversation={handleSelectConversation}
                     onRenameConversation={handleRenameConversation}
                     onArchiveConversation={handleArchiveConversation}
                     onDeleteConversation={handleDeleteConversation}
+                    onUnarchiveConversation={handleUnarchiveConversation}
                     isLoading={isLoading}
                     searchQuery={searchQuery}
+                    mode={viewMode}
                   />
                 </div>
 

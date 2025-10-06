@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { NewConversationButton } from '@/components/maya-page/sidebar/NewConversationButton';
 import { ConversationSearch } from '@/components/maya-page/sidebar/ConversationSearch';
 import { ConversationList } from '@/components/maya-page/sidebar/ConversationList';
+import { ArchiveToggle } from '@/components/maya-page/sidebar/ArchiveToggle';
 import { SidebarHeader } from './sidebar/SidebarHeader';
 import { SidebarDivider } from './sidebar/SidebarDivider';
 import { ModuleNavigation } from './sidebar/ModuleNavigation';
@@ -28,6 +29,8 @@ export const UnifiedSidebar: React.FC = () => {
     return stored === 'true';
   });
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+  const [archivedConversations, setArchivedConversations] = useState<ConversationSummary[]>([]);
+  const [viewMode, setViewMode] = useState<'active' | 'archived'>('active');
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -41,6 +44,7 @@ export const UnifiedSidebar: React.FC = () => {
         companyId
       });
       loadConversations();
+      loadArchivedConversations();
     }
   }, [user?.id, companyId]);
 
@@ -48,6 +52,7 @@ export const UnifiedSidebar: React.FC = () => {
   useEffect(() => {
     if (currentConversationId && user?.id && companyId) {
       loadConversations();
+      loadArchivedConversations();
     }
   }, [currentConversationId, user?.id, companyId]);
 
@@ -74,6 +79,18 @@ export const UnifiedSidebar: React.FC = () => {
       toast.error('Error al cargar conversaciones');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadArchivedConversations = async () => {
+    if (!user?.id || !companyId) return;
+    
+    try {
+      const archived = await conversationManager.getArchivedConversations(user.id, companyId);
+      console.log('📦 UnifiedSidebar: Conversaciones archivadas cargadas:', archived.length);
+      setArchivedConversations(archived);
+    } catch (error) {
+      console.error('❌ UnifiedSidebar: Error loading archived conversations:', error);
     }
   };
 
@@ -118,10 +135,32 @@ export const UnifiedSidebar: React.FC = () => {
     try {
       await conversationManager.archiveConversation(id);
       await loadConversations();
-      toast.success('Conversación archivada');
+      await loadArchivedConversations();
+      
+      toast.success('Conversación archivada', {
+        action: {
+          label: 'Deshacer',
+          onClick: async () => {
+            await handleUnarchiveConversation(id);
+          }
+        },
+        duration: 5000
+      });
     } catch (error) {
       console.error('Error archiving conversation:', error);
       toast.error('Error al archivar');
+    }
+  };
+
+  const handleUnarchiveConversation = async (id: string) => {
+    try {
+      await conversationManager.unarchiveConversation(id);
+      await loadConversations();
+      await loadArchivedConversations();
+      toast.success('Conversación restaurada');
+    } catch (error) {
+      console.error('Error unarchiving conversation:', error);
+      toast.error('Error al restaurar');
     }
   };
 
@@ -129,6 +168,7 @@ export const UnifiedSidebar: React.FC = () => {
     try {
       await conversationManager.deleteConversation(id);
       await loadConversations();
+      await loadArchivedConversations();
       if (id === currentConversationId) {
         clearConversation();
       }
@@ -138,6 +178,8 @@ export const UnifiedSidebar: React.FC = () => {
       toast.error('Error al eliminar');
     }
   };
+
+  const currentConversations = viewMode === 'active' ? conversations : archivedConversations;
 
   return (
     <>
@@ -161,6 +203,17 @@ export const UnifiedSidebar: React.FC = () => {
 
             {!collapsed && (
               <div className="px-3 pb-2">
+                <ArchiveToggle
+                  mode={viewMode}
+                  onModeChange={setViewMode}
+                  activeCount={conversations.length}
+                  archivedCount={archivedConversations.length}
+                />
+              </div>
+            )}
+
+            {!collapsed && (
+              <div className="px-3 pb-2">
                 <ConversationSearch 
                   onSearch={setSearchQuery} 
                   collapsed={collapsed}
@@ -171,18 +224,26 @@ export const UnifiedSidebar: React.FC = () => {
             <div className="flex-1 overflow-y-auto min-h-0">
               {!collapsed ? (
                 <ConversationList
-                  conversations={conversations}
+                  conversations={currentConversations}
                   currentConversationId={currentConversationId}
                   onSelectConversation={handleSelectConversation}
                   onRenameConversation={handleRenameConversation}
                   onArchiveConversation={handleArchiveConversation}
                   onDeleteConversation={handleDeleteConversation}
+                  onUnarchiveConversation={handleUnarchiveConversation}
                   isLoading={isLoading}
                   searchQuery={searchQuery}
+                  mode={viewMode}
                 />
               ) : (
-                <div className="flex items-center justify-center py-4">
-                  <span className="text-xs text-muted-foreground">{conversations.length}</span>
+                <div className="flex flex-col gap-2 items-center py-4">
+                  <ArchiveToggle
+                    mode={viewMode}
+                    onModeChange={setViewMode}
+                    activeCount={conversations.length}
+                    archivedCount={archivedConversations.length}
+                    collapsed
+                  />
                 </div>
               )}
             </div>
@@ -233,19 +294,30 @@ export const UnifiedSidebar: React.FC = () => {
                 </div>
 
                 <div className="px-3 pb-2">
+                  <ArchiveToggle
+                    mode={viewMode}
+                    onModeChange={setViewMode}
+                    activeCount={conversations.length}
+                    archivedCount={archivedConversations.length}
+                  />
+                </div>
+
+                <div className="px-3 pb-2">
                   <ConversationSearch onSearch={setSearchQuery} />
                 </div>
 
                 <div className="flex-1 overflow-y-auto border-b border-border" style={{ maxHeight: '40vh' }}>
                   <ConversationList
-                    conversations={conversations}
+                    conversations={currentConversations}
                     currentConversationId={currentConversationId}
                     onSelectConversation={handleSelectConversation}
                     onRenameConversation={handleRenameConversation}
                     onArchiveConversation={handleArchiveConversation}
                     onDeleteConversation={handleDeleteConversation}
+                    onUnarchiveConversation={handleUnarchiveConversation}
                     isLoading={isLoading}
                     searchQuery={searchQuery}
+                    mode={viewMode}
                   />
                 </div>
 

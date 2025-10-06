@@ -204,6 +204,53 @@ export class MayaConversationManager {
   }
 
   /**
+   * Get archived conversations
+   */
+  async getArchivedConversations(userId: string, companyId: string): Promise<ConversationSummary[]> {
+    try {
+      const { data: conversations, error } = await (supabase as any)
+        .from('maya_conversations')
+        .select(`
+          id,
+          title,
+          updated_at,
+          is_archived,
+          maya_messages (
+            id,
+            content,
+            role,
+            created_at
+          )
+        `)
+        .eq('user_id', userId)
+        .eq('company_id', companyId)
+        .eq('is_archived', true)
+        .order('updated_at', { ascending: false });
+
+      if (error) throw error;
+
+      const summaries: ConversationSummary[] = conversations?.map((conv: any) => {
+        const messages = (conv.maya_messages as any[]) || [];
+        const lastMsg = messages.length > 0 ? messages[messages.length - 1] : null;
+        
+        return {
+          id: conv.id,
+          title: conv.title,
+          lastMessage: lastMsg?.content?.substring(0, 60) || 'Sin mensajes',
+          updated_at: conv.updated_at,
+          message_count: messages.length
+        };
+      }) || [];
+
+      console.log('📦 MAYA: Loaded archived conversations', { count: summaries.length });
+      return summaries;
+    } catch (error) {
+      console.error('❌ MAYA: Error loading archived conversations', error);
+      return [];
+    }
+  }
+
+  /**
    * Archive a conversation
    */
   async archiveConversation(conversationId: string): Promise<void> {
@@ -218,6 +265,25 @@ export class MayaConversationManager {
       console.log('📦 MAYA: Archived conversation', { conversationId });
     } catch (error) {
       console.error('❌ MAYA: Error archiving conversation', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Unarchive a conversation
+   */
+  async unarchiveConversation(conversationId: string): Promise<void> {
+    try {
+      const { error } = await (supabase as any)
+        .from('maya_conversations')
+        .update({ is_archived: false })
+        .eq('id', conversationId);
+
+      if (error) throw error;
+
+      console.log('📤 MAYA: Unarchived conversation', { conversationId });
+    } catch (error) {
+      console.error('❌ MAYA: Error unarchiving conversation', error);
       throw error;
     }
   }

@@ -15,6 +15,8 @@ interface ConversationListProps {
   onDeleteConversation: (id: string) => Promise<void>;
   isLoading?: boolean;
   searchQuery?: string;
+  mode?: 'active' | 'archived';
+  onUnarchiveConversation?: (id: string) => Promise<void>;
 }
 
 export const ConversationList: React.FC<ConversationListProps> = ({
@@ -25,7 +27,9 @@ export const ConversationList: React.FC<ConversationListProps> = ({
   onArchiveConversation,
   onDeleteConversation,
   isLoading = false,
-  searchQuery = ''
+  searchQuery = '',
+  mode = 'active',
+  onUnarchiveConversation
 }) => {
   const [filteredConversations, setFilteredConversations] = useState(conversations);
 
@@ -54,7 +58,12 @@ export const ConversationList: React.FC<ConversationListProps> = ({
     return (
       <div className="text-center py-8 px-4">
         <p className="text-sm text-muted-foreground">
-          {searchQuery ? 'No se encontraron conversaciones' : 'No hay conversaciones aún'}
+          {searchQuery 
+            ? 'No se encontraron conversaciones' 
+            : mode === 'archived' 
+              ? 'No hay conversaciones archivadas' 
+              : 'No hay conversaciones aún'
+          }
         </p>
       </div>
     );
@@ -82,6 +91,8 @@ export const ConversationList: React.FC<ConversationListProps> = ({
                 onRename={onRenameConversation}
                 onArchive={onArchiveConversation}
                 onDelete={onDeleteConversation}
+                mode={mode}
+                onUnarchive={onUnarchiveConversation}
               />
             ))}
           </ConversationGroupSection>

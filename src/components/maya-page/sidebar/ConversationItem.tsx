@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Edit2, Archive, Trash2 } from 'lucide-react';
+import { Edit2, Archive, Trash2, ArchiveRestore } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,6 +23,8 @@ interface ConversationItemProps {
   onRename: (id: string, newTitle: string) => Promise<void>;
   onArchive: (id: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  mode?: 'active' | 'archived';
+  onUnarchive?: (id: string) => Promise<void>;
 }
 
 export const ConversationItem: React.FC<ConversationItemProps> = ({
@@ -31,7 +33,9 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
   onClick,
   onRename,
   onArchive,
-  onDelete
+  onDelete,
+  mode = 'active',
+  onUnarchive
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -63,6 +67,7 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
         onMouseLeave={() => setIsHovered(false)}
         className={`
           relative px-3 py-2.5 rounded-lg cursor-pointer transition-all
+          ${mode === 'archived' ? 'opacity-70' : ''}
           ${isActive 
             ? 'bg-primary/10 border-l-4 border-primary' 
             : 'hover:bg-muted/50 border-l-4 border-transparent'
@@ -99,39 +104,69 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
                   className="flex items-center gap-1"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsEditing(true);
-                    }}
-                  >
-                    <Edit2 className="h-3 w-3" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onArchive(conversation.id);
-                    }}
-                  >
-                    <Archive className="h-3 w-3" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 text-destructive hover:text-destructive"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowDeleteDialog(true);
-                    }}
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
+                  {mode === 'archived' ? (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 text-primary hover:text-primary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onUnarchive?.(conversation.id);
+                        }}
+                        title="Restaurar"
+                      >
+                        <ArchiveRestore className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 text-destructive hover:text-destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowDeleteDialog(true);
+                        }}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsEditing(true);
+                        }}
+                      >
+                        <Edit2 className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onArchive(conversation.id);
+                        }}
+                      >
+                        <Archive className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 text-destructive hover:text-destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowDeleteDialog(true);
+                        }}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </>
+                  )}
                 </motion.div>
               )}
             </div>
