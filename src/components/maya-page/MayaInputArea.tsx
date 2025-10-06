@@ -3,7 +3,6 @@ import { useMaya } from '@/maya/MayaProvider';
 import { Button } from '@/components/ui/button';
 import { Send, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { ComposerActions } from './ComposerActions';
 import { CommandChips } from './CommandChips';
 
 export const MayaInputArea: React.FC = () => {
@@ -93,10 +92,8 @@ export const MayaInputArea: React.FC = () => {
           </Button>
         </div>
 
-        {/* Bottom actions and hint */}
-        <div className="flex items-center justify-between">
-          <ComposerActions />
-          
+        {/* Bottom hint */}
+        <div className="flex items-center justify-center">
           <p className="text-[10px] text-gray-500">
             <span className="inline-flex items-center gap-1">
               <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
