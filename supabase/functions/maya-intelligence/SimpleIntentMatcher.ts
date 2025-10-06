@@ -120,6 +120,74 @@ export class SimpleIntentMatcher {
     const text = message.toLowerCase().trim();
     
     // ============================================================================
+    // DOMAIN DEFINITIONS - KISS Route for Colombian Labor Terms
+    // ============================================================================
+    
+    // EPS Definition
+    if (/^(?:qu[eé]|que)\s+(?:es|significa)\s+(?:una?\s+)?eps[?\s]*$/i.test(text) ||
+        /^(?:eps)[\?\.]*$/i.test(text) ||
+        /^(?:qu[eé]|que)\s+significa\s+eps/i.test(text)) {
+      return {
+        type: 'DOMAIN_DEFINITION',
+        confidence: 0.98,
+        method: 'domainDefinition',
+        params: { term: 'EPS' }
+      };
+    }
+    
+    // ARL Definition
+    if (/^(?:qu[eé]|que)\s+(?:es|significa)\s+(?:una?\s+)?arl[?\s]*$/i.test(text) ||
+        /^(?:arl)[\?\.]*$/i.test(text)) {
+      return {
+        type: 'DOMAIN_DEFINITION',
+        confidence: 0.98,
+        method: 'domainDefinition',
+        params: { term: 'ARL' }
+      };
+    }
+    
+    // AFP Definition
+    if (/^(?:qu[eé]|que)\s+(?:es|significa)\s+(?:una?\s+)?afp[?\s]*$/i.test(text) ||
+        /^(?:afp)[\?\.]*$/i.test(text)) {
+      return {
+        type: 'DOMAIN_DEFINITION',
+        confidence: 0.98,
+        method: 'domainDefinition',
+        params: { term: 'AFP' }
+      };
+    }
+    
+    // Cajas de Compensación
+    if (/^(?:qu[eé]|que)\s+(?:es|son|significa)\s+(?:una?\s+)?caja[s]?\s+(?:de\s+)?compensaci[oó]n/i.test(text)) {
+      return {
+        type: 'DOMAIN_DEFINITION',
+        confidence: 0.98,
+        method: 'domainDefinition',
+        params: { term: 'CAJA_COMPENSACION' }
+      };
+    }
+    
+    // SMLV
+    if (/^(?:qu[eé]|que)\s+(?:es|significa)\s+(?:el\s+)?(?:smlv|salario\s+m[ií]nimo)/i.test(text)) {
+      return {
+        type: 'DOMAIN_DEFINITION',
+        confidence: 0.98,
+        method: 'domainDefinition',
+        params: { term: 'SMLV' }
+      };
+    }
+    
+    // Parafiscales
+    if (/^(?:qu[eé]|que)\s+(?:son|significa)\s+(?:los?\s+)?parafiscales/i.test(text)) {
+      return {
+        type: 'DOMAIN_DEFINITION',
+        confidence: 0.98,
+        method: 'domainDefinition',
+        params: { term: 'PARAFISCALES' }
+      };
+    }
+    
+    // ============================================================================
     // NEW COLOMBIAN PAYROLL INTENTS
     // ============================================================================
     

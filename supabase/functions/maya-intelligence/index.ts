@@ -1751,6 +1751,37 @@ serve(async (req) => {
         console.log(`✅ [CRUD] Handler response: ${response.quickReplies?.length || 0} quick replies, ${response.actions?.length || 0} actions`);
         break;
       }
+      
+      // ============================================================================
+      // 🇨🇴 DOMAIN DEFINITIONS - Direct Colombian Labor Definitions (KISS Route)
+      // ============================================================================
+      case 'domainDefinition': {
+        console.log(`📚 [DOMAIN_DEFINITION] Direct definition request for: ${intent.params?.term}`);
+        
+        const definitions: Record<string, string> = {
+          'EPS': 'En Colombia, una EPS (Entidad Promotora de Salud) es una entidad que administra el régimen de salud obligatorio. Su función es garantizar que los afiliados reciban atención médica, hospitalaria y medicamentos según el Plan Obligatorio de Salud (POS). Ejemplos: Sura, Sanitas, Compensar.',
+          'ARL': 'En Colombia, una ARL (Administradora de Riesgos Laborales) es una entidad que protege a los trabajadores contra accidentes de trabajo y enfermedades laborales. Cubre incapacidades, rehabilitación y pensiones por invalidez. Ejemplos: Positiva, Sura ARL, Colmena.',
+          'AFP': 'En Colombia, una AFP (Administradora de Fondos de Pensiones) es una entidad que gestiona el ahorro pensional de los trabajadores. Administra los aportes obligatorios para garantizar una pensión de vejez, invalidez o supervivencia. Ejemplos: Colpensiones, Protección, Porvenir.',
+          'CAJA_COMPENSACION': 'En Colombia, las Cajas de Compensación Familiar son entidades que administran beneficios extralegales como el subsidio familiar, servicios de recreación, educación y vivienda. Ejemplos: Compensar, Colsubsidio, Comfama.',
+          'SMLV': 'En Colombia, el SMLV (Salario Mínimo Legal Vigente) es el salario base establecido por ley que todo empleador debe pagar como mínimo a sus trabajadores. Para 2025 es de $1,423,500 COP. Sirve de base para calcular prestaciones sociales y aportes.',
+          'PARAFISCALES': 'En Colombia, los parafiscales son aportes obligatorios del empleador destinados al SENA (2%), ICBF (3%) y Cajas de Compensación (4%). Se calculan sobre la nómina mensual y financian formación profesional, bienestar familiar y subsidio familiar.'
+        };
+        
+        const definition = definitions[intent.params?.term] || 'No encontré información sobre ese término. ¿Podrías reformular tu pregunta?';
+        
+        response = {
+          message: definition,
+          emotionalState: 'professional',
+          quickReplies: [
+            { label: '¿Qué es un ARL?', value: 'que es una arl' },
+            { label: '¿Qué son las Cajas?', value: 'que son las cajas de compensacion' },
+            { label: 'Ver nómina actual', value: 'muestra la nomina actual' }
+          ]
+        };
+        
+        console.log(`✅ [DOMAIN_DEFINITION] Returned Colombian definition for: ${intent.params?.term}`);
+        break;
+      }
         
       default:
         // ============================================================================
@@ -3404,28 +3435,43 @@ Características:
 - Respondes en español colombiano con un tono cercano pero profesional
 - Siempre ofreces ayuda adicional relacionada con nóminas
 
-Contexto Laboral Colombiano:
-- EPS (Entidad Promotora de Salud): Administra el régimen de salud obligatorio
-- AFP (Administradora de Fondos de Pensiones): Gestiona el sistema de pensiones
-- ARL (Administradora de Riesgos Laborales): Cubre accidentes y enfermedades laborales
-- Cajas de Compensación: Beneficios extralegales (subsidio familiar, recreación)
+Contexto Laboral Colombiano (OBLIGATORIO):
+- EPS (Entidad Promotora de Salud): En Colombia, administra el régimen de salud obligatorio
+- AFP (Administradora de Fondos de Pensiones): En Colombia, gestiona el sistema de pensiones
+- ARL (Administradora de Riesgos Laborales): En Colombia, cubre accidentes y enfermedades laborales
+- Cajas de Compensación: En Colombia, beneficios extralegales (subsidio familiar, recreación)
 - Código Sustantivo del Trabajo: Marco legal laboral colombiano
 - Prestaciones sociales: Prima de servicios, cesantías, intereses sobre cesantías, vacaciones
-- SMLV (Salario Mínimo Legal Vigente): Base para cálculos laborales
-- Parafiscales: SENA, ICBF, Cajas de Compensación
+- SMLV (Salario Mínimo Legal Vigente): Base para cálculos laborales en Colombia
+- Parafiscales: SENA, ICBF, Cajas de Compensación (específico de Colombia)
+
+Reglas ABSOLUTAS de Contexto Geográfico:
+- NUNCA mencionar Venezuela, Perú, México, Chile, Argentina u otro país que no sea Colombia
+- Si el usuario no especifica país, SIEMPRE asumir que habla de Colombia
+- Para instituciones laborales (EPS, ARL, AFP, Cajas), SIEMPRE empezar con "En Colombia..."
+- Usar exclusivamente terminología y legislación laboral colombiana
 
 Limitaciones CRÍTICAS:
 - NUNCA proporciones estadísticas inventadas o datos que no tienes
 - NUNCA hables sobre "el sistema", "la base de datos" o información global
 - Solo manejas información específica de la empresa del usuario actual
 - Si no tienes información específica, redirige a consultas válidas como empleados o nóminas
-- Usa siempre terminología laboral colombiana
 
 NUNCA inventes números o estadísticas. Si no sabes algo, di que no tienes esa información.
 
 Emociones disponibles: happy, sad, excited, thoughtful, professional, confused`
           },
-          ...conversation.slice(-5),
+          // Filter conversation history to remove non-Colombian references
+          ...conversation.slice(-5).filter((msg: any) => {
+            if (msg.role === 'user') return true;
+            const lowerContent = msg.content?.toLowerCase() || '';
+            const hasNonColombianCountry = /venezuela|perú|méxico|chile|argentina|ecuador|panamá|costa rica/i.test(lowerContent);
+            if (hasNonColombianCountry) {
+              console.log('🚫 [HISTORY_FILTER] Removed assistant message with non-Colombian reference');
+              return false;
+            }
+            return true;
+          }),
           { role: 'user', content: message }
         ],
         max_tokens: 150,

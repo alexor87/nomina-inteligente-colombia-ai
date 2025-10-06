@@ -196,6 +196,19 @@ export class ResponseOrchestrator {
       sanitized.message = sanitized.message
         .replace(/<script[^>]*>.*?<\/script>/gi, '')
         .replace(/<iframe[^>]*>.*?<\/iframe>/gi, '');
+      
+      // 🇨🇴 COLOMBIAN CONTEXT SANITIZER: Replace non-Colombian country references
+      const nonColombianCountries = /\b(venezuela|venezuela\w*|perú|peru\w*|méxico|mexico\w*|chile|chile\w*|argentina|argentin\w*|ecuador|panamá|panama\w*|costa rica)\b/gi;
+      
+      if (nonColombianCountries.test(sanitized.message)) {
+        console.log('🚫 [COUNTRY_SANITIZER] Detected non-Colombian country reference, normalizing to Colombia');
+        
+        // Replace country names with "Colombia"
+        sanitized.message = sanitized.message.replace(nonColombianCountries, 'Colombia');
+        
+        // Log the sanitization for audit
+        console.log(`🇨🇴 [COUNTRY_SANITIZER] Normalized message: ${sanitized.message.substring(0, 100)}...`);
+      }
     }
     
     return sanitized;
