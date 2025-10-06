@@ -59,15 +59,16 @@ export const ModuleNavigation: React.FC<ModuleNavigationProps> = ({ collapsed })
   return (
     <div className="space-y-1">
       {filteredNavigation.map((item) => {
-        const isActive = location.pathname === item.href;
+        const isActive = location.pathname === item.href || location.pathname.startsWith(item.href + '/');
         
         return (
           <Link
             key={item.name}
             to={item.href}
+            aria-current={isActive ? 'page' : undefined}
             className={cn(
               "group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors",
-              "hover:bg-muted/40 active:scale-[0.98]",
+              "hover:bg-muted/40",
               isActive
                 ? "bg-primary/5 text-primary border-l-2 border-primary"
                 : "text-foreground/70 hover:text-foreground border-l-2 border-transparent",

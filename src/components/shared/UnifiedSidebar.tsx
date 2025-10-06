@@ -56,6 +56,29 @@ export const UnifiedSidebar: React.FC = () => {
     }
   }, [currentConversationId, user?.id, companyId]);
 
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const isCmdOrCtrl = e.metaKey || e.ctrlKey;
+      if (!isCmdOrCtrl) return;
+      const key = e.key.toLowerCase();
+      if (key === 'b') {
+        e.preventDefault();
+        const newValue = !collapsed;
+        setCollapsed(newValue);
+        localStorage.setItem(STORAGE_KEY, String(newValue));
+      } else if (key === 'k') {
+        e.preventDefault();
+        const el = document.getElementById('sidebar-search') as HTMLInputElement | null;
+        el?.focus();
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [collapsed]);
+
   const loadConversations = async () => {
     console.log('📋 UnifiedSidebar: loadConversations llamado', {
       hasUser: !!user?.id,

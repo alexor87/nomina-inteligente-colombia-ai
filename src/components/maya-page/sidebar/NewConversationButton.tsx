@@ -21,6 +21,7 @@ export const NewConversationButton: React.FC<NewConversationButtonProps> = ({
         onClick={onClick}
         className="w-full bg-muted hover:bg-muted/80 text-foreground border border-border/50 py-2.5"
         size={collapsed ? "icon" : "sm"}
+        title={collapsed ? 'Nueva conversación' : undefined}
       >
         <Plus className="h-4 w-4" />
         {!collapsed && <span className="ml-1.5 text-sm">Nueva conversación</span>}
