@@ -1647,6 +1647,7 @@ serve(async (req) => {
       case 'getTotalIncapacityDays':
       case 'getIncapacityReport':
       case 'getContributionReport':
+      case 'getPayrollProjection':
       case 'getTotalOvertimeHours':
       case 'getPayrollMonthlyVariation': {
         console.log(`🔀 [ROUTER] Routing ${intent.method} to IntentRouter`);
