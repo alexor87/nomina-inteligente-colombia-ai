@@ -51,39 +51,47 @@ export const ArchiveToggle: React.FC<ArchiveToggleProps> = ({
   }
 
   return (
-    <div className="relative bg-muted/30 rounded-md p-0.5 flex gap-0.5">
+    <div className="relative bg-muted/50 rounded-lg p-0.5 flex gap-0.5">
       <button
         onClick={() => onModeChange('active')}
-        className={`relative flex-1 px-2 py-1 rounded text-xs font-medium transition-colors flex items-center justify-center gap-1.5 ${
+        className={`relative flex-1 px-2 py-1.5 rounded-md text-xs font-medium transition-all flex items-center justify-center gap-1 ${
           mode === 'active'
             ? 'text-foreground'
             : 'text-muted-foreground hover:text-foreground'
         }`}
       >
-        <span>Activas ({activeCount})</span>
+        <span>Activas</span>
+        <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">
+          {activeCount}
+        </Badge>
         {mode === 'active' && (
           <motion.div
             layoutId="archive-toggle-indicator"
-            className="absolute inset-0 bg-background rounded shadow-sm -z-10"
-            transition={{ type: 'spring', bounce: 0.15, duration: 0.5 }}
+            className="absolute inset-0 bg-background rounded-md shadow-sm -z-10"
+            transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
           />
         )}
       </button>
       
       <button
         onClick={() => onModeChange('archived')}
-        className={`relative flex-1 px-2 py-1 rounded text-xs font-medium transition-colors flex items-center justify-center gap-1.5 ${
+        className={`relative flex-1 px-2 py-1.5 rounded-md text-xs font-medium transition-all flex items-center justify-center gap-1 ${
           mode === 'archived'
             ? 'text-foreground'
             : 'text-muted-foreground hover:text-foreground'
         }`}
       >
-        <span>Archivadas ({archivedCount})</span>
+        <span>Archivadas</span>
+        {archivedCount > 0 && (
+          <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">
+            {archivedCount}
+          </Badge>
+        )}
         {mode === 'archived' && (
           <motion.div
             layoutId="archive-toggle-indicator"
-            className="absolute inset-0 bg-background rounded shadow-sm -z-10"
-            transition={{ type: 'spring', bounce: 0.15, duration: 0.5 }}
+            className="absolute inset-0 bg-background rounded-md shadow-sm -z-10"
+            transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
           />
         )}
       </button>

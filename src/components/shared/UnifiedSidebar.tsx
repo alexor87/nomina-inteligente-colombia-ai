@@ -56,29 +56,6 @@ export const UnifiedSidebar: React.FC = () => {
     }
   }, [currentConversationId, user?.id, companyId]);
 
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      const isCmdOrCtrl = e.metaKey || e.ctrlKey;
-      if (!isCmdOrCtrl) return;
-      const key = e.key.toLowerCase();
-      if (key === 'b') {
-        e.preventDefault();
-        const newValue = !collapsed;
-        setCollapsed(newValue);
-        localStorage.setItem(STORAGE_KEY, String(newValue));
-      } else if (key === 'k') {
-        e.preventDefault();
-        const el = document.getElementById('sidebar-search') as HTMLInputElement | null;
-        el?.focus();
-      }
-    };
-
-    window.addEventListener('keydown', onKeyDown);
-    return () => {
-      window.removeEventListener('keydown', onKeyDown);
-    };
-  }, [collapsed]);
-
   const loadConversations = async () => {
     console.log('📋 UnifiedSidebar: loadConversations llamado', {
       hasUser: !!user?.id,
@@ -214,10 +191,10 @@ export const UnifiedSidebar: React.FC = () => {
       >
         <div className="flex flex-col h-full">
           {/* SECCIÓN SUPERIOR: MAYA */}
-          <div className="flex-none flex flex-col border-b border-border bg-muted/30" style={{ maxHeight: '45vh' }}>
-            <SidebarHeader collapsed={collapsed} onToggle={handleToggleCollapse} />
+          <div className="flex-none flex flex-col border-b border-border" style={{ maxHeight: '45vh' }}>
+            <SidebarHeader collapsed={collapsed} />
             
-            <div className="px-2.5 py-2">
+            <div className="px-3 py-2">
               <NewConversationButton 
                 onClick={handleNewConversation} 
                 collapsed={collapsed}
@@ -225,7 +202,7 @@ export const UnifiedSidebar: React.FC = () => {
             </div>
 
             {!collapsed && (
-              <div className="px-2.5 pb-2">
+              <div className="px-3 pb-2">
                 <ArchiveToggle
                   mode={viewMode}
                   onModeChange={setViewMode}
@@ -236,7 +213,7 @@ export const UnifiedSidebar: React.FC = () => {
             )}
 
             {!collapsed && (
-              <div className="px-2.5 pb-2">
+              <div className="px-3 pb-2">
                 <ConversationSearch 
                   onSearch={setSearchQuery} 
                   collapsed={collapsed}
@@ -277,9 +254,16 @@ export const UnifiedSidebar: React.FC = () => {
 
           {/* SECCIÓN INFERIOR: MÓDULOS */}
           <div className="flex-1 flex flex-col min-h-0">
-            <nav className="flex-1 px-2.5 py-3 overflow-y-auto">
+            <nav className="flex-1 px-3 py-4 overflow-y-auto">
               <ModuleNavigation collapsed={collapsed} />
             </nav>
+
+            <div className="p-2 border-t border-border flex-shrink-0">
+              <ToggleButton 
+                collapsed={collapsed} 
+                onToggle={handleToggleCollapse} 
+              />
+            </div>
           </div>
         </div>
       </motion.aside>
@@ -303,7 +287,7 @@ export const UnifiedSidebar: React.FC = () => {
               className="md:hidden fixed left-0 top-0 bottom-0 w-72 bg-background border-r border-border z-50 flex flex-col"
             >
               <div className="flex flex-col h-full">
-                <SidebarHeader collapsed={false} onToggle={handleToggleCollapse} />
+                <SidebarHeader collapsed={false} />
                 
                 <div className="p-3 border-b border-border">
                   <NewConversationButton onClick={handleNewConversation} />
@@ -342,6 +326,13 @@ export const UnifiedSidebar: React.FC = () => {
                 <nav className="flex-1 px-3 py-4 overflow-y-auto">
                   <ModuleNavigation collapsed={false} />
                 </nav>
+
+                <div className="p-2 border-t border-border">
+                  <ToggleButton 
+                    collapsed={false} 
+                    onToggle={handleToggleCollapse} 
+                  />
+                </div>
               </div>
             </motion.aside>
           </>
