@@ -29,10 +29,16 @@ export const MayaHistorySidebar: React.FC = () => {
 
   const conversationManager = MayaConversationManager.getInstance();
 
-  // Load conversations on mount
+  // ✅ Cargar conversaciones cuando user y profile estén disponibles
   useEffect(() => {
-    loadConversations();
-  }, [user]);
+    if (user?.id && profile?.company_id) {
+      console.log('🔄 Sidebar: user y profile listos, cargando conversaciones...', {
+        userId: user.id,
+        companyId: profile.company_id
+      });
+      loadConversations();
+    }
+  }, [user?.id, profile?.company_id]);
 
   // ⚡ Recargar conversaciones cuando cambia currentConversationId
   useEffect(() => {
@@ -42,14 +48,25 @@ export const MayaHistorySidebar: React.FC = () => {
   }, [currentConversationId]);
 
   const loadConversations = async () => {
-    if (!user?.id || !profile?.company_id) return;
+    console.log('📋 Sidebar: loadConversations llamado', {
+      hasUser: !!user?.id,
+      hasCompanyId: !!profile?.company_id,
+      userId: user?.id,
+      companyId: profile?.company_id
+    });
+    
+    if (!user?.id || !profile?.company_id) {
+      console.warn('⚠️ Sidebar: No se puede cargar, falta user o company_id');
+      return;
+    }
     
     setIsLoading(true);
     try {
       const convs = await conversationManager.getConversations(user.id, profile.company_id);
+      console.log('✅ Sidebar: Conversaciones cargadas:', convs.length);
       setConversations(convs);
     } catch (error) {
-      console.error('Error loading conversations:', error);
+      console.error('❌ Sidebar: Error loading conversations:', error);
       toast.error('Error al cargar conversaciones');
     } finally {
       setIsLoading(false);
