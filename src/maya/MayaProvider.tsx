@@ -711,8 +711,20 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
   }, [setPhase, chatService, conversationManager, setCurrentConversationId]);
 
   const deleteCurrentConversation = useCallback(async () => {
+    // Si no hay conversación en BD, solo limpiar estado local
     if (!currentConversationId) {
-      toast.error('No hay conversación activa para eliminar');
+      console.log('🧹 MAYA: No DB conversation, clearing local state only');
+      chatService.clearConversation();
+      setChatHistory([]);
+      setIsChatMode(false);
+      
+      if (activeFlow) {
+        flowManager.cancelFlow(activeFlow);
+        setActiveFlow(null);
+      }
+      
+      await setPhase('initial');
+      toast.success('Conversación limpiada');
       return;
     }
 
