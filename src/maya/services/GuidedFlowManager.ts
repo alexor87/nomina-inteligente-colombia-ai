@@ -518,6 +518,12 @@ export class GuidedFlowManager {
         allNumeric: Number.isFinite(totalDevengado) && Number.isFinite(totalDeducciones) && Number.isFinite(totalNeto)
       });
 
+      // 🔒 SECURITY: Pre-flight validation de company_id
+      if (period.company_id !== profile.company_id) {
+        console.error(`🚨 [SECURITY] Cross-company access blocked: period.company_id=${period.company_id}, profile.company_id=${profile.company_id}`);
+        throw new Error('🔒 Error de seguridad: El período no pertenece a tu empresa actual. Verifica que estés en la empresa correcta.');
+      }
+
       return {
         success: true,
         period_id: period.id,
@@ -535,7 +541,7 @@ export class GuidedFlowManager {
               periodId: period.id,
               startDate: period.fecha_inicio,
               endDate: period.fecha_fin,
-              companyId: profile.company_id,
+              companyId: profile.company_id, // ✅ Validado contra profile
               periodName: period.periodo
             },
             requiresConfirmation: true,

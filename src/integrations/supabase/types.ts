@@ -3192,6 +3192,10 @@ export type Database = {
         Args: { p_employee_id: string }
         Returns: boolean
       }
+      validate_support_company_access: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: boolean
+      }
       vector_avg: {
         Args: { "": number[] }
         Returns: string

@@ -11,6 +11,96 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 );
 
+// ============================================================================
+// 🔒 CORPORATE SECURITY: Company Access Validation
+// ============================================================================
+
+/**
+ * Validates that the requested companyId matches the authenticated user's profile
+ * CRITICAL: Prevents cross-company data access attacks
+ */
+async function validateCompanyAccess(
+  requestedCompanyId: string,
+  authHeader: string | null
+): Promise<{ valid: boolean; userId?: string; userCompanyId?: string; error?: string }> {
+  if (!authHeader) {
+    return { valid: false, error: 'No authorization header' };
+  }
+
+  try {
+    // Extract JWT token from Authorization header
+    const token = authHeader.replace('Bearer ', '');
+    
+    // Verify JWT and get user
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      console.error('[SECURITY] Auth validation failed:', authError);
+      return { valid: false, error: 'Authentication failed' };
+    }
+
+    // Get user's company from profile
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('company_id')
+      .eq('user_id', user.id)
+      .single();
+
+    if (profileError || !profile?.company_id) {
+      console.error('[SECURITY] Profile lookup failed:', profileError);
+      return { valid: false, userId: user.id, error: 'No company profile found' };
+    }
+
+    // Validate company match
+    const isValid = profile.company_id === requestedCompanyId;
+    
+    if (!isValid) {
+      console.warn(`🚨 [SECURITY VIOLATION] User ${user.id} attempted cross-company access: requested=${requestedCompanyId}, actual=${profile.company_id}`);
+      await logSecurityViolation(user.id, profile.company_id, requestedCompanyId, 'cross_company_access_attempt');
+    }
+
+    return {
+      valid: isValid,
+      userId: user.id,
+      userCompanyId: profile.company_id,
+      error: isValid ? undefined : 'Company access denied'
+    };
+  } catch (error: any) {
+    console.error('[SECURITY] Validation error:', error);
+    return { valid: false, error: error.message };
+  }
+}
+
+/**
+ * Logs security violations to audit table
+ */
+async function logSecurityViolation(
+  userId: string,
+  userCompanyId: string,
+  requestedCompanyId: string,
+  violationType: string
+) {
+  try {
+    await supabase.from('security_audit_log').insert({
+      table_name: 'maya_actions',
+      action: 'EXECUTE_ACTION',
+      violation_type: violationType,
+      query_attempted: 'execute-maya-action edge function',
+      additional_data: {
+        userId,
+        userCompanyId,
+        requestedCompanyId,
+        timestamp: new Date().toISOString(),
+        source: 'execute-maya-action'
+      },
+      user_id: userId,
+      company_id: userCompanyId
+    });
+  } catch (error) {
+    console.error('[SECURITY] Failed to log violation:', error);
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -19,6 +109,26 @@ serve(async (req) => {
   try {
     const { action } = await req.json();
     console.log(`[execute-maya-action] Executing action:`, action);
+
+    // 🔒 SECURITY: Validate company access if companyId is present
+    if (action.parameters?.companyId) {
+      const authHeader = req.headers.get('authorization');
+      const validation = await validateCompanyAccess(action.parameters.companyId, authHeader);
+      
+      if (!validation.valid) {
+        console.error(`🚨 [SECURITY] Action blocked:`, validation.error);
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            message: '🔒 Acceso denegado: No tienes permiso para realizar acciones en esta empresa.',
+            securityError: true
+          }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      console.log(`✅ [SECURITY] Company access validated for user ${validation.userId}`);
+    }
 
     // Voucher actions
     if (action.type === 'send_voucher' || action.type === 'confirm_send_voucher') {
