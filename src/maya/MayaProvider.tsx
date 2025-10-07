@@ -698,11 +698,11 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
           }
         }
 
-        // 4. Si no hay conversaciones, crear una nueva automáticamente
+        // 4. Si no hay conversaciones, esperar a que el usuario escriba
         const existingConvs = await conversationManager.getConversations(user.id, companyId);
         if (existingConvs.length === 0) {
-          const newConvId = await createNewConversation();
-          console.log('✨ MAYA Provider: Created initial conversation', { id: newConvId });
+          console.log('📝 MAYA Provider: No conversations yet, waiting for first message');
+          // No crear conversación - se creará automáticamente cuando el usuario envíe el primer mensaje
         }
 
       } catch (error) {
