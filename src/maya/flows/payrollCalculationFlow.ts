@@ -1,4 +1,5 @@
 import { GuidedFlow, FlowType, FlowStepType } from '../types/GuidedFlow';
+import { NOVEDAD_CATEGORIES } from '@/types/novedades-enhanced';
 
 export const payrollCalculationFlow: GuidedFlow = {
   id: FlowType.PAYROLL_CALCULATE,
@@ -101,7 +102,11 @@ Este proceso incluye:
       ],
       nextStep: (data, input) => {
         if (input === 'skip_novelties') return 'calculation_preview';
-        if (input?.startsWith('add_')) return 'novelty_input';
+        if (input?.startsWith('add_')) {
+          // Guardar el tipo de novedad seleccionado
+          data.last_novelty_action = input;
+          return 'novelty_subtype_selection';
+        }
         return 'novelties_check';
       },
       canGoBack: true,
@@ -109,14 +114,91 @@ Este proceso incluye:
       skipToStep: 'calculation_preview'
     },
 
+    novelty_subtype_selection: {
+      id: 'novelty_subtype_selection',
+      type: FlowStepType.SELECT,
+      message: (data) => {
+        const actionTypeMap: Record<string, string> = {
+          'add_overtime': 'Horas extras',
+          'add_disability': 'Incapacidad',
+          'add_bonus': 'Bono/Prima',
+          'add_absence': 'Ausencia'
+        };
+        const typeLabel = actionTypeMap[data.last_novelty_action || ''] || 'novedad';
+        
+        // Generar opciones dinámicamente
+        const actionToNovedadTypeMap: Record<string, string[]> = {
+          'add_overtime': ['horas_extra'],
+          'add_disability': ['incapacidad'],
+          'add_bonus': ['bonificacion', 'auxilio_transporte', 'comisiones'],
+          'add_absence': ['ausencia_justificada', 'ausencia_injustificada']
+        };
+        
+        const noveltyAction = data.last_novelty_action || '';
+        const novedadTypes = actionToNovedadTypeMap[noveltyAction] || [];
+        
+        let optionsText = '';
+        novedadTypes.forEach((novedadType: string) => {
+          // Buscar en devengados
+          const devengadosObj = NOVEDAD_CATEGORIES.devengados as any;
+          const deduccionesObj = NOVEDAD_CATEGORIES.deducciones as any;
+          const config = devengadosObj[novedadType] || deduccionesObj[novedadType];
+          
+          if (config?.subtipos) {
+            optionsText += `\n**${config.label}:**\n`;
+            config.subtipos.forEach((subtipo: string) => {
+              optionsText += `• ${subtipo.replace(/_/g, ' ')}\n`;
+            });
+          }
+        });
+        
+        return `🎯 **Selecciona el tipo de ${typeLabel}**\n${optionsText}\n¿Qué tipo específico deseas registrar?`;
+      },
+      quickReplies: [
+        { label: '⏱️ Diurnas', value: 'horas_extra:diurnas', icon: '⏱️' },
+        { label: '🌙 Nocturnas', value: 'horas_extra:nocturnas', icon: '🌙' },
+        { label: '⏱️🌞 Diurnas Dominicales', value: 'horas_extra:diurnas_dominicales', icon: '⏱️' },
+        { label: '🌙🌞 Nocturnas Dominicales', value: 'horas_extra:nocturnas_dominicales', icon: '🌙' },
+        { label: '🏥 EPS', value: 'incapacidad:eps', icon: '🏥' },
+        { label: '🏥 ARL', value: 'incapacidad:arl', icon: '🏥' },
+        { label: '🎁 Bonificación', value: 'bonificacion:default', icon: '🎁' },
+        { label: '🚌 Auxilio Transporte', value: 'auxilio_transporte:default', icon: '🚌' },
+        { label: '💰 Comisiones', value: 'comisiones:default', icon: '💰' },
+        { label: '✅ Justificada', value: 'ausencia_justificada:default', icon: '✅' },
+        { label: '❌ Injustificada', value: 'ausencia_injustificada:default', icon: '❌' }
+      ],
+      nextStep: (data, input) => {
+        // Guardar el tipo y subtipo seleccionado
+        if (input) {
+          const [tipoNovedad, subtipo] = input.split(':');
+          data.selected_novedad_type = tipoNovedad;
+          data.selected_novedad_subtype = subtipo !== 'default' ? subtipo : undefined;
+        }
+        return 'novelty_input';
+      },
+      canGoBack: true
+    },
+
     novelty_input: {
       id: 'novelty_input',
       type: FlowStepType.INPUT,
       message: (data) => {
-        const noveltyType = data.last_novelty_action || 'novedad';
-        return `📝 **Registrar novedad**\n\nIngresa los detalles de la ${noveltyType}:\n\nEjemplo: "Juan Pérez, 10 horas extras"`;
+        const tipoLabel = data.selected_novedad_type?.replace(/_/g, ' ') || 'novedad';
+        const subtipoLabel = data.selected_novedad_subtype?.replace(/_/g, ' ') || '';
+        const fullLabel = subtipoLabel ? `${tipoLabel} - ${subtipoLabel}` : tipoLabel;
+        
+        let example = 'Ejemplo: "Juan Pérez, 10 horas"';
+        if (data.selected_novedad_type?.includes('horas')) {
+          example = 'Ejemplo: "Juan Pérez, 10 horas"';
+        } else if (data.selected_novedad_type?.includes('incapacidad') || data.selected_novedad_type?.includes('ausencia')) {
+          example = 'Ejemplo: "Juan Pérez, 3 días"';
+        } else if (data.selected_novedad_type?.includes('bono') || data.selected_novedad_type?.includes('comision')) {
+          example = 'Ejemplo: "Juan Pérez, 500000"';
+        }
+        
+        return `📝 **Registrar ${fullLabel}**\n\nIngresa los detalles:\n\n${example}`;
       },
-      inputPlaceholder: 'Empleado, cantidad/descripción',
+      inputPlaceholder: 'Empleado, cantidad',
       inputType: 'text',
       validationRules: [
         { type: 'required', message: 'Debes ingresar los detalles de la novedad' },
