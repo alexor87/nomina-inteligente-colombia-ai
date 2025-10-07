@@ -276,6 +276,42 @@ export class GuidedFlowManager {
           periods
         };
       }
+
+      // Check if this is an action execution step
+      if (flowState.currentStep === 'action_execution') {
+        const pendingAction = flowState.accumulatedData._pending_action;
+        
+        if (!pendingAction) {
+          throw new Error('No pending action found for execution');
+        }
+
+        console.log('🎬 Executing pending action:', pendingAction);
+
+        // Execute the action via edge function
+        const { supabase } = await import('@/integrations/supabase/client');
+        
+        const { data: actionResult, error } = await supabase.functions.invoke('execute-maya-action', {
+          body: { action: pendingAction }
+        });
+
+        if (error) {
+          console.error('❌ Action execution failed:', error);
+          return {
+            success: false,
+            message: `Error al ejecutar la acción: ${error.message}`
+          };
+        }
+
+        console.log('✅ Action executed successfully:', actionResult);
+
+        // Store the result for the next step
+        flowState.accumulatedData._action_execution_result = actionResult;
+
+        // Clear the pending action
+        delete flowState.accumulatedData._pending_action;
+
+        return actionResult;
+      }
       
       switch (flowState.flowId) {
         case FlowType.EMPLOYEE_CREATE:

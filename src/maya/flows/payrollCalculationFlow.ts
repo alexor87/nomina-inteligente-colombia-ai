@@ -324,23 +324,106 @@ Este proceso incluye:
 
 La nómina ha sido calculada y está lista para su revisión.`;
       },
-      quickReplies: [
-        { label: '📋 Ver nómina calculada', value: 'view_payroll' },
-        { label: '📧 Enviar comprobantes', value: 'send_vouchers' },
-        { label: '✅ Listo', value: 'completed' }
-      ],
+      quickReplies: (data) => {
+        const result = data._executionResult || {};
+        const executableActions = result.executableActions || [];
+        
+        // Si hay acciones ejecutables disponibles, usarlas
+        if (executableActions.length > 0) {
+          return executableActions.map((action: any) => ({
+            label: action.label,
+            value: `action_${action.id}`,
+            icon: action.icon
+          }));
+        }
+        
+        // Fallback: Si no hay acciones (no debería pasar), mostrar "Listo"
+        return [
+          { label: '✅ Listo', value: 'completed' }
+        ];
+      },
       nextStep: (data, input) => {
-        // 🆕 FASE 1: Usar callback para navegación externa
-        if (input === 'view_payroll') {
-          // Trigger navigation via provider callback
-          data._navigate_url = '/payroll/liquidation';
+        const result = data._executionResult || {};
+        const executableActions = result.executableActions || [];
+        
+        // Si el input empieza con "action_", es una acción ejecutable
+        if (input?.startsWith('action_')) {
+          const actionId = input.replace('action_', '');
+          const action = executableActions.find((a: any) => a.id === actionId);
+          
+          if (action) {
+            // Guardar la acción para que Maya la ejecute
+            data._pending_action = action;
+            return 'action_execution';
+          }
+        }
+        
+        // Si el input es "completed", terminar el flujo
+        if (input === 'completed') {
           return 'completed';
         }
-        if (input === 'send_vouchers') {
-          // Trigger navigation via provider callback
-          data._navigate_url = '/payroll/vouchers';
-          return 'completed';
+        
+        // Fallback
+        return 'completed';
+      },
+      canGoBack: false
+    },
+
+    action_execution: {
+      id: 'action_execution',
+      type: FlowStepType.EXECUTION,
+      message: '⚙️ **Ejecutando acción...**\n\nPor favor espera.',
+      nextStep: () => 'action_result',
+      canGoBack: false
+    },
+
+    action_result: {
+      id: 'action_result',
+      type: FlowStepType.RESULT,
+      message: (data) => {
+        const actionResult = data._action_execution_result || {};
+        
+        if (actionResult.success) {
+          return actionResult.message || '✅ Acción completada exitosamente.';
+        } else {
+          return actionResult.message || '❌ Error al ejecutar la acción.';
         }
+      },
+      quickReplies: (data) => {
+        const actionResult = data._action_execution_result || {};
+        const nextActions = actionResult.data?.nextActions || [];
+        
+        // Si hay acciones siguientes disponibles, mostrarlas
+        if (nextActions.length > 0) {
+          return nextActions.map((action: any) => ({
+            label: action.label,
+            value: `action_${action.id}`,
+            icon: action.icon
+          }));
+        }
+        
+        // Si no hay más acciones, ofrecer finalizar
+        return [
+          { label: '✅ Finalizar', value: 'completed' }
+        ];
+      },
+      nextStep: (data, input) => {
+        const actionResult = data._action_execution_result || {};
+        const nextActions = actionResult.data?.nextActions || [];
+        
+        // Si el input empieza con "action_", es otra acción ejecutable
+        if (input?.startsWith('action_')) {
+          const actionId = input.replace('action_', '');
+          const action = nextActions.find((a: any) => a.id === actionId);
+          
+          if (action) {
+            // Guardar la nueva acción para ejecutar
+            data._pending_action = action;
+            return 'action_execution';
+          }
+        }
+        
+        // Si el input es "completed", terminar el flujo
         return 'completed';
       },
       canGoBack: false
