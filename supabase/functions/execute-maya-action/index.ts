@@ -584,18 +584,39 @@ async function executeLiquidatePayrollCompleteAction(action: any) {
 
     console.log(`[execute-maya-action] 📋 Loaded ${employees.length} active employees`);
 
-    // Step 2: Calculate working days for the period
+    // Step 2: 🔍 Buscar período existente antes de calcular (evitar duplicados)
+    console.log(`[execute-maya-action] 🔍 Buscando período existente: ${companyId}, ${startDate} - ${endDate}`);
+    const { data: existingPeriod } = await supabase
+      .from('payroll_periods_real')
+      .select('id, estado, empleados_count, tipo_periodo')
+      .eq('company_id', companyId)
+      .eq('fecha_inicio', startDate)
+      .eq('fecha_fin', endDate)
+      .maybeSingle();
+
+    let actualPeriodId = periodId;
+    let periodType = 'mensual';
+    let workedDays = 30;
+
+    if (existingPeriod) {
+      console.log(`[execute-maya-action] ✅ Período existente encontrado: ${existingPeriod.id}`);
+      actualPeriodId = existingPeriod.id;
+      periodType = existingPeriod.tipo_periodo;
+    }
+
+    // Calculate working days for the period
     const start = new Date(startDate);
     const end = new Date(endDate);
     const diffTime = Math.abs(end.getTime() - start.getTime());
-    const workedDays = Math.min(Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1, 30);
+    workedDays = Math.min(Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1, 30);
 
-    // Determine period type based on worked days
-    let periodType = 'mensual';
-    if (workedDays <= 7) {
-      periodType = 'semanal';
-    } else if (workedDays <= 15) {
-      periodType = 'quincenal';
+    // Determine period type based on worked days if not found
+    if (!existingPeriod) {
+      if (workedDays <= 7) {
+        periodType = 'semanal';
+      } else if (workedDays <= 15) {
+        periodType = 'quincenal';
+      }
     }
 
     console.log(`[execute-maya-action] 📅 Period: ${startDate} to ${endDate}, Days: ${workedDays}, Type: ${periodType}`);
@@ -623,7 +644,7 @@ async function executeLiquidatePayrollCompleteAction(action: any) {
         .from('payroll_novedades')
         .select('*')
         .eq('empleado_id', employee.id)
-        .eq('periodo_id', periodId);
+        .eq('periodo_id', actualPeriodId);
 
       console.log(`[execute-maya-action] 🧮 Calculating payroll for employee ${employee.id} with ${novedades?.length || 0} novedades`);
 
@@ -660,7 +681,7 @@ async function executeLiquidatePayrollCompleteAction(action: any) {
         company_id: companyId,
         employee_id: employee.id,
         periodo: periodName,
-        period_id: periodId,
+        period_id: actualPeriodId,
         salario_base: employee.salario_base,
         dias_trabajados: workedDays,
         total_devengado: calculation.grossPay,
@@ -688,7 +709,7 @@ async function executeLiquidatePayrollCompleteAction(action: any) {
 
     console.log(`[execute-maya-action] ✅ Inserted ${payrollRecords.length} payroll records`);
 
-    // Step 6: Update period status to closed and update totals
+    // Step 6: Update period status to closed and update totals (usar actualPeriodId)
     const { error: updateError } = await supabase
       .from('payroll_periods_real')
       .update({
@@ -702,7 +723,7 @@ async function executeLiquidatePayrollCompleteAction(action: any) {
         last_activity_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
-      .eq('id', periodId);
+      .eq('id', actualPeriodId);
 
     if (updateError) {
       throw new Error(`Error actualizando período: ${updateError.message}`);
@@ -710,12 +731,30 @@ async function executeLiquidatePayrollCompleteAction(action: any) {
 
     console.log(`[execute-maya-action] 🔒 Period ${periodName} closed successfully`);
 
+    // 🔒 VERIFICACIÓN FINAL: Asegurar estado 'cerrado' (defensa contra race conditions)
+    const { data: verifyPeriod } = await supabase
+      .from('payroll_periods_real')
+      .select('estado')
+      .eq('id', actualPeriodId)
+      .single();
+
+    if (verifyPeriod && verifyPeriod.estado !== 'cerrado') {
+      console.warn('[execute-maya-action] ⚠️ Estado no persistió, forzando cierre...');
+      await supabase
+        .from('payroll_periods_real')
+        .update({ 
+          estado: 'cerrado',
+          last_activity_at: new Date().toISOString() 
+        })
+        .eq('id', actualPeriodId);
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
         message: `✅ Nómina liquidada y período cerrado exitosamente para **${periodName}**.\n\n📊 **Resumen:**\n• Empleados procesados: ${employees.length}\n• Total devengado: $${totalDevengado.toLocaleString('es-CO')}\n• Total deducciones: $${totalDeducciones.toLocaleString('es-CO')}\n• Total neto: $${totalNeto.toLocaleString('es-CO')}\n\n✨ El período está ahora cerrado y listo para envío de comprobantes.`,
         data: {
-          periodId,
+          periodId: actualPeriodId, // Devolver el ID correcto
           periodName,
           employeesProcessed: employees.length,
           totalDevengado,

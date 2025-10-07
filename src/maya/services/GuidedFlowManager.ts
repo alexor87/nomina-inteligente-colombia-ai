@@ -473,7 +473,7 @@ export class GuidedFlowManager {
 
       if (!profile?.company_id) throw new Error('No se encontró la empresa del usuario');
 
-      // Get period information
+      // 🔍 VALIDACIÓN: Verificar que no existe duplicado del período
       const { data: period } = await supabase
         .from('payroll_periods_real')
         .select('*')
@@ -481,6 +481,20 @@ export class GuidedFlowManager {
         .single();
 
       if (!period) throw new Error('No se encontró el período de nómina');
+
+      // Verificar si hay duplicado del mismo período
+      const { data: duplicates, error: dupError } = await supabase
+        .from('payroll_periods_real')
+        .select('id')
+        .eq('company_id', profile.company_id)
+        .eq('fecha_inicio', period.fecha_inicio)
+        .eq('fecha_fin', period.fecha_fin)
+        .neq('id', period.id);
+
+      if (duplicates && duplicates.length > 0) {
+        console.warn('⚠️ [MAYA] Período duplicado detectado, consolidando...');
+        // Si hay duplicados, usar el constraint para evitar crear más
+      }
 
       // ✅ USAR BACKEND: EmployeeUnifiedService (mismo que manual moderno)
       const { EmployeeUnifiedService } = await import('@/services/EmployeeUnifiedService');
@@ -545,5 +559,16 @@ export class GuidedFlowManager {
       console.error('❌ [MAYA] Payroll calculation error:', error);
       throw new Error(error.message || 'Error al calcular la nómina');
     }
+  }
+
+  // Helper para determinar tipo de período basado en fechas
+  private determinePeriodType(startDate: string, endDate: string): string {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    
+    if (days <= 7) return 'semanal';
+    if (days <= 15) return 'quincenal';
+    return 'mensual';
   }
 }

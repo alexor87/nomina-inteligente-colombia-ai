@@ -2818,6 +2818,10 @@ export type Database = {
         Args: { p_company_name?: string; p_nit?: string; p_user_email: string }
         Returns: Json
       }
+      consolidate_duplicate_periods: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       create_company_with_setup: {
         Args: {
           p_ciudad?: string
