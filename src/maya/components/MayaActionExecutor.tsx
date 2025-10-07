@@ -4,11 +4,12 @@ import { ExecutableAction, ActionExecutionResult } from '../types/ExecutableActi
 import { VoucherSendDialog } from '@/components/payroll/modals/VoucherSendDialog';
 import { PayrollEmployee } from '@/types/payroll';
 import { supabase } from '@/integrations/supabase/client';
-import { Send, User, FileText, Eye, Loader2, Calendar, MessageCircle } from 'lucide-react';
+import { Send, User, FileText, Eye, Loader2, Calendar, MessageCircle, Save } from 'lucide-react';
 import { InlineSearchResults } from './inline/InlineSearchResults';
 import { EmployeeWithStatus } from '@/types/employee-extended';
 import { EmployeeDetailsModal } from '@/components/employees/EmployeeDetailsModal';
 import { useMaya } from '../MayaProvider';
+import { useNavigate } from 'react-router-dom';
 
 interface MayaActionExecutorProps {
   actions: ExecutableAction[];
@@ -37,12 +38,14 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
   const [showEmployeeDetails, setShowEmployeeDetails] = useState(false);
   
   const { sendMessage } = useMaya();
+  const navigate = useNavigate();
 
   const getActionIcon = (type: string) => {
     switch (type) {
       case 'send_voucher': return Send;
       case 'send_voucher_all': return Send;
       case 'confirm_send_voucher': return Send;
+      case 'liquidate_payroll_complete': return Save;
       case 'expand_periods': return Calendar;
       case 'search_employee': return User;
       case 'send_message': return MessageCircle;
@@ -122,6 +125,8 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
       case 'send_voucher_all':
         return await executeAutomatically(action);
       case 'confirm_send_voucher':
+        return await executeAutomatically(action);
+      case 'liquidate_payroll_complete':
         return await executeAutomatically(action);
       case 'expand_periods':
         return await handleExpandPeriods(action);
@@ -298,11 +303,50 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
   };
 
   const executeViewDetails = async (action: ExecutableAction): Promise<ActionExecutionResult> => {
-    // This would typically navigate to details view
-    return {
-      success: true,
-      message: `Viendo detalles de: ${action.parameters.entityName}`
-    };
+    const { entityType, entityId, entityName, navigationPath } = action.parameters;
+    
+    try {
+      // Si viene con navigationPath, navegar directamente
+      if (navigationPath) {
+        console.log(`🧭 Navigating to: ${navigationPath}`);
+        navigate(navigationPath);
+        
+        return {
+          success: true,
+          message: `Navegando a ${entityName}...`
+        };
+      }
+      
+      // Si no, construir ruta según entityType
+      let path = '/';
+      switch (entityType) {
+        case 'period':
+          path = `/modules/liquidation?period=${entityId}`;
+          break;
+        case 'employee':
+          path = `/employees/${entityId}`;
+          break;
+        case 'payroll':
+          path = `/modules/liquidation?payroll=${entityId}`;
+          break;
+        default:
+          throw new Error(`Tipo de entidad no soportado: ${entityType}`);
+      }
+      
+      console.log(`🧭 Navigating to constructed path: ${path}`);
+      navigate(path);
+      
+      return {
+        success: true,
+        message: `Viendo detalles de: ${entityName}`
+      };
+    } catch (error: any) {
+      console.error('❌ Navigation error:', error);
+      return {
+        success: false,
+        message: `Error al navegar: ${error.message}`
+      };
+    }
   };
 
   const handleExpandPeriods = async (action: ExecutableAction): Promise<ActionExecutionResult> => {

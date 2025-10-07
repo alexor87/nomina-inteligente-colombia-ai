@@ -1,6 +1,6 @@
 export interface ExecutableAction {
   id: string;
-  type: 'send_voucher' | 'search_employee' | 'generate_report' | 'view_details' | 'confirm_send_voucher' | 'show_period_alternatives' | 'send_voucher_all' | 'expand_periods' | 'list_employees' | 'send_message';
+  type: 'send_voucher' | 'search_employee' | 'generate_report' | 'view_details' | 'confirm_send_voucher' | 'show_period_alternatives' | 'send_voucher_all' | 'expand_periods' | 'list_employees' | 'send_message' | 'liquidate_payroll_complete';
   label: string;
   description?: string;
   parameters: Record<string, any>;

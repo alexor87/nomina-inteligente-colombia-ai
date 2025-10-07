@@ -25,9 +25,13 @@ serve(async (req) => {
       return await executeSendVoucherAction(action);
     }
 
-    if (action.type === 'send_voucher_all') {
-      return await executeSendVoucherAllAction(action);
-    }
+  if (action.type === 'send_voucher_all') {
+    return await executeSendVoucherAllAction(action);
+  }
+
+  if (action.type === 'liquidate_payroll_complete') {
+    return await executeLiquidatePayrollCompleteAction(action);
+  }
 
     // Employee CRUD actions
     if (action.type === 'create_employee') {
@@ -683,7 +687,33 @@ async function executeLiquidatePayrollCompleteAction(action: any) {
           totalDevengado,
           totalDeducciones,
           totalNeto,
-          estado: 'cerrado'
+          estado: 'cerrado',
+          nextActions: [
+            {
+              id: 'view_payroll',
+              type: 'view_details',
+              label: '👁️ Ver Nómina Liquidada',
+              description: 'Revisar detalles de la nómina procesada',
+              parameters: {
+                entityType: 'period',
+                entityId: periodId,
+                entityName: periodName,
+                navigationPath: `/modules/liquidation?period=${periodId}`
+              }
+            },
+            {
+              id: 'send_vouchers',
+              type: 'send_voucher_all',
+              label: '📧 Enviar Comprobantes a Todos',
+              description: `Enviar comprobantes de pago a ${employees.length} empleados`,
+              parameters: {
+                periodId: periodId,
+                periodName: periodName,
+                employeeCount: employees.length
+              },
+              requiresConfirmation: true
+            }
+          ]
         }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
