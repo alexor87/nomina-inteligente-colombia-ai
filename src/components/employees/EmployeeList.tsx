@@ -497,7 +497,10 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
                         <DropdownMenuContent>
                           {showDeleted ? (
                             <DropdownMenuItem 
-                              onClick={() => handleRestoreEmployee(employee.id, `${employee.nombre} ${employee.apellido}`)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRestoreEmployee(employee.id, `${employee.nombre} ${employee.apellido}`);
+                              }}
                               className="text-green-600"
                             >
                               <Undo2 className="w-4 h-4 mr-2" />
@@ -505,12 +508,18 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
                             </DropdownMenuItem>
                           ) : (
                             <>
-                              <DropdownMenuItem onClick={() => navigate(`/modules/employees/${employee.id}/edit`)}>
+                              <DropdownMenuItem onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/modules/employees/${employee.id}/edit`);
+                              }}>
                                 <Edit className="w-4 h-4 mr-2" />
                                 Editar
                               </DropdownMenuItem>
                               <DropdownMenuItem 
-                                onClick={() => handleSoftDelete(employee.id, `${employee.nombre} ${employee.apellido}`)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSoftDelete(employee.id, `${employee.nombre} ${employee.apellido}`);
+                                }}
                                 className="text-red-600"
                               >
                                 <Trash2 className="w-4 h-4 mr-2" />
