@@ -47,8 +47,8 @@ serve(async (req) => {
     }
 
     // Payroll CRUD actions
-    if (action.type === 'liquidate_payroll') {
-      return await executeLiquidatePayrollAction(action);
+    if (action.type === 'liquidate_payroll_complete') {
+      return await executeLiquidatePayrollCompleteAction(action);
     }
 
     if (action.type === 'register_vacation') {
@@ -551,34 +551,148 @@ async function executeSearchEmployeeAction(action: any) {
 // PAYROLL CRUD ACTIONS
 // ============================================================================
 
-async function executeLiquidatePayrollAction(action: any) {
-  const { periodName, companyId } = action.parameters;
+async function executeLiquidatePayrollCompleteAction(action: any) {
+  const { periodId, startDate, endDate, companyId, periodName } = action.parameters;
   
-  if (!periodName || !companyId) {
+  if (!periodId || !startDate || !endDate || !companyId) {
     throw new Error('Información incompleta para liquidar nómina');
   }
 
-  console.log(`[execute-maya-action] Liquidating payroll for period: ${periodName}`);
+  console.log(`[execute-maya-action] 🚀 Executing complete payroll liquidation for period: ${periodName}`, {
+    periodId, startDate, endDate, companyId
+  });
 
-  // This is a complex operation that would normally involve:
-  // 1. Finding or creating the payroll period
-  // 2. Calculating payroll for all active employees
-  // 3. Applying deductions and benefits
-  // 4. Generating vouchers
+  try {
+    // Step 1: Load active employees for the company
+    const { data: employees, error: employeesError } = await supabase
+      .from('employees')
+      .select('*')
+      .eq('company_id', companyId)
+      .eq('estado', 'activo');
 
-  // For now, return guidance to use the UI since this is a critical operation
-  return new Response(
-    JSON.stringify({
-      success: true,
-      message: `⚠️ La liquidación de nómina para "${periodName}" es una operación compleja que se debe realizar desde la sección de Nómina para garantizar todos los cálculos y validaciones.\n\n¿Te gustaría que te guíe en el proceso paso a paso?`,
-      data: {
-        periodName: periodName,
-        requiresUIGuidance: true,
-        suggestedPath: '/app/payroll'
-      }
-    }),
-    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-  );
+    if (employeesError) {
+      throw new Error(`Error cargando empleados: ${employeesError.message}`);
+    }
+
+    if (!employees || employees.length === 0) {
+      throw new Error('No se encontraron empleados activos para liquidar');
+    }
+
+    console.log(`[execute-maya-action] 📋 Loaded ${employees.length} active employees`);
+
+    // Step 2: Calculate working days for the period
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    const workedDays = Math.min(Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1, 30);
+
+    console.log(`[execute-maya-action] 📅 Period: ${startDate} to ${endDate}, Days: ${workedDays}`);
+
+    // Step 3: Get payroll configuration for the company
+    const { data: config } = await supabase
+      .from('company_payroll_configurations')
+      .select('*')
+      .eq('company_id', companyId)
+      .eq('year', new Date().getFullYear().toString())
+      .single();
+
+    const salaryMin = config?.salary_min || 1423500;
+    const transportAllowance = config?.transport_allowance || 200000;
+
+    // Step 4: Calculate payroll for each employee
+    const payrollRecords = [];
+    let totalDevengado = 0;
+    let totalDeducciones = 0;
+    let totalNeto = 0;
+
+    for (const employee of employees) {
+      const baseSalary = employee.salario_base;
+      const proportionalSalary = (baseSalary / 30) * workedDays;
+      
+      // Calculate transport allowance if applicable
+      const auxTransporte = baseSalary <= (2 * salaryMin) ? 
+        (transportAllowance / 30) * workedDays : 0;
+
+      // Calculate deductions (simplified for now)
+      const saludDeduccion = proportionalSalary * 0.04; // 4% health
+      const pensionDeduccion = proportionalSalary * 0.04; // 4% pension
+      const deductions = saludDeduccion + pensionDeduccion;
+
+      const netPay = proportionalSalary + auxTransporte - deductions;
+
+      payrollRecords.push({
+        company_id: companyId,
+        employee_id: employee.id,
+        periodo: periodName,
+        period_id: periodId,
+        salario_base: baseSalary,
+        dias_trabajados: workedDays,
+        total_devengado: proportionalSalary + auxTransporte,
+        total_deducciones: deductions,
+        neto_pagado: netPay,
+        estado: 'procesada',
+        created_at: new Date().toISOString()
+      });
+
+      totalDevengado += proportionalSalary + auxTransporte;
+      totalDeducciones += deductions;
+      totalNeto += netPay;
+    }
+
+    console.log(`[execute-maya-action] 💰 Totals calculated - Devengado: ${totalDevengado}, Deducciones: ${totalDeducciones}, Neto: ${totalNeto}`);
+
+    // Step 5: Insert payroll records
+    const { error: insertError } = await supabase
+      .from('payrolls')
+      .insert(payrollRecords);
+
+    if (insertError) {
+      throw new Error(`Error insertando registros de nómina: ${insertError.message}`);
+    }
+
+    console.log(`[execute-maya-action] ✅ Inserted ${payrollRecords.length} payroll records`);
+
+    // Step 6: Update period status to closed and update totals
+    const { error: updateError } = await supabase
+      .from('payroll_periods_real')
+      .update({
+        estado: 'cerrado',
+        empleados_count: employees.length,
+        total_devengado: totalDevengado,
+        total_deducciones: totalDeducciones,
+        total_neto: totalNeto,
+        calculated_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', periodId);
+
+    if (updateError) {
+      throw new Error(`Error actualizando período: ${updateError.message}`);
+    }
+
+    console.log(`[execute-maya-action] 🔒 Period ${periodName} closed successfully`);
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: `✅ Nómina liquidada y período cerrado exitosamente para **${periodName}**.\n\n📊 **Resumen:**\n• Empleados procesados: ${employees.length}\n• Total devengado: $${totalDevengado.toLocaleString('es-CO')}\n• Total deducciones: $${totalDeducciones.toLocaleString('es-CO')}\n• Total neto: $${totalNeto.toLocaleString('es-CO')}\n\n✨ El período está ahora cerrado y listo para envío de comprobantes.`,
+        data: {
+          periodId,
+          periodName,
+          employeesProcessed: employees.length,
+          totalDevengado,
+          totalDeducciones,
+          totalNeto,
+          estado: 'cerrado'
+        }
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+
+  } catch (error: any) {
+    console.error('[execute-maya-action] ❌ Error in complete liquidation:', error);
+    throw error;
+  }
 }
 
 async function executeRegisterVacationAction(action: any) {

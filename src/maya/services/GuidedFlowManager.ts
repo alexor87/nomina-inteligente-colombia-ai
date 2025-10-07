@@ -471,7 +471,35 @@ export class GuidedFlowManager {
         employees_processed: employees.length,
         total_devengado: totalDevengado,
         total_deducciones: totalDeducciones,
-        total_neto: totalNeto
+        total_neto: totalNeto,
+        executableActions: [
+          {
+            id: 'liquidate_complete',
+            type: 'liquidate_payroll_complete',
+            label: '✅ Liquidar y Cerrar Período',
+            description: 'Cierra el período y crea los registros de nómina definitivos',
+            parameters: {
+              periodId: period.id,
+              startDate: period.fecha_inicio,
+              endDate: period.fecha_fin,
+              companyId: profile.company_id,
+              periodName: period.periodo
+            },
+            requiresConfirmation: true,
+            icon: '💾'
+          },
+          {
+            id: 'view_payroll',
+            type: 'view_details',
+            label: '👁️ Ver Nómina Calculada',
+            description: 'Navega al módulo de liquidación para revisar detalles',
+            parameters: {
+              entityType: 'period',
+              entityId: period.id,
+              entityName: period.periodo
+            }
+          }
+        ]
       };
 
     } catch (error: any) {
