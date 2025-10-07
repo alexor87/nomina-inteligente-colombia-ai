@@ -722,7 +722,7 @@ serve(async (req) => {
         });
         
         // Route to execute-maya-action edge function with auth
-        const { data, error } = await supabase.functions.invoke('execute-maya-action', {
+        const { data, error } = await userSupabase.functions.invoke('execute-maya-action', {
           body: { action },
           headers: {
             Authorization: authHeader
