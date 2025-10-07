@@ -64,6 +64,8 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
   const [isUpdating, setIsUpdating] = useState(false);
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
   const [showImportDrawer, setShowImportDrawer] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [employeeToDelete, setEmployeeToDelete] = useState<{id: string, name: string} | null>(null);
 
   const getStatusBadge = (status: string) => {
     const variants = {
@@ -97,28 +99,38 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
     }
   };
 
-  const handleSoftDelete = async (employeeId: string, employeeName: string) => {
+  const handleSoftDelete = (employeeId: string, employeeName: string) => {
+    setEmployeeToDelete({ id: employeeId, name: employeeName });
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!employeeToDelete) return;
+    
     try {
-      const result = await EmployeeService.deleteEmployee(employeeId);
+      const result = await EmployeeService.deleteEmployee(employeeToDelete.id);
       if (result.success) {
         toast({
-          title: "Empleado eliminado",
-          description: `${employeeName} ha sido eliminado correctamente.`,
+          title: "Empleado archivado",
+          description: `${employeeToDelete.name} ha sido archivado. Puedes restaurarlo usando el botón "Ver eliminados".`,
         });
         await refreshEmployees();
       } else {
         toast({
           title: "Error",
-          description: result.error || "No se pudo eliminar el empleado",
+          description: result.error || "No se pudo archivar el empleado",
           variant: "destructive"
         });
       }
     } catch (error) {
       toast({
         title: "Error",
-        description: "Error inesperado al eliminar empleado",
+        description: "Error inesperado al archivar empleado",
         variant: "destructive"
       });
+    } finally {
+      setDeleteDialogOpen(false);
+      setEmployeeToDelete(null);
     }
   };
 
@@ -545,6 +557,24 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
           )}
         </CardContent>
       </Card>
+
+      {/* Single Employee Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Archivar empleado?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Estás a punto de archivar a <strong>{employeeToDelete?.name}</strong>. El empleado no será eliminado permanentemente de la base de datos y podrás restaurarlo en cualquier momento usando el botón "Ver eliminados" en la parte superior de la lista.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
+              Archivar empleado
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Bulk Delete Confirmation Dialog */}
       <AlertDialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
