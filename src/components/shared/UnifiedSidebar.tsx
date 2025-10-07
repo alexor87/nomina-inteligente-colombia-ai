@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useMaya } from '@/maya/MayaProvider';
@@ -15,6 +15,7 @@ import { SidebarHeader } from './sidebar/SidebarHeader';
 import { SidebarDivider } from './sidebar/SidebarDivider';
 import { ModuleNavigation } from './sidebar/ModuleNavigation';
 import { ToggleButton } from './sidebar/ToggleButton';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const STORAGE_KEY = 'unified_sidebar_collapsed';
 
@@ -37,6 +38,7 @@ export const UnifiedSidebar: React.FC = () => {
   const loadConversation = mayaContext?.loadConversation || (async () => {});
   const navigate = useNavigate();
   const location = useLocation();
+  const isMobile = useIsMobile();
   const [collapsed, setCollapsed] = useState(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
     return stored === 'true';
@@ -47,6 +49,26 @@ export const UnifiedSidebar: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
+  const prevDeletingRef = useRef(isDeleting);
+
+  // Diagnostics: log overlay mount/unmount
+  useEffect(() => {
+    if (isMobile && !collapsed) {
+      console.log('📱 UnifiedSidebar overlay-mounted', { isMobile, collapsed });
+      return () => console.log('📱 UnifiedSidebar overlay-unmounted');
+    }
+  }, [isMobile, collapsed]);
+
+  // Failsafe: after deletion finishes on mobile, force collapse
+  useEffect(() => {
+    const prev = prevDeletingRef.current;
+    if (prev && !isDeleting && isMobile) {
+      console.log('📱 UnifiedSidebar: deletion finished, collapsing');
+      setCollapsed(true);
+      localStorage.setItem(STORAGE_KEY, 'true');
+    }
+    prevDeletingRef.current = isDeleting;
+  }, [isDeleting, isMobile]);
 
   const conversationManager = MayaConversationManager.getInstance();
 
@@ -209,6 +231,10 @@ export const UnifiedSidebar: React.FC = () => {
       toast.error('Error al eliminar');
     } finally {
       setIsDeleting(false);
+      if (isMobile) {
+        setCollapsed(true);
+        localStorage.setItem(STORAGE_KEY, 'true');
+      }
     }
   };
 
@@ -310,7 +336,7 @@ export const UnifiedSidebar: React.FC = () => {
 
       {/* Mobile Overlay Sidebar */}
       <AnimatePresence>
-        {!collapsed && (
+        {isMobile && !collapsed && (
           <>
             <motion.div
               initial={{ opacity: 0 }}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -12,7 +12,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { MayaConversationManager } from '@/maya/services/MayaConversationManager';
 import { ConversationSummary } from '@/maya/types';
 import { toast } from 'sonner';
-
+import { useIsMobile } from '@/hooks/use-mobile';
+ 
 const STORAGE_KEY = 'maya_sidebar_collapsed';
 
 export const MayaHistorySidebar: React.FC = () => {
@@ -33,6 +34,7 @@ export const MayaHistorySidebar: React.FC = () => {
   const loadConversation = mayaContext?.loadConversation || (async () => {});
   const navigate = useNavigate();
   const location = useLocation();
+  const isMobile = useIsMobile();
   const [collapsed, setCollapsed] = useState(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
     return stored === 'true';
@@ -43,7 +45,27 @@ export const MayaHistorySidebar: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
-
+  const prevDeletingRef = useRef(isDeleting);
+ 
+  // Diagnostics: log overlay mount/unmount
+  useEffect(() => {
+    if (isMobile && !collapsed) {
+      console.log('📱 MayaHistorySidebar overlay-mounted', { isMobile, collapsed });
+      return () => console.log('📱 MayaHistorySidebar overlay-unmounted');
+    }
+  }, [isMobile, collapsed]);
+ 
+  // Failsafe: after deletion finishes on mobile, force collapse
+  useEffect(() => {
+    const prev = prevDeletingRef.current;
+    if (prev && !isDeleting && isMobile) {
+      console.log('📱 MayaHistorySidebar: deletion finished, collapsing');
+      setCollapsed(true);
+      localStorage.setItem(STORAGE_KEY, 'true');
+    }
+    prevDeletingRef.current = isDeleting;
+  }, [isDeleting, isMobile]);
+ 
   const conversationManager = MayaConversationManager.getInstance();
 
   // ✅ Cargar conversaciones cuando user y profile estén disponibles
@@ -205,6 +227,10 @@ export const MayaHistorySidebar: React.FC = () => {
       toast.error('Error al eliminar');
     } finally {
       setIsDeleting(false);
+      if (isMobile) {
+        setCollapsed(true);
+        localStorage.setItem(STORAGE_KEY, 'true');
+      }
     }
   };
 
@@ -297,7 +323,7 @@ export const MayaHistorySidebar: React.FC = () => {
 
       {/* Mobile Overlay Sidebar */}
       <AnimatePresence>
-        {!collapsed && (
+        {isMobile && !collapsed && (
           <>
             <motion.div
               initial={{ opacity: 0 }}
