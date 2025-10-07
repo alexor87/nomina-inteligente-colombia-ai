@@ -461,43 +461,48 @@ export class GuidedFlowManager {
         throw new Error('No se pudo determinar el período de nómina');
       }
 
-      // Get employees for the period
-      const { data: employees } = await supabase
-        .from('employees')
-        .select('*')
-        .eq('company_id', profile.company_id)
-        .eq('estado', 'activo');
-
-      if (!employees || employees.length === 0) {
-        throw new Error('No hay empleados activos para calcular');
-      }
-
-      // Call recalculation service
-      const { PayrollRecalculationService } = await import('@/services/PayrollRecalculationService');
-      const result = await PayrollRecalculationService.recalculateIBC(periodId, profile.company_id);
+      // ✅ NUEVO: Usar servicio unificado con modo 'calculation' (solo preview)
+      const { PayrollUnifiedAtomicService } = await import('@/services/PayrollUnifiedAtomicService');
+      
+      console.log('🚀 [MAYA] Ejecutando cálculo con servicio unificado (modo: calculation)');
+      
+      const result = await PayrollUnifiedAtomicService.execute(
+        periodId,
+        profile.company_id,
+        {
+          mode: 'calculation', // Solo cálculo, no cierra período ni genera vouchers
+          generateVouchers: false,
+          closePeriod: false,
+          sendEmails: false,
+          userId: user.id
+        }
+      );
 
       if (!result.success) {
         throw new Error(result.error || 'Error al calcular la nómina');
       }
 
-      // Get updated period totals
-      const { data: period } = await supabase
-        .from('payroll_periods_real')
-        .select('*')
-        .eq('id', periodId)
-        .single();
+      console.log('✅ [MAYA] Cálculo completado:', {
+        employeesProcessed: result.employeesProcessed,
+        employeesCreated: result.employeesCreated, // ✅ FIX: Empleados creados
+        totalDevengado: result.totalDevengado,
+        totalDeducciones: result.totalDeducciones,
+        totalNeto: result.totalNeto
+      });
 
       return {
         success: true,
-        period_id: periodId,
-        employees_processed: result.employees_processed,
-        total_devengado: period?.total_devengado || 0,
-        total_deducciones: period?.total_deducciones || 0,
-        total_neto: period?.total_neto || 0
+        period_id: result.periodId,
+        employees_processed: result.employeesProcessed,
+        employees_created: result.employeesCreated, // ✅ FIX: Reportar empleados creados
+        total_devengado: result.totalDevengado,
+        total_deducciones: result.totalDeducciones,
+        total_neto: result.totalNeto,
+        mode: result.mode
       };
 
     } catch (error: any) {
-      console.error('❌ Payroll calculation error:', error);
+      console.error('❌ [MAYA] Payroll calculation error:', error);
       throw new Error(error.message || 'Error al calcular la nómina');
     }
   }

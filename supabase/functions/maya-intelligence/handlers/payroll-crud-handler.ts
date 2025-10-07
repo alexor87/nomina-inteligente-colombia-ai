@@ -26,6 +26,8 @@ export class PayrollCrudHandler extends BaseHandler {
   }
   
   private async handlePayrollLiquidation(intent: Intent, context?: RichContext): Promise<HandlerResponse> {
+    // ✅ MEJORADO: Ahora Maya puede ejecutar liquidación completa usando el servicio unificado
+    
     // Extract period information
     const periodEntity = intent.entities.find(e => e.type === 'period');
     const periodName = periodEntity?.value;
@@ -36,26 +38,41 @@ export class PayrollCrudHandler extends BaseHandler {
       );
     }
     
-    // Create executable action for payroll liquidation
-    const action: ExecutableAction = {
-      id: `liquidate_payroll_${Date.now()}`,
-      type: 'liquidate_payroll',
-      label: `Liquidar nómina: ${periodName}`,
-      description: `Procesar y liquidar la nómina del período especificado`,
+    // ✅ NUEVA OPCIÓN: Crear dos acciones - calcular (preview) o liquidar completo
+    const calculateAction: ExecutableAction = {
+      id: `calculate_payroll_${Date.now()}`,
+      type: 'calculate_payroll',
+      label: `📊 Calcular (Preview): ${periodName}`,
+      description: `Solo calcular valores sin cerrar el período ni generar vouchers`,
       parameters: {
         periodName: periodName,
         companyId: context?.companyId,
-        includeCalculations: true,
-        generateVouchers: true
+        mode: 'calculation'
+      },
+      requiresConfirmation: false,
+      icon: '📊'
+    };
+    
+    const liquidateAction: ExecutableAction = {
+      id: `liquidate_payroll_full_${Date.now()}`,
+      type: 'liquidate_payroll_full',
+      label: `💰 Liquidar Completo: ${periodName}`,
+      description: `Calcular, cerrar período y generar desprendibles (operación final)`,
+      parameters: {
+        periodName: periodName,
+        companyId: context?.companyId,
+        mode: 'liquidation',
+        generateVouchers: true,
+        closePeriod: true
       },
       requiresConfirmation: true,
       icon: '💰'
     };
     
     return ResponseBuilder.buildExecutableResponse(
-      `Perfecto! Voy a procesar la liquidación de nómina para **${periodName}**.\n\n**El proceso incluirá:**\n• Cálculo de salarios base\n• Aplicación de deducciones legales\n• Procesamiento de novedades\n• Generación de desprendibles\n\n⚠️ **Importante:** Esta operación procesará todos los empleados activos.`,
-      [action],
-      'analyzing'
+      `Perfecto! ¿Qué quieres hacer con la nómina de **${periodName}**?\n\n**🔍 Opciones disponibles:**\n\n**1️⃣ Calcular (Preview)**\n• Solo calcula valores\n• No cierra el período\n• Puedes revisar antes de liquidar\n• ✅ Soluciona bug de empleados faltantes\n\n**2️⃣ Liquidar Completo**\n• Calcula valores\n• Cierra el período\n• Genera desprendibles\n• ⚠️ Operación final e irreversible\n\nElige una opción:`,
+      [calculateAction, liquidateAction],
+      'neutral'
     );
   }
   
