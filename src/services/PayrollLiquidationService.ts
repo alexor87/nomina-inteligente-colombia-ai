@@ -98,63 +98,50 @@ export class PayrollLiquidationService extends SecureBaseService {
 
   static async loadEmployeesForPeriod(startDate: string, endDate: string, year?: string): Promise<Employee[]> {
     try {
-      console.log('🔒 Loading employees for period securely');
+      console.log('🔒 Loading employees for period using BACKEND calculations');
 
-      // Use secure query to get active employees
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) {
         throw new Error('🔒 [SECURITY] Access denied: No company context');
       }
       
-      const employeesQuery = this.secureQuery('employees', companyId, 'id, nombre, apellido, salario_base', {
-        estado: 'activo'
-      });
+      // Get period ID
+      const periodId = await this.ensurePeriodExists(startDate, endDate);
       
-      const { data: employees, error } = await employeesQuery;
+      // Get period data
+      const { data: period } = await supabase
+        .from('payroll_periods_real')
+        .select('*')
+        .eq('id', periodId)
+        .single();
 
-      if (error) {
-        throw error;
+      if (!period) {
+        throw new Error('Period not found');
       }
 
-      if (!employees || employees.length === 0) {
-        return [];
-      }
+      // ✅ USE BACKEND: PayrollLiquidationNewService for calculations
+      const { PayrollLiquidationNewService } = await import('./PayrollLiquidationNewService');
+      const backendEmployees = await PayrollLiquidationNewService.loadEmployeesForActivePeriod(period);
 
-      const diasTrabajados = this.calculateWorkingDays(startDate, endDate);
-
-      const configYear = year || new Date().getFullYear().toString();
-      
-      const processedEmployees: Employee[] = await Promise.all(employees.map(async (employee) => {
-        const salarioProporcional = (employee.salario_base / 30) * diasTrabajados;
-        const auxilioTransporte = this.calculateTransportAllowance(employee.salario_base, diasTrabajados, configYear);
-        const totalDevengado = salarioProporcional + auxilioTransporte;
-        
-        const deductionResult = await DeductionCalculationService.calculateDeductions({
-          salarioBase: employee.salario_base,
-          totalDevengado: totalDevengado,
-          auxilioTransporte: auxilioTransporte,
-          periodType: 'mensual',
-          year: configYear
-        });
-        
-        return {
-          id: employee.id,
-          nombre: employee.nombre,
-          apellido: employee.apellido,
-          salario_base: employee.salario_base,
-          devengos: 0, // Other accrued items (bonuses, overtime) - not total accrued
-          deducciones: deductionResult.totalDeducciones,
-          total_pagar: totalDevengado - deductionResult.totalDeducciones,
-          dias_trabajados: diasTrabajados,
-          auxilio_transporte: auxilioTransporte,
-          salud_empleado: deductionResult.saludEmpleado,
-          pension_empleado: deductionResult.pensionEmpleado,
-          fondo_solidaridad: deductionResult.fondoSolidaridad,
-          retencion_fuente: deductionResult.retencionFuente,
-          deducciones_novedades: 0
-        };
+      // Map to Employee[] format expected by consumers
+      const processedEmployees: Employee[] = backendEmployees.map(emp => ({
+        id: emp.id,
+        nombre: emp.name.split(' ')[0] || '',
+        apellido: emp.name.split(' ').slice(1).join(' ') || '',
+        salario_base: emp.baseSalary,
+        devengos: 0, // Other accrued (bonuses, overtime)
+        deducciones: emp.deductions,
+        total_pagar: emp.netPay,
+        dias_trabajados: emp.workedDays,
+        auxilio_transporte: emp.transportAllowance,
+        salud_empleado: emp.healthDeduction,
+        pension_empleado: emp.pensionDeduction,
+        fondo_solidaridad: 0,
+        retencion_fuente: 0,
+        deducciones_novedades: 0
       }));
 
+      console.log(`✅ Loaded ${processedEmployees.length} employees using BACKEND`);
       return processedEmployees;
     } catch (error) {
       console.error('Error loading employees for period:', error);
@@ -164,63 +151,52 @@ export class PayrollLiquidationService extends SecureBaseService {
 
   static async loadSpecificEmployeesForPeriod(employeeIds: string[], startDate: string, endDate: string, year?: string): Promise<Employee[]> {
     try {
-      console.log('🔒 Loading specific employees for period securely');
+      console.log('🔒 Loading specific employees for period using BACKEND calculations');
 
-      // Use secure query with IN filter for specific employees
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) {
         throw new Error('🔒 [SECURITY] Access denied: No company context');
       }
       
-      const employeesQuery = this.secureQuery('employees', companyId, 'id, nombre, apellido, salario_base', {
-        estado: 'activo'
-      });
+      // Get period ID
+      const periodId = await this.ensurePeriodExists(startDate, endDate);
       
-      const { data: employees, error } = await employeesQuery.in('id', employeeIds);
+      // Get period data
+      const { data: period } = await supabase
+        .from('payroll_periods_real')
+        .select('*')
+        .eq('id', periodId)
+        .single();
 
-      if (error) {
-        throw error;
+      if (!period) {
+        throw new Error('Period not found');
       }
 
-      if (!employees || employees.length === 0) {
-        return [];
-      }
+      // ✅ USE BACKEND: PayrollLiquidationNewService for calculations
+      const { PayrollLiquidationNewService } = await import('./PayrollLiquidationNewService');
+      const backendEmployees = await PayrollLiquidationNewService.loadEmployeesForActivePeriod(period);
 
-      const diasTrabajados = this.calculateWorkingDays(startDate, endDate);
-
-      const configYear = year || new Date().getFullYear().toString();
-      
-      const processedEmployees: Employee[] = await Promise.all(employees.map(async (employee) => {
-        const salarioProporcional = (employee.salario_base / 30) * diasTrabajados;
-        const auxilioTransporte = this.calculateTransportAllowance(employee.salario_base, diasTrabajados, configYear);
-        const totalDevengado = salarioProporcional + auxilioTransporte;
-        
-        const deductionResult = await DeductionCalculationService.calculateDeductions({
-          salarioBase: employee.salario_base,
-          totalDevengado: totalDevengado,
-          auxilioTransporte: auxilioTransporte,
-          periodType: 'mensual',
-          year: configYear
-        });
-        
-        return {
-          id: employee.id,
-          nombre: employee.nombre,
-          apellido: employee.apellido,
-          salario_base: employee.salario_base,
-          devengos: 0, // Other accrued items (bonuses, overtime) - not total accrued
-          deducciones: deductionResult.totalDeducciones,
-          total_pagar: totalDevengado - deductionResult.totalDeducciones,
-          dias_trabajados: diasTrabajados,
-          auxilio_transporte: auxilioTransporte,
-          salud_empleado: deductionResult.saludEmpleado,
-          pension_empleado: deductionResult.pensionEmpleado,
-          fondo_solidaridad: deductionResult.fondoSolidaridad,
-          retencion_fuente: deductionResult.retencionFuente,
+      // Filter to specific employee IDs and map to Employee[] format
+      const processedEmployees: Employee[] = backendEmployees
+        .filter(emp => employeeIds.includes(emp.id))
+        .map(emp => ({
+          id: emp.id,
+          nombre: emp.name.split(' ')[0] || '',
+          apellido: emp.name.split(' ').slice(1).join(' ') || '',
+          salario_base: emp.baseSalary,
+          devengos: 0,
+          deducciones: emp.deductions,
+          total_pagar: emp.netPay,
+          dias_trabajados: emp.workedDays,
+          auxilio_transporte: emp.transportAllowance,
+          salud_empleado: emp.healthDeduction,
+          pension_empleado: emp.pensionDeduction,
+          fondo_solidaridad: 0,
+          retencion_fuente: 0,
           deducciones_novedades: 0
-        };
-      }));
+        }));
 
+      console.log(`✅ Loaded ${processedEmployees.length} specific employees using BACKEND`);
       return processedEmployees;
     } catch (error) {
       console.error('Error loading specific employees for period:', error);

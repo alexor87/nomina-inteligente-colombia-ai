@@ -482,54 +482,22 @@ export class GuidedFlowManager {
 
       if (!period) throw new Error('No se encontró el período de nómina');
 
-      // ✅ USAR SERVICIO DEL MANUAL: PayrollLiquidationService
-      const { PayrollLiquidationService } = await import('@/services/PayrollLiquidationService');
+      // ✅ USAR BACKEND: EmployeeUnifiedService (mismo que manual moderno)
+      const { EmployeeUnifiedService } = await import('@/services/EmployeeUnifiedService');
       
-      console.log('🚀 [MAYA] Cargando empleados con PayrollLiquidationService (mismo que manual)');
+      console.log('🚀 [MAYA] Cargando empleados con EmployeeUnifiedService (BACKEND)');
       
-      // Load employees with calculations (same as manual)
-      const employees = await PayrollLiquidationService.loadEmployeesForPeriod(
-        period.fecha_inicio,
-        period.fecha_fin,
-        new Date().getFullYear().toString()
-      );
+      // Load employees with BACKEND calculations
+      const employees = await EmployeeUnifiedService.getEmployeesForPeriod(period.id);
 
-      console.log(`✅ [MAYA] ${employees.length} empleados cargados con cálculos`);
+      console.log(`✅ [MAYA] ${employees.length} empleados cargados con BACKEND`);
 
-      // 🔍 Debug employee data before totals
-      console.log('🔍 [MAYA] Employees data before totals:', 
-        employees.map(emp => ({
-          id: emp.id,
-          nombre: `${emp.nombre} ${emp.apellido}`,
-          salario_base: emp.salario_base,
-          dias_trabajados: emp.dias_trabajados,
-          auxilio_transporte: emp.auxilio_transporte,
-          devengos: emp.devengos,
-          deducciones: emp.deducciones,
-          types: {
-            salario_base: typeof emp.salario_base,
-            dias_trabajados: typeof emp.dias_trabajados,
-            auxilio_transporte: typeof emp.auxilio_transporte,
-            devengos: typeof emp.devengos,
-            deducciones: typeof emp.deducciones
-          }
-        }))
-      );
+      // ✅ Totals come directly from BACKEND calculations
+      const totalDevengado = employees.reduce((sum, emp) => sum + emp.totalEarnings, 0);
+      const totalDeducciones = employees.reduce((sum, emp) => sum + emp.totalDeductions, 0);
+      const totalNeto = employees.reduce((sum, emp) => sum + emp.netPay, 0);
 
-      // Calculate totals aligned with manual liquidator
-      // Formula per employee: (salario_base/30)*dias_trabajados + auxilio_transporte + (devengos||0)
-      const totalDevengado = employees.reduce((sum, emp) => {
-        const proportionalSalary = (Number(emp.salario_base || 0) / 30) * Number(emp.dias_trabajados || 0);
-        const transportAid = Number(emp.auxilio_transporte || 0);
-        const otherAccrued = Number(emp.devengos || 0);
-        const employeeTotal = proportionalSalary + transportAid + otherAccrued;
-        return sum + employeeTotal;
-      }, 0);
-      
-      const totalDeducciones = employees.reduce((sum, emp) => sum + Number(emp.deducciones || 0), 0);
-      const totalNeto = totalDevengado - totalDeducciones;
-
-      console.log('💰 [MAYA] Calculated totals:', {
+      console.log('💰 [MAYA] Backend totals:', {
         totalDevengado: Math.round(totalDevengado),
         totalDeducciones: Math.round(totalDeducciones),
         totalNeto: Math.round(totalNeto),
