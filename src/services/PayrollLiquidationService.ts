@@ -142,7 +142,7 @@ export class PayrollLiquidationService extends SecureBaseService {
           nombre: employee.nombre,
           apellido: employee.apellido,
           salario_base: employee.salario_base,
-          devengos: totalDevengado,
+          devengos: 0, // Other accrued items (bonuses, overtime) - not total accrued
           deducciones: deductionResult.totalDeducciones,
           total_pagar: totalDevengado - deductionResult.totalDeducciones,
           dias_trabajados: diasTrabajados,
@@ -208,7 +208,7 @@ export class PayrollLiquidationService extends SecureBaseService {
           nombre: employee.nombre,
           apellido: employee.apellido,
           salario_base: employee.salario_base,
-          devengos: totalDevengado,
+          devengos: 0, // Other accrued items (bonuses, overtime) - not total accrued
           deducciones: deductionResult.totalDeducciones,
           total_pagar: totalDevengado - deductionResult.totalDeducciones,
           dias_trabajados: diasTrabajados,

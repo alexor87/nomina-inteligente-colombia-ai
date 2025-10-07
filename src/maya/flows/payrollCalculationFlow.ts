@@ -314,13 +314,16 @@ Este proceso incluye:
         const totalDeductions = result.total_deducciones || 0;
         const totalNet = result.total_neto || 0;
         
+        // Helper to format numbers consistently
+        const fmt = (n: any) => new Intl.NumberFormat('es-CO').format(Math.round(Number(n) || 0));
+        
         return `✅ **¡Nómina calculada exitosamente!**
 
 📊 **Resumen:**
 • Empleados procesados: **${employeeCount}**
-• Total devengado: **$${Number(totalGross).toLocaleString('es-CO')}**
-• Total deducciones: **$${Number(totalDeductions).toLocaleString('es-CO')}**
-• **Neto a pagar: $${Number(totalNet).toLocaleString('es-CO')}**
+• Total devengado: **$${fmt(totalGross)}**
+• Total deducciones: **$${fmt(totalDeductions)}**
+• **Neto a pagar: $${fmt(totalNet)}**
 
 La nómina ha sido calculada y está lista para su revisión.`;
       },
