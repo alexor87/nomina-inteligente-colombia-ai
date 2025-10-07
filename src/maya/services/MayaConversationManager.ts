@@ -119,6 +119,7 @@ export class MayaConversationManager {
 
   /**
    * Load messages from a specific conversation
+   * 🆕 FASE 4: Con restauración de metadata de flujo
    */
   async loadConversationMessages(conversationId: string): Promise<ChatMessage[]> {
     try {
@@ -139,7 +140,11 @@ export class MayaConversationManager {
         executableActions: msg.metadata?.executableActions,
         quickReplies: msg.metadata?.quickReplies,
         fieldName: msg.metadata?.fieldName,
-        conversationState: msg.metadata?.conversationState
+        conversationState: msg.metadata?.conversationState,
+        // 🆕 FASE 4: Restaurar metadata de flujo
+        isFlowMessage: msg.metadata?.isFlowMessage,
+        flowId: msg.metadata?.flowId,
+        stepId: msg.metadata?.stepId
       })) || [];
 
       console.log('💬 MAYA: Loaded conversation messages', { conversationId, count: chatMessages.length });
@@ -152,6 +157,7 @@ export class MayaConversationManager {
 
   /**
    * Save a message to a conversation
+   * 🆕 FASE 4: Con metadata de flujo para persistir estado
    */
   async saveMessage(conversationId: string, message: ChatMessage): Promise<void> {
     try {
@@ -165,7 +171,15 @@ export class MayaConversationManager {
             executableActions: message.executableActions,
             quickReplies: message.quickReplies,
             fieldName: message.fieldName,
-            conversationState: message.conversationState
+            conversationState: message.conversationState,
+            // 🆕 FASE 4: Persistir estado de flujo
+            isFlowMessage: message.isFlowMessage,
+            flowId: message.flowId,
+            stepId: message.stepId,
+            flowCompleted: message.stepId === 'completed' || 
+                          message.stepId === 'result' ||
+                          message.content?.includes('✅ Proceso completado') ||
+                          message.content?.includes('¡Nómina calculada exitosamente!')
           }
         });
 

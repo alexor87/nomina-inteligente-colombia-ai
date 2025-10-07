@@ -39,6 +39,7 @@ interface MayaProviderValue {
   advanceFlow: (userInput: string) => Promise<void>;
   goBackInFlow: () => void;
   cancelFlow: () => void;
+  completeFlowAndNavigate: (url: string) => void;
 }
 
 const MayaContext = createContext<MayaProviderValue | null>(null);
@@ -358,8 +359,40 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
     console.log('🚀 Flow started:', flowType, initialStep);
   }, [flowManager, chatService]);
 
+  // 🆕 FASE 1: Cleanup y navegación externa (DECLARAR ANTES de advanceFlow)
+  const completeFlowAndNavigate = useCallback((url: string) => {
+    console.log('🚀 MAYA: Completing flow and navigating', { url });
+    
+    if (activeFlow) {
+      flowManager.completeFlow(activeFlow);
+      setActiveFlow(null);
+    }
+    
+    if (currentConversationId) {
+      conversationManager.updateConversationTitle(
+        currentConversationId, 
+        '✅ Flujo completado'
+      ).catch(err => console.error('❌ Failed to update conversation title', err));
+    }
+    
+    setTimeout(() => {
+      window.location.href = url;
+    }, 100);
+  }, [activeFlow, currentConversationId, flowManager, conversationManager]);
+
   const advanceFlow = useCallback(async (userInput: string) => {
     if (!activeFlow) return;
+    
+    // 🆕 FASE 3: Crear conversación si no existe (para quick replies)
+    if (!currentConversationId) {
+      console.log('🆕 MAYA: Creating conversation for flow action');
+      try {
+        await createNewConversation();
+      } catch (error) {
+        console.error('❌ MAYA: Failed to create conversation for flow', error);
+        // Continue anyway - flow can work without DB persistence
+      }
+    }
     
     const result = await flowManager.advance(activeFlow, userInput);
     
@@ -377,6 +410,30 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
     }
     
     setActiveFlow(result.flowState);
+    
+    // 🆕 FASE 1: Detectar navegación externa después de completed
+    if (result.currentStep.id === 'completed' && result.flowState.accumulatedData._navigate_url) {
+      const navigateUrl = result.flowState.accumulatedData._navigate_url;
+      console.log('🚀 MAYA: Flow completed with navigation', { url: navigateUrl });
+      
+      // Add final step message
+      const stepMessage: ChatMessage = {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: result.currentStep.message,
+        timestamp: new Date().toISOString(),
+        isFlowMessage: true,
+        flowId: result.flowState.flowId,
+        stepId: result.currentStep.id
+      };
+      
+      chatService.addMessage(stepMessage);
+      setChatHistory([...chatService.getConversation().messages]);
+      
+      // Trigger navigation via callback
+      completeFlowAndNavigate(navigateUrl);
+      return;
+    }
     
     // Add next step message
     const stepMessage: ChatMessage = {
@@ -501,7 +558,7 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
       flowManager.completeFlow(result.flowState);
       setActiveFlow(null);
     }
-  }, [activeFlow, flowManager, chatService]);
+  }, [activeFlow, flowManager, chatService, completeFlowAndNavigate, createNewConversation, currentConversationId]);
 
   const goBackInFlow = useCallback(() => {
     if (!activeFlow) return;
@@ -767,7 +824,7 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
     }
   }, [currentConversationId, conversationManager, chatService, activeFlow, flowManager, setPhase, loadConversations]);
 
-  // NUEVO: Inicialización completa con migración y carga de conversaciones
+  // 🆕 FASE 2: Inicialización con prevención de re-inicio de flujos completados
   useEffect(() => {
     const initializeConversations = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -793,6 +850,36 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
           if (messages.length > 0) {
             await loadConversation(lastConvId);
             setIsChatMode(true);
+            
+            // 🆕 FASE 2: Detectar si el último mensaje indica flujo completado
+            const lastMessage = messages[messages.length - 1];
+            const isFlowCompleted = 
+              lastMessage?.content?.includes('✅ Proceso completado') ||
+              lastMessage?.content?.includes('¡Nómina calculada exitosamente!') ||
+              lastMessage?.content?.includes('✅ ¡Nómina calculada exitosamente!') ||
+              lastMessage?.stepId === 'completed' ||
+              lastMessage?.stepId === 'result';
+            
+            if (isFlowCompleted) {
+              console.log('🚫 MAYA: Flow already completed, not restoring activeFlow');
+              setActiveFlow(null);
+            } else if (lastMessage?.isFlowMessage && lastMessage?.flowId && lastMessage?.stepId) {
+              // Solo restaurar si está en progreso
+              console.log('🔄 MAYA: Restoring active flow', {
+                flowId: lastMessage.flowId,
+                stepId: lastMessage.stepId
+              });
+              // Restaurar flow state básico (sin history completo)
+              setActiveFlow({
+                flowId: lastMessage.flowId as FlowType,
+                currentStep: lastMessage.stepId,
+                accumulatedData: {},
+                history: [],
+                startedAt: new Date().toISOString(),
+                lastUpdatedAt: new Date().toISOString()
+              });
+            }
+            
             console.log('🔄 MAYA Provider: Restored last conversation', { id: lastConvId });
             return;
           }
@@ -811,7 +898,7 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
     };
 
     initializeConversations();
-  }, [companyId, conversationManager, loadConversations, loadConversation, createNewConversation]);
+  }, [companyId, conversationManager, loadConversations, loadConversation]);
 
   // Legacy: Sync with old localStorage conversation for backward compatibility
   useEffect(() => {
@@ -904,7 +991,8 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
     startGuidedFlow,
     advanceFlow,
     goBackInFlow,
-    cancelFlow
+    cancelFlow,
+    completeFlowAndNavigate
   };
 
   return (

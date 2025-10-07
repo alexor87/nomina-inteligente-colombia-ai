@@ -335,6 +335,12 @@ export class MayaChatService {
   addMessage(message: ChatMessage): void {
     this.currentConversation.messages.push(message);
     this.saveToStorage(); // Persist to localStorage
+    
+    // 🆕 FASE 3: Guardar en BD si hay conversación activa
+    if (this.conversationManager && this.currentConversationId) {
+      this.conversationManager.saveMessage(this.currentConversationId, message)
+        .catch(err => console.error('❌ MAYA Chat: Failed to persist flow message', err));
+    }
   }
 
   getDebugInfo() {

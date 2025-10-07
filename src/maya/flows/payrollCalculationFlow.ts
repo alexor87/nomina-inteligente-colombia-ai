@@ -330,12 +330,15 @@ La nómina ha sido calculada y está lista para su revisión.`;
         { label: '✅ Listo', value: 'completed' }
       ],
       nextStep: (data, input) => {
+        // 🆕 FASE 1: Usar callback para navegación externa
         if (input === 'view_payroll') {
-          window.location.href = '/payroll/liquidation';
+          // Trigger navigation via provider callback
+          data._navigate_url = '/payroll/liquidation';
           return 'completed';
         }
         if (input === 'send_vouchers') {
-          window.location.href = '/payroll/vouchers';
+          // Trigger navigation via provider callback
+          data._navigate_url = '/payroll/vouchers';
           return 'completed';
         }
         return 'completed';
