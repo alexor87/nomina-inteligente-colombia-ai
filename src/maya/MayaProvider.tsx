@@ -415,6 +415,16 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
           return;
         }
 
+        // For current_period_loading step, store period and auto-advance
+        if (result.flowState.currentStep === 'current_period_loading') {
+          result.flowState.accumulatedData.current_period = executionResult.period;
+          result.flowState.accumulatedData.selected_period_id = executionResult.period.id;
+          result.flowState.accumulatedData.period_name = executionResult.period.name;
+          // Auto-advance to employee_selection
+          setTimeout(() => advanceFlow('loaded'), 500);
+          return;
+        }
+
         // For period_list_loading step, store periods and auto-advance
         if (result.flowState.currentStep === 'period_list_loading') {
           result.flowState.accumulatedData.available_periods = executionResult.periods;

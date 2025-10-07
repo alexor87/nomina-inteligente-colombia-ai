@@ -252,6 +252,19 @@ export class GuidedFlowManager {
         };
       }
 
+      // Check if this is a loading step for current period
+      if (flowState.currentStep === 'current_period_loading') {
+        const periodInfo = await this.loadCurrentPeriod(flowState.accumulatedData);
+        flowState.accumulatedData.selected_period_id = periodInfo.id;
+        flowState.accumulatedData.period_name = periodInfo.name;
+        flowState.accumulatedData.current_period = periodInfo;
+        
+        return {
+          success: true,
+          period: periodInfo
+        };
+      }
+
       // Check if this is a loading step for periods
       if (flowState.currentStep === 'period_list_loading') {
         const periods = await this.loadPayrollPeriods(flowState.accumulatedData);
@@ -340,6 +353,25 @@ export class GuidedFlowManager {
       .limit(10);
 
     return periods || [];
+  }
+
+  private async loadCurrentPeriod(data: Record<string, any>): Promise<any> {
+    const { PayrollDomainService } = await import('@/services/PayrollDomainService');
+    
+    const result = await PayrollDomainService.detectCurrentPeriodSituation();
+    
+    if (!result.currentPeriod) {
+      throw new Error('No hay un período activo. Por favor crea un período desde el módulo de nómina.');
+    }
+    
+    return {
+      id: result.currentPeriod.id,
+      name: result.currentPeriod.periodo,
+      tipo_periodo: result.currentPeriod.tipo_periodo,
+      fecha_inicio: result.currentPeriod.fecha_inicio,
+      fecha_fin: result.currentPeriod.fecha_fin,
+      estado: result.currentPeriod.estado
+    };
   }
 
   private async executeEmployeeCreation(data: Record<string, any>): Promise<any> {

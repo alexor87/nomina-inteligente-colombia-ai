@@ -40,8 +40,7 @@ Este proceso incluye:
       ],
       nextStep: (data, input) => {
         if (input === 'current_period') {
-          data.period_name = 'Período actual';
-          return 'employee_selection';
+          return 'current_period_loading';
         }
         if (input === 'list_periods') {
           return 'period_list_loading';
@@ -52,6 +51,14 @@ Este proceso incluye:
         return 'period_selection';
       },
       canGoBack: true
+    },
+
+    current_period_loading: {
+      id: 'current_period_loading',
+      type: FlowStepType.EXECUTION,
+      message: '⏳ **Detectando período actual...**\n\nEstoy identificando el período de nómina activo.',
+      nextStep: () => 'employee_selection',
+      canGoBack: false
     },
 
     period_list_loading: {
