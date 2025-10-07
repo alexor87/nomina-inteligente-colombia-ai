@@ -400,7 +400,15 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
         // Store execution result in flow state
         result.flowState.accumulatedData._executionResult = executionResult;
         
-        // Trigger employee refresh
+        // For loading_employees step, store employee count and auto-advance
+        if (result.flowState.currentStep === 'loading_employees') {
+          result.flowState.accumulatedData.employee_count = executionResult.employee_count;
+          // Auto-advance to novelties_check
+          setTimeout(() => advanceFlow('loaded'), 500);
+          return;
+        }
+        
+        // Trigger employee refresh for employee creation
         if (window.dispatchEvent) {
           window.dispatchEvent(new CustomEvent('employee-created', { 
             detail: executionResult 

@@ -236,6 +236,17 @@ export class GuidedFlowManager {
     console.log(`🎯 Executing flow action for ${flowState.flowId}`, flowState.accumulatedData);
     
     try {
+      // Check if this is a loading step for employee count
+      if (flowState.currentStep === 'loading_employees') {
+        const employeeCount = await this.loadEmployeeCount(flowState.accumulatedData);
+        flowState.accumulatedData.employee_count = employeeCount;
+        
+        return {
+          success: true,
+          employee_count: employeeCount
+        };
+      }
+      
       switch (flowState.flowId) {
         case FlowType.EMPLOYEE_CREATE:
           return await this.executeEmployeeCreation(flowState.accumulatedData);
@@ -250,6 +261,43 @@ export class GuidedFlowManager {
       console.error('❌ Flow execution failed:', error);
       throw error;
     }
+  }
+
+  private async loadEmployeeCount(data: Record<string, any>): Promise<number> {
+    const { supabase } = await import('@/integrations/supabase/client');
+    
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return 0;
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('company_id')
+      .eq('user_id', user.id)
+      .single();
+
+    if (!profile?.company_id) return 0;
+
+    const employeeSelection = data.employee_selection;
+    
+    let query = supabase
+      .from('employees')
+      .select('id', { count: 'exact', head: true })
+      .eq('company_id', profile.company_id);
+
+    // Filtrar según la selección
+    if (employeeSelection === 'all_active') {
+      query = query.eq('estado', 'activo');
+    } else if (employeeSelection === 'new_employees') {
+      // Empleados ingresados en los últimos 30 días
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      query = query
+        .eq('estado', 'activo')
+        .gte('fecha_ingreso', thirtyDaysAgo.toISOString().split('T')[0]);
+    }
+
+    const { count } = await query;
+    return count || 0;
   }
 
   private async executeEmployeeCreation(data: Record<string, any>): Promise<any> {

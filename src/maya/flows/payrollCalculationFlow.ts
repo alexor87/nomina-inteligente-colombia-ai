@@ -58,8 +58,16 @@ Este proceso incluye:
         { label: '👤 Empleados específicos', value: 'specific_employees' },
         { label: '🆕 Solo empleados nuevos', value: 'new_employees' }
       ],
-      nextStep: () => 'novelties_check',
+      nextStep: () => 'loading_employees',
       canGoBack: true
+    },
+
+    loading_employees: {
+      id: 'loading_employees',
+      type: FlowStepType.EXECUTION,
+      message: '⏳ **Cargando empleados...**\n\nEstoy consultando los empleados activos de tu empresa.',
+      nextStep: () => 'novelties_check',
+      canGoBack: false
     },
 
     novelties_check: {
