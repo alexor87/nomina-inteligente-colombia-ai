@@ -721,19 +721,13 @@ serve(async (req) => {
           parameters: action.parameters
         });
         
-        // Route to execute-maya-action edge function with auth (using authHeader from line 506)
-        const { data, error } = await fetch(
-          `${Deno.env.get('SUPABASE_URL')}/functions/v1/execute-maya-action`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': authHeader || '',
-              'apikey': Deno.env.get('SUPABASE_ANON_KEY') || ''
-            },
-            body: JSON.stringify({ action })
+        // Route to execute-maya-action edge function with auth
+        const { data, error } = await supabase.functions.invoke('execute-maya-action', {
+          body: { action },
+          headers: {
+            Authorization: authHeader
           }
-        ).then(res => res.json());
+        });
         
         if (error) {
           console.error(`❌ [DIRECT_ACTION] Error executing "${actionType}":`, error);
