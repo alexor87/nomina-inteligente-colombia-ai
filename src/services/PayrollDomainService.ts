@@ -62,11 +62,12 @@ export class PayrollDomainService {
       }
 
       // Buscar período activo usando query directa optimizada
+      console.log('🔍 Buscando períodos activos para company:', companyId);
       const { data: periods, error } = await supabase
         .from('payroll_periods_real')
         .select('*')
         .eq('company_id', companyId)
-        .in('estado', ['draft', 'active'])
+        .in('estado', ['borrador', 'abierto', 'en_proceso'])
         .order('created_at', { ascending: false })
         .limit(1);
 
@@ -75,8 +76,14 @@ export class PayrollDomainService {
         throw error;
       }
 
+      console.log('🔍 Períodos encontrados:', periods?.length || 0);
+      if (periods && periods.length > 0) {
+        console.log('📅 Período actual:', periods[0]);
+      }
+
       // Si no hay período activo, necesita crear uno
       if (!periods || periods.length === 0) {
+        console.log('⚠️ No se encontró período activo');
         return {
           currentPeriod: null,
           needsCreation: true,
@@ -152,7 +159,7 @@ export class PayrollDomainService {
           fecha_inicio: startDate.toISOString().split('T')[0],
           fecha_fin: endDate.toISOString().split('T')[0],
           tipo_periodo: 'mensual',
-          estado: 'draft'
+          estado: 'borrador'
         })
         .select()
         .single();
@@ -295,7 +302,7 @@ export class PayrollDomainService {
       const { error } = await supabase
         .from('payroll_periods_real')
         .update({ 
-          estado: 'closed',
+          estado: 'cerrado',
           updated_at: new Date().toISOString()
         })
         .eq('id', periodId);
@@ -307,7 +314,7 @@ export class PayrollDomainService {
       // También actualizar payrolls relacionados
       await supabase
         .from('payrolls')
-        .update({ estado: 'closed' })
+        .update({ estado: 'procesada' })
         .eq('period_id', periodId);
 
       return {
