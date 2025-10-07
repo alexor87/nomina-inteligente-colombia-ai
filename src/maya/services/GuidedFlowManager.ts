@@ -496,10 +496,33 @@ export class GuidedFlowManager {
 
       console.log(`✅ [MAYA] ${employees.length} empleados cargados con cálculos`);
 
-      // Calculate totals from loaded employees
-      const totalDevengado = employees.reduce((sum, emp) => sum + (emp.devengos || 0), 0);
-      const totalDeducciones = employees.reduce((sum, emp) => sum + (emp.deducciones || 0), 0);
-      const totalNeto = employees.reduce((sum, emp) => sum + (emp.total_pagar || 0), 0);
+      // 🔍 Debug employee data before totals
+      console.log('🔍 [MAYA] Employees data before totals:', 
+        employees.map(emp => ({
+          id: emp.id,
+          nombre: `${emp.nombre} ${emp.apellido}`,
+          devengos: emp.devengos,
+          deducciones: emp.deducciones,
+          total_pagar: emp.total_pagar,
+          types: {
+            devengos: typeof emp.devengos,
+            deducciones: typeof emp.deducciones,
+            total_pagar: typeof emp.total_pagar
+          }
+        }))
+      );
+
+      // Calculate totals from loaded employees with explicit Number() casting
+      const totalDevengado = employees.reduce((sum, emp) => sum + Number(emp.devengos || 0), 0);
+      const totalDeducciones = employees.reduce((sum, emp) => sum + Number(emp.deducciones || 0), 0);
+      const totalNeto = employees.reduce((sum, emp) => sum + Number(emp.total_pagar || 0), 0);
+
+      console.log('💰 [MAYA] Calculated totals:', {
+        totalDevengado,
+        totalDeducciones,
+        totalNeto,
+        allNumeric: Number.isFinite(totalDevengado) && Number.isFinite(totalDeducciones) && Number.isFinite(totalNeto)
+      });
 
       return {
         success: true,
