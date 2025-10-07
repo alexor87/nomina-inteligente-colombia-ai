@@ -7,7 +7,7 @@ import { MayaHeaderActions } from './MayaHeaderActions';
 import { Button } from '@/components/ui/button';
 
 export const MayaPageHeader: React.FC = () => {
-  const { clearConversation } = useMaya();
+  const { clearConversation, deleteCurrentConversation, currentConversationId } = useMaya();
   const location = useLocation();
   const comesFromModules = location.state?.from?.startsWith('/modules');
 
@@ -58,7 +58,11 @@ export const MayaPageHeader: React.FC = () => {
           </div>
         </div>
 
-        <MayaHeaderActions onNewConversation={clearConversation} />
+        <MayaHeaderActions 
+          onNewConversation={clearConversation}
+          onDeleteConversation={deleteCurrentConversation}
+          hasActiveConversation={!!currentConversationId}
+        />
       </div>
     </motion.header>
   );

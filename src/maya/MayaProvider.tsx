@@ -31,6 +31,7 @@ interface MayaProviderValue {
   performIntelligentValidation: (companyId: string, periodId?: string, employees?: any[]) => Promise<any>;
   setErrorContext: (errorType: string, errorDetails: any) => Promise<void>;
   clearConversation: () => void;
+  deleteCurrentConversation: () => Promise<void>;
   loadConversations: () => Promise<void>;
   loadConversation: (conversationId: string) => Promise<void>;
   createNewConversation: () => Promise<string>;
@@ -709,6 +710,51 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
     }
   }, [setPhase, chatService, conversationManager, setCurrentConversationId]);
 
+  const deleteCurrentConversation = useCallback(async () => {
+    if (!currentConversationId) {
+      toast.error('No hay conversación activa para eliminar');
+      return;
+    }
+
+    try {
+      console.log('🗑️ MAYA: Deleting current conversation', { id: currentConversationId });
+      
+      // 1. Eliminar de la base de datos
+      await conversationManager.deleteConversation(currentConversationId);
+      
+      // 2. Limpiar estado local
+      chatService.clearConversation();
+      setChatHistory([]);
+      setIsChatMode(false);
+      setCurrentConversationId(null);
+      conversationManager.clearCurrentConversationId();
+      
+      // 3. Cancelar flujo activo si existe
+      if (activeFlow) {
+        flowManager.cancelFlow(activeFlow);
+        setActiveFlow(null);
+      }
+      
+      // 4. Reset a fase inicial
+      await setPhase('initial');
+      
+      // 5. Recargar lista de conversaciones
+      await loadConversations();
+      
+      // 6. Mostrar confirmación
+      toast.success('Conversación eliminada', {
+        description: 'La conversación ha sido eliminada permanentemente'
+      });
+      
+      console.log('✅ MAYA: Conversation deleted successfully');
+    } catch (error) {
+      console.error('❌ MAYA: Error deleting conversation', error);
+      toast.error('Error al eliminar', {
+        description: 'No se pudo eliminar la conversación'
+      });
+    }
+  }, [currentConversationId, conversationManager, chatService, activeFlow, flowManager, setPhase, loadConversations]);
+
   // NUEVO: Inicialización completa con migración y carga de conversaciones
   useEffect(() => {
     const initializeConversations = async () => {
@@ -839,6 +885,7 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
     performIntelligentValidation,
     setErrorContext,
     clearConversation,
+    deleteCurrentConversation,
     loadConversations,
     loadConversation,
     createNewConversation,
