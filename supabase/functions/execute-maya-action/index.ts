@@ -590,7 +590,15 @@ async function executeLiquidatePayrollCompleteAction(action: any) {
     const diffTime = Math.abs(end.getTime() - start.getTime());
     const workedDays = Math.min(Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1, 30);
 
-    console.log(`[execute-maya-action] 📅 Period: ${startDate} to ${endDate}, Days: ${workedDays}`);
+    // Determine period type based on worked days
+    let periodType = 'mensual';
+    if (workedDays <= 7) {
+      periodType = 'semanal';
+    } else if (workedDays <= 15) {
+      periodType = 'quincenal';
+    }
+
+    console.log(`[execute-maya-action] 📅 Period: ${startDate} to ${endDate}, Days: ${workedDays}, Type: ${periodType}`);
 
     // Step 3: Get payroll configuration for the company
     const { data: config } = await supabase
@@ -684,12 +692,14 @@ async function executeLiquidatePayrollCompleteAction(action: any) {
     const { error: updateError } = await supabase
       .from('payroll_periods_real')
       .update({
-        estado: 'closed',
+        estado: 'cerrado',
         empleados_count: employees.length,
         total_devengado: totalDevengado,
         total_deducciones: totalDeducciones,
         total_neto: totalNeto,
+        employees_loaded: true,
         calculated_at: new Date().toISOString(),
+        last_activity_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
       .eq('id', periodId);
