@@ -649,35 +649,23 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
 
   const clearConversation = useCallback(async () => {
     try {
-      // ✅ PASO 1: Limpiar el estado interno del chatService PRIMERO
+      console.log('🧹 MAYA: Clearing conversation (no auto-create)...');
+      
+      // Limpiar el estado interno del chatService
       chatService.clearConversation();
       
-      // PASO 2: Crear nueva conversación
-      const newConvId = await createNewConversation();
-      
-      // PASO 3: Limpiar React state
-      setChatHistory([]);
-      setIsChatMode(false);
-      await setPhase('initial');
-      
-      toast.success('Nueva conversación', {
-        description: 'Tu conversación anterior ha sido guardada',
-      });
-    } catch (error) {
-      console.error('❌ MAYA: Error creating new conversation', error);
-      
-      // Fallback: limpiar sin crear en BD
-      chatService.clearConversation();
+      // Limpiar React state (SIN auto-crear conversación)
       setChatHistory([]);
       setIsChatMode(false);
       setCurrentConversationId(null);
+      conversationManager.clearCurrentConversationId();
       await setPhase('initial');
       
-      toast.warning('Nueva conversación (modo local)', {
-        description: 'La conversación no se guardará en el historial permanente',
-      });
+      console.log('✅ MAYA: Conversation cleared');
+    } catch (error) {
+      console.error('❌ MAYA: Error clearing conversation', error);
     }
-  }, [createNewConversation, setPhase, chatService, setCurrentConversationId]);
+  }, [setPhase, chatService, conversationManager, setCurrentConversationId]);
 
   // NUEVO: Inicialización completa con migración y carga de conversaciones
   useEffect(() => {

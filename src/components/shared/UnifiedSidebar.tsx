@@ -21,7 +21,20 @@ const STORAGE_KEY = 'unified_sidebar_collapsed';
 export const UnifiedSidebar: React.FC = () => {
   const { user } = useAuth();
   const { companyId } = useCurrentCompany();
-  const { clearConversation, currentConversationId, loadConversation } = useMaya();
+  
+  // Protected Maya context access
+  const mayaContext = (() => {
+    try {
+      return useMaya();
+    } catch (error) {
+      console.warn('⚠️ Maya context not available during cleanup');
+      return null;
+    }
+  })();
+
+  const clearConversation = mayaContext?.clearConversation || (async () => {});
+  const currentConversationId = mayaContext?.currentConversationId || null;
+  const loadConversation = mayaContext?.loadConversation || (async () => {});
   const navigate = useNavigate();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(() => {
@@ -33,6 +46,7 @@ export const UnifiedSidebar: React.FC = () => {
   const [viewMode, setViewMode] = useState<'active' | 'archived'>('active');
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const conversationManager = MayaConversationManager.getInstance();
 
@@ -48,13 +62,13 @@ export const UnifiedSidebar: React.FC = () => {
     }
   }, [user?.id, companyId]);
 
-  // ⚡ Recargar conversaciones cuando cambia currentConversationId
+  // ⚡ Recargar conversaciones cuando cambia currentConversationId (pero no durante eliminación)
   useEffect(() => {
-    if (currentConversationId && user?.id && companyId) {
+    if (!isDeleting && currentConversationId && user?.id && companyId) {
       loadConversations();
       loadArchivedConversations();
     }
-  }, [currentConversationId, user?.id, companyId]);
+  }, [currentConversationId, user?.id, companyId, isDeleting]);
 
   const loadConversations = async () => {
     console.log('📋 UnifiedSidebar: loadConversations llamado', {
@@ -174,16 +188,27 @@ export const UnifiedSidebar: React.FC = () => {
 
   const handleDeleteConversation = async (id: string) => {
     try {
+      setIsDeleting(true);
+      
       await conversationManager.deleteConversation(id);
+      
+      // Si es la conversación actual, limpiar el ID
+      if (id === currentConversationId) {
+        conversationManager.clearCurrentConversationId();
+        // Llamar clearConversation para limpiar el estado
+        await clearConversation();
+      }
+      
+      // Cargar conversaciones UNA SOLA VEZ
       await loadConversations();
       await loadArchivedConversations();
-      if (id === currentConversationId) {
-        clearConversation();
-      }
+      
       toast.success('Conversación eliminada');
     } catch (error) {
       console.error('Error deleting conversation:', error);
       toast.error('Error al eliminar');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
