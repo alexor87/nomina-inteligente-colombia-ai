@@ -51,7 +51,8 @@ export const MayaChatArea: React.FC = () => {
       icon: Zap, 
       title: "Calcular nómina", 
       desc: "Liquidar nómina del período", 
-      color: "from-purple-500 to-pink-500"
+      color: "from-purple-500 to-pink-500",
+      flowType: FlowType.PAYROLL_CALCULATE
     },
     { 
       icon: FileText, 
