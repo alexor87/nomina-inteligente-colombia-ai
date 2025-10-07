@@ -450,22 +450,39 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
       } catch (error: any) {
         console.error('Flow execution error:', error);
         
-        // Handle specific errors
+        // Determine flow context for error messages
+        const flowId = result.flowState.flowId;
+        let errorTitle = 'Error';
+        let errorContext = 'en el proceso';
+        
+        if (flowId === 'EMPLOYEE_CREATE') {
+          errorTitle = 'Error al crear empleado';
+          errorContext = 'al crear el empleado';
+        } else if (flowId === 'PAYROLL_CALCULATE') {
+          errorTitle = 'Error al calcular nómina';
+          errorContext = 'al calcular la nómina';
+        }
+        
+        // Handle specific error types
         if (error.message?.includes('ya existe')) {
           toast.error('Empleado duplicado', {
             description: 'Ya existe un empleado con este número de documento'
           });
+        } else if (error.message?.includes('No hay un período activo')) {
+          toast.error('Sin período activo', {
+            description: 'Debes crear un período de nómina primero desde el módulo de nómina'
+          });
         } else {
-          toast.error('Error al crear empleado', {
+          toast.error(errorTitle, {
             description: error.message || 'Ocurrió un error inesperado'
           });
         }
         
-        // Send error message to chat
+        // Send contextual error message to chat
         const errorMsg: ChatMessage = {
           id: Date.now().toString(),
           role: 'assistant',
-          content: `❌ Hubo un error al crear el empleado: ${error.message}. ¿Quieres intentar nuevamente?`,
+          content: `❌ Hubo un error ${errorContext}: ${error.message}. ¿Quieres intentar nuevamente?`,
           timestamp: new Date().toISOString(),
           quickReplies: [
             { label: '🔄 Intentar de nuevo', value: 'retry' },
