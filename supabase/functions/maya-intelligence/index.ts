@@ -721,10 +721,7 @@ serve(async (req) => {
           parameters: action.parameters
         });
         
-        // Get authorization header to pass through
-        const authHeader = headers.get('authorization');
-        
-        // Route to execute-maya-action edge function with auth
+        // Route to execute-maya-action edge function with auth (using authHeader from line 506)
         const { data, error } = await fetch(
           `${Deno.env.get('SUPABASE_URL')}/functions/v1/execute-maya-action`,
           {
