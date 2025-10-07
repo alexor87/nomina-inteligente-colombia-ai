@@ -1,5 +1,6 @@
 import { GuidedFlow, FlowState, FlowType, ValidationRule } from '../types/GuidedFlow';
 import { employeeManagementFlow } from '../flows/employeeManagementFlow';
+import { payrollCalculationFlow } from '../flows/payrollCalculationFlow';
 
 export class GuidedFlowManager {
   private static instance: GuidedFlowManager;
@@ -9,6 +10,7 @@ export class GuidedFlowManager {
   private constructor() {
     // Register all available flows
     this.registerFlow(employeeManagementFlow);
+    this.registerFlow(payrollCalculationFlow);
   }
 
   static getInstance(): GuidedFlowManager {
@@ -238,6 +240,9 @@ export class GuidedFlowManager {
         case FlowType.EMPLOYEE_CREATE:
           return await this.executeEmployeeCreation(flowState.accumulatedData);
         
+        case FlowType.PAYROLL_CALCULATE:
+          return await this.executePayrollCalculation(flowState.accumulatedData);
+        
         default:
           throw new Error(`No executor for flow type: ${flowState.flowId}`);
       }
@@ -292,5 +297,86 @@ export class GuidedFlowManager {
       employeeName: `${createdEmployee.nombre} ${createdEmployee.apellido}`,
       data: createdEmployee
     };
+  }
+
+  private async executePayrollCalculation(data: Record<string, any>): Promise<any> {
+    const { supabase } = await import('@/integrations/supabase/client');
+    
+    try {
+      // Get current user's company
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuario no autenticado');
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!profile?.company_id) throw new Error('No se encontró la empresa del usuario');
+
+      // Get or create period based on selection
+      let periodId = data.selected_period_id;
+      
+      if (data.employee_selection === 'current_period') {
+        // Get current active period
+        const { data: periods } = await supabase
+          .from('payroll_periods_real')
+          .select('*')
+          .eq('company_id', profile.company_id)
+          .eq('estado', 'borrador')
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (periods && periods.length > 0) {
+          periodId = periods[0].id;
+        } else {
+          throw new Error('No hay un período activo. Crea uno primero desde el módulo de nómina.');
+        }
+      }
+
+      if (!periodId) {
+        throw new Error('No se pudo determinar el período de nómina');
+      }
+
+      // Get employees for the period
+      const { data: employees } = await supabase
+        .from('employees')
+        .select('*')
+        .eq('company_id', profile.company_id)
+        .eq('estado', 'activo');
+
+      if (!employees || employees.length === 0) {
+        throw new Error('No hay empleados activos para calcular');
+      }
+
+      // Call recalculation service
+      const { PayrollRecalculationService } = await import('@/services/PayrollRecalculationService');
+      const result = await PayrollRecalculationService.recalculateIBC(periodId, profile.company_id);
+
+      if (!result.success) {
+        throw new Error(result.error || 'Error al calcular la nómina');
+      }
+
+      // Get updated period totals
+      const { data: period } = await supabase
+        .from('payroll_periods_real')
+        .select('*')
+        .eq('id', periodId)
+        .single();
+
+      return {
+        success: true,
+        period_id: periodId,
+        employees_processed: result.employees_processed,
+        total_devengado: period?.total_devengado || 0,
+        total_deducciones: period?.total_deducciones || 0,
+        total_neto: period?.total_neto || 0
+      };
+
+    } catch (error: any) {
+      console.error('❌ Payroll calculation error:', error);
+      throw new Error(error.message || 'Error al calcular la nómina');
+    }
   }
 }
