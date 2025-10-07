@@ -603,44 +603,68 @@ async function executeLiquidatePayrollCompleteAction(action: any) {
     const salaryMin = config?.salary_min || 1423500;
     const transportAllowance = config?.transport_allowance || 200000;
 
-    // Step 4: Calculate payroll for each employee
+    // Step 4: Calculate payroll for each employee using normative backend
     const payrollRecords = [];
     let totalDevengado = 0;
     let totalDeducciones = 0;
     let totalNeto = 0;
 
     for (const employee of employees) {
-      const baseSalary = employee.salario_base;
-      const proportionalSalary = (baseSalary / 30) * workedDays;
-      
-      // Calculate transport allowance if applicable
-      const auxTransporte = baseSalary <= (2 * salaryMin) ? 
-        (transportAllowance / 30) * workedDays : 0;
+      // Get employee novedades for this period
+      const { data: novedades } = await supabase
+        .from('payroll_novedades')
+        .select('*')
+        .eq('empleado_id', employee.id)
+        .eq('periodo_id', periodId);
 
-      // Calculate deductions (simplified for now)
-      const saludDeduccion = proportionalSalary * 0.04; // 4% health
-      const pensionDeduccion = proportionalSalary * 0.04; // 4% pension
-      const deductions = saludDeduccion + pensionDeduccion;
+      console.log(`[execute-maya-action] 🧮 Calculating payroll for employee ${employee.id} with ${novedades?.length || 0} novedades`);
 
-      const netPay = proportionalSalary + auxTransporte - deductions;
+      // Call payroll-calculations edge function (normative backend)
+      const { data: calculation, error: calcError } = await supabase.functions.invoke('payroll-calculations', {
+        body: {
+          action: 'calculate',
+          data: {
+            baseSalary: employee.salario_base,
+            workedDays: workedDays,
+            extraHours: 0,
+            disabilities: 0,
+            bonuses: 0,
+            absences: 0,
+            periodType: periodType,
+            novedades: novedades || [],
+            year: new Date().getFullYear().toString()
+          }
+        }
+      });
+
+      if (calcError) {
+        console.error(`[execute-maya-action] ❌ Error calculating payroll for employee ${employee.id}:`, calcError);
+        throw new Error(`Error en cálculo de empleado: ${calcError.message}`);
+      }
+
+      if (!calculation) {
+        throw new Error(`No se recibieron datos de cálculo para empleado ${employee.id}`);
+      }
+
+      console.log(`[execute-maya-action] ✅ Calculated for employee ${employee.id} - Gross: ${calculation.grossPay}, Net: ${calculation.netPay}`);
 
       payrollRecords.push({
         company_id: companyId,
         employee_id: employee.id,
         periodo: periodName,
         period_id: periodId,
-        salario_base: baseSalary,
+        salario_base: employee.salario_base,
         dias_trabajados: workedDays,
-        total_devengado: proportionalSalary + auxTransporte,
-        total_deducciones: deductions,
-        neto_pagado: netPay,
+        total_devengado: calculation.grossPay,
+        total_deducciones: calculation.totalDeductions,
+        neto_pagado: calculation.netPay,
         estado: 'procesada',
         created_at: new Date().toISOString()
       });
 
-      totalDevengado += proportionalSalary + auxTransporte;
-      totalDeducciones += deductions;
-      totalNeto += netPay;
+      totalDevengado += calculation.grossPay;
+      totalDeducciones += calculation.totalDeductions;
+      totalNeto += calculation.netPay;
     }
 
     console.log(`[execute-maya-action] 💰 Totals calculated - Devengado: ${totalDevengado}, Deducciones: ${totalDeducciones}, Neto: ${totalNeto}`);
@@ -660,7 +684,7 @@ async function executeLiquidatePayrollCompleteAction(action: any) {
     const { error: updateError } = await supabase
       .from('payroll_periods_real')
       .update({
-        estado: 'cerrado',
+        estado: 'closed',
         empleados_count: employees.length,
         total_devengado: totalDevengado,
         total_deducciones: totalDeducciones,
