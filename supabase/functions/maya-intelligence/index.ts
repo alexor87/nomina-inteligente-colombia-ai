@@ -697,6 +697,80 @@ serve(async (req) => {
     }
     
     // ============================================================================
+    // ============================================================================
+    // PRIORITY 0: DIRECT ACTION PREFIX DETECTION
+    // ============================================================================
+    // Auto-detect and execute actions prefixed with "action_" from Maya guided flows
+    if (lastMessage.startsWith('action_')) {
+      console.log(`🎯 [DIRECT_ACTION] Detected action prefix: "${lastMessage}"`);
+      
+      // Extract action type and build executable action
+      const actionType = lastMessage.replace('action_', '');
+      
+      try {
+        // Build action with context from the conversation
+        const action = {
+          type: actionType,
+          parameters: {
+            ...richContext,
+            autoTriggered: true
+          }
+        };
+        
+        console.log(`🚀 [DIRECT_ACTION] Invoking execute-maya-action for: ${actionType}`, {
+          parameters: action.parameters
+        });
+        
+        // Get authorization header to pass through
+        const authHeader = headers.get('authorization');
+        
+        // Route to execute-maya-action edge function with auth
+        const { data, error } = await fetch(
+          `${Deno.env.get('SUPABASE_URL')}/functions/v1/execute-maya-action`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': authHeader || '',
+              'apikey': Deno.env.get('SUPABASE_ANON_KEY') || ''
+            },
+            body: JSON.stringify({ action })
+          }
+        ).then(res => res.json());
+        
+        if (error) {
+          console.error(`❌ [DIRECT_ACTION] Error executing "${actionType}":`, error);
+          throw new Error(error.message || error);
+        }
+        
+        console.log(`✅ [DIRECT_ACTION] Action "${actionType}" executed successfully`);
+        
+        // Return success response with data from execution
+        return new Response(JSON.stringify({
+          message: data.message || `✅ Acción "${actionType}" ejecutada correctamente`,
+          emotionalState: 'celebrating',
+          sessionId,
+          timestamp: new Date().toISOString(),
+          executableActions: data.data?.nextActions || [],
+          data: data.data
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+        
+      } catch (error: any) {
+        console.error(`❌ [DIRECT_ACTION] Error executing "${actionType}":`, error);
+        return new Response(JSON.stringify({
+          message: `❌ Error al ejecutar la acción: ${error.message || 'Error desconocido'}. Por favor intenta de nuevo.`,
+          emotionalState: 'concerned',
+          sessionId,
+          timestamp: new Date().toISOString()
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
+    // ============================================================================
     // CHECK FOR PENDING CONTEXT (EMAIL_OVERRIDE waiting for employee name)
     // ============================================================================
     const lastAssistantMsg = conversation.filter(m => m.role === 'assistant').slice(-1)[0];
@@ -706,7 +780,7 @@ serve(async (req) => {
       
       // Extract employee name from user's message
       const employeeNameMatch = lastMessage.match(/(?:para|de|a)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*)/i) ||
-                               lastMessage.match(/^([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*)$/i);
+                                lastMessage.match(/^([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*)$/i);
       
       if (employeeNameMatch) {
         const extractedName = employeeNameMatch[1].trim();
