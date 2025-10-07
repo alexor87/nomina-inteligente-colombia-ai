@@ -32,7 +32,7 @@ export interface FlowStep {
   id: string;
   type: FlowStepType;
   message: string | ((data: Record<string, any>) => string);
-  quickReplies?: QuickReply[];
+  quickReplies?: QuickReply[] | ((data: Record<string, any>) => QuickReply[]);
   inputPlaceholder?: string;
   inputType?: 'text' | 'number' | 'date' | 'email';
   validationRules?: ValidationRule[];

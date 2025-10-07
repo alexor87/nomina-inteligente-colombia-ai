@@ -125,48 +125,40 @@ Este proceso incluye:
           'add_absence': 'Ausencia'
         };
         const typeLabel = actionTypeMap[data.last_novelty_action || ''] || 'novedad';
-        
-        // Generar opciones dinámicamente
-        const actionToNovedadTypeMap: Record<string, string[]> = {
-          'add_overtime': ['horas_extra'],
-          'add_disability': ['incapacidad'],
-          'add_bonus': ['bonificacion', 'auxilio_transporte', 'comisiones'],
-          'add_absence': ['ausencia_justificada', 'ausencia_injustificada']
+        return `🎯 **Selecciona el tipo de ${typeLabel}**\n\n¿Qué tipo específico deseas registrar?`;
+      },
+      quickReplies: (data) => {
+        const quickRepliesMap: Record<string, any[]> = {
+          'add_overtime': [
+            { label: '⏱️ Diurnas', value: 'horas_extra:diurnas', icon: '⏱️' },
+            { label: '🌙 Nocturnas', value: 'horas_extra:nocturnas', icon: '🌙' },
+            { label: '⏱️🌞 Dominicales Diurnas', value: 'horas_extra:dominicales_diurnas', icon: '⏱️' },
+            { label: '🌙🌞 Dominicales Nocturnas', value: 'horas_extra:dominicales_nocturnas', icon: '🌙' },
+            { label: '⏱️🎉 Festivas Diurnas', value: 'horas_extra:festivas_diurnas', icon: '⏱️' },
+            { label: '🌙🎉 Festivas Nocturnas', value: 'horas_extra:festivas_nocturnas', icon: '🌙' }
+          ],
+          'add_disability': [
+            { label: '🏥 General (EPS)', value: 'incapacidad:general', icon: '🏥' },
+            { label: '🏥 Laboral (ARL)', value: 'incapacidad:laboral', icon: '🏥' },
+            { label: '👶 Maternidad', value: 'incapacidad:maternidad', icon: '👶' }
+          ],
+          'add_bonus': [
+            { label: '📊 Productividad', value: 'bonificacion:productividad', icon: '📊' },
+            { label: '💰 Ventas', value: 'comision:ventas', icon: '💰' },
+            { label: '⏰ Puntualidad', value: 'bonificacion:puntualidad', icon: '⏰' },
+            { label: '🎖️ Permanencia', value: 'bonificacion:permanencia', icon: '🎖️' }
+          ],
+          'add_absence': [
+            { label: '❌ Injustificada', value: 'ausencia:injustificada', icon: '❌' },
+            { label: '🚫 Abandono de Puesto', value: 'ausencia:abandono_puesto', icon: '🚫' },
+            { label: '⚠️ Suspensión Disciplinaria', value: 'ausencia:suspension_disciplinaria', icon: '⚠️' },
+            { label: '⏱️ Tardanza Excesiva', value: 'ausencia:tardanza_excesiva', icon: '⏱️' }
+          ]
         };
         
-        const noveltyAction = data.last_novelty_action || '';
-        const novedadTypes = actionToNovedadTypeMap[noveltyAction] || [];
-        
-        let optionsText = '';
-        novedadTypes.forEach((novedadType: string) => {
-          // Buscar en devengados
-          const devengadosObj = NOVEDAD_CATEGORIES.devengados as any;
-          const deduccionesObj = NOVEDAD_CATEGORIES.deducciones as any;
-          const config = devengadosObj[novedadType] || deduccionesObj[novedadType];
-          
-          if (config?.subtipos) {
-            optionsText += `\n**${config.label}:**\n`;
-            config.subtipos.forEach((subtipo: string) => {
-              optionsText += `• ${subtipo.replace(/_/g, ' ')}\n`;
-            });
-          }
-        });
-        
-        return `🎯 **Selecciona el tipo de ${typeLabel}**\n${optionsText}\n¿Qué tipo específico deseas registrar?`;
+        const action = data.last_novelty_action || '';
+        return quickRepliesMap[action] || [];
       },
-      quickReplies: [
-        { label: '⏱️ Diurnas', value: 'horas_extra:diurnas', icon: '⏱️' },
-        { label: '🌙 Nocturnas', value: 'horas_extra:nocturnas', icon: '🌙' },
-        { label: '⏱️🌞 Diurnas Dominicales', value: 'horas_extra:diurnas_dominicales', icon: '⏱️' },
-        { label: '🌙🌞 Nocturnas Dominicales', value: 'horas_extra:nocturnas_dominicales', icon: '🌙' },
-        { label: '🏥 EPS', value: 'incapacidad:eps', icon: '🏥' },
-        { label: '🏥 ARL', value: 'incapacidad:arl', icon: '🏥' },
-        { label: '🎁 Bonificación', value: 'bonificacion:default', icon: '🎁' },
-        { label: '🚌 Auxilio Transporte', value: 'auxilio_transporte:default', icon: '🚌' },
-        { label: '💰 Comisiones', value: 'comisiones:default', icon: '💰' },
-        { label: '✅ Justificada', value: 'ausencia_justificada:default', icon: '✅' },
-        { label: '❌ Injustificada', value: 'ausencia_injustificada:default', icon: '❌' }
-      ],
       nextStep: (data, input) => {
         // Guardar el tipo y subtipo seleccionado
         if (input) {

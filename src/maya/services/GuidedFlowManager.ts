@@ -59,8 +59,13 @@ export class GuidedFlowManager {
       ? step.message(flowState.accumulatedData)
       : step.message;
 
-    // Process quick replies to replace 'custom' values with actual dates
-    const quickReplies = step.quickReplies?.map(reply => {
+    // Process quick replies - handle both static arrays and dynamic functions
+    let quickReplies = typeof step.quickReplies === 'function'
+      ? step.quickReplies(flowState.accumulatedData)
+      : step.quickReplies;
+
+    // Further process quick replies to replace 'custom' values with actual dates
+    quickReplies = quickReplies?.map(reply => {
       if (reply.value === 'custom') return reply;
       // For date quick replies, ensure they have current date
       if (step.id === 'start_date' && reply.label === '📅 Hoy') {
