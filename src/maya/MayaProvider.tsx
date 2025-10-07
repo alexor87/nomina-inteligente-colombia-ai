@@ -10,7 +10,7 @@ import { useCurrentCompany } from '@/hooks/useCurrentCompany';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { GuidedFlowManager } from './services/GuidedFlowManager';
-import type { FlowState, FlowType } from './types/GuidedFlow';
+import { FlowState, FlowType } from './types/GuidedFlow';
 
 interface MayaProviderValue {
   currentMessage: MayaMessage | null;
@@ -460,6 +460,58 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
     // Handle execution step
     if (result.currentStep.type === 'execution') {
       try {
+        // 🆕 FASE 2: Interceptar acciones de navegación para ejecutarlas localmente
+        const pendingAction = result.flowState.accumulatedData._pending_action;
+        
+        if (result.flowState.currentStep === 'action_execution' && pendingAction?.type === 'view_details') {
+          console.log('🧭 [MAYA] Executing view_details action locally:', pendingAction);
+          
+          // Ejecutar navegación localmente
+          const { navigationPath, entityType, entityId, entityName } = pendingAction.parameters;
+          
+          let path = navigationPath;
+          if (!path) {
+            // Construir ruta según entityType
+            switch (entityType) {
+              case 'period':
+                path = `/modules/liquidation?period=${entityId}`;
+                break;
+              case 'employee':
+                path = `/employees/${entityId}`;
+                break;
+              case 'payroll':
+                path = `/modules/liquidation?payroll=${entityId}`;
+                break;
+              default:
+                console.error('❌ Tipo de entidad no soportado:', entityType);
+                path = '/';
+            }
+          }
+          
+          console.log('✅ [MAYA] Navigating to:', path);
+          
+          // Guardar resultado para el siguiente step
+          result.flowState.accumulatedData._action_execution_result = {
+            success: true,
+            message: `Navegando a ${entityName || 'detalles'}...`,
+            data: {}
+          };
+          
+          // Limpiar pending action
+          delete result.flowState.accumulatedData._pending_action;
+          
+          // Auto-advance y navegar
+          await advanceFlow('executed');
+          
+          // Navegar después de un pequeño delay
+          setTimeout(() => {
+            window.location.href = path;
+          }, 300);
+          
+          return;
+        }
+        
+        // Para otras acciones, ejecutar normalmente vía flowManager
         const executionResult = await flowManager.executeFlowAction(result.flowState);
         
         // Store execution result in flow state
@@ -501,9 +553,12 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
         // Auto-advance to result
         await advanceFlow('executed');
         
-        toast.success('Empleado creado', {
-          description: `${executionResult.employeeName} ha sido agregado exitosamente`
-        });
+        // ✅ CORRECCIÓN 1: Toast solo para flujo de empleados
+        if (result.flowState.flowId === FlowType.EMPLOYEE_CREATE) {
+          toast.success('Empleado creado', {
+            description: `${executionResult.employeeName} ha sido agregado exitosamente`
+          });
+        }
         
       } catch (error: any) {
         console.error('Flow execution error:', error);
