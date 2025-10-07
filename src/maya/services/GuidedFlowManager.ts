@@ -251,6 +251,18 @@ export class GuidedFlowManager {
           employee_count: employeeCount
         };
       }
+
+      // Check if this is a loading step for periods
+      if (flowState.currentStep === 'period_list_loading') {
+        const periods = await this.loadPayrollPeriods(flowState.accumulatedData);
+        flowState.accumulatedData.available_periods = periods;
+        
+        return {
+          success: true,
+          period_count: periods.length,
+          periods
+        };
+      }
       
       switch (flowState.flowId) {
         case FlowType.EMPLOYEE_CREATE:
@@ -303,6 +315,31 @@ export class GuidedFlowManager {
 
     const { count } = await query;
     return count || 0;
+  }
+
+  private async loadPayrollPeriods(data: Record<string, any>): Promise<any[]> {
+    const { supabase } = await import('@/integrations/supabase/client');
+    
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('company_id')
+      .eq('user_id', user.id)
+      .single();
+
+    if (!profile?.company_id) return [];
+
+    const { data: periods } = await supabase
+      .from('payroll_periods_real')
+      .select('id, periodo, tipo_periodo, fecha_inicio, fecha_fin, estado')
+      .eq('company_id', profile.company_id)
+      .in('estado', ['borrador', 'abierto'])
+      .order('fecha_inicio', { ascending: false })
+      .limit(10);
+
+    return periods || [];
   }
 
   private async executeEmployeeCreation(data: Record<string, any>): Promise<any> {

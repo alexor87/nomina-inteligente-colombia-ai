@@ -39,10 +39,63 @@ Este proceso incluye:
         { label: '📋 Ver todos los períodos', value: 'list_periods' }
       ],
       nextStep: (data, input) => {
-        if (input === 'current_period' || input?.includes('period_')) {
+        if (input === 'current_period') {
+          data.period_name = 'Período actual';
+          return 'employee_selection';
+        }
+        if (input === 'list_periods') {
+          return 'period_list_loading';
+        }
+        if (input?.startsWith('period_')) {
           return 'employee_selection';
         }
         return 'period_selection';
+      },
+      canGoBack: true
+    },
+
+    period_list_loading: {
+      id: 'period_list_loading',
+      type: FlowStepType.EXECUTION,
+      message: '⏳ **Cargando períodos disponibles...**\n\nEstoy consultando los períodos de nómina.',
+      nextStep: () => 'period_list_selection',
+      canGoBack: false
+    },
+
+    period_list_selection: {
+      id: 'period_list_selection',
+      type: FlowStepType.SELECT,
+      message: (data) => {
+        const periodCount = data.available_periods?.length || 0;
+        if (periodCount === 0) {
+          return '📋 **No hay períodos disponibles**\n\nNo se encontraron períodos en estado borrador. Debes crear un período primero desde el módulo de nómina.';
+        }
+        return `📋 **Períodos disponibles (${periodCount})**\n\nSelecciona el período que deseas calcular:`;
+      },
+      quickReplies: (data) => {
+        const periods = data.available_periods || [];
+        if (periods.length === 0) {
+          return [
+            { label: '🔙 Volver', value: 'back' },
+            { label: '❌ Cancelar', value: 'cancel' }
+          ];
+        }
+        return periods.map((p: any) => ({
+          label: `📅 ${p.periodo} (${p.tipo_periodo})`,
+          value: `period_${p.id}`
+        }));
+      },
+      nextStep: (data, input) => {
+        if (input === 'back') return 'period_selection';
+        if (input === 'cancel') return 'cancelled';
+        if (input?.startsWith('period_')) {
+          const periodId = input.replace('period_', '');
+          data.selected_period_id = periodId;
+          const selectedPeriod = data.available_periods?.find((p: any) => p.id === periodId);
+          data.period_name = selectedPeriod?.periodo || 'Período seleccionado';
+          return 'employee_selection';
+        }
+        return 'period_list_selection';
       },
       canGoBack: true
     },
