@@ -437,68 +437,41 @@ export class GuidedFlowManager {
 
       if (!profile?.company_id) throw new Error('No se encontró la empresa del usuario');
 
-      // Get or create period based on selection
-      let periodId = data.selected_period_id;
-      
-      if (data.employee_selection === 'current_period') {
-        // Get current active period
-        const { data: periods } = await supabase
-          .from('payroll_periods_real')
-          .select('*')
-          .eq('company_id', profile.company_id)
-          .eq('estado', 'borrador')
-          .order('created_at', { ascending: false })
-          .limit(1);
+      // Get period information
+      const { data: period } = await supabase
+        .from('payroll_periods_real')
+        .select('*')
+        .eq('id', data.selected_period_id)
+        .single();
 
-        if (periods && periods.length > 0) {
-          periodId = periods[0].id;
-        } else {
-          throw new Error('No hay un período activo. Crea uno primero desde el módulo de nómina.');
-        }
-      }
+      if (!period) throw new Error('No se encontró el período de nómina');
 
-      if (!periodId) {
-        throw new Error('No se pudo determinar el período de nómina');
-      }
-
-      // ✅ NUEVO: Usar servicio unificado con modo 'calculation' (solo preview)
-      const { PayrollUnifiedAtomicService } = await import('@/services/PayrollUnifiedAtomicService');
+      // ✅ USAR SERVICIO DEL MANUAL: PayrollLiquidationService
+      const { PayrollLiquidationService } = await import('@/services/PayrollLiquidationService');
       
-      console.log('🚀 [MAYA] Ejecutando cálculo con servicio unificado (modo: calculation)');
+      console.log('🚀 [MAYA] Cargando empleados con PayrollLiquidationService (mismo que manual)');
       
-      const result = await PayrollUnifiedAtomicService.execute(
-        periodId,
-        profile.company_id,
-        {
-          mode: 'calculation', // Solo cálculo, no cierra período ni genera vouchers
-          generateVouchers: false,
-          closePeriod: false,
-          sendEmails: false,
-          userId: user.id
-        }
+      // Load employees with calculations (same as manual)
+      const employees = await PayrollLiquidationService.loadEmployeesForPeriod(
+        period.fecha_inicio,
+        period.fecha_fin,
+        new Date().getFullYear().toString()
       );
 
-      if (!result.success) {
-        throw new Error(result.error || 'Error al calcular la nómina');
-      }
+      console.log(`✅ [MAYA] ${employees.length} empleados cargados con cálculos`);
 
-      console.log('✅ [MAYA] Cálculo completado:', {
-        employeesProcessed: result.employeesProcessed,
-        employeesCreated: result.employeesCreated, // ✅ FIX: Empleados creados
-        totalDevengado: result.totalDevengado,
-        totalDeducciones: result.totalDeducciones,
-        totalNeto: result.totalNeto
-      });
+      // Calculate totals from loaded employees
+      const totalDevengado = employees.reduce((sum, emp) => sum + (emp.devengos || 0), 0);
+      const totalDeducciones = employees.reduce((sum, emp) => sum + (emp.deducciones || 0), 0);
+      const totalNeto = employees.reduce((sum, emp) => sum + (emp.total_pagar || 0), 0);
 
       return {
         success: true,
-        period_id: result.periodId,
-        employees_processed: result.employeesProcessed,
-        employees_created: result.employeesCreated, // ✅ FIX: Reportar empleados creados
-        total_devengado: result.totalDevengado,
-        total_deducciones: result.totalDeducciones,
-        total_neto: result.totalNeto,
-        mode: result.mode
+        period_id: period.id,
+        employees_processed: employees.length,
+        total_devengado: totalDevengado,
+        total_deducciones: totalDeducciones,
+        total_neto: totalNeto
       };
 
     } catch (error: any) {

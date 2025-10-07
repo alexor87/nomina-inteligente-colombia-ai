@@ -38,40 +38,36 @@ export class PayrollCrudHandler extends BaseHandler {
       );
     }
     
-    // ✅ NUEVA OPCIÓN: Crear dos acciones - calcular (preview) o liquidar completo
-    const calculateAction: ExecutableAction = {
-      id: `calculate_payroll_${Date.now()}`,
-      type: 'calculate_payroll',
-      label: `📊 Calcular (Preview): ${periodName}`,
-      description: `Solo calcular valores sin cerrar el período ni generar vouchers`,
+    // ✅ Usar las mismas funciones que el liquidador manual
+    const previewAction: ExecutableAction = {
+      id: `preview_payroll_${Date.now()}`,
+      type: 'preview_payroll',
+      label: `📊 Calcular y Previsualizar: ${periodName}`,
+      description: `Cargar empleados y calcular valores (mismo cálculo que manual)`,
       parameters: {
         periodName: periodName,
-        companyId: context?.companyId,
-        mode: 'calculation'
+        companyId: context?.companyId
       },
       requiresConfirmation: false,
       icon: '📊'
     };
     
     const liquidateAction: ExecutableAction = {
-      id: `liquidate_payroll_full_${Date.now()}`,
-      type: 'liquidate_payroll_full',
+      id: `liquidate_payroll_complete_${Date.now()}`,
+      type: 'liquidate_payroll_complete',
       label: `💰 Liquidar Completo: ${periodName}`,
-      description: `Calcular, cerrar período y generar desprendibles (operación final)`,
+      description: `Ejecutar liquidación completa (PayrollLiquidationService.liquidatePayroll)`,
       parameters: {
         periodName: periodName,
-        companyId: context?.companyId,
-        mode: 'liquidation',
-        generateVouchers: true,
-        closePeriod: true
+        companyId: context?.companyId
       },
       requiresConfirmation: true,
       icon: '💰'
     };
     
     return ResponseBuilder.buildExecutableResponse(
-      `Perfecto! ¿Qué quieres hacer con la nómina de **${periodName}**?\n\n**🔍 Opciones disponibles:**\n\n**1️⃣ Calcular (Preview)**\n• Solo calcula valores\n• No cierra el período\n• Puedes revisar antes de liquidar\n• ✅ Soluciona bug de empleados faltantes\n\n**2️⃣ Liquidar Completo**\n• Calcula valores\n• Cierra el período\n• Genera desprendibles\n• ⚠️ Operación final e irreversible\n\nElige una opción:`,
-      [calculateAction, liquidateAction],
+      `Perfecto! ¿Qué quieres hacer con la nómina de **${periodName}**?\n\n**🔍 Opciones disponibles:**\n\n**1️⃣ Calcular y Previsualizar**\n• Usa PayrollLiquidationService.loadEmployeesForPeriod\n• Mismo cálculo que el liquidador manual\n• Solo muestra valores, no modifica datos\n\n**2️⃣ Liquidar Completo**\n• Usa PayrollLiquidationService.liquidatePayroll\n• Crea registros de nómina\n• Cierra el período\n• ⚠️ Operación final\n\nElige una opción:`,
+      [previewAction, liquidateAction],
       'neutral'
     );
   }
