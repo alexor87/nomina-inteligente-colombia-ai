@@ -92,6 +92,60 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
     return persistedConversation.messages;
   });
 
+  // 🆕 Regenerate flow messages on mount if they have outdated quickReplies
+  useEffect(() => {
+    const regenerateFlowMessage = async () => {
+      if (!activeFlow || chatHistory.length === 0) return;
+
+      const lastMessage = chatHistory[chatHistory.length - 1];
+      
+      // Check if last message is a flow message from assistant
+      if (lastMessage.isFlowMessage && lastMessage.role === 'assistant') {
+        console.log('🔄 [MAYA] Checking if flow message needs regeneration');
+        
+        try {
+          // Get current step data with latest code
+          const currentStepData = flowManager.getCurrentStep(activeFlow);
+          
+          // Compare quickReplies
+          const oldQuickReplies = JSON.stringify(lastMessage.quickReplies || []);
+          const newQuickReplies = JSON.stringify(currentStepData.quickReplies || []);
+          
+          if (oldQuickReplies !== newQuickReplies) {
+            console.log('✨ [MAYA] Quick replies changed, updating message', {
+              old: lastMessage.quickReplies,
+              new: currentStepData.quickReplies
+            });
+            
+            // Create updated message
+            const updatedMessage: ChatMessage = {
+              ...lastMessage,
+              quickReplies: currentStepData.quickReplies,
+              executableActions: currentStepData.executableActions,
+              timestamp: lastMessage.timestamp // Keep original timestamp
+            };
+            
+            // Update in memory
+            const updatedHistory = [...chatHistory];
+            updatedHistory[updatedHistory.length - 1] = updatedMessage;
+            
+            // Save to storage and state
+            chatService.updateMessage(updatedMessage.id, updatedMessage);
+            setChatHistory(updatedHistory);
+            
+            console.log('✅ [MAYA] Message regenerated successfully');
+          } else {
+            console.log('✓ [MAYA] Quick replies unchanged, no regeneration needed');
+          }
+        } catch (error) {
+          console.error('❌ [MAYA] Error regenerating flow message:', error);
+        }
+      }
+    };
+
+    regenerateFlowMessage();
+  }, []); // Only on mount
+
   // Inject conversation manager into chat service
   useEffect(() => {
     chatService.setConversationManager(conversationManager);

@@ -343,6 +343,15 @@ export class MayaChatService {
     }
   }
 
+  updateMessage(messageId: string, updatedMessage: ChatMessage): void {
+    const messageIndex = this.currentConversation.messages.findIndex(m => m.id === messageId);
+    if (messageIndex !== -1) {
+      this.currentConversation.messages[messageIndex] = updatedMessage;
+      this.saveToStorage();
+      console.log('💾 MAYA: Updated message in storage', { messageId });
+    }
+  }
+
   getDebugInfo() {
     return {
       sessionId: this.currentConversation.sessionId,
