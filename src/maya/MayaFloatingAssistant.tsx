@@ -24,7 +24,9 @@ export const MayaFloatingAssistant: React.FC = () => {
     addActionMessage,
     isChatMode,
     setChatMode,
-    clearConversation
+    clearConversation,
+    advanceFlow,
+    activeFlow
   } = useMaya();
   const [isMinimized, setIsMinimized] = useState(false);
   const [userInput, setUserInput] = useState('');
@@ -169,18 +171,43 @@ export const MayaFloatingAssistant: React.FC = () => {
                               <MayaQuickReplies
                                 options={msg.quickReplies}
                                 onSelect={async (selectedValue) => {
-                                  // Find the selected option label
-                                  const selectedOption = msg.quickReplies?.find(opt => opt.value === selectedValue);
-                                  const userResponse = selectedOption?.label || selectedValue;
+                                  console.log('🔘 Quick Reply Selected:', { 
+                                    selectedValue, 
+                                    isFlowMessage: msg.isFlowMessage,
+                                    flowId: msg.flowId,
+                                    stepId: msg.stepId,
+                                    activeFlow: activeFlow?.flowId 
+                                  });
                                   
-                                  // Build conversation state with selected value
-                                  const updatedState = {
-                                    ...(msg.conversationState || {}),
-                                    [msg.fieldName || 'field']: selectedValue
-                                  };
-                                  
-                                  // Send user selection with enriched context
-                                  await sendMessage(userResponse, updatedState);
+                                  // If this is a flow message, advance the flow
+                                  if (msg.isFlowMessage && activeFlow) {
+                                    setIsLoading(true);
+                                    try {
+                                      await advanceFlow(selectedValue);
+                                    } catch (error) {
+                                      console.error('Error advancing flow:', error);
+                                    } finally {
+                                      setIsLoading(false);
+                                    }
+                                  } else {
+                                    // Standard chat mode behavior
+                                    const selectedOption = msg.quickReplies?.find(opt => opt.value === selectedValue);
+                                    const userResponse = selectedOption?.label || selectedValue;
+                                    
+                                    const updatedState = {
+                                      ...(msg.conversationState || {}),
+                                      [msg.fieldName || 'field']: selectedValue
+                                    };
+                                    
+                                    setIsLoading(true);
+                                    try {
+                                      await sendMessage(userResponse, updatedState);
+                                    } catch (error) {
+                                      console.error('Error sending message:', error);
+                                    } finally {
+                                      setIsLoading(false);
+                                    }
+                                  }
                                 }}
                                 disabled={isLoading}
                               />

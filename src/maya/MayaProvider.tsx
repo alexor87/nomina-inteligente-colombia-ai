@@ -389,6 +389,13 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
       stepId: result.currentStep.id
     };
     
+    console.log('💬 Adding flow step message:', {
+      stepId: result.currentStep.id,
+      hasQuickReplies: !!result.currentStep.quickReplies,
+      quickRepliesCount: result.currentStep.quickReplies?.length || 0,
+      quickReplies: result.currentStep.quickReplies
+    });
+    
     chatService.addMessage(stepMessage);
     setChatHistory([...chatService.getConversation().messages]);
     
