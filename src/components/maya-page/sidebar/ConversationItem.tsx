@@ -4,16 +4,6 @@ import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -29,7 +19,7 @@ interface ConversationItemProps {
   onClick: () => void;
   onRename: (id: string, newTitle: string) => Promise<void>;
   onArchive: (id: string) => Promise<void>;
-  onDelete: (id: string) => Promise<void>;
+  onDelete: () => void;
   mode?: 'active' | 'archived';
   onUnarchive?: (id: string) => Promise<void>;
 }
@@ -47,7 +37,6 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
   const [isHovered, setIsHovered] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(conversation.title);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const handleRename = async () => {
     if (editTitle.trim() && editTitle !== conversation.title) {
@@ -133,7 +122,7 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
                       <DropdownMenuItem
                         onClick={(e) => {
                           e.stopPropagation();
-                          setShowDeleteDialog(true);
+                          onDelete();
                         }}
                         className="text-destructive focus:text-destructive"
                       >
@@ -165,7 +154,7 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
                       <DropdownMenuItem
                         onClick={(e) => {
                           e.stopPropagation();
-                          setShowDeleteDialog(true);
+                          onDelete();
                         }}
                         className="text-destructive focus:text-destructive"
                       >
@@ -184,29 +173,6 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
           </>
         )}
       </motion.div>
-
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar conversación?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta acción no se puede deshacer. La conversación "{conversation.title}" será eliminada permanentemente.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                setShowDeleteDialog(false);
-                setTimeout(() => onDelete(conversation.id), 30);
-              }}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Eliminar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 };

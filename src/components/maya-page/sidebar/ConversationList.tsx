@@ -5,6 +5,7 @@ import { ConversationItem } from './ConversationItem';
 import { ConversationGroupSection } from './ConversationGroupSection';
 import { groupConversationsByDate, getGroupLabel } from '@/maya/utils/conversationGrouping';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 
 interface ConversationListProps {
   conversations: ConversationSummary[];
@@ -32,6 +33,8 @@ export const ConversationList: React.FC<ConversationListProps> = ({
   onUnarchiveConversation
 }) => {
   const [filteredConversations, setFilteredConversations] = useState(conversations);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [pendingConversation, setPendingConversation] = useState<ConversationSummary | null>(null);
 
   useEffect(() => {
     if (searchQuery.trim()) {
@@ -71,33 +74,58 @@ export const ConversationList: React.FC<ConversationListProps> = ({
 
   const grouped = groupConversationsByDate(filteredConversations);
 
+  const handleDeleteRequest = (conversation: ConversationSummary) => {
+    setPendingConversation(conversation);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (pendingConversation) {
+      await onDeleteConversation(pendingConversation.id);
+      setPendingConversation(null);
+    }
+  };
+
   return (
-    <ScrollArea className="flex-1">
-      <div className="px-2 pb-4">
-        {(Object.keys(grouped) as Array<keyof typeof grouped>).map(groupKey => (
-          <ConversationGroupSection
-            key={groupKey}
-            title={getGroupLabel(groupKey)}
-            count={grouped[groupKey].length}
-            storageKey={`maya_group_${groupKey}_open`}
-            defaultOpen={groupKey === 'today' || groupKey === 'yesterday'}
-          >
-            {grouped[groupKey].map(conversation => (
-              <ConversationItem
-                key={conversation.id}
-                conversation={conversation}
-                isActive={conversation.id === currentConversationId}
-                onClick={() => onSelectConversation(conversation.id)}
-                onRename={onRenameConversation}
-                onArchive={onArchiveConversation}
-                onDelete={onDeleteConversation}
-                mode={mode}
-                onUnarchive={onUnarchiveConversation}
-              />
-            ))}
-          </ConversationGroupSection>
-        ))}
-      </div>
-    </ScrollArea>
+    <>
+      <ScrollArea className="flex-1">
+        <div className="px-2 pb-4">
+          {(Object.keys(grouped) as Array<keyof typeof grouped>).map(groupKey => (
+            <ConversationGroupSection
+              key={groupKey}
+              title={getGroupLabel(groupKey)}
+              count={grouped[groupKey].length}
+              storageKey={`maya_group_${groupKey}_open`}
+              defaultOpen={groupKey === 'today' || groupKey === 'yesterday'}
+            >
+              {grouped[groupKey].map(conversation => (
+                <ConversationItem
+                  key={conversation.id}
+                  conversation={conversation}
+                  isActive={conversation.id === currentConversationId}
+                  onClick={() => onSelectConversation(conversation.id)}
+                  onRename={onRenameConversation}
+                  onArchive={onArchiveConversation}
+                  onDelete={() => handleDeleteRequest(conversation)}
+                  mode={mode}
+                  onUnarchive={onUnarchiveConversation}
+                />
+              ))}
+            </ConversationGroupSection>
+          ))}
+        </div>
+      </ScrollArea>
+
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="¿Eliminar conversación?"
+        description={pendingConversation ? `Esta acción no se puede deshacer. La conversación "${pendingConversation.title}" será eliminada permanentemente.` : ''}
+        confirmLabel="Eliminar"
+        cancelLabel="Cancelar"
+        onConfirm={handleConfirmDelete}
+        isDestructive
+      />
+    </>
   );
 };
