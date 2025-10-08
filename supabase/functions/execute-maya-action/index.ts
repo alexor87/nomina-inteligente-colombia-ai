@@ -670,7 +670,13 @@ async function executeLiquidatePayrollCompleteAction(action: any) {
   const { periodId, startDate, endDate, companyId, periodName } = action.parameters;
   
   if (!periodId || !startDate || !endDate || !companyId) {
-    throw new Error('Información incompleta para liquidar nómina');
+    return new Response(
+      JSON.stringify({
+        success: false,
+        message: '❌ Información incompleta para liquidar nómina. Por favor intenta de nuevo.'
+      }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   }
 
   console.log(`[execute-maya-action] 🚀 Executing complete payroll liquidation for period: ${periodName}`, {
@@ -686,16 +692,29 @@ async function executeLiquidatePayrollCompleteAction(action: any) {
       .eq('estado', 'activo');
 
     if (employeesError) {
-      throw new Error(`Error cargando empleados: ${employeesError.message}`);
+      console.error('[execute-maya-action] ❌ Error loading employees:', employeesError);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: `❌ No se pudieron cargar los empleados: ${employeesError.message}`
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     if (!employees || employees.length === 0) {
-      throw new Error('No se encontraron empleados activos para liquidar');
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: '⚠️ No se encontraron empleados activos para liquidar en este período.'
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     console.log(`[execute-maya-action] 📋 Loaded ${employees.length} active employees`);
 
-    // Step 2: 🔍 Buscar período existente antes de calcular (evitar duplicados)
+    // Step 2: 🔍 Buscar período existente y verificar estado
     console.log(`[execute-maya-action] 🔍 Buscando período existente: ${companyId}, ${startDate} - ${endDate}`);
     const { data: existingPeriod } = await supabase
       .from('payroll_periods_real')
@@ -710,9 +729,54 @@ async function executeLiquidatePayrollCompleteAction(action: any) {
     let workedDays = 30;
 
     if (existingPeriod) {
-      console.log(`[execute-maya-action] ✅ Período existente encontrado: ${existingPeriod.id}`);
+      console.log(`[execute-maya-action] ✅ Período existente encontrado: ${existingPeriod.id}, estado: ${existingPeriod.estado}`);
       actualPeriodId = existingPeriod.id;
       periodType = existingPeriod.tipo_periodo;
+      
+      // ⚡ IDEMPOTENCIA: Si el período ya está cerrado, retornar success con mensaje informativo
+      if (existingPeriod.estado === 'cerrado') {
+        console.log(`[execute-maya-action] ℹ️ Period already closed, returning success with next actions`);
+        return new Response(
+          JSON.stringify({
+            success: true,
+            message: `ℹ️ El período **${periodName}** ya está cerrado y liquidado.\n\n✨ Puedes ver la nómina o enviar comprobantes.`,
+            data: {
+              periodId: actualPeriodId,
+              periodName,
+              employeesProcessed: existingPeriod.empleados_count || employees.length,
+              estado: 'cerrado',
+              alreadyClosed: true,
+              nextActions: [
+                {
+                  id: 'view_payroll',
+                  type: 'view_details',
+                  label: '👁️ Ver Nómina',
+                  description: 'Revisar detalles de la nómina procesada',
+                  parameters: {
+                    entityType: 'period',
+                    entityId: actualPeriodId,
+                    entityName: periodName,
+                    navigationPath: `/modules/liquidation?period=${actualPeriodId}`
+                  }
+                },
+                {
+                  id: 'send_vouchers',
+                  type: 'send_voucher_all',
+                  label: '📧 Enviar Comprobantes',
+                  description: `Enviar comprobantes a ${employees.length} empleados`,
+                  parameters: {
+                    periodId: actualPeriodId,
+                    periodName: periodName,
+                    employeeCount: employees.length
+                  },
+                  requiresConfirmation: true
+                }
+              ]
+            }
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     // Calculate working days for the period
@@ -809,16 +873,27 @@ async function executeLiquidatePayrollCompleteAction(action: any) {
 
     console.log(`[execute-maya-action] 💰 Totals calculated - Devengado: ${totalDevengado}, Deducciones: ${totalDeducciones}, Neto: ${totalNeto}`);
 
-    // Step 5: Insert payroll records
-    const { error: insertError } = await supabase
+    // Step 5: Upsert payroll records (idempotencia - evita duplicados)
+    console.log(`[execute-maya-action] 📝 Upserting ${payrollRecords.length} payroll records...`);
+    const { error: upsertError } = await supabase
       .from('payrolls')
-      .insert(payrollRecords);
+      .upsert(payrollRecords, { 
+        onConflict: 'employee_id,period_id',
+        ignoreDuplicates: false 
+      });
 
-    if (insertError) {
-      throw new Error(`Error insertando registros de nómina: ${insertError.message}`);
+    if (upsertError) {
+      console.error('[execute-maya-action] ❌ Error upserting payroll records:', upsertError);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: `❌ No se pudieron guardar los registros de nómina: ${upsertError.message}`
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
-    console.log(`[execute-maya-action] ✅ Inserted ${payrollRecords.length} payroll records`);
+    console.log(`[execute-maya-action] ✅ Upserted ${payrollRecords.length} payroll records`);
 
     // Step 6: Update period status to closed and update totals (usar actualPeriodId)
     const { error: updateError } = await supabase
@@ -865,7 +940,7 @@ async function executeLiquidatePayrollCompleteAction(action: any) {
         success: true,
         message: `✅ Nómina liquidada y período cerrado exitosamente para **${periodName}**.\n\n📊 **Resumen:**\n• Empleados procesados: ${employees.length}\n• Total devengado: $${totalDevengado.toLocaleString('es-CO')}\n• Total deducciones: $${totalDeducciones.toLocaleString('es-CO')}\n• Total neto: $${totalNeto.toLocaleString('es-CO')}\n\n✨ El período está ahora cerrado y listo para envío de comprobantes.`,
         data: {
-          periodId: actualPeriodId, // Devolver el ID correcto
+          periodId: actualPeriodId, // Usar actualPeriodId correcto
           periodName,
           employeesProcessed: employees.length,
           totalDevengado,
@@ -880,9 +955,9 @@ async function executeLiquidatePayrollCompleteAction(action: any) {
               description: 'Revisar detalles de la nómina procesada',
               parameters: {
                 entityType: 'period',
-                entityId: periodId,
+                entityId: actualPeriodId, // ✅ Usar actualPeriodId
                 entityName: periodName,
-                navigationPath: `/modules/liquidation?period=${periodId}`
+                navigationPath: `/modules/liquidation?period=${actualPeriodId}` // ✅ Usar actualPeriodId
               }
             },
             {
@@ -891,7 +966,7 @@ async function executeLiquidatePayrollCompleteAction(action: any) {
               label: '📧 Enviar Comprobantes a Todos',
               description: `Enviar comprobantes de pago a ${employees.length} empleados`,
               parameters: {
-                periodId: periodId,
+                periodId: actualPeriodId, // ✅ Usar actualPeriodId
                 periodName: periodName,
                 employeeCount: employees.length
               },
@@ -900,12 +975,19 @@ async function executeLiquidatePayrollCompleteAction(action: any) {
           ]
         }
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error: any) {
     console.error('[execute-maya-action] ❌ Error in complete liquidation:', error);
-    throw error;
+    // ⚡ MANEJO CONTROLADO: Retornar 200 con success:false en lugar de throw
+    return new Response(
+      JSON.stringify({
+        success: false,
+        message: `❌ No se pudo liquidar el período: ${error.message || 'Error desconocido'}. Por favor intenta de nuevo.`
+      }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   }
 }
 

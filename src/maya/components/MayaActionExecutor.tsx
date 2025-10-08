@@ -10,6 +10,7 @@ import { EmployeeWithStatus } from '@/types/employee-extended';
 import { EmployeeDetailsModal } from '@/components/employees/EmployeeDetailsModal';
 import { useMaya } from '../MayaProvider';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 
 interface MayaActionExecutorProps {
   actions: ExecutableAction[];
@@ -58,6 +59,9 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
   const executeAction = async (action: ExecutableAction) => {
     setIsExecuting(action.id);
     
+    // Show loading toast
+    const loadingToast = toast.loading(`Ejecutando: ${action.label}...`);
+    
     try {
       let result: ActionExecutionResult;
       
@@ -68,7 +72,13 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
         result = await handleAction(action);
       }
 
+      // Dismiss loading toast
+      toast.dismiss(loadingToast);
+
       if (result.success) {
+        // Show success toast
+        toast.success(result.message);
+        
         // Handle search results inline
         if (action.type === 'search_employee' && result.data?.employees) {
           setSearchResults({
@@ -76,13 +86,22 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
             query: result.data.query
           });
         }
+      } else {
+        // Show error toast for failed actions
+        toast.error(result.message || 'La acción no se pudo completar');
       }
 
       onActionExecuted?.(action, result);
     } catch (error: any) {
+      // Dismiss loading toast
+      toast.dismiss(loadingToast);
+      
+      const errorMessage = error.message || 'Error desconocido';
+      toast.error(errorMessage);
+      
       const result: ActionExecutionResult = {
         success: false,
-        message: error.message || 'Error desconocido'
+        message: errorMessage
       };
 
       onActionExecuted?.(action, result);
@@ -108,7 +127,17 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
     });
 
     if (error) {
-      throw new Error(error.message);
+      console.error('❌ Edge function invocation error:', error);
+      throw new Error(error.message || 'Error al ejecutar la acción');
+    }
+
+    // Check if backend returned controlled failure (success: false)
+    if (data && data.success === false) {
+      return {
+        success: false,
+        message: data.message || 'La acción no se pudo completar',
+        data: data.data
+      };
     }
 
     return {
