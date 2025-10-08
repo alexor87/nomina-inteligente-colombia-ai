@@ -5,7 +5,6 @@ import { useMaya } from '@/maya/MayaProvider';
 import { motion } from 'framer-motion';
 import { MayaHeaderActions } from './MayaHeaderActions';
 import { Button } from '@/components/ui/button';
-import { OverlayResetButton } from './OverlayResetButton';
 
 export const MayaPageHeader: React.FC = () => {
   const { clearConversation } = useMaya();
@@ -24,7 +23,6 @@ export const MayaPageHeader: React.FC = () => {
       
       <div className="max-w-7xl mx-auto px-4 md:px-8 py-3.5 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <OverlayResetButton />
           {comesFromModules && (
             <Link to="/modules/dashboard">
               <Button variant="ghost" size="icon">
