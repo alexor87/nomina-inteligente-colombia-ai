@@ -543,9 +543,19 @@ serve(async (req) => {
       global: { headers: { Authorization: authHeader } }
     });
 
-    const { conversation, sessionId, richContext, metadata, idempotencyKey } = await req.json();
+    const { conversation, sessionId, richContext, metadata, idempotencyKey, actionType, actionParameters } = await req.json();
     console.log(`📦 [METADATA] Received metadata:`, metadata ? 'present' : 'missing');
     console.log(`🔑 [IDEMPOTENCY] Received key:`, idempotencyKey ? 'present' : 'missing');
+    
+    // Log action data if present
+    if (actionType || actionParameters) {
+      console.log('✅ [REQUEST_BODY] Action data received:', {
+        hasActionType: !!actionType,
+        hasActionParameters: !!actionParameters,
+        actionType,
+        paramKeys: actionParameters ? Object.keys(actionParameters) : []
+      });
+    }
     
     if (!conversation || !Array.isArray(conversation)) {
       return new Response(JSON.stringify({
@@ -744,7 +754,7 @@ serve(async (req) => {
       
       try {
         // ✅ CRITICAL FIX: Use provided parameters from frontend if available
-        const providedActionParams = payload.actionParameters;
+        const providedActionParams = actionParameters;
         
         let actionParams: Record<string, any>;
         
