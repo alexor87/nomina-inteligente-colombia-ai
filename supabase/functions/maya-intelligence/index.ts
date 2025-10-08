@@ -709,6 +709,59 @@ serve(async (req) => {
     }
     
     // ============================================================================
+    // REPORT GENERATION BRIDGE - Direct Handler
+    // ============================================================================
+    if (body?.action === 'generate_report' && body?.reportRequest) {
+      console.log('📊 [REPORT_GENERATION] Direct report request detected');
+      console.log('📊 [REPORT_GENERATION] Request:', body.reportRequest);
+      
+      try {
+        const { ReportsHandler } = await import('./handlers/reports-handler.ts');
+        
+        const reportResult = await ReportsHandler.handleReportGeneration(
+          body.reportRequest,
+          userSupabase
+        );
+        
+        console.log('✅ [REPORT_GENERATION] Report generated successfully');
+        
+        return new Response(JSON.stringify({
+          message: reportResult.message,
+          emotionalState: reportResult.emotionalState || 'professional',
+          narrative: reportResult.message,
+          insights: reportResult.conversationState?.insights || [],
+          data: reportResult.conversationState?.reportData || [],
+          contextualActions: reportResult.contextualActions || [],
+          quickReplies: reportResult.quickReplies || [],
+          sessionId: body.sessionId || sessionId,
+          timestamp: new Date().toISOString()
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } catch (error) {
+        console.error('❌ [REPORT_GENERATION] Error:', error);
+        
+        await eventLogger.logError(
+          sessionId || 'unknown',
+          body.reportRequest?.companyId,
+          error as Error,
+          undefined,
+          { stage: 'REPORT_GENERATION', reportType: body.reportRequest?.reportType }
+        );
+        
+        return new Response(JSON.stringify({
+          message: `❌ Hubo un error al generar el reporte: ${(error as Error).message}. Por favor intenta de nuevo.`,
+          emotionalState: 'concerned',
+          sessionId: body.sessionId || sessionId,
+          timestamp: new Date().toISOString()
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500
+        });
+      }
+    }
+    
+    // ============================================================================
     // CONVERSATIONAL CONTEXT ANALYSIS - PRIORITY 1
     // ============================================================================
     

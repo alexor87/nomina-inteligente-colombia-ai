@@ -586,9 +586,9 @@ export class GuidedFlowManager {
     const { supabase } = await import('@/integrations/supabase/client');
     
     try {
-      console.log('📊 [MAYA] Generando reporte:', data.report_type);
+      console.log('📊 [MAYA] Ejecutando generación de reporte:', data.report_type);
       
-      // Get current user's company
+      // Obtener company_id del usuario actual
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuario no autenticado');
 
@@ -600,27 +600,27 @@ export class GuidedFlowManager {
 
       if (!profile?.company_id) throw new Error('No se encontró la empresa del usuario');
 
-      // Build report request
+      // Construir reportRequest estructurado
       const reportRequest = {
         reportType: data.report_type,
-        period: data.period_name || data.periodo,
+        period: data.period,
         periodId: data.selected_period_id,
         companyId: profile.company_id,
         filters: {
-          employeeIds: data.employee_filters || [],
-          costCenters: data.cost_center_filters || [],
-          contractTypes: data.contract_type_filters || []
+          employeeIds: data.employee_filters,
+          costCenters: data.cost_center_filters,
+          contractTypes: data.contract_type_filters
         },
-        includeComparison: data.include_comparison === 'yes'
+        includeComparison: true
       };
 
       console.log('📤 [MAYA] Invocando maya-intelligence con reportRequest:', reportRequest);
 
-      // Call maya-intelligence edge function
+      // ✅ CAMBIO CRÍTICO: Enviar con action flag
       const { data: reportResult, error } = await supabase.functions.invoke('maya-intelligence', {
         body: {
-          message: `generate_report:${data.report_type}`,
-          reportRequest,
+          action: 'generate_report',  // 🎯 Identificador claro
+          reportRequest,              // 📊 Datos estructurados
           sessionId: `report-flow-${Date.now()}`
         }
       });
@@ -635,7 +635,7 @@ export class GuidedFlowManager {
       return {
         success: true,
         reportType: data.report_type,
-        narrative: reportResult.narrative,
+        narrative: reportResult.message || reportResult.narrative,
         insights: reportResult.insights || [],
         reportData: reportResult.data,
         executableActions: reportResult.contextualActions || []
