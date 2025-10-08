@@ -615,12 +615,17 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
         setActiveFlow(nextResult.flowState);
         
         // Construir mensaje del siguiente step (result)
+        // Evaluar quickReplies si son una función
+        const evaluatedQuickReplies = typeof nextResult.currentStep.quickReplies === 'function'
+          ? nextResult.currentStep.quickReplies(nextResult.flowState.accumulatedData)
+          : nextResult.currentStep.quickReplies;
+
         const nextStepMessage: ChatMessage = {
           id: Date.now().toString(),
           role: 'assistant',
           content: nextResult.currentStep.message,
           timestamp: new Date().toISOString(),
-          quickReplies: nextResult.currentStep.quickReplies,
+          quickReplies: evaluatedQuickReplies,
           isFlowMessage: true,
           flowId: nextResult.flowState.flowId,
           stepId: nextResult.currentStep.id,
