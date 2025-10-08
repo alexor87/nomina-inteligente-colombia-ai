@@ -244,13 +244,18 @@ export class MayaChatService {
         throw error;
       }
 
-      // Create assistant response
+      // Create assistant response con validación de acciones
+      const rawActions = data?.executableActions || data?.executable_actions || [];
+      const validActions = rawActions.filter(
+        (action: any) => action && typeof action === 'object' && action.type && action.label
+      );
+      
       const assistantMessage: ChatMessage = {
         id: `maya_${Date.now()}`,
         role: 'assistant',
         content: data?.message ?? data?.response ?? "Disculpa, no pude procesar tu mensaje en este momento.",
         timestamp: new Date().toISOString(),
-        executableActions: data?.executableActions || data?.executable_actions || [],
+        executableActions: validActions,
         quickReplies: data?.quickReplies || [],
         fieldName: data?.fieldName,
         conversationState: data?.conversationState

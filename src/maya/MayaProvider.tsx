@@ -630,7 +630,9 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
           flowId: nextResult.flowState.flowId,
           stepId: nextResult.currentStep.id,
           ...(executionResult.executableActions && {
-            executableActions: executionResult.executableActions
+            executableActions: executionResult.executableActions.filter(
+              (action: any) => action && typeof action === 'object' && action.type && action.label
+            )
           })
         };
         

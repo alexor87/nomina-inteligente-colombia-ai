@@ -56,6 +56,14 @@ export class MayaReportService {
       
       console.log('✅ [MayaReportService] Reporte generado exitosamente');
       
+      // Filtrar acciones válidas (solo objetos con type y label)
+      const validActions = (aiResult.contextualActions || []).filter(
+        (action: any) => action && 
+        typeof action === 'object' && 
+        typeof action.type === 'string' && 
+        typeof action.label === 'string'
+      );
+      
       return {
         success: true,
         reportType: request.reportType,
@@ -69,7 +77,7 @@ export class MayaReportService {
         narrative: aiResult.message || aiResult.narrative,
         insightsData: aiResult.insights || [],
         reportData: aiResult.data || reportData,
-        executableActions: aiResult.contextualActions || []
+        executableActions: validActions
       };
       
     } catch (error: any) {
