@@ -15,15 +15,15 @@ export const NewConversationButton: React.FC<NewConversationButtonProps> = ({
   return (
     <Button
       onClick={onClick}
-      variant="outline"
+      variant="default"
       className={cn(
-        "w-full hover:bg-muted/50 border-border/50",
+        "w-full shadow-sm hover:shadow-md transition-all duration-200",
         collapsed ? "justify-center" : "justify-start"
       )}
       size={collapsed ? "icon" : "default"}
     >
-      <Plus className="h-4 w-4" />
-      {!collapsed && <span className="ml-2">Nueva conversación</span>}
+      <Plus className="h-5 w-5" />
+      {!collapsed && <span className="ml-2 font-medium">Nueva conversación</span>}
     </Button>
   );
 };
