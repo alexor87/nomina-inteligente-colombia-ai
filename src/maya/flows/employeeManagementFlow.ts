@@ -32,7 +32,10 @@ export const employeeManagementFlow: GuidedFlow = {
         { label: '🎫 TI - Tarjeta de Identidad', value: 'TI' },
         { label: '🌍 CE - Cédula de Extranjería', value: 'CE' },
         { label: '✈️ PA - Pasaporte', value: 'PA' },
-        { label: '🏢 NIT', value: 'NIT' }
+        { label: '📄 RC - Registro Civil', value: 'RC' },
+        { label: '🏢 NIT', value: 'NIT' },
+        { label: '🛂 PEP - Permiso Especial', value: 'PEP' },
+        { label: '🔐 PPT - Protección Temporal', value: 'PPT' }
       ],
       nextStep: 'document_number',
       canGoBack: true
