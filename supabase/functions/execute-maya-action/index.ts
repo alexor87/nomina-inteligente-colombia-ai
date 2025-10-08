@@ -139,7 +139,11 @@ serve(async (req) => {
     return await executeSendVoucherAllAction(action);
   }
 
-  if (action.type === 'liquidate_payroll_complete') {
+  // Support both liquidate_complete and liquidate_payroll_complete action types
+  if (action.type === 'liquidate_complete' || action.type === 'liquidate_payroll_complete') {
+    if (action.type === 'liquidate_complete') {
+      console.log('[execute-maya-action] ⚡ Using alias: liquidate_complete → liquidate_payroll_complete');
+    }
     return await executeLiquidatePayrollCompleteAction(action);
   }
 
@@ -160,10 +164,7 @@ serve(async (req) => {
       return await executeSearchEmployeeAction(action);
     }
 
-    // Payroll CRUD actions
-    if (action.type === 'liquidate_payroll_complete') {
-      return await executeLiquidatePayrollCompleteAction(action);
-    }
+    // Payroll CRUD actions (duplicate removed - handled at line 143)
 
     if (action.type === 'register_vacation') {
       return await executeRegisterVacationAction(action);
