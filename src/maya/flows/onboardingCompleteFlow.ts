@@ -50,8 +50,14 @@ Esto es solo una **demostración** - nada se guardará en tu cuenta aún.
 
 ¿Qué tipo de documento tiene?`,
       quickReplies: [
-        { label: '🪪 CC - Cédula', value: 'CC' },
-        { label: '🌍 CE - Extranjería', value: 'CE' }
+        { label: '🪪 CC - Cédula de Ciudadanía', value: 'CC' },
+        { label: '👶 TI - Tarjeta de Identidad', value: 'TI' },
+        { label: '🌍 CE - Cédula de Extranjería', value: 'CE' },
+        { label: '✈️ PA - Pasaporte', value: 'PA' },
+        { label: '📄 RC - Registro Civil', value: 'RC' },
+        { label: '🏢 NIT', value: 'NIT' },
+        { label: '🛂 PEP - Permiso Especial', value: 'PEP' },
+        { label: '🔐 PPT - Protección Temporal', value: 'PPT' }
       ],
       nextStep: 'document_number',
       canGoBack: true
