@@ -43,6 +43,41 @@ import { CircuitBreaker } from './services/circuit-breaker.ts';
 // ============================================================================
 // Functions moved to core/context-enricher.ts for better modularity
 
+// ============================================================================
+// HELPER: Extract action parameters from conversation history
+// ============================================================================
+function extractActionParametersFromContext(conversation: any[], actionType: string): Record<string, any> {
+  console.log(`🔍 [PARAM_EXTRACTION] Searching for parameters for action: ${actionType}`);
+  
+  // Search in the last 5 messages for executable actions
+  const recentMessages = conversation.slice(-5).reverse();
+  
+  for (const msg of recentMessages) {
+    if (msg.executableActions && Array.isArray(msg.executableActions)) {
+      // Look for matching action by type or id
+      const matchingAction = msg.executableActions.find((action: any) => 
+        action.type === actionType || 
+        action.type === 'liquidate_payroll_complete' ||
+        action.id === `action_${actionType}` ||
+        action.id === 'liquidate_complete'
+      );
+      
+      if (matchingAction?.parameters) {
+        console.log(`✅ [PARAM_EXTRACTION] Found parameters:`, {
+          periodId: matchingAction.parameters.periodId,
+          startDate: matchingAction.parameters.startDate,
+          endDate: matchingAction.parameters.endDate,
+          companyId: matchingAction.parameters.companyId
+        });
+        return matchingAction.parameters;
+      }
+    }
+  }
+  
+  console.log(`⚠️ [PARAM_EXTRACTION] No parameters found for action: ${actionType}`);
+  return {};
+}
+
 // Context analysis functions moved to core/context-enricher.ts
 
 // Legacy context detection moved to core/context-enricher.ts
@@ -708,11 +743,15 @@ serve(async (req) => {
       const actionType = lastMessage.replace('action_', '');
       
       try {
-        // Build action with context from the conversation
+        // CRITICAL FIX: Extract original parameters from previous executable actions
+        const originalParams = extractActionParametersFromContext(conversation, actionType);
+        
+        // Build action with ORIGINAL parameters preserved + rich context
         const action = {
           type: actionType,
           parameters: {
-            ...richContext,
+            ...originalParams,   // ✅ Preserve specific action parameters (periodId, startDate, endDate)
+            ...richContext,      // Add general context
             autoTriggered: true
           }
         };
