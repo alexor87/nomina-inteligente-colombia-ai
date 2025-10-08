@@ -219,9 +219,9 @@ export const UnifiedSidebar: React.FC = () => {
     
     try {
       setIsDeleting(true);
+      await new Promise((res) => setTimeout(res, 120));
       
       await conversationManager.deleteConversation(id);
-      
       // Si es la conversación actual, limpiar el ID y el estado SIN generar mensaje
       if (id === currentConversationId) {
         conversationManager.clearCurrentConversationId();

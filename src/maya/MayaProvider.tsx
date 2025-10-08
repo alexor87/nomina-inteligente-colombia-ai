@@ -897,7 +897,7 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
         setActiveFlow(null);
       }
       
-      await setPhase('initial');
+      // Avoid triggering initial message during local clear
       toast.success('Conversación limpiada');
       return;
     }

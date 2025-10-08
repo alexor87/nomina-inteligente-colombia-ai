@@ -213,6 +213,7 @@ export const MayaHistorySidebar: React.FC = () => {
     }
     isDeletingRef.current = true;
     setIsDeleting(true);
+    await new Promise((res) => setTimeout(res, 120));
     
     try {
       // 1. Validar que existe una conversación para eliminar

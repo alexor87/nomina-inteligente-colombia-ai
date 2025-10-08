@@ -34,7 +34,12 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   const handleConfirm = () => {
     try {
       onOpenChange(false);
-      setTimeout(() => { void onConfirm(); }, 0);
+      requestAnimationFrame(() => {
+        try {
+          document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        } catch {}
+        setTimeout(() => { void onConfirm(); }, 120);
+      });
     } catch (e) {
       console.error('ConfirmDialog onConfirm error', e);
     }
