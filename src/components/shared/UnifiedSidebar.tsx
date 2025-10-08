@@ -50,6 +50,7 @@ export const UnifiedSidebar: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const prevDeletingRef = useRef(isDeleting);
+  const isDeletingRef = useRef(false);
 
   // Diagnostics: log overlay mount/unmount
   useEffect(() => {
@@ -209,16 +210,22 @@ export const UnifiedSidebar: React.FC = () => {
   };
 
   const handleDeleteConversation = async (id: string) => {
+    // Prevenir ejecuciones múltiples
+    if (isDeletingRef.current) {
+      console.log('⚠️ Deletion already in progress');
+      return;
+    }
+    isDeletingRef.current = true;
+    
     try {
       setIsDeleting(true);
       
       await conversationManager.deleteConversation(id);
       
-      // Si es la conversación actual, limpiar el ID
+      // Si es la conversación actual, limpiar el ID y el estado SIN generar mensaje
       if (id === currentConversationId) {
         conversationManager.clearCurrentConversationId();
-        // Llamar clearConversation para limpiar el estado
-        await clearConversation();
+        await clearConversation(true);
       }
       
       // Cargar conversaciones UNA SOLA VEZ
@@ -231,6 +238,7 @@ export const UnifiedSidebar: React.FC = () => {
       toast.error('Error al eliminar');
     } finally {
       setIsDeleting(false);
+      isDeletingRef.current = false;
       if (isMobile) {
         setCollapsed(true);
         localStorage.setItem(STORAGE_KEY, 'true');

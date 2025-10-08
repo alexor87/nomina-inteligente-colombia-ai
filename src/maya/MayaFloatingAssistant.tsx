@@ -106,7 +106,7 @@ export const MayaFloatingAssistant: React.FC = () => {
             <Button
               variant="ghost"
               size="sm"
-              onClick={clearConversation}
+              onClick={() => clearConversation()}
               className="h-8 w-8 p-0 hover:bg-orange-100 hover:text-orange-600"
               title="Limpiar conversación"
             >

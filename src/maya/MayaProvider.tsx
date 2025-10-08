@@ -30,7 +30,7 @@ interface MayaProviderValue {
   setPhase: (phase: PayrollPhase, additionalData?: Partial<MayaContextType>) => Promise<void>;
   performIntelligentValidation: (companyId: string, periodId?: string, employees?: any[]) => Promise<any>;
   setErrorContext: (errorType: string, errorDetails: any) => Promise<void>;
-  clearConversation: () => void;
+  clearConversation: (skipMessage?: boolean) => Promise<void>;
   deleteCurrentConversation: () => Promise<void>;
   loadConversations: () => Promise<void>;
   loadConversation: (conversationId: string) => Promise<void>;
@@ -860,7 +860,7 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
     });
   }, [setPhase]);
 
-  const clearConversation = useCallback(async () => {
+  const clearConversation = useCallback(async (skipMessage: boolean = false) => {
     try {
       console.log('🧹 MAYA: Clearing conversation (no auto-create)...');
       
@@ -872,13 +872,17 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
       setIsChatMode(false);
       setCurrentConversationId(null);
       conversationManager.clearCurrentConversationId();
-      await setPhase('initial');
+      
+      // Evitar generar mensaje inicial durante procesos de eliminación
+      if (!skipMessage) {
+        await setPhase('initial');
+      }
       
       console.log('✅ MAYA: Conversation cleared');
     } catch (error) {
       console.error('❌ MAYA: Error clearing conversation', error);
     }
-  }, [setPhase, chatService, conversationManager, setCurrentConversationId]);
+  }, [setPhase, chatService, conversationManager]);
 
   const deleteCurrentConversation = useCallback(async () => {
     // Si no hay conversación en BD, solo limpiar estado local

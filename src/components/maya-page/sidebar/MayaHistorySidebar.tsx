@@ -46,6 +46,7 @@ export const MayaHistorySidebar: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const prevDeletingRef = useRef(isDeleting);
+  const isDeletingRef = useRef(false);
  
   // Diagnostics: log overlay mount/unmount
   useEffect(() => {
@@ -205,6 +206,12 @@ export const MayaHistorySidebar: React.FC = () => {
   };
 
   const handleDeleteConversation = async (id: string) => {
+    // Prevenir ejecuciones múltiples
+    if (isDeletingRef.current) {
+      console.log('⚠️ Deletion already in progress');
+      return;
+    }
+    isDeletingRef.current = true;
     setIsDeleting(true);
     
     try {
@@ -216,18 +223,18 @@ export const MayaHistorySidebar: React.FC = () => {
       // 2. Eliminar de la base de datos
       await conversationManager.deleteConversation(id);
       
-      // 3. Si es la conversación actual, limpiar el estado
+      // 3. Si es la conversación actual, limpiar el estado SIN generar mensaje inicial
       if (id === currentConversationId) {
         try {
           conversationManager.clearCurrentConversationId();
-          await clearConversation();
+          await clearConversation(true);
         } catch (clearError) {
           console.error('Error clearing conversation state:', clearError);
           // Continuar aunque falle la limpieza
         }
       }
       
-      // 4. Recargar lista de conversaciones
+      // 4. Recargar lista de conversaciones una sola vez
       try {
         await Promise.all([
           loadConversations(),
@@ -247,6 +254,7 @@ export const MayaHistorySidebar: React.FC = () => {
     } finally {
       // Asegurar que siempre se limpia el estado
       setIsDeleting(false);
+      isDeletingRef.current = false;
       
       // En mobile, colapsar el sidebar después de eliminar
       if (isMobile) {
