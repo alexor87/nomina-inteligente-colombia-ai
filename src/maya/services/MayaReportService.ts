@@ -59,8 +59,15 @@ export class MayaReportService {
       return {
         success: true,
         reportType: request.reportType,
+        
+        // Para el flujo
+        reportTitle: this.getReportLabel(request.reportType),
+        summary: aiResult.message || aiResult.narrative || 'Reporte generado',
+        insights: this.formatInsightsForDisplay(aiResult.insights || []),
+        
+        // Datos originales (para acciones posteriores)
         narrative: aiResult.message || aiResult.narrative,
-        insights: aiResult.insights || [],
+        insightsData: aiResult.insights || [],
         reportData: aiResult.data || reportData,
         executableActions: aiResult.contextualActions || []
       };
@@ -243,5 +250,36 @@ export class MayaReportService {
     }
     
     return result;
+  }
+  
+  /**
+   * Formatea insights array a texto legible
+   */
+  private static formatInsightsForDisplay(insights: any[]): string {
+    if (!insights || insights.length === 0) {
+      return 'No se encontraron insights significativos para este período.';
+    }
+    
+    return insights
+      .map((insight) => {
+        const emoji = insight.severity === 'critical' ? '🔴' :
+                      insight.severity === 'warning' ? '⚠️' : 'ℹ️';
+        return `${emoji} **${insight.title}**\n   ${insight.description}`;
+      })
+      .join('\n\n');
+  }
+  
+  /**
+   * Obtiene etiqueta legible para tipo de reporte
+   */
+  private static getReportLabel(reportType: string): string {
+    const labels: Record<string, string> = {
+      payroll_summary: 'Resumen de Nómina',
+      labor_cost: 'Costos Laborales',
+      social_security: 'Seguridad Social',
+      novelty_history: 'Historial de Novedades',
+      accounting_export: 'Exportación Contable'
+    };
+    return labels[reportType] || reportType;
   }
 }

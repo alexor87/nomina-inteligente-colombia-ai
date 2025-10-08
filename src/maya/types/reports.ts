@@ -23,9 +23,16 @@ export interface MayaReportRequest {
 export interface MayaReportResult {
   success: boolean;
   reportType: string;
-  narrative: string;
-  insights: ReportInsight[];
-  reportData: any;
+  
+  // Para el flujo
+  reportTitle?: string;
+  summary?: string;
+  insights?: string;
+  
+  // Datos originales
+  narrative?: string;
+  insightsData?: ReportInsight[];
+  reportData?: any;
   executableActions?: string[];
 }
 
