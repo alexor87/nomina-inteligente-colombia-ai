@@ -55,10 +55,23 @@ function mapIntentToAction(intentType: string): string {
   return actionMap[intentType] || 'otros';
 }
 
-function extractPeriod(message: string, params: any): string {
+export function extractPeriod(message: string, params: any): string {
   // Check for explicit periods in params
   if (params?.periodo && params.periodo !== 'actual') {
     return params.periodo;
+  }
+  
+  // NUEVO: Detectar referencias a "último" o "última"
+  if (/última?\s+(?:quincena|periodo|nómina|liquidación)/i.test(message)) {
+    return 'última_quincena';
+  }
+  
+  if (/último?\s+mes/i.test(message)) {
+    return 'último_mes';
+  }
+  
+  if (/penúltim[ao]\s+(?:quincena|mes)/i.test(message)) {
+    return 'penúltima_quincena';
   }
   
   // Extract from message

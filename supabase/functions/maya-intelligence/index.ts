@@ -8,7 +8,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { SimpleIntentMatcher } from './SimpleIntentMatcher.ts';
 import { liquidarNomina, registrarNovedad, calcularPrestacion, generarReporte } from './payroll-handlers.ts';
-import { buildStructuredResponse } from './structured-response-builder.ts';
+import { buildStructuredResponse, extractPeriod } from './structured-response-builder.ts';
 import { ConversationContextAnalyzer } from './core/conversation-context-analyzer.ts';
 import { SmartContextInferencer } from './core/smart-context-inferencer.ts';
 import * as AggregationService from './services/aggregation/index.ts';
@@ -2107,7 +2107,8 @@ serve(async (req) => {
         break;
       
       case 'getPayrollTotals':
-        response = await getPayrollTotals(userSupabase);
+        const periodParam = intent.params?.periodo || extractPeriod(lastMessage, intent.params);
+        response = await getPayrollTotals(userSupabase, periodParam);
         break;
         
       case 'getPayrollByMonth':
@@ -3554,29 +3555,60 @@ async function getEmployeePaidTotal(supabase: any, params: any) {
   }
 }
 
-async function getPayrollTotals(supabase: any) {
+async function getPayrollTotals(supabase: any, periodFilter?: string) {
   try {
-    const currentYear = new Date().getFullYear();
+    let query = supabase
+      .from('payroll_periods_real')
+      .select('id, periodo, total_devengado, total_deducciones, total_neto, fecha_inicio, fecha_fin, empleados_count')
+      .eq('estado', 'cerrado')
+      .order('fecha_fin', { ascending: false });
     
-    const { data, error } = await supabase
-      .from('payrolls')
-      .select('total_devengado, neto_pagado')
-      .eq('estado', 'procesada')
-      .gte('created_at', `${currentYear}-01-01`);
+    // Si se especifica "última quincena" o "último periodo"
+    if (periodFilter === 'última_quincena' || periodFilter === 'último_mes') {
+      query = query.limit(1);  // Solo el más reciente
       
+      const { data, error } = await query;
+      if (error) throw error;
+      
+      if (!data || data.length === 0) {
+        return {
+          message: 'No hay períodos de nómina cerrados aún.',
+          emotionalState: 'neutral'
+        };
+      }
+      
+      const period = data[0];
+      return {
+        message: `💰 **${period.periodo}**\n\n` +
+                `📊 Total devengado: $${(period.total_devengado || 0).toLocaleString()}\n` +
+                `💸 Total deducciones: $${(period.total_deducciones || 0).toLocaleString()}\n` +
+                `✅ **Total neto pagado: $${(period.total_neto || 0).toLocaleString()}**\n\n` +
+                `👥 Empleados: ${period.empleados_count || 0}`,
+        emotionalState: 'professional'
+      };
+    }
+    
+    // Si no, devolver totales del año (comportamiento actual)
+    const currentYear = new Date().getFullYear();
+    query = query.gte('fecha_inicio', `${currentYear}-01-01`);
+    
+    const { data, error } = await query;
     if (error) throw error;
     
-    if (data.length === 0) {
+    if (!data || data.length === 0) {
       return {
-        message: 'No hay nóminas procesadas este año aún.',
+        message: 'No hay períodos de nómina procesados este año aún.',
         emotionalState: 'neutral'
       };
     }
     
-    const totalNeto = data.reduce((sum: number, p: any) => sum + (p.neto_pagado || 0), 0);
+    const totalNeto = data.reduce((sum, p) => sum + (p.total_neto || 0), 0);
+    const totalDevengado = data.reduce((sum, p) => sum + (p.total_devengado || 0), 0);
     
     return {
-      message: `Este año has pagado **$${totalNeto.toLocaleString()}** en **${data.length} nóminas** procesadas.`,
+      message: `📊 **Resumen ${currentYear}**\n\n` +
+              `Este año has pagado **$${totalNeto.toLocaleString()}** en **${data.length} nóminas** procesadas.\n` +
+              `Total devengado: $${totalDevengado.toLocaleString()}`,
       emotionalState: 'neutral'
     };
   } catch (error) {
