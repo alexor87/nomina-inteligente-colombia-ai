@@ -6,24 +6,39 @@
  * Checks if the UI is currently blocked by overlays or scroll locks
  */
 export function isUIBlocked(): boolean {
-  // Check for scroll lock
-  const hasScrollLock = document.body.classList.contains('react-remove-scroll-bar');
+  // Check for scroll lock on body
+  const hasScrollLock = 
+    document.body.classList.contains('react-remove-scroll-bar') ||
+    document.body.style.overflow === 'hidden' ||
+    document.documentElement.style.overflow === 'hidden';
   
-  // Check for open Radix portals
-  const hasOpenPortals = document.querySelectorAll('[data-radix-portal]').length > 0;
+  // Check if #root itself is blocked
+  const root = document.getElementById('root');
+  const rootBlocked = 
+    root?.hasAttribute('inert') || 
+    root?.getAttribute('aria-hidden') === 'true';
   
-  // Check for aria-hidden on main content (indicates modal is open)
-  const mainContent = document.querySelector('[data-radix-dialog-content]');
-  const hasAriaHidden = mainContent !== null;
+  // Check for actually open dialogs/overlays (not just empty portals)
+  const hasOpenDialog = !!document.querySelector(
+    '[role="dialog"][data-state="open"], [data-radix-portal] [data-state="open"]'
+  );
   
-  return hasScrollLock || hasOpenPortals || hasAriaHidden;
+  return hasScrollLock || rootBlocked || hasOpenDialog;
 }
 
 /**
  * Forces a complete UI reset by removing scroll locks and closing all overlays
  */
 export function forceUIReset(): void {
-  console.log('[UI Recovery] Forcing UI reset...');
+  console.log('[UI Recovery] Starting UI reset...');
+  console.log('[UI Recovery] Before reset:', {
+    bodyClasses: Array.from(document.body.classList),
+    bodyOverflow: document.body.style.overflow,
+    htmlOverflow: document.documentElement.style.overflow,
+    rootInert: document.getElementById('root')?.hasAttribute('inert'),
+    rootAriaHidden: document.getElementById('root')?.getAttribute('aria-hidden'),
+    openDialogs: document.querySelectorAll('[role="dialog"][data-state="open"]').length,
+  });
   
   // 1. Dispatch multiple Escape events to close any open dialogs/menus
   for (let i = 0; i < 3; i++) {
@@ -39,28 +54,49 @@ export function forceUIReset(): void {
     );
   }
   
-  // 2. Remove scroll lock class
-  document.body.classList.remove('react-remove-scroll-bar');
-  
-  // 3. Clear body styles that might be preventing scroll
-  document.body.style.overflow = '';
-  document.body.style.paddingRight = '';
-  document.body.style.position = '';
-  
-  // 4. Restore aria-hidden and inert attributes on root siblings
-  const rootSiblings = document.querySelectorAll('body > *:not(#root)');
-  rootSiblings.forEach((sibling) => {
-    sibling.removeAttribute('aria-hidden');
-    sibling.removeAttribute('inert');
+  // 2. Use double requestAnimationFrame to ensure Radix animations complete
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      // 3. Remove scroll lock class
+      document.body.classList.remove('react-remove-scroll-bar');
+      
+      // 4. Clear body AND html styles that might be preventing scroll
+      document.body.style.overflow = '';
+      document.body.style.paddingRight = '';
+      document.body.style.position = '';
+      document.documentElement.style.overflow = '';
+      
+      // 5. Restore #root itself (critical!)
+      const root = document.getElementById('root');
+      if (root) {
+        root.removeAttribute('inert');
+        root.removeAttribute('aria-hidden');
+      }
+      
+      // 6. Restore aria-hidden and inert attributes on root siblings
+      const rootSiblings = document.querySelectorAll('body > *:not(#root)');
+      rootSiblings.forEach((sibling) => {
+        sibling.removeAttribute('aria-hidden');
+        sibling.removeAttribute('inert');
+      });
+      
+      // 7. Remove any lingering empty portal elements
+      const portals = document.querySelectorAll('[data-radix-portal]');
+      portals.forEach((portal) => {
+        if (portal.childElementCount === 0) {
+          portal.remove();
+        }
+      });
+      
+      console.log('[UI Recovery] After reset:', {
+        bodyClasses: Array.from(document.body.classList),
+        bodyOverflow: document.body.style.overflow,
+        htmlOverflow: document.documentElement.style.overflow,
+        rootInert: document.getElementById('root')?.hasAttribute('inert'),
+        rootAriaHidden: document.getElementById('root')?.getAttribute('aria-hidden'),
+        openDialogs: document.querySelectorAll('[role="dialog"][data-state="open"]').length,
+      });
+      console.log('[UI Recovery] UI reset complete');
+    });
   });
-  
-  // 5. Remove any lingering portal elements
-  const portals = document.querySelectorAll('[data-radix-portal]');
-  portals.forEach((portal) => {
-    if (portal.childElementCount === 0) {
-      portal.remove();
-    }
-  });
-  
-  console.log('[UI Recovery] UI reset complete');
 }

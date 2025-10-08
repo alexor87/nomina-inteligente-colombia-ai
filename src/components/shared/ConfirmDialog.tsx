@@ -40,8 +40,11 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
       console.error('ConfirmDialog onConfirm error', e);
     } finally {
       // Force UI reset to clear any orphaned overlays
+      // Double RAF ensures Radix animations complete first
       requestAnimationFrame(() => {
-        forceUIReset();
+        requestAnimationFrame(() => {
+          forceUIReset();
+        });
       });
     }
   };

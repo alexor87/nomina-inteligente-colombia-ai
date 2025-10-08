@@ -268,8 +268,11 @@ export const MayaHistorySidebar: React.FC = () => {
       isDeletingRef.current = false;
       
       // Force UI reset to clear any orphaned overlays
+      // Double RAF ensures Radix animations complete first
       requestAnimationFrame(() => {
-        forceUIReset();
+        requestAnimationFrame(() => {
+          forceUIReset();
+        });
       });
       
       // En mobile, colapsar el sidebar después de eliminar

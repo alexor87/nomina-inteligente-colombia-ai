@@ -251,8 +251,11 @@ export const UnifiedSidebar: React.FC = () => {
       isDeletingRef.current = false;
       
       // Force UI reset to clear any orphaned overlays
+      // Double RAF ensures Radix animations complete first
       requestAnimationFrame(() => {
-        forceUIReset();
+        requestAnimationFrame(() => {
+          forceUIReset();
+        });
       });
       
       if (isMobile) {
