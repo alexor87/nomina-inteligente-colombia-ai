@@ -28,7 +28,7 @@ export const MayaFloatingAssistant: React.FC = () => {
     advanceFlow,
     activeFlow
   } = useMaya();
-  const [isMinimized, setIsMinimized] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(true);
   const [userInput, setUserInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -37,6 +37,11 @@ export const MayaFloatingAssistant: React.FC = () => {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatHistory]);
+
+  // Minimizar automáticamente cuando cambia la ruta
+  useEffect(() => {
+    setIsMinimized(true);
+  }, [location.pathname]);
 
   // No mostrar el flotante si estamos en la página de MAYA
   if (location.pathname === '/maya') {
