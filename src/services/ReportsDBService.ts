@@ -1,9 +1,67 @@
 import { supabase } from '@/integrations/supabase/client';
 import { ReportFilters, NoveltyHistoryReport } from '@/types/reports';
+import { ReportInsightAnalyzer } from './ReportInsightAnalyzer';
+import { ReportInsight } from '@/types/insights';
+
+export interface ReportWithInsights {
+  data: any[];
+  insights?: ReportInsight[];
+  summary?: {
+    totalRecords: number;
+    totalAmount: number;
+    averageAmount: number;
+  };
+}
 
 export class ReportsDBService {
+  /**
+   * Obtiene datos del período anterior para comparación
+   */
+  private static async fetchPreviousPeriodData(
+    currentPeriodId: string
+  ): Promise<any[] | undefined> {
+    try {
+      const { data: currentPeriod } = await supabase
+        .from('payroll_periods_real')
+        .select('fecha_inicio, company_id')
+        .eq('id', currentPeriodId)
+        .single();
+
+      if (!currentPeriod) return undefined;
+
+      const currentStart = new Date(currentPeriod.fecha_inicio);
+      const previousMonth = new Date(currentStart);
+      previousMonth.setMonth(previousMonth.getMonth() - 1);
+
+      const { data: previousPeriod } = await supabase
+        .from('payroll_periods_real')
+        .select('id')
+        .eq('company_id', currentPeriod.company_id)
+        .gte('fecha_inicio', previousMonth.toISOString().split('T')[0])
+        .lt('fecha_inicio', currentStart.toISOString().split('T')[0])
+        .order('fecha_inicio', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (!previousPeriod) return undefined;
+
+      const { data } = await supabase
+        .from('payrolls')
+        .select('neto_pagado')
+        .eq('period_id', previousPeriod.id);
+
+      return data?.map((item: any) => ({
+        totalCost: item.neto_pagado || 0,
+        netPay: item.neto_pagado || 0
+      })) || undefined;
+    } catch (error) {
+      console.error('[ReportsDBService] Error fetching previous period:', error);
+      return undefined;
+    }
+  }
+
   // Reporte de Resumen de Nómina
-  static async getPayrollSummaryReport(filters: ReportFilters) {
+  static async getPayrollSummaryReport(filters: ReportFilters, includeInsights = false): Promise<ReportWithInsights> {
     console.log('🔍 ReportsDBService: Fetching payroll summary with filters:', filters);
     
     let query = supabase
@@ -11,6 +69,7 @@ export class ReportsDBService {
       .select(`
         employee_id,
         periodo,
+        period_id,
         total_devengado,
         total_deducciones,
         neto_pagado,
@@ -56,16 +115,44 @@ export class ReportsDBService {
 
     console.log('✅ ReportsDBService: Payroll summary fetched:', data?.length, 'records');
 
-    return data?.map(item => ({
+    const mappedData = data?.map((item: any) => ({
       employeeId: item.employee_id,
       employeeName: `${item.employees?.nombre} ${item.employees?.apellido}`,
       period: item.periodo,
       totalEarnings: Number(item.total_devengado) || 0,
       totalDeductions: Number(item.total_deducciones) || 0,
       netPay: Number(item.neto_pagado) || 0,
-      employerContributions: Number(item.total_devengado) * 0.21, // Cálculo aproximado de aportes patronales
+      employerContributions: Number(item.total_devengado) * 0.21,
       costCenter: item.employees?.centro_costos
     })) || [];
+
+    // Calcular resumen
+    const totalAmount = mappedData.reduce((sum, r) => sum + r.netPay, 0);
+    const totalRecords = mappedData.length;
+    const averageAmount = totalRecords > 0 ? totalAmount / totalRecords : 0;
+
+    const result: ReportWithInsights = {
+      data: mappedData,
+      summary: {
+        totalRecords,
+        totalAmount,
+        averageAmount
+      }
+    };
+
+    // Generar insights si se solicita
+    if (includeInsights && mappedData.length > 0 && data && data.length > 0) {
+      const periodId = (data[0] as any).period_id;
+      const previousData = await this.fetchPreviousPeriodData(periodId);
+      
+      result.insights = ReportInsightAnalyzer.generateInsights(
+        'payroll_summary',
+        mappedData,
+        previousData
+      );
+    }
+
+    return result;
   }
 
   // Reporte de Costos Laborales

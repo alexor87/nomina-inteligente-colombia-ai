@@ -27,9 +27,9 @@ export class ReportsDataService {
   static async getPayrollSummaryReport(filters: ReportFilters): Promise<PayrollSummaryReport[]> {
     console.log('🔄 ReportsDataService: Fetching real payroll summary data');
     try {
-      const data = await ReportsDBService.getPayrollSummaryReport(filters);
-      console.log('✅ ReportsDataService: Payroll summary data received:', data.length, 'records');
-      return data;
+      const result = await ReportsDBService.getPayrollSummaryReport(filters, false);
+      console.log('✅ ReportsDataService: Payroll summary data received:', result.data.length, 'records');
+      return result.data;
     } catch (error) {
       console.error('❌ ReportsDataService: Error fetching payroll summary:', error);
       throw error;

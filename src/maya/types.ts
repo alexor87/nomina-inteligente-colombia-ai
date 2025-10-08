@@ -36,6 +36,20 @@ export interface MayaMessage {
   conversationState?: Record<string, any>;
   timestamp: string;
   isVisible: boolean;
+  insights?: ReportInsight[];
+  reportData?: any;
+}
+
+export interface ReportInsight {
+  id: string;
+  type: 'comparison' | 'composition' | 'alert' | 'recommendation' | 'trend' | 'anomaly';
+  severity: 'info' | 'warning' | 'critical' | 'success';
+  title: string;
+  description: string;
+  value?: number;
+  percentage?: number;
+  change?: number;
+  actions?: string[];
 }
 
 export type EmotionalState = 

@@ -5,6 +5,15 @@ export enum FlowType {
   BENEFITS_CALCULATE = 'BENEFITS_CALCULATE'
 }
 
+export enum ReportType {
+  PAYROLL_SUMMARY = 'payroll_summary',
+  LABOR_COST = 'labor_cost',
+  SOCIAL_SECURITY = 'social_security',
+  NOVELTY_HISTORY = 'novelty_history',
+  INCOME_RETENTION = 'income_retention',
+  ACCOUNTING_EXPORT = 'accounting_export'
+}
+
 export enum FlowStepType {
   GREETING = 'greeting',
   INPUT = 'input',
