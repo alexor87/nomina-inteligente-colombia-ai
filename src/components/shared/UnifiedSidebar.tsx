@@ -280,7 +280,7 @@ export const UnifiedSidebar: React.FC = () => {
           <div className="flex-none flex flex-col border-b border-border" style={{ maxHeight: '45vh' }}>
             <SidebarHeader collapsed={collapsed} />
             
-            <div className="px-3 py-2">
+            <div className="px-3 pt-4 pb-3">
               <NewConversationButton 
                 onClick={handleNewConversation} 
                 collapsed={collapsed}
@@ -288,7 +288,7 @@ export const UnifiedSidebar: React.FC = () => {
             </div>
 
             {!collapsed && (
-              <div className="px-3 pb-2">
+              <div className="px-3 pt-2 pb-3">
                 <ArchiveToggle
                   mode={viewMode}
                   onModeChange={setViewMode}
@@ -299,7 +299,7 @@ export const UnifiedSidebar: React.FC = () => {
             )}
 
             {!collapsed && (
-              <div className="px-3 pb-2">
+              <div className="px-3 pt-1 pb-3">
                 <ConversationSearch 
                   onSearch={setSearchQuery} 
                   collapsed={collapsed}
@@ -382,11 +382,11 @@ export const UnifiedSidebar: React.FC = () => {
               <div className="flex flex-col h-full">
                 <SidebarHeader collapsed={false} />
                 
-                <div className="p-3 border-b border-border">
+                <div className="px-3 pt-4 pb-3 border-b border-border">
                   <NewConversationButton onClick={handleNewConversation} />
                 </div>
 
-                <div className="px-3 pb-2">
+                <div className="px-3 pt-2 pb-3">
                   <ArchiveToggle
                     mode={viewMode}
                     onModeChange={setViewMode}
@@ -395,7 +395,7 @@ export const UnifiedSidebar: React.FC = () => {
                   />
                 </div>
 
-                <div className="px-3 pb-2">
+                <div className="px-3 pt-1 pb-3">
                   <ConversationSearch onSearch={setSearchQuery} />
                 </div>
 
