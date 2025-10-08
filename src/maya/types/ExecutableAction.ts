@@ -1,6 +1,6 @@
 export interface ExecutableAction {
   id: string;
-  type: 'send_voucher' | 'search_employee' | 'generate_report' | 'view_details' | 'confirm_send_voucher' | 'show_period_alternatives' | 'send_voucher_all' | 'expand_periods' | 'list_employees' | 'send_message' | 'liquidate_payroll_complete';
+  type: 'send_voucher' | 'search_employee' | 'generate_report' | 'view_details' | 'confirm_send_voucher' | 'show_period_alternatives' | 'send_voucher_all' | 'expand_periods' | 'list_employees' | 'send_message' | 'liquidate_payroll_complete' | 'download_excel' | 'download_pdf';
   label: string;
   description?: string;
   parameters: Record<string, any>;
@@ -75,4 +75,22 @@ export interface SendMessageAction extends ExecutableAction {
   };
 }
 
-export type MayaExecutableAction = VoucherSendAction | SearchEmployeeAction | ViewDetailsAction | SendVoucherAllAction | ExpandPeriodsAction | ListEmployeesAction | SendMessageAction;
+export interface DownloadExcelAction extends ExecutableAction {
+  type: 'download_excel';
+  parameters: {
+    reportType: string;
+    reportData: any[];
+    period: string;
+  };
+}
+
+export interface DownloadPDFAction extends ExecutableAction {
+  type: 'download_pdf';
+  parameters: {
+    reportType: string;
+    reportData: any[];
+    period: string;
+  };
+}
+
+export type MayaExecutableAction = VoucherSendAction | SearchEmployeeAction | ViewDetailsAction | SendVoucherAllAction | ExpandPeriodsAction | ListEmployeesAction | SendMessageAction | DownloadExcelAction | DownloadPDFAction;

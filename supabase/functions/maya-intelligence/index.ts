@@ -888,6 +888,108 @@ serve(async (req) => {
     }
     
     // ============================================================================
+    // REPORT ACTION DETECTION
+    // ============================================================================
+    const reportActions = ['export_excel', 'export_pdf', 'view_detail', 'compare', 'otro_reporte'];
+    if (reportActions.includes(lastMessage.toLowerCase().trim())) {
+      console.log(`📊 [REPORT_ACTION] Detected: "${lastMessage}"`);
+      
+      // Get report context from conversation state
+      const lastAssistantMsg = conversation.slice().reverse().find(msg => msg.role === 'assistant');
+      const reportState = lastAssistantMsg?.conversationState;
+      
+      if (!reportState?.reportType) {
+        return new Response(JSON.stringify({
+          message: '❌ No encontré información del reporte previo. Por favor genera un reporte primero.',
+          emotionalState: 'neutral',
+          sessionId,
+          timestamp: new Date().toISOString()
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      
+      // Handle different actions
+      const action = lastMessage.toLowerCase().trim();
+      let response: any;
+      
+      switch (action) {
+        case 'export_excel':
+          response = {
+            message: '📥 Exportando a Excel...\n\nEl archivo se descargará automáticamente cuando esté listo.',
+            emotionalState: 'professional',
+            executableActions: [{
+              id: 'export_excel_action',
+              type: 'download_excel',
+              label: 'Descargar Excel',
+              parameters: {
+                reportType: reportState.reportType,
+                reportData: reportState.reportData,
+                period: reportState.period
+              }
+            }]
+          };
+          break;
+          
+        case 'export_pdf':
+          response = {
+            message: '📄 Generando PDF...\n\nEl archivo se descargará automáticamente cuando esté listo.',
+            emotionalState: 'professional',
+            executableActions: [{
+              id: 'export_pdf_action',
+              type: 'download_pdf',
+              label: 'Descargar PDF',
+              parameters: {
+                reportType: reportState.reportType,
+                reportData: reportState.reportData,
+                period: reportState.period
+              }
+            }]
+          };
+          break;
+          
+        case 'view_detail':
+          response = {
+            message: `📊 Mostrando detalles del reporte:\n\n**Período:** ${reportState.period}\n**Total registros:** ${reportState.reportData?.length || 0}\n\n¿Qué deseas hacer?`,
+            emotionalState: 'professional',
+            quickReplies: [
+              { value: 'export_excel', label: 'Exportar Excel', icon: '📥' },
+              { value: 'compare', label: 'Comparar', icon: '📈' },
+              { value: 'otro_reporte', label: 'Otro reporte', icon: '🔄' }
+            ]
+          };
+          break;
+          
+        case 'compare':
+          response = {
+            message: '📈 ¿Con qué período quieres comparar?\n\nEjemplos:\n- "Comparar con el mes anterior"\n- "Comparar con enero 2025"',
+            emotionalState: 'questioning',
+            conversationState: {
+              ...reportState,
+              awaitingComparison: true
+            }
+          };
+          break;
+          
+        case 'otro_reporte':
+          response = {
+            message: '🔄 ¿Qué reporte quieres generar ahora?\n\nPuedes pedirme:\n- "Reporte de nómina de febrero"\n- "Costos laborales del año 2025"\n- "Seguridad social del último mes"',
+            emotionalState: 'neutral',
+            conversationState: null
+          };
+          break;
+      }
+      
+      return new Response(JSON.stringify({
+        ...response,
+        sessionId,
+        timestamp: new Date().toISOString()
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
+    // ============================================================================
     // ============================================================================
     // PRIORITY 0: DIRECT ACTION PREFIX DETECTION
     // ============================================================================

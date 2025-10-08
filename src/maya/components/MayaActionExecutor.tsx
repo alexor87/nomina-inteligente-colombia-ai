@@ -52,6 +52,8 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
       case 'send_message': return MessageCircle;
       case 'view_details': return Eye;
       case 'generate_report': return FileText;
+      case 'download_excel': return FileText;
+      case 'download_pdf': return FileText;
       default: return FileText;
     }
   };
@@ -165,6 +167,10 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
         return await executeSendMessage(action);
       case 'view_details':
         return await executeViewDetails(action);
+      case 'download_excel':
+        return await handleDownloadExcel(action);
+      case 'download_pdf':
+        return await handleDownloadPDF(action);
       default:
         return {
           success: false,
@@ -471,6 +477,66 @@ export const MayaActionExecutor: React.FC<MayaActionExecutorProps> = ({
       success: false,
       message: '🚧 El envío de comprobantes desde búsqueda estará disponible pronto'
     });
+  };
+
+  const handleDownloadExcel = async (action: ExecutableAction): Promise<ActionExecutionResult> => {
+    try {
+      const { reportType, reportData, period } = action.parameters;
+      
+      // Import Excel export service
+      const { ReportsExportService } = await import('@/services/ReportsExportService');
+      
+      await ReportsExportService.exportToExcel(
+        reportType,
+        reportData,
+        `Reporte_${reportType}_${period}`,
+        { period },
+        'Maya AI',
+        (exportItem) => {
+          console.log('Export created:', exportItem);
+        }
+      );
+      
+      return {
+        success: true,
+        message: '✅ Archivo Excel descargado correctamente'
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: `Error al descargar Excel: ${error.message}`
+      };
+    }
+  };
+
+  const handleDownloadPDF = async (action: ExecutableAction): Promise<ActionExecutionResult> => {
+    try {
+      const { reportType, reportData, period } = action.parameters;
+      
+      // Import PDF export service
+      const { ReportsExportService } = await import('@/services/ReportsExportService');
+      
+      await ReportsExportService.exportToPDF(
+        reportType,
+        reportData,
+        `Reporte_${reportType}_${period}`,
+        { period },
+        'Maya AI',
+        (exportItem) => {
+          console.log('Export created:', exportItem);
+        }
+      );
+      
+      return {
+        success: true,
+        message: '✅ Archivo PDF descargado correctamente'
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: `Error al descargar PDF: ${error.message}`
+      };
+    }
   };
 
   return (

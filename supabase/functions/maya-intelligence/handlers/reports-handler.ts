@@ -862,7 +862,8 @@ Devuelve SOLO el JSON válido, sin texto adicional ni markdown.`;
         { value: 'export_excel', label: 'Exportar Excel', icon: '📥' },
         { value: 'export_pdf', label: 'Exportar PDF', icon: '📄' },
         { value: 'view_detail', label: 'Ver detalle', icon: '🔍' },
-        { value: 'compare', label: 'Comparar', icon: '📈' }
+        { value: 'compare', label: 'Comparar', icon: '📈' },
+        { value: 'otro_reporte', label: 'Otro reporte', icon: '🔄' }
       ],
       conversationState: {
         reportType: request.reportType,
