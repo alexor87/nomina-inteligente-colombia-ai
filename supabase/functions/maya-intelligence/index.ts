@@ -584,7 +584,70 @@ serve(async (req) => {
       }
     }
 
-    const lastMessage = conversation[conversation.length - 1]?.content || '';
+    // ============================================================================
+    // REPORT GENERATION BRIDGE - Direct Handler (moved earlier to avoid conversation access)
+    // ============================================================================
+    if (body?.action === 'generate_report' && body?.reportRequest) {
+      console.log('📊 [REPORT_GENERATION] Direct report request detected');
+      console.log('📊 [REPORT_GENERATION] Request:', body.reportRequest);
+      
+      try {
+        console.log('📊 [REPORT_GENERATION] Generating report with request:', body.reportRequest);
+        console.log('📊 [REPORT_GENERATION] Period resolution:', {
+          period: body.reportRequest?.period,
+          periodId: body.reportRequest?.periodId,
+          hasPeriodId: !!body.reportRequest?.periodId,
+          willResolveBy: body.reportRequest?.periodId ? 'UUID' : 'name'
+        });
+        
+        const { ReportsHandler } = await import('./handlers/reports-handler.ts');
+        
+        const reportResult = await ReportsHandler.handleReportGeneration(
+          body.reportRequest,
+          userSupabase
+        );
+        
+        console.log('✅ [REPORT_GENERATION] Report generated successfully');
+        
+        return new Response(JSON.stringify({
+          message: reportResult.message,
+          emotionalState: reportResult.emotionalState || 'professional',
+          narrative: reportResult.message,
+          insights: reportResult.conversationState?.insights || [],
+          data: reportResult.conversationState?.reportData || [],
+          contextualActions: reportResult.contextualActions || [],
+          quickReplies: reportResult.quickReplies || [],
+          sessionId: body.sessionId || sessionId,
+          timestamp: new Date().toISOString()
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } catch (error) {
+        console.error('❌ [REPORT_GENERATION] Error:', error);
+        
+        await eventLogger.logError(
+          sessionId || 'unknown',
+          body.reportRequest?.companyId,
+          error as Error,
+          undefined,
+          { stage: 'REPORT_GENERATION', reportType: body.reportRequest?.reportType }
+        );
+        
+        return new Response(JSON.stringify({
+          message: `❌ Hubo un error al generar el reporte: ${(error as Error).message}. Por favor intenta de nuevo.`,
+          emotionalState: 'concerned',
+          sessionId: body.sessionId || sessionId,
+          timestamp: new Date().toISOString()
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500
+        });
+      }
+    }
+
+    const lastMessage = Array.isArray(conversation) && conversation.length > 0
+      ? (conversation[conversation.length - 1]?.content || '')
+      : '';
     console.log(`[MAYA-KISS] Processing: "${lastMessage}"`);
     
     // ============================================================================
@@ -699,66 +762,6 @@ serve(async (req) => {
       );
     }
     
-    // ============================================================================
-    // REPORT GENERATION BRIDGE - Direct Handler
-    // ============================================================================
-    if (body?.action === 'generate_report' && body?.reportRequest) {
-      console.log('📊 [REPORT_GENERATION] Direct report request detected');
-      console.log('📊 [REPORT_GENERATION] Request:', body.reportRequest);
-      
-      try {
-        console.log('📊 [REPORT_GENERATION] Generating report with request:', body.reportRequest);
-        console.log('📊 [REPORT_GENERATION] Period resolution:', {
-          period: body.reportRequest?.period,
-          periodId: body.reportRequest?.periodId,
-          hasPeriodId: !!body.reportRequest?.periodId,
-          willResolveBy: body.reportRequest?.periodId ? 'UUID' : 'name'
-        });
-        
-        const { ReportsHandler } = await import('./handlers/reports-handler.ts');
-        
-        const reportResult = await ReportsHandler.handleReportGeneration(
-          body.reportRequest,
-          userSupabase
-        );
-        
-        console.log('✅ [REPORT_GENERATION] Report generated successfully');
-        
-        return new Response(JSON.stringify({
-          message: reportResult.message,
-          emotionalState: reportResult.emotionalState || 'professional',
-          narrative: reportResult.message,
-          insights: reportResult.conversationState?.insights || [],
-          data: reportResult.conversationState?.reportData || [],
-          contextualActions: reportResult.contextualActions || [],
-          quickReplies: reportResult.quickReplies || [],
-          sessionId: body.sessionId || sessionId,
-          timestamp: new Date().toISOString()
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      } catch (error) {
-        console.error('❌ [REPORT_GENERATION] Error:', error);
-        
-        await eventLogger.logError(
-          sessionId || 'unknown',
-          body.reportRequest?.companyId,
-          error as Error,
-          undefined,
-          { stage: 'REPORT_GENERATION', reportType: body.reportRequest?.reportType }
-        );
-        
-        return new Response(JSON.stringify({
-          message: `❌ Hubo un error al generar el reporte: ${(error as Error).message}. Por favor intenta de nuevo.`,
-          emotionalState: 'concerned',
-          sessionId: body.sessionId || sessionId,
-          timestamp: new Date().toISOString()
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 500
-        });
-      }
-    }
 
     // ============================================================================
     // CONVERSATION VALIDATION - For normal chat flows
@@ -1993,7 +1996,7 @@ serve(async (req) => {
               ...intent.params,
               employee_name: intent.params?.name || intent.params?.employee_name,
               originalMessage: lastMessage, // 🔥 Also pass to V1 for improved parsing
-              conversationParams: conversation.length > 0 ? 
+              conversationParams: Array.isArray(conversation) && conversation.length > 0 ? 
                 conversation[conversation.length - 1]?.conversationState : undefined
             }
           };
