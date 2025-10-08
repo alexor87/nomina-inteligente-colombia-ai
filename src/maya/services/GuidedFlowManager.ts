@@ -606,11 +606,59 @@ export class GuidedFlowManager {
 
       if (!profile?.company_id) throw new Error('No se encontró la empresa del usuario');
 
+      // Normalizar y resolver datos del reporte
+      const reportType = data.report_type ?? data.greeting ?? data.reportType;
+      if (!reportType) {
+        throw new Error('Debes seleccionar el tipo de reporte.');
+      }
+
+      const rawPeriod = data.period ?? data.period_selection ?? data.period_name;
+      let resolvedPeriodId: string | undefined = data.selected_period_id;
+      let resolvedPeriod: string | undefined = rawPeriod;
+
+      // Resolver alias de período a un periodId real cuando sea posible
+      try {
+        if (!resolvedPeriodId) {
+          if (rawPeriod === 'current_month' || rawPeriod === 'current_quarter' || rawPeriod === 'current_year') {
+            const { PayrollDomainService } = await import('@/services/PayrollDomainService');
+            const situation = await PayrollDomainService.detectCurrentPeriodSituation();
+            if (situation?.currentPeriod) {
+              resolvedPeriodId = situation.currentPeriod.id;
+              resolvedPeriod = situation.currentPeriod.periodo;
+            }
+          } else if (rawPeriod === 'last_month') {
+            const { data: recent } = await supabase
+              .from('payroll_periods_real')
+              .select('id, periodo, fecha_inicio')
+              .eq('company_id', profile.company_id)
+              .order('fecha_inicio', { ascending: false })
+              .limit(2);
+            if (recent && recent.length > 1) {
+              resolvedPeriodId = recent[1].id;
+              resolvedPeriod = recent[1].periodo;
+            }
+          } else if (rawPeriod) {
+            const { data: match } = await supabase
+              .from('payroll_periods_real')
+              .select('id, periodo')
+              .eq('company_id', profile.company_id)
+              .eq('periodo', rawPeriod)
+              .maybeSingle();
+            if (match) {
+              resolvedPeriodId = match.id;
+              resolvedPeriod = match.periodo;
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('⚠️ [MAYA] No se pudo resolver el período a periodId:', e);
+      }
+
       // Construir reportRequest estructurado
       const reportRequest = {
-        reportType: data.report_type,
-        period: data.period,
-        periodId: data.selected_period_id,
+        reportType,
+        period: resolvedPeriod,
+        periodId: resolvedPeriodId,
         companyId: profile.company_id,
         filters: {
           employeeIds: data.filter_type === 'employees' 
@@ -624,9 +672,14 @@ export class GuidedFlowManager {
             : undefined
         },
         includeComparison: true
-      };
+      } as const;
 
-      console.log('📤 [MAYA] Invocando maya-intelligence con reportRequest:', reportRequest);
+      console.log('📤 [MAYA] Invocando maya-intelligence con reportRequest:', {
+        reportType: reportRequest.reportType,
+        periodId: reportRequest.periodId,
+        period: reportRequest.period,
+        filters: reportRequest.filters
+      });
 
       // ✅ CAMBIO CRÍTICO: Enviar con action flag
       const { data: reportResult, error } = await supabase.functions.invoke('maya-intelligence', {
@@ -646,7 +699,7 @@ export class GuidedFlowManager {
 
       return {
         success: true,
-        reportType: data.report_type,
+        reportType,
         narrative: reportResult.message || reportResult.narrative,
         insights: reportResult.insights || [],
         reportData: reportResult.data,
