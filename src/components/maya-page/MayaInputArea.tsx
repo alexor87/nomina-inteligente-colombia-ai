@@ -33,6 +33,7 @@ export const MayaInputArea: React.FC = () => {
       console.error('Error sending message:', error);
     } finally {
       setIsLoading(false);
+      textareaRef.current?.focus();
     }
   };
 
