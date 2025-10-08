@@ -1,6 +1,8 @@
 import { GuidedFlow, FlowState, FlowType, ValidationRule } from '../types/GuidedFlow';
 import { employeeManagementFlow } from '../flows/employeeManagementFlow';
 import { payrollCalculationFlow } from '../flows/payrollCalculationFlow';
+import { reportsGenerationFlow } from '../flows/reportsGenerationFlow';
+import { whatIfSimulationFlow } from '../flows/whatIfSimulationFlow';
 
 export class GuidedFlowManager {
   private static instance: GuidedFlowManager;
@@ -11,6 +13,8 @@ export class GuidedFlowManager {
     // Register all available flows
     this.registerFlow(employeeManagementFlow);
     this.registerFlow(payrollCalculationFlow);
+    this.registerFlow(reportsGenerationFlow);
+    this.registerFlow(whatIfSimulationFlow);
   }
 
   static getInstance(): GuidedFlowManager {

@@ -58,13 +58,15 @@ export const MayaChatArea: React.FC = () => {
       icon: FileText, 
       title: "Ver reportes", 
       desc: "Análisis y estadísticas", 
-      color: "from-emerald-500 to-teal-500"
+      color: "from-emerald-500 to-teal-500",
+      flowType: FlowType.REPORTS_GENERATE
     },
     { 
       icon: TrendingUp, 
       title: "Prestaciones", 
       desc: "Consultar liquidaciones", 
-      color: "from-orange-500 to-amber-500"
+      color: "from-orange-500 to-amber-500",
+      flowType: FlowType.BENEFITS_CALCULATE
     },
   ];
 
