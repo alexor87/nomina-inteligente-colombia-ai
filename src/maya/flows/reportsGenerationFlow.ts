@@ -141,18 +141,22 @@ export const reportsGenerationFlow: GuidedFlow = {
       id: 'result',
       type: FlowStepType.RESULT,
       message: (data) => {
-        if (!data.success) {
-          return `❌ No pude generar el reporte.\n\n${data.error || 'Ocurrió un error inesperado.'}`;
+        const r = data._executionResult || {};
+        
+        if (!r.success) {
+          return `❌ No pude generar el reporte.\n\n${r.error || 'Ocurrió un error inesperado.'}`;
         }
 
         return `✅ **Reporte generado exitosamente**\n\n` +
-               `📊 **${data.reportTitle}**\n` +
-               `${data.summary || ''}\n\n` +
-               `🎯 **Insights principales:**\n${data.insights || 'Analizando datos...'}\n\n` +
+               `📊 **${r.reportTitle || 'Reporte'}**\n` +
+               `${r.summary || ''}\n\n` +
+               `🎯 **Insights principales:**\n${r.insights || 'Analizando datos...'}\n\n` +
                `¿Qué quieres hacer ahora?`;
       },
       quickReplies: (data) => {
-        if (!data.success) {
+        const r = data._executionResult || {};
+        
+        if (!r.success) {
           return [
             { label: '🔄 Intentar de nuevo', value: 'retry', icon: '🔄' },
             { label: '🏠 Volver al inicio', value: 'home', icon: '🏠' }
