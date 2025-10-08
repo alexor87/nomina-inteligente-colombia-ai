@@ -27,6 +27,14 @@ interface ReportData {
 
 export class ReportsHandler {
   /**
+   * Helper: Detecta si un string es un UUID
+   */
+  private static looksLikeUUID(str: string): boolean {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(str);
+  }
+
+  /**
    * Maneja solicitudes de generación de reportes con insights
    */
   static async handleReportGeneration(
@@ -107,22 +115,50 @@ export class ReportsHandler {
    */
   private static async fetchReportData(
     reportType: string,
-    period: string,
+    periodOrId: string,
     companyId: string,
     filters: any,
     supabaseClient: any
   ): Promise<ReportData> {
-    // Obtener período actual
-    const { data: periodData } = await supabaseClient
-      .from('payroll_periods_real')
-      .select('*')
-      .eq('company_id', companyId)
-      .eq('periodo', period)
-      .single();
+    console.log('[ReportsHandler] fetchReportData called with:', { reportType, periodOrId, companyId });
+    
+    // Resolver período por ID o nombre
+    let periodData;
+    if (this.looksLikeUUID(periodOrId)) {
+      console.log('[ReportsHandler] Resolving period by UUID:', periodOrId);
+      const { data, error } = await supabaseClient
+        .from('payroll_periods_real')
+        .select('*')
+        .eq('company_id', companyId)
+        .eq('id', periodOrId)
+        .single();
+      
+      if (error) {
+        console.error('[ReportsHandler] Error fetching period by ID:', error);
+        throw new Error(`Período no encontrado: ${error.message}`);
+      }
+      periodData = data;
+    } else {
+      console.log('[ReportsHandler] Resolving period by name:', periodOrId);
+      const { data, error } = await supabaseClient
+        .from('payroll_periods_real')
+        .select('*')
+        .eq('company_id', companyId)
+        .eq('periodo', periodOrId)
+        .single();
+      
+      if (error) {
+        console.error('[ReportsHandler] Error fetching period by name:', error);
+        throw new Error(`Período no encontrado: ${error.message}`);
+      }
+      periodData = data;
+    }
 
     if (!periodData) {
       throw new Error('Período no encontrado');
     }
+
+    console.log('[ReportsHandler] Period resolved:', periodData.periodo);
 
     let query = supabaseClient
       .from('payrolls')
@@ -135,23 +171,30 @@ export class ReportsHandler {
 
     // Aplicar filtros
     if (filters?.employeeIds && filters.employeeIds.length > 0) {
-      query = query.in('empleado_id', filters.employeeIds);
+      console.log('[ReportsHandler] Applying employee filter:', filters.employeeIds);
+      query = query.in('employee_id', filters.employeeIds);
     }
 
     const { data, error } = await query;
 
-    if (error) throw error;
+    if (error) {
+      console.error('[ReportsHandler] Error fetching payroll data:', error);
+      throw error;
+    }
+
+    const safeData = data ?? [];
+    console.log('[ReportsHandler] Fetched payroll records:', safeData.length);
 
     // Calcular summary
-    const totalAmount = data.reduce((sum: number, r: any) => sum + (r.total_neto || 0), 0);
-    const averageAmount = data.length > 0 ? totalAmount / data.length : 0;
+    const totalAmount = safeData.reduce((sum: number, r: any) => sum + (r.total_neto || 0), 0);
+    const averageAmount = safeData.length > 0 ? totalAmount / safeData.length : 0;
 
     return {
       type: reportType,
       period: periodData.periodo,
-      data: data || [],
+      data: safeData,
       summary: {
-        totalRecords: data?.length || 0,
+        totalRecords: safeData.length,
         totalAmount,
         averageAmount
       }
@@ -163,21 +206,38 @@ export class ReportsHandler {
    */
   private static async fetchPreviousPeriodData(
     reportType: string,
-    currentPeriod: string,
+    currentPeriodOrId: string,
     companyId: string,
     filters: any,
     supabaseClient: any
   ): Promise<any[] | undefined> {
     try {
-      // Buscar el período anterior
-      const { data: currentPeriodData } = await supabaseClient
-        .from('payroll_periods_real')
-        .select('fecha_inicio, fecha_fin')
-        .eq('company_id', companyId)
-        .eq('periodo', currentPeriod)
-        .single();
+      console.log('[ReportsHandler] Fetching previous period data for:', currentPeriodOrId);
+      
+      // Resolver período actual por ID o nombre
+      let currentPeriodData;
+      if (this.looksLikeUUID(currentPeriodOrId)) {
+        const { data } = await supabaseClient
+          .from('payroll_periods_real')
+          .select('fecha_inicio, fecha_fin')
+          .eq('company_id', companyId)
+          .eq('id', currentPeriodOrId)
+          .single();
+        currentPeriodData = data;
+      } else {
+        const { data } = await supabaseClient
+          .from('payroll_periods_real')
+          .select('fecha_inicio, fecha_fin')
+          .eq('company_id', companyId)
+          .eq('periodo', currentPeriodOrId)
+          .single();
+        currentPeriodData = data;
+      }
 
-      if (!currentPeriodData) return undefined;
+      if (!currentPeriodData) {
+        console.log('[ReportsHandler] Current period not found for comparison');
+        return undefined;
+      }
 
       // Calcular fecha del período anterior
       const currentStart = new Date(currentPeriodData.fecha_inicio);
@@ -194,7 +254,10 @@ export class ReportsHandler {
         .limit(1)
         .single();
 
-      if (!previousPeriod) return undefined;
+      if (!previousPeriod) {
+        console.log('[ReportsHandler] No previous period found');
+        return undefined;
+      }
 
       // Obtener datos del período anterior
       const { data } = await supabaseClient
@@ -203,6 +266,7 @@ export class ReportsHandler {
         .eq('company_id', companyId)
         .eq('period_id', previousPeriod.id);
 
+      console.log('[ReportsHandler] Previous period records:', data?.length || 0);
       return data || undefined;
     } catch (error) {
       console.error('[ReportsHandler] Error fetching previous period:', error);

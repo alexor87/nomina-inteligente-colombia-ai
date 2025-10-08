@@ -609,7 +609,7 @@ export class GuidedFlowManager {
       
       // 2. Delegar TODO a MayaReportService (separación de responsabilidades)
       return await MayaReportService.generateReport({
-        reportType: data.report_type ?? data.greeting,
+        reportType: data.report_type ?? data.greeting ?? 'payroll_summary',
         period: data.period ?? data.period_selection,
         periodId: data.selected_period_id,
         companyId: profile.company_id,

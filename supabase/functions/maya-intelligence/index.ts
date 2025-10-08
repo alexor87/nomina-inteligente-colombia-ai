@@ -707,6 +707,14 @@ serve(async (req) => {
       console.log('📊 [REPORT_GENERATION] Request:', body.reportRequest);
       
       try {
+        console.log('📊 [REPORT_GENERATION] Generating report with request:', body.reportRequest);
+        console.log('📊 [REPORT_GENERATION] Period resolution:', {
+          period: body.reportRequest?.period,
+          periodId: body.reportRequest?.periodId,
+          hasPeriodId: !!body.reportRequest?.periodId,
+          willResolveBy: body.reportRequest?.periodId ? 'UUID' : 'name'
+        });
+        
         const { ReportsHandler } = await import('./handlers/reports-handler.ts');
         
         const reportResult = await ReportsHandler.handleReportGeneration(
