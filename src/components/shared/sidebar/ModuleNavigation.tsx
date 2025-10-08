@@ -69,7 +69,7 @@ export const ModuleNavigation: React.FC<ModuleNavigationProps> = ({ collapsed })
               "group flex items-center px-3 py-2.5 text-sm font-normal rounded-lg transition-colors",
               "hover:bg-muted/30",
               isActive
-                ? "bg-muted text-foreground"
+                ? "bg-primary/10 text-primary font-medium border-l-2 border-primary"
                 : "text-muted-foreground hover:text-foreground",
               collapsed ? "justify-center" : "justify-start"
             )}
@@ -79,7 +79,7 @@ export const ModuleNavigation: React.FC<ModuleNavigationProps> = ({ collapsed })
               "flex items-center justify-center transition-colors",
               collapsed ? "w-8 h-8" : "w-5 h-5 mr-3"
             )}>
-              <item.icon className="h-4 w-4" />
+              <item.icon className={cn("h-5 w-5 transition-colors", isActive && "text-primary")} />
             </div>
             
             {!collapsed && (

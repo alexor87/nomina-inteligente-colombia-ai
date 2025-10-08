@@ -36,12 +36,14 @@ export const ConversationGroupSection: React.FC<ConversationGroupSectionProps> =
       >
         <div className="flex items-center gap-2">
           {isOpen ? (
-            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground transition-colors" />
           ) : (
-            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground transition-colors" />
           )}
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{title}</span>
-          <span className="text-[11px] text-muted-foreground/60">{count}</span>
+          <span className="text-xs font-semibold text-foreground uppercase tracking-wide">{title}</span>
+          <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-primary/10 text-primary text-[11px] font-medium">
+            {count}
+          </span>
         </div>
       </button>
 

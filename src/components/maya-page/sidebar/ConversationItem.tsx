@@ -64,11 +64,11 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         className={`
-          group relative px-3 py-2 rounded-lg cursor-pointer transition-colors
+          group relative px-3 py-2.5 rounded-lg cursor-pointer transition-all duration-200
           ${mode === 'archived' ? 'opacity-70' : ''}
           ${isActive 
-            ? 'bg-muted text-foreground' 
-            : 'hover:bg-muted/30'
+            ? 'bg-primary/10 text-foreground border-l-2 border-primary shadow-sm' 
+            : 'hover:bg-muted/50 hover:shadow-sm border-l-2 border-transparent'
           }
         `}
         onClick={onClick}
@@ -87,10 +87,10 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
           <>
             <div className="flex items-start gap-2">
               {/* Visual indicator */}
-              <div className="w-2 h-2 rounded-full bg-primary/60 mt-1.5 flex-shrink-0" />
+              <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 transition-colors ${isActive ? "bg-primary" : "bg-primary/40 group-hover:bg-primary/60"}`} />
               
               <div className="flex-1 min-w-0">
-                <h4 className="text-sm font-normal text-foreground truncate">
+                <h4 className={`text-sm truncate transition-colors ${isActive ? "font-medium text-foreground" : "font-normal text-foreground group-hover:text-foreground"}`}>
                   {conversation.title}
                 </h4>
                 <p className="text-xs text-muted-foreground/80 truncate mt-0.5">
@@ -164,7 +164,7 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
               </DropdownMenu>
             </div>
             
-            <p className="text-xs text-muted-foreground/70 mt-1 ml-4">
+            <p className={`text-xs mt-1 ml-4 transition-opacity ${isActive ? "text-muted-foreground" : "text-muted-foreground/60 opacity-0 group-hover:opacity-100"}`}>
               {formatRelativeTime(conversation.updated_at)}
             </p>
           </>
