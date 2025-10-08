@@ -430,7 +430,7 @@ ${context.composition.contractTypes.map((ct: any) =>
 **ANOMALÍAS DETECTADAS:**
 ${context.anomalies.length > 0 ? context.anomalies.map((a: any) => 
   `- ${a.employeeName}: ${this.formatCurrency(a.value)} (desviación: ${a.deviationFromMean.toFixed(1)}%)`
-).join('\n') : 'Ninguna anomalía detectada'}
+).join('\n') : 'No se detectaron valores atípicos o irregularidades en esta nómina'}
 
 ---
 
@@ -459,9 +459,11 @@ Genera 3-4 insights ACCIONABLES siguiendo este formato JSON ESTRICTO:
 
 **EVITAR:**
 - ❌ Repetir números que ya están en el contexto sin análisis
-- ❌ Recomendaciones vagas o genéricas
+- ❌ Recomendaciones vagas o genéricas ("revisar proyecciones", "monitorear situación")
 - ❌ Insights sin contexto o impacto de negocio
 - ❌ Usar emojis en los títulos (ya los agregamos nosotros)
+- ❌ Frases como "sin anomalías, pero..." o "no se detectaron problemas, pero..."
+- ❌ Insights que solo digan que todo está bien sin agregar valor
 
 Devuelve SOLO el JSON válido, sin texto adicional ni markdown.`;
 
@@ -503,10 +505,30 @@ Devuelve SOLO el JSON válido, sin texto adicional ni markdown.`;
       }
       
       const parsed = JSON.parse(jsonMatch[0]);
-      const insights = parsed.insights || [];
+      const rawInsights = parsed.insights || [];
       
-      console.log(`✅ Generados ${insights.length} insights con OpenAI`);
-      return insights;
+      // Filtrar insights vagos o sin sustancia
+      const validInsights = rawInsights.filter((insight: any) => {
+        const title = (insight.title || '').toLowerCase();
+        const description = (insight.description || '').toLowerCase();
+        
+        // Eliminar insights con frases confusas
+        if (title.includes('sin anomalía') || title.includes('sin anomalías')) {
+          console.log('⚠️ Insight filtrado (sin anomalías):', insight.title);
+          return false;
+        }
+        
+        // Eliminar insights sin descripción sustancial
+        if (description.length < 50) {
+          console.log('⚠️ Insight filtrado (descripción muy corta):', insight.title);
+          return false;
+        }
+        
+        return true;
+      });
+      
+      console.log(`✅ Generados ${validInsights.length} insights con OpenAI (${rawInsights.length - validInsights.length} filtrados)`);
+      return validInsights;
       
     } catch (error) {
       console.error('❌ Error generando insights con OpenAI:', error);
@@ -624,16 +646,18 @@ Devuelve SOLO el JSON válido, sin texto adicional ni markdown.`;
     narrative += `con un costo total de **${this.formatCurrency(summary.totalAmount)}** `;
     narrative += `(promedio: ${this.formatCurrency(summary.averageAmount)} por empleado).\n\n`;
 
-    // Agregar principales hallazgos
+    // Agregar principales hallazgos (solo los 2 más críticos)
     const criticalInsights = insights.filter(i => 
       i.severity === 'critical' || i.severity === 'warning'
     );
 
     if (criticalInsights.length > 0) {
       narrative += `**🎯 Hallazgos principales:**\n`;
+      // Limitar a máximo 2 hallazgos para evitar duplicación
       criticalInsights.slice(0, 2).forEach(insight => {
         narrative += `• ${insight.title}\n`;
       });
+      narrative += `\n`;
     }
 
     return narrative;
@@ -648,12 +672,17 @@ Devuelve SOLO el JSON válido, sin texto adicional ni markdown.`;
     narrative: string,
     request: ReportRequest
   ): HandlerResponse {
-    // Formatear insights para mostrar
-    const insightsText = insights.slice(0, 4).map(insight => 
-      `${insight.title}`
-    ).join('\n');
+    // Formatear solo insights informativos (no críticos) para evitar duplicación
+    // Los críticos ya están en "Hallazgos principales" del narrative
+    const regularInsights = insights.filter(i => 
+      i.severity === 'info' || i.severity === 'success'
+    );
+    
+    const insightsText = regularInsights.length > 0 
+      ? regularInsights.slice(0, 3).map(insight => `${insight.title}`).join('\n') + '\n\n'
+      : '';
 
-    const message = `${narrative}\n${insightsText}\n\n¿Qué quieres hacer ahora?`;
+    const message = `${narrative}${insightsText}¿Qué quieres hacer ahora?`;
 
     return {
       message,
