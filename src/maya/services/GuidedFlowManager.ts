@@ -3,6 +3,7 @@ import { employeeManagementFlow } from '../flows/employeeManagementFlow';
 import { payrollCalculationFlow } from '../flows/payrollCalculationFlow';
 import { reportsGenerationFlow } from '../flows/reportsGenerationFlow';
 import { whatIfSimulationFlow } from '../flows/whatIfSimulationFlow';
+import { proactiveDetectionFlow } from '../flows/proactiveDetectionFlow';
 
 export class GuidedFlowManager {
   private static instance: GuidedFlowManager;
@@ -15,6 +16,7 @@ export class GuidedFlowManager {
     this.registerFlow(payrollCalculationFlow);
     this.registerFlow(reportsGenerationFlow);
     this.registerFlow(whatIfSimulationFlow);
+    this.registerFlow(proactiveDetectionFlow);
   }
 
   static getInstance(): GuidedFlowManager {

@@ -12,7 +12,7 @@ export const InsightCard = ({ insight, onAction }: InsightCardProps) => {
   const getIcon = () => {
     switch (insight.type) {
       case 'comparison':
-        return insight.change && insight.change > 0 ? TrendingUp : TrendingDown;
+        return insight.comparison && insight.comparison.change > 0 ? TrendingUp : TrendingDown;
       case 'composition':
         return BarChart3;
       case 'alert':
@@ -89,10 +89,10 @@ export const InsightCard = ({ insight, onAction }: InsightCardProps) => {
               {insight.actions.map((action, index) => (
                 <button
                   key={index}
-                  onClick={() => onAction?.(action)}
+                  onClick={() => onAction?.(action.label)}
                   className="text-xs font-medium text-primary hover:underline"
                 >
-                  {action} →
+                  {action.label} →
                 </button>
               ))}
             </div>
