@@ -122,7 +122,8 @@ Esto es solo una **demostración** - nada se guardará en tu cuenta aún.
       quickReplies: [
         { label: '💰 $1,423,500', value: '1423500' },
         { label: '💵 $2,000,000', value: '2000000' },
-        { label: '💸 $3,000,000', value: '3000000' }
+        { label: '💸 $3,000,000', value: '3000000' },
+        { label: '✏️ Otro valor', value: '' }
       ],
       validationRules: [
         { type: 'required', message: 'El salario es obligatorio' },
