@@ -252,15 +252,15 @@ Ahora voy a calcular la nómina de **${data.first_name}** usando el motor de cá
 👤 **${data.first_name} ${data.last_name}**
 📅 Período: ${data.worked_days_input || 30} días
 
-💰 **Devengado:** $${fmt(result.grossPay)}
-  • Salario: $${fmt(result.baseSalary)}
-  • Aux. Transporte: $${fmt(result.transportAllowance)}
+💰 **Devengado:** $${fmt(result.totalDevengado)}
+  • Salario: $${fmt(result.salarioProporcional)}
+  • Aux. Transporte: $${fmt(result.auxilioTransporte)}
 
-📉 **Deducciones:** $${fmt(result.totalDeductions)}
-  • Salud (4%): $${fmt(result.healthDeduction)}
-  • Pensión (4%): $${fmt(result.pensionDeduction)}
+📉 **Deducciones:** $${fmt(result.totalDeducciones)}
+  • Salud (4%): $${fmt(result.saludEmpleado)}
+  • Pensión (4%): $${fmt(result.pensionEmpleado)}
 
-💵 **Neto a Pagar:** $${fmt(result.netPay)}`;
+💵 **Neto a Pagar:** $${fmt(result.netoPagar)}`;
       },
       quickReplies: [
         { label: '📄 Generar comprobante PDF', value: 'generate_pdf' },
@@ -300,7 +300,7 @@ Ahora voy a calcular la nómina de **${data.first_name}** usando el motor de cá
 
 **Resumen:**
 • Empleado: ${data.first_name} ${data.last_name}
-• Neto: $${fmt(result.netPay)}
+• Neto: $${fmt(result.netoPagar)}
 • Período: ${data.worked_days_input || 30} días
 
 ¿Qué quieres hacer ahora?`;
