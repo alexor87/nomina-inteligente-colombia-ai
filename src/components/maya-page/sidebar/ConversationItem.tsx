@@ -196,7 +196,10 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => onDelete(conversation.id)}
+              onClick={() => {
+                setShowDeleteDialog(false);
+                setTimeout(() => onDelete(conversation.id), 30);
+              }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Eliminar

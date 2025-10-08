@@ -256,6 +256,11 @@ export const MayaHistorySidebar: React.FC = () => {
       setIsDeleting(false);
       isDeletingRef.current = false;
       
+      // Failsafe: cerrar cualquier overlay residual de Radix
+      try {
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      } catch {}
+      
       // En mobile, colapsar el sidebar después de eliminar
       if (isMobile) {
         setCollapsed(true);

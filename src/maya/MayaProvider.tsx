@@ -921,10 +921,8 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
         setActiveFlow(null);
       }
       
-      // 4. Reset a fase inicial
-      await setPhase('initial');
-      
-      // 5. Mostrar confirmación (la recarga de lista se hace en el sidebar)
+      // 4. Mostrar confirmación (la recarga de lista se hace en el sidebar)
+      // NO resetear a fase inicial aquí - el sidebar lo maneja y evita bloqueos
       toast.success('Conversación eliminada', {
         description: 'La conversación ha sido eliminada permanentemente'
       });

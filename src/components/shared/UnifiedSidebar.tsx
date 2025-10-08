@@ -239,6 +239,12 @@ export const UnifiedSidebar: React.FC = () => {
     } finally {
       setIsDeleting(false);
       isDeletingRef.current = false;
+      
+      // Failsafe: cerrar cualquier overlay residual de Radix
+      try {
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      } catch {}
+      
       if (isMobile) {
         setCollapsed(true);
         localStorage.setItem(STORAGE_KEY, 'true');
