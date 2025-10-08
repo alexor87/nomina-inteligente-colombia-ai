@@ -1,16 +1,28 @@
-import React from 'react';
-import { Plus } from 'lucide-react';
+import React, { useState } from 'react';
+import { Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { motion } from 'framer-motion';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 
 interface MayaHeaderActionsProps {
   onNewConversation: () => void;
+  onDeleteConversation: () => Promise<void>;
+  currentConversationId: string | null;
 }
 
 export const MayaHeaderActions: React.FC<MayaHeaderActionsProps> = ({ 
-  onNewConversation
+  onNewConversation,
+  onDeleteConversation,
+  currentConversationId
 }) => {
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
+  const handleDelete = async () => {
+    await onDeleteConversation();
+    setShowDeleteDialog(false);
+  };
+
   return (
     <>
       <div className="flex items-center gap-2">
@@ -43,7 +55,31 @@ export const MayaHeaderActions: React.FC<MayaHeaderActionsProps> = ({
           <Plus className="h-4 w-4 mr-1.5" />
           <span className="text-xs font-medium">Nueva</span>
         </Button>
+
+        {/* Delete conversation button */}
+        {currentConversationId && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowDeleteDialog(true)}
+            className="text-gray-600 hover:text-red-600 hover:bg-red-50 h-8 w-8"
+            title="Eliminar conversación"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        )}
       </div>
+
+      <ConfirmDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        onConfirm={handleDelete}
+        title="¿Eliminar conversación?"
+        description="Esta acción no se puede deshacer. Se eliminará la conversación y todo su historial."
+        confirmLabel="Eliminar"
+        cancelLabel="Cancelar"
+        isDestructive
+      />
     </>
   );
 };
