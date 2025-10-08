@@ -756,7 +756,7 @@ async function executeLiquidatePayrollCompleteAction(action: any) {
                     entityType: 'period',
                     entityId: actualPeriodId,
                     entityName: periodName,
-                    navigationPath: `/modules/liquidation?period=${actualPeriodId}`
+                    navigationPath: `/modules/payroll-history/${actualPeriodId}`
                   }
                 },
                 {
@@ -960,7 +960,7 @@ async function executeLiquidatePayrollCompleteAction(action: any) {
                 entityType: 'period',
                 entityId: actualPeriodId, // ✅ Usar actualPeriodId
                 entityName: periodName,
-                navigationPath: `/modules/liquidation?period=${actualPeriodId}` // ✅ Usar actualPeriodId
+                navigationPath: `/modules/payroll-history/${actualPeriodId}` // ✅ Usar actualPeriodId
               }
             },
             {

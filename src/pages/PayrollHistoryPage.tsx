@@ -261,7 +261,7 @@ export const PayrollHistoryPage = () => {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => navigate(`/app/payroll-history/${period.id}`)}
+                            onClick={() => navigate(`/modules/payroll-history/${period.id}`)}
                             className="flex items-center gap-2 text-sm"
                           >
                             <Eye className="h-4 w-4" />

@@ -84,7 +84,7 @@ export const PayrollSuccessModal: React.FC<PayrollSuccessModalProps> = ({
 
   const handleGoToHistory = () => {
     onClose();
-    navigate(periodId ? `/app/payroll-history/${periodId}` : '/app/payroll-history');
+    navigate(periodId ? `/modules/payroll-history/${periodId}` : '/modules/payroll-history');
   };
   return (
     <CustomModal 

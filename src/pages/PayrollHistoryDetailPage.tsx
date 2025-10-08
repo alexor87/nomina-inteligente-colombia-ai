@@ -326,7 +326,7 @@ function PayrollHistoryDetailPageContent() {
   }, [periodId]);
 
   const handleGoBack = () => {
-    navigate('/app/payroll-history');
+    navigate('/modules/payroll-history');
   };
 
   // Handle adding novedad - detect period state and show appropriate modal
