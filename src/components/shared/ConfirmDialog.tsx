@@ -9,6 +9,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { forceUIReset } from '@/utils/ui/overlayRecovery';
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -37,6 +38,11 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
       await onConfirm();
     } catch (e) {
       console.error('ConfirmDialog onConfirm error', e);
+    } finally {
+      // Force UI reset to clear any orphaned overlays
+      requestAnimationFrame(() => {
+        forceUIReset();
+      });
     }
   };
 

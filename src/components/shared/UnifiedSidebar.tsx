@@ -16,6 +16,7 @@ import { SidebarDivider } from './sidebar/SidebarDivider';
 import { ModuleNavigation } from './sidebar/ModuleNavigation';
 import { ToggleButton } from './sidebar/ToggleButton';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { forceUIReset } from '@/utils/ui/overlayRecovery';
 
 const STORAGE_KEY = 'unified_sidebar_collapsed';
 
@@ -249,14 +250,10 @@ export const UnifiedSidebar: React.FC = () => {
       setIsDeleting(false);
       isDeletingRef.current = false;
       
-      // Solo dispatch Escape si estamos en mobile con overlay visible
-      if (isMobile && !collapsed) {
-        try {
-          requestAnimationFrame(() => {
-            document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-          });
-        } catch {}
-      }
+      // Force UI reset to clear any orphaned overlays
+      requestAnimationFrame(() => {
+        forceUIReset();
+      });
       
       if (isMobile) {
         setCollapsed(true);

@@ -13,6 +13,7 @@ import { MayaConversationManager } from '@/maya/services/MayaConversationManager
 import { ConversationSummary } from '@/maya/types';
 import { toast } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { forceUIReset } from '@/utils/ui/overlayRecovery';
  
 const STORAGE_KEY = 'maya_sidebar_collapsed';
 
@@ -266,14 +267,10 @@ export const MayaHistorySidebar: React.FC = () => {
       setIsDeleting(false);
       isDeletingRef.current = false;
       
-      // Solo dispatch Escape si estamos en mobile con overlay visible
-      if (isMobile && !collapsed) {
-        try {
-          requestAnimationFrame(() => {
-            document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-          });
-        } catch {}
-      }
+      // Force UI reset to clear any orphaned overlays
+      requestAnimationFrame(() => {
+        forceUIReset();
+      });
       
       // En mobile, colapsar el sidebar después de eliminar
       if (isMobile) {
