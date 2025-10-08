@@ -7,9 +7,9 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { employee, period, companyInfo } = await req.json();
+    const { employee, period, companyInfo, isDemo } = await req.json();
     
-    console.log('Generating PDF voucher for employee:', employee?.nombre, employee?.apellido);
+    console.log('Generating PDF voucher for employee:', employee?.nombre, employee?.apellido, isDemo ? '(DEMO MODE)' : '');
     console.log('Period:', period);
 
     // Import jsPDF and autoTable dynamically
@@ -18,6 +18,15 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Create new PDF instance
     const doc = new jsPDF();
+    
+    // Add DEMO watermark if in demo mode
+    if (isDemo) {
+      doc.setFontSize(60);
+      doc.setTextColor(200, 200, 200);
+      doc.setFont(undefined, 'bold');
+      doc.text('DEMO', 105, 150, { align: 'center', angle: 45 });
+      doc.setTextColor(0, 0, 0); // Reset color
+    }
     
     // Company header
     doc.setFontSize(16);

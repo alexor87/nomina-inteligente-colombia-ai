@@ -4,6 +4,7 @@ import { payrollCalculationFlow } from '../flows/payrollCalculationFlow';
 import { reportsGenerationFlow } from '../flows/reportsGenerationFlow';
 import { whatIfSimulationFlow } from '../flows/whatIfSimulationFlow';
 import { proactiveDetectionFlow } from '../flows/proactiveDetectionFlow';
+import { onboardingDemoFlow } from '../flows/onboardingDemoFlow';
 
 export class GuidedFlowManager {
   private static instance: GuidedFlowManager;
@@ -17,6 +18,7 @@ export class GuidedFlowManager {
     this.registerFlow(reportsGenerationFlow);
     this.registerFlow(whatIfSimulationFlow);
     this.registerFlow(proactiveDetectionFlow);
+    this.registerFlow(onboardingDemoFlow);
   }
 
   static getInstance(): GuidedFlowManager {
@@ -340,6 +342,9 @@ export class GuidedFlowManager {
         
         case FlowType.PROACTIVE_SCAN:
           return await this.executeProactiveScan(flowState.accumulatedData);
+        
+        case FlowType.ONBOARDING_DEMO_LIQUIDATION:
+          return await this.executeDemoLiquidation(flowState.accumulatedData);
         
         default:
           throw new Error(`No executor for flow type: ${flowState.flowId}`);
@@ -754,6 +759,127 @@ export class GuidedFlowManager {
       console.error('❌ [MAYA] Proactive scan error:', error);
       throw new Error(error.message || 'Error al ejecutar el escaneo proactivo');
     }
+  }
+
+  private async executeDemoLiquidation(data: Record<string, any>): Promise<any> {
+    console.log('🎯 [DEMO] Executing demo liquidation', data);
+    
+    try {
+      // Parse employee data from conversational input
+      const parsedData = this.parseDemoEmployeeInput(data.capture_name, data.capture_salary);
+      
+      console.log('📊 [DEMO] Parsed employee data:', parsedData);
+      
+      // Use PayrollCalculationSimple for in-memory calculation
+      const { PayrollCalculationSimple } = await import('@/services/PayrollCalculationSimple');
+      
+      const calculationInput = {
+        salarioBase: parsedData.salary,
+        diasTrabajados: 30,
+        year: new Date().getFullYear().toString()
+      };
+      
+      const result = PayrollCalculationSimple.calculate(calculationInput);
+      
+      console.log('✅ [DEMO] Calculation result:', result);
+      
+      // Generate demo PDF if needed
+      if (data.generating_pdf) {
+        const { supabase } = await import('@/integrations/supabase/client');
+        
+        // Get company info for PDF header
+        const { data: { user } } = await supabase.auth.getUser();
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('company_id')
+          .eq('user_id', user?.id)
+          .single();
+        
+        const { data: company } = await supabase
+          .from('companies')
+          .select('*')
+          .eq('id', profile?.company_id)
+          .single();
+        
+        // Generate PDF with isDemo flag
+        const { data: pdfResult, error } = await supabase.functions.invoke('generate-voucher-pdf', {
+          body: {
+            isDemo: true,
+            employee: {
+              nombre: parsedData.name.split(' ')[0] || parsedData.name,
+              apellido: parsedData.name.split(' ').slice(1).join(' ') || '',
+              cedula: 'Demo',
+              cargo: 'Empleado Demo',
+              salario_base: result.salarioBase,
+              auxilio_transporte: result.auxilioTransporte,
+              total_devengado: result.totalDevengado,
+              salud_empleado: result.deduccionSalud,
+              pension_empleado: result.deduccionPension,
+              total_deducciones: result.totalDeducciones,
+              neto_pagado: result.netoPagar
+            },
+            period: {
+              startDate: new Date().toISOString().split('T')[0],
+              endDate: new Date().toISOString().split('T')[0],
+              type: 'Demo'
+            },
+            companyInfo: company || {
+              razon_social: 'Empresa Demo',
+              nit: '900000000-0',
+              email: 'demo@empresa.com'
+            }
+          }
+        });
+        
+        if (error) {
+          console.error('❌ [DEMO] PDF generation failed:', error);
+          throw new Error('Error generando PDF demo');
+        }
+        
+        console.log('📄 [DEMO] PDF generated successfully');
+        
+        return {
+          success: true,
+          employeeName: parsedData.name,
+          employeeSalary: parsedData.salary,
+          calculationResult: result,
+          pdfBase64: pdfResult?.pdfBase64,
+          message: '¡Comprobante demo generado exitosamente!'
+        };
+      }
+      
+      return {
+        success: true,
+        employeeName: parsedData.name,
+        employeeSalary: parsedData.salary,
+        ...result
+      };
+    } catch (error: any) {
+      console.error('❌ [DEMO] Liquidation failed:', error);
+      throw new Error(error.message || 'Error ejecutando demo de liquidación');
+    }
+  }
+
+  private parseDemoEmployeeInput(nameInput: string, salaryInput?: string): { name: string; salary: number } {
+    let name = '';
+    let salary = 0;
+
+    if (salaryInput) {
+      name = nameInput.trim();
+      salary = Number(salaryInput.replace(/[$.]/g, ''));
+    } else {
+      const match = nameInput.match(/^(.+?)[,\s]+\$?([\d.]+)$/);
+      
+      if (match) {
+        name = match[1].trim();
+        salary = Number(match[2].replace(/\./g, ''));
+      } else {
+        name = nameInput.trim();
+        salary = 0;
+      }
+    }
+
+    return { name, salary };
   }
 
   // Helper para determinar tipo de período basado en fechas
