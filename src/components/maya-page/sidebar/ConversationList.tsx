@@ -79,11 +79,11 @@ export const ConversationList: React.FC<ConversationListProps> = ({
     setDeleteDialogOpen(true);
   };
 
-  const handleConfirmDelete = async () => {
-    if (pendingConversation) {
-      await onDeleteConversation(pendingConversation.id);
-      setPendingConversation(null);
-    }
+  const handleConfirmDelete = () => {
+    if (!pendingConversation) return;
+    const id = pendingConversation.id;
+    setPendingConversation(null);
+    void onDeleteConversation(id);
   };
 
   return (

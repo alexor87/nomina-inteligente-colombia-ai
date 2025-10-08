@@ -110,20 +110,14 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
                   {mode === 'archived' ? (
                     <>
                       <DropdownMenuItem
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onUnarchive?.(conversation.id);
-                        }}
+                        onSelect={() => onUnarchive?.(conversation.id)}
                       >
                         <ArchiveRestore className="h-4 w-4 mr-2" />
                         Restaurar
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDelete();
-                        }}
+                        onSelect={() => onDelete()}
                         className="text-destructive focus:text-destructive"
                       >
                         <Trash2 className="h-4 w-4 mr-2" />
@@ -133,29 +127,20 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
                   ) : (
                     <>
                       <DropdownMenuItem
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setIsEditing(true);
-                        }}
+                        onSelect={() => setIsEditing(true)}
                       >
                         <Edit2 className="h-4 w-4 mr-2" />
                         Renombrar
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onArchive(conversation.id);
-                        }}
+                        onSelect={() => onArchive(conversation.id)}
                       >
                         <Archive className="h-4 w-4 mr-2" />
                         Archivar
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDelete();
-                        }}
+                        onSelect={() => onDelete()}
                         className="text-destructive focus:text-destructive"
                       >
                         <Trash2 className="h-4 w-4 mr-2" />

@@ -31,9 +31,13 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   onConfirm,
   isDestructive = false,
 }) => {
-  const handleConfirm = async () => {
-    await onConfirm();
-    onOpenChange(false);
+  const handleConfirm = () => {
+    try {
+      onOpenChange(false);
+      setTimeout(() => { void onConfirm(); }, 0);
+    } catch (e) {
+      console.error('ConfirmDialog onConfirm error', e);
+    }
   };
 
   return (
