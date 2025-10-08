@@ -103,13 +103,18 @@ export const reportsGenerationFlow: GuidedFlow = {
           novelty_history: 'Historial de novedades'
         };
         
+        // Usar fallbacks correctos para evitar valores undefined
+        const typeKey = data.report_type ?? data.greeting;
+        const typeLabel = reportLabels[typeKey] || typeKey || '—';
+        const periodLabel = data.period_name ?? data.period ?? '—';
+        
         const filterInfo = data.filter_type && data.filter_values
           ? `${data.filter_type}: ${data.filter_values}`
           : 'Ninguno';
         
         return `📋 **Resumen del reporte:**\n\n` +
-               `• **Tipo:** ${reportLabels[data.report_type] || data.report_type}\n` +
-               `• **Período:** ${data.period}\n` +
+               `• **Tipo:** ${typeLabel}\n` +
+               `• **Período:** ${periodLabel}\n` +
                `• **Filtros:** ${filterInfo}\n\n` +
                `¿Generar el reporte con análisis automático?`;
       },

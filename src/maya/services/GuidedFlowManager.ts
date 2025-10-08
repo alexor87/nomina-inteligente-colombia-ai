@@ -590,11 +590,12 @@ export class GuidedFlowManager {
 
   private async executeReportGeneration(data: Record<string, any>): Promise<any> {
     const { supabase } = await import('@/integrations/supabase/client');
+    const { MayaReportService } = await import('./MayaReportService');
     
     try {
-      console.log('📊 [MAYA] Ejecutando generación de reporte:', data.report_type);
+      console.log('📊 [MAYA] Ejecutando generación de reporte');
       
-      // Obtener company_id del usuario actual
+      // 1. Obtener company_id del usuario actual
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuario no autenticado');
 
@@ -605,60 +606,12 @@ export class GuidedFlowManager {
         .single();
 
       if (!profile?.company_id) throw new Error('No se encontró la empresa del usuario');
-
-      // Normalizar y resolver datos del reporte
-      const reportType = data.report_type ?? data.greeting ?? data.reportType;
-      if (!reportType) {
-        throw new Error('Debes seleccionar el tipo de reporte.');
-      }
-
-      const rawPeriod = data.period ?? data.period_selection ?? data.period_name;
-      let resolvedPeriodId: string | undefined = data.selected_period_id;
-      let resolvedPeriod: string | undefined = rawPeriod;
-
-      // Resolver alias de período a un periodId real cuando sea posible
-      try {
-        if (!resolvedPeriodId) {
-          if (rawPeriod === 'current_month' || rawPeriod === 'current_quarter' || rawPeriod === 'current_year') {
-            const { PayrollDomainService } = await import('@/services/PayrollDomainService');
-            const situation = await PayrollDomainService.detectCurrentPeriodSituation();
-            if (situation?.currentPeriod) {
-              resolvedPeriodId = situation.currentPeriod.id;
-              resolvedPeriod = situation.currentPeriod.periodo;
-            }
-          } else if (rawPeriod === 'last_month') {
-            const { data: recent } = await supabase
-              .from('payroll_periods_real')
-              .select('id, periodo, fecha_inicio')
-              .eq('company_id', profile.company_id)
-              .order('fecha_inicio', { ascending: false })
-              .limit(2);
-            if (recent && recent.length > 1) {
-              resolvedPeriodId = recent[1].id;
-              resolvedPeriod = recent[1].periodo;
-            }
-          } else if (rawPeriod) {
-            const { data: match } = await supabase
-              .from('payroll_periods_real')
-              .select('id, periodo')
-              .eq('company_id', profile.company_id)
-              .eq('periodo', rawPeriod)
-              .maybeSingle();
-            if (match) {
-              resolvedPeriodId = match.id;
-              resolvedPeriod = match.periodo;
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('⚠️ [MAYA] No se pudo resolver el período a periodId:', e);
-      }
-
-      // Construir reportRequest estructurado
-      const reportRequest = {
-        reportType,
-        period: resolvedPeriod,
-        periodId: resolvedPeriodId,
+      
+      // 2. Delegar TODO a MayaReportService (separación de responsabilidades)
+      return await MayaReportService.generateReport({
+        reportType: data.report_type ?? data.greeting,
+        period: data.period ?? data.period_selection,
+        periodId: data.selected_period_id,
         companyId: profile.company_id,
         filters: {
           employeeIds: data.filter_type === 'employees' 
@@ -672,40 +625,8 @@ export class GuidedFlowManager {
             : undefined
         },
         includeComparison: true
-      } as const;
-
-      console.log('📤 [MAYA] Invocando maya-intelligence con reportRequest:', {
-        reportType: reportRequest.reportType,
-        periodId: reportRequest.periodId,
-        period: reportRequest.period,
-        filters: reportRequest.filters
       });
-
-      // ✅ CAMBIO CRÍTICO: Enviar con action flag
-      const { data: reportResult, error } = await supabase.functions.invoke('maya-intelligence', {
-        body: {
-          action: 'generate_report',  // 🎯 Identificador claro
-          reportRequest,              // 📊 Datos estructurados
-          sessionId: `report-flow-${Date.now()}`
-        }
-      });
-
-      if (error) {
-        console.error('❌ [MAYA] Error generando reporte:', error);
-        throw new Error(`Error al generar el reporte: ${error.message}`);
-      }
-
-      console.log('✅ [MAYA] Reporte generado exitosamente');
-
-      return {
-        success: true,
-        reportType,
-        narrative: reportResult.message || reportResult.narrative,
-        insights: reportResult.insights || [],
-        reportData: reportResult.data,
-        executableActions: reportResult.contextualActions || []
-      };
-
+      
     } catch (error: any) {
       console.error('❌ [MAYA] Report generation error:', error);
       throw new Error(error.message || 'Error al generar el reporte');
