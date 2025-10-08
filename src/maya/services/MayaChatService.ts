@@ -35,6 +35,12 @@ export interface RichContext {
   dashboardData?: any;
   employeeData?: any;
   payrollData?: any;
+  pendingAction?: {
+    type: string;
+    id: string;
+    parameters: Record<string, any>;
+    timestamp: string;
+  };
 }
 
 export class MayaChatService {
@@ -134,51 +140,66 @@ export class MayaChatService {
     // Generate idempotency key for this request
     const idempotencyKey = this.generateIdempotencyKey();
 
-    // ✅ CRITICAL FIX: Extract action parameters if this is an action_ message
+    // ✅ PROFESSIONAL: Extract action parameters with explicit state management
     let actionType: string | undefined;
     let actionParameters: Record<string, any> | undefined;
     
     if (userMessage.startsWith('action_')) {
       actionType = userMessage.replace('action_', '');
       
-      // Find the last assistant message with executable actions
-      const lastAssistantMessage = [...this.currentConversation.messages]
-        .reverse()
-        .find(m => m.role === 'assistant' && m.executableActions && m.executableActions.length > 0);
-      
-      if (lastAssistantMessage?.executableActions) {
-        // Find matching action
-        const matchingAction = lastAssistantMessage.executableActions.find((action: any) =>
-          action.type === actionType ||
-          action.type === 'liquidate_payroll_complete' ||
-          action.id === `action_${actionType}` ||
-          action.id === 'liquidate_complete'
-        );
+      // 🎯 PRIORITY 1: Use pendingAction from context (explicit state)
+      if (context?.pendingAction?.parameters && 
+          Object.keys(context.pendingAction.parameters).length > 0) {
+        actionParameters = context.pendingAction.parameters;
+        console.log('✅ [FRONTEND] Using pendingAction from context:', {
+          actionType,
+          periodId: actionParameters.periodId,
+          startDate: actionParameters.startDate,
+          endDate: actionParameters.endDate,
+          companyId: actionParameters.companyId,
+          source: 'richContext.pendingAction'
+        });
+      }
+      // 🎯 PRIORITY 2: Fallback to conversation history
+      else {
+        const lastAssistantMessage = [...this.currentConversation.messages]
+          .reverse()
+          .find(m => m.role === 'assistant' && m.executableActions?.length > 0);
         
-        if (matchingAction?.parameters) {
-          actionParameters = matchingAction.parameters;
-          console.log('✅ [FRONTEND] Extracted action parameters:', {
-            actionType,
-            periodId: actionParameters.periodId,
-            startDate: actionParameters.startDate,
-            endDate: actionParameters.endDate,
-            companyId: actionParameters.companyId
-          });
-        } else {
-          console.warn('⚠️ [FRONTEND] No matching action found for:', actionType);
+        if (lastAssistantMessage?.executableActions) {
+          const matchingAction = lastAssistantMessage.executableActions.find((action: any) =>
+            action.type === actionType ||
+            action.type === 'liquidate_payroll_complete' ||
+            action.id === `action_${actionType}`
+          );
+          
+          if (matchingAction?.parameters) {
+            actionParameters = matchingAction.parameters;
+            console.log('✅ [FRONTEND] Extracted from conversation history:', {
+              actionType,
+              source: 'conversation_history'
+            });
+          }
         }
+      }
+      
+      if (!actionParameters) {
+        console.warn('⚠️ [FRONTEND] No parameters found for action:', actionType);
       }
     }
 
     try {
       console.log('🤖 MAYA Chat: Calling maya-intelligence function...');
       
-      // Simplified conversation WITH conversationState for context continuity
+      // ✅ PROFESSIONAL: Preserve executableActions for backend parameter extraction
       const simplifiedConversation = this.currentConversation.messages.map(msg => ({
         role: msg.role,
         content: msg.content,
         ...(msg.conversationState && { conversationState: msg.conversationState }),
-        ...(msg.fieldName && { fieldName: msg.fieldName })
+        ...(msg.fieldName && { fieldName: msg.fieldName }),
+        ...(msg.executableActions && msg.executableActions.length > 0 && { 
+          executableActions: msg.executableActions 
+        })
       }));
       
       // Extract last conversation state from most recent assistant message
@@ -242,6 +263,25 @@ export class MayaChatService {
       });
 
       console.log('🤖 MAYA Chat: Assistant response created:', assistantMessage);
+
+      // ✅ PROFESSIONAL: Update pendingAction in context when assistant provides actions
+      if (assistantMessage.executableActions && assistantMessage.executableActions.length > 0) {
+        const firstAction = assistantMessage.executableActions[0];
+        
+        if (context) {
+          context.pendingAction = {
+            type: firstAction.type,
+            id: firstAction.id || `action_${firstAction.type}`,
+            parameters: firstAction.parameters || {},
+            timestamp: new Date().toISOString()
+          };
+          console.log('✅ [FRONTEND] Stored pendingAction in context:', {
+            type: context.pendingAction.type,
+            hasParameters: Object.keys(context.pendingAction.parameters).length > 0,
+            parameterKeys: Object.keys(context.pendingAction.parameters)
+          });
+        }
+      }
 
       this.currentConversation.messages.push(assistantMessage);
       this.saveToStorage(); // Persist to localStorage

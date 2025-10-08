@@ -753,25 +753,58 @@ serve(async (req) => {
       const actionType = lastMessage.replace('action_', '');
       
       try {
-        // ✅ CRITICAL FIX: Use provided parameters from frontend if available
-        const providedActionParams = actionParameters;
+        // ✅ PROFESSIONAL SOLUTION: Clear priority order for parameter sourcing
+        let actionParams: Record<string, any> = {};
+        let paramSource = 'unknown';
         
-        let actionParams: Record<string, any>;
-        
-        if (providedActionParams && Object.keys(providedActionParams).length > 0) {
-          console.log(`✅ [PARAM_SOURCE] Using parameters from frontend:`, {
-            periodId: providedActionParams.periodId,
-            startDate: providedActionParams.startDate,
-            endDate: providedActionParams.endDate,
-            companyId: providedActionParams.companyId
-          });
-          actionParams = providedActionParams;
-        } else {
-          console.log(`⚠️ [PARAM_SOURCE] No frontend params, extracting from conversation history`);
+        // 🎯 PRIORITY 1: Parameters from frontend payload (explicit)
+        if (actionParameters && Object.keys(actionParameters).length > 0) {
+          actionParams = actionParameters;
+          paramSource = 'frontend_payload';
+        }
+        // 🎯 PRIORITY 2: pendingAction from richContext (explicit state)
+        else if (richContext?.pendingAction?.parameters && 
+                 Object.keys(richContext.pendingAction.parameters).length > 0) {
+          actionParams = richContext.pendingAction.parameters;
+          paramSource = 'richContext_pendingAction';
+        }
+        // 🎯 PRIORITY 3: Conversation history (now includes executableActions)
+        else {
           actionParams = extractActionParametersFromContext(conversation, actionType);
+          paramSource = 'conversation_history';
         }
         
-        // Build action with parameters + rich context
+        console.log(`✅ [PARAM_SOURCE] Using parameters from: ${paramSource}`, {
+          periodId: actionParams.periodId,
+          startDate: actionParams.startDate,
+          endDate: actionParams.endDate,
+          companyId: actionParams.companyId
+        });
+        
+        // ⚠️ FAIL FAST: Validate critical parameters for liquidate_complete
+        if (actionType === 'liquidate_complete' || actionType === 'liquidate_payroll_complete') {
+          const missingParams = [];
+          if (!actionParams.periodId) missingParams.push('periodId');
+          if (!actionParams.startDate) missingParams.push('startDate');
+          if (!actionParams.endDate) missingParams.push('endDate');
+          
+          if (missingParams.length > 0) {
+            console.error(`❌ [VALIDATION] Missing critical parameters:`, missingParams);
+            return new Response(JSON.stringify({
+              message: `⚠️ No encontré información completa del período. Falta: ${missingParams.join(', ')}. Por favor, usa el botón de acción directamente.`,
+              emotionalState: 'concerned',
+              requiresUserInput: true,
+              missingParameters: missingParams,
+              sessionId,
+              timestamp: new Date().toISOString()
+            }), { 
+              status: 400, 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+        }
+        
+        // Build action with validated parameters + rich context
         const action = {
           type: actionType,
           parameters: {
