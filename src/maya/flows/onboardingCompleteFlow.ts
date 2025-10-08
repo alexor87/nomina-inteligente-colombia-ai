@@ -362,6 +362,10 @@ Revisa tu bandeja de entrada (y spam si no lo ves).`,
       nextStep: (data, input) => {
         if (input === 'register_real') return 'transition_to_real';
         if (input === 'restart') return 'welcome';
+        if (input === 'go_home') {
+          data._navigate_url = '/dashboard';
+          return 'completed';
+        }
         return 'completed';
       },
       canGoBack: false
@@ -388,6 +392,10 @@ Revisa tu bandeja de entrada (y spam si no lo ves).`,
       nextStep: (data, input) => {
         if (input === 'register_real') return 'transition_to_real';
         if (input === 'restart') return 'welcome';
+        if (input === 'go_home') {
+          data._navigate_url = '/dashboard';
+          return 'completed';
+        }
         return 'completed';
       },
       canGoBack: false
@@ -434,7 +442,17 @@ Has visto cómo funciona MAYA de principio a fin. Ahora puedes:
         { label: '➕ Crear primer empleado', value: 'create_employee' },
         { label: '🏠 Ir al dashboard', value: 'go_dashboard' }
       ],
-      nextStep: 'completed',
+      nextStep: (data, input) => {
+        if (input === 'go_dashboard') {
+          data._navigate_url = '/dashboard';
+          return 'completed';
+        }
+        if (input === 'create_employee') {
+          data._navigate_url = '/employees';
+          return 'completed';
+        }
+        return 'completed';
+      },
       canGoBack: false
     }
   }
