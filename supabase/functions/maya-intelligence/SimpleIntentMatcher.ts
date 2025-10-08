@@ -909,11 +909,14 @@ export class SimpleIntentMatcher {
       };
     }
 
-    // Employee count queries (CORREGIDO: más específico para evitar "cuánto")
-    if (/cuántos\s+empleados?|cuantos\s+empleados?/i.test(text)) {
+    // Employee count queries - ENHANCED para capturar más variaciones
+    if (/(?:cuántos?|cuantos?|cantidad\s+de)\s+empleados?(?:\s+(?:tengo|hay|tiene|activos?|trabajan))?/i.test(text) ||
+        /(?:cuántos?|cuantos?)\s+(?:son|hay)\s+(?:los\s+)?empleados?/i.test(text) ||
+        /número\s+de\s+empleados?/i.test(text)) {
+      console.log('👥 [EMPLOYEE_COUNT] Detected employee count query');
       return {
         type: 'EMPLOYEE_COUNT',
-        confidence: 0.95,
+        confidence: 0.98,  // Aumentar confianza para evitar LLM fallback
         method: 'getEmployeeCount'
       };
     }

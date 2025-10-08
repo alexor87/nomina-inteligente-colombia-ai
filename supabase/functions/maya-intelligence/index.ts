@@ -1066,13 +1066,19 @@ serve(async (req) => {
                 }
                 break;
               
-              case LLMQueryType.AGGREGATION:
-              case LLMQueryType.DIRECT_INTENT:
-                // Use fast path result if available, otherwise keep low confidence
-                if (!intent || intent.confidence < 0.5) {
-                  console.log(`❓ [LLM] No clear intent from classification, keeping fast path or low confidence`);
-                }
-                break;
+      case LLMQueryType.AGGREGATION:
+      case LLMQueryType.DIRECT_INTENT:
+        // PROTECTION: Never override high-confidence EMPLOYEE_COUNT from fast path
+        if (intent?.type === 'EMPLOYEE_COUNT' && intent.confidence >= 0.95) {
+          console.log(`✅ [LLM] Keeping high-confidence EMPLOYEE_COUNT from fast path`);
+          break;
+        }
+        
+        // Use fast path result if available, otherwise keep low confidence
+        if (!intent || intent.confidence < 0.5) {
+          console.log(`❓ [LLM] No clear intent from classification, keeping fast path or low confidence`);
+        }
+        break;
             }
           } catch (error) {
             console.error('❌ [LLM] Classification error:', error);
@@ -1788,7 +1794,12 @@ serve(async (req) => {
         break;
         
       case 'getEmployeeCount':
+        console.log('✅ [ROUTER] Executing getEmployeeCount - simple count query');
         response = await getEmployeeCount(userSupabase);
+        console.log('✅ [ROUTER] getEmployeeCount response:', { 
+          messageLength: response.message?.length,
+          hasActions: !!response.actions?.length  
+        });
         break;
         
       case 'listAllEmployees':
