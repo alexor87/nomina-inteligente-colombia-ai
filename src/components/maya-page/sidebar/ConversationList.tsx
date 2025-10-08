@@ -77,9 +77,13 @@ export const ConversationList: React.FC<ConversationListProps> = ({
 
   const handleDeleteRequest = (conversation: ConversationSummary) => {
     setPendingConversation(conversation);
-    setDeleteDialogOpen(true);
+    // Defer opening the dialog until after DropdownMenu fully closes
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setDeleteDialogOpen(true);
+      });
+    });
   };
-
   const handleConfirmDelete = async () => {
     if (!pendingConversation) return;
     const id = pendingConversation.id;

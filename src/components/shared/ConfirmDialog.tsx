@@ -43,7 +43,9 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
       // Double RAF ensures Radix animations complete first
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          forceUIReset();
+          setTimeout(() => {
+            forceUIReset();
+          }, 250);
         });
       });
     }

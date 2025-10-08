@@ -57,46 +57,50 @@ export function forceUIReset(): void {
   // 2. Use double requestAnimationFrame to ensure Radix animations complete
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
-      // 3. Remove scroll lock class
-      document.body.classList.remove('react-remove-scroll-bar');
-      
-      // 4. Clear body AND html styles that might be preventing scroll
-      document.body.style.overflow = '';
-      document.body.style.paddingRight = '';
-      document.body.style.position = '';
-      document.documentElement.style.overflow = '';
-      
-      // 5. Restore #root itself (critical!)
-      const root = document.getElementById('root');
-      if (root) {
-        root.removeAttribute('inert');
-        root.removeAttribute('aria-hidden');
-      }
-      
-      // 6. Restore aria-hidden and inert attributes on root siblings
-      const rootSiblings = document.querySelectorAll('body > *:not(#root)');
-      rootSiblings.forEach((sibling) => {
-        sibling.removeAttribute('aria-hidden');
-        sibling.removeAttribute('inert');
-      });
-      
-      // 7. Remove any lingering empty portal elements
-      const portals = document.querySelectorAll('[data-radix-portal]');
-      portals.forEach((portal) => {
-        if (portal.childElementCount === 0) {
-          portal.remove();
+      // 2.5 Add a small timeout to let teardown finish
+      setTimeout(() => {
+        // 3. Remove scroll lock class
+        document.body.classList.remove('react-remove-scroll-bar');
+        
+        // 4. Clear body AND html styles that might be preventing scroll
+        document.body.style.overflow = '';
+        document.body.style.paddingRight = '';
+        document.body.style.position = '';
+        document.documentElement.style.overflow = '';
+        
+        // 5. Restore #root itself (critical!)
+        const root = document.getElementById('root');
+        if (root) {
+          root.removeAttribute('inert');
+          root.removeAttribute('aria-hidden');
         }
-      });
-      
-      console.log('[UI Recovery] After reset:', {
-        bodyClasses: Array.from(document.body.classList),
-        bodyOverflow: document.body.style.overflow,
-        htmlOverflow: document.documentElement.style.overflow,
-        rootInert: document.getElementById('root')?.hasAttribute('inert'),
-        rootAriaHidden: document.getElementById('root')?.getAttribute('aria-hidden'),
-        openDialogs: document.querySelectorAll('[role="dialog"][data-state="open"]').length,
-      });
-      console.log('[UI Recovery] UI reset complete');
+        
+        // 6. Restore aria-hidden and inert attributes on root siblings
+        const rootSiblings = document.querySelectorAll('body > *:not(#root)');
+        rootSiblings.forEach((sibling) => {
+          sibling.removeAttribute('aria-hidden');
+          sibling.removeAttribute('inert');
+        });
+        
+        // 7. Remove any lingering closed or empty portal elements
+        const portals = document.querySelectorAll('[data-radix-portal]');
+        portals.forEach((portal) => {
+          const hasOpenChild = portal.querySelector('[data-state="open"]');
+          if (!hasOpenChild) {
+            portal.remove();
+          }
+        });
+        
+        console.log('[UI Recovery] After reset:', {
+          bodyClasses: Array.from(document.body.classList),
+          bodyOverflow: document.body.style.overflow,
+          htmlOverflow: document.documentElement.style.overflow,
+          rootInert: document.getElementById('root')?.hasAttribute('inert'),
+          rootAriaHidden: document.getElementById('root')?.getAttribute('aria-hidden'),
+          openDialogs: document.querySelectorAll('[role="dialog"][data-state="open"]').length,
+        });
+        console.log('[UI Recovery] UI reset complete');
+      }, 250);
     });
   });
 }
