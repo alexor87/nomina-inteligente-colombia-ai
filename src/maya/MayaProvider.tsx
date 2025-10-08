@@ -608,8 +608,39 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
           }));
         }
         
-        // Auto-advance to result
-        await advanceFlow('executed');
+        // 🔧 FIX: Avanzar manualmente con el flowState actualizado (evita recursión con estado stale)
+        setActiveFlow(result.flowState); // Persistir el estado con _executionResult
+        
+        const nextResult = await flowManager.advance(result.flowState, 'executed');
+        setActiveFlow(nextResult.flowState);
+        
+        // Construir mensaje del siguiente step (result)
+        const nextStepMessage: ChatMessage = {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: nextResult.currentStep.message,
+          timestamp: new Date().toISOString(),
+          quickReplies: nextResult.currentStep.quickReplies,
+          isFlowMessage: true,
+          flowId: nextResult.flowState.flowId,
+          stepId: nextResult.currentStep.id,
+          ...(executionResult.executableActions && {
+            executableActions: executionResult.executableActions
+          })
+        };
+        
+        chatService.addMessage(nextStepMessage);
+        setChatHistory([...chatService.getConversation().messages]);
+        
+        // Completar flujo si llegó al final
+        if (nextResult.currentStep.id === 'completed' || nextResult.currentStep.id === 'result') {
+          flowManager.completeFlow(nextResult.flowState);
+          
+          if (nextResult.flowState.accumulatedData._navigate_url) {
+            completeFlowAndNavigate(nextResult.flowState.accumulatedData._navigate_url);
+            return;
+          }
+        }
         
         // ✅ CORRECCIÓN 1: Toast solo para flujo de empleados
         if (result.flowState.flowId === FlowType.EMPLOYEE_CREATE) {
