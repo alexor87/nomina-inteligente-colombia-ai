@@ -878,7 +878,7 @@ async function executeLiquidatePayrollCompleteAction(action: any) {
     const { error: upsertError } = await supabase
       .from('payrolls')
       .upsert(payrollRecords, { 
-        onConflict: 'employee_id,period_id',
+        onConflict: 'company_id,employee_id,period_id',
         ignoreDuplicates: false 
       });
 
