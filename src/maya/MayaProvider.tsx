@@ -600,6 +600,26 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
           setTimeout(() => advanceFlow('loaded'), 500);
           return;
         }
+
+        // 🆕 DEMO FLOW: Auto-ejecutar cálculo y generación de PDF
+        if (result.flowState.flowId === FlowType.ONBOARDING_DEMO_LIQUIDATION) {
+          if (result.flowState.currentStep === 'calculating') {
+            // Ejecutar cálculo demo
+            result.flowState.accumulatedData._calculation_result = executionResult;
+            setTimeout(() => advanceFlow('calculated'), 800);
+            return;
+          }
+          
+          if (result.flowState.currentStep === 'generating_pdf') {
+            // Marcar que se debe generar PDF
+            result.flowState.accumulatedData.generating_pdf = true;
+            // Ejecutar generación de PDF
+            const pdfResult = await flowManager.executeFlowAction(result.flowState);
+            result.flowState.accumulatedData._pdf_result = pdfResult;
+            setTimeout(() => advanceFlow('generated'), 1000);
+            return;
+          }
+        }
         
         // Trigger employee refresh for employee creation
         if (window.dispatchEvent) {
@@ -642,6 +662,18 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
         // Completar flujo si llegó al final
         if (nextResult.currentStep.id === 'completed' || nextResult.currentStep.id === 'result') {
           flowManager.completeFlow(nextResult.flowState);
+          
+          // 🆕 DEMO FLOW: Marcar demo como completado
+          if (nextResult.flowState.flowId === FlowType.ONBOARDING_DEMO_LIQUIDATION) {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+              await supabase
+                .from('profiles')
+                .update({ demo_payroll_completed: true })
+                .eq('user_id', user.id);
+              console.log('✅ [DEMO] Demo marked as completed');
+            }
+          }
           
           if (nextResult.flowState.accumulatedData._navigate_url) {
             completeFlowAndNavigate(nextResult.flowState.accumulatedData._navigate_url);
@@ -1049,6 +1081,76 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
 
     initializeConversations();
   }, [companyId, conversationManager, loadConversations, loadConversation]);
+
+  // 🆕 AUTO-TRIGGER: Demo flow para usuarios nuevos sin empleados
+  useEffect(() => {
+    const checkAndTriggerDemo = async () => {
+      // Solo ejecutar en la página de MAYA
+      if (!location.pathname.includes('/maya')) return;
+      
+      // Solo si hay companyId y NO hay flujo activo
+      if (!companyId || activeFlow) return;
+      
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        // Obtener perfil del usuario
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('first_maya_visit, demo_payroll_completed')
+          .eq('user_id', user.id)
+          .single();
+
+        console.log('🔍 [DEMO] Checking onboarding status:', profile);
+
+        // Solo continuar si es primera visita Y demo no completado
+        if (!profile?.first_maya_visit || profile?.demo_payroll_completed) {
+          return;
+        }
+
+        // Verificar que no tenga empleados
+        const { count: employeeCount } = await supabase
+          .from('employees')
+          .select('id', { count: 'exact', head: true })
+          .eq('company_id', companyId);
+
+        console.log('👥 [DEMO] Employee count:', employeeCount);
+
+        // Si tiene empleados, no mostrar demo
+        if (employeeCount && employeeCount > 0) {
+          // Marcar como visitado pero no completado
+          await supabase
+            .from('profiles')
+            .update({ first_maya_visit: false })
+            .eq('user_id', user.id);
+          return;
+        }
+
+        // ✨ TRIGGER: Iniciar demo flow automáticamente después de 2 segundos
+        console.log('🎯 [DEMO] Triggering onboarding demo flow...');
+        
+        setTimeout(() => {
+          // Verificar que no haya iniciado otro flujo mientras tanto
+          if (!activeFlow && !chatHistory.some(m => m.isFlowMessage)) {
+            startGuidedFlow(FlowType.ONBOARDING_DEMO_LIQUIDATION);
+            
+            // Marcar primera visita como completada (pero demo aún no)
+            supabase
+              .from('profiles')
+              .update({ first_maya_visit: false })
+              .eq('user_id', user.id)
+              .then(() => console.log('✅ [DEMO] First visit marked'));
+          }
+        }, 2000);
+
+      } catch (error) {
+        console.error('❌ [DEMO] Error checking onboarding status:', error);
+      }
+    };
+
+    checkAndTriggerDemo();
+  }, [companyId, location.pathname, activeFlow, chatHistory, startGuidedFlow]);
 
   // Legacy: Sync with old localStorage conversation for backward compatibility
   useEffect(() => {

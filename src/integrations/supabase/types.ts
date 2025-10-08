@@ -2307,6 +2307,8 @@ export type Database = {
           avatar_url: string | null
           company_id: string | null
           created_at: string
+          demo_payroll_completed: boolean | null
+          first_maya_visit: boolean | null
           first_name: string | null
           id: string
           last_name: string | null
@@ -2318,6 +2320,8 @@ export type Database = {
           avatar_url?: string | null
           company_id?: string | null
           created_at?: string
+          demo_payroll_completed?: boolean | null
+          first_maya_visit?: boolean | null
           first_name?: string | null
           id?: string
           last_name?: string | null
@@ -2329,6 +2333,8 @@ export type Database = {
           avatar_url?: string | null
           company_id?: string | null
           created_at?: string
+          demo_payroll_completed?: boolean | null
+          first_maya_visit?: boolean | null
           first_name?: string | null
           id?: string
           last_name?: string | null

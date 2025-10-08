@@ -813,8 +813,8 @@ export class GuidedFlowManager {
               salario_base: result.salarioBase,
               auxilio_transporte: result.auxilioTransporte,
               total_devengado: result.totalDevengado,
-              salud_empleado: result.deduccionSalud,
-              pension_empleado: result.deduccionPension,
+              salud_empleado: result.saludEmpleado,
+              pension_empleado: result.pensionEmpleado,
               total_deducciones: result.totalDeducciones,
               neto_pagado: result.netoPagar
             },

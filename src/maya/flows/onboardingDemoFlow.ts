@@ -168,8 +168,8 @@ Ahora dime, ¿cuál es su **salario mensual**?`;
 **💰 Total Devengado: ${formatCurrency(result.totalDevengado)}**
 
 **Deducciones:**
-🏥 Salud (4%): ${formatCurrency(result.deduccionSalud)}
-👴 Pensión (4%): ${formatCurrency(result.deduccionPension)}
+🏥 Salud (4%): ${formatCurrency(result.saludEmpleado)}
+👴 Pensión (4%): ${formatCurrency(result.pensionEmpleado)}
 **━━━━━━━━━━━━━━━━**
 **📉 Total Deducciones: ${formatCurrency(result.totalDeducciones)}**
 
