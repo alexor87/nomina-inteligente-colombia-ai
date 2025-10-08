@@ -66,6 +66,10 @@ export class IntentRouter {
           return await this.routeEmployeeCrud(intent, context);
 
         // Employee queries
+        case 'listAllEmployees':
+          this.logger.info('[ROUTER] Routing employee list to search');
+          return await this.routeEmployeeSearch(intent, context);
+        
         case 'searchEmployee':
           return await this.routeEmployeeSearch(intent, context);
         
