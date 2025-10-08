@@ -370,11 +370,11 @@ Los números te van a impactar...`;
       ],
       nextStep: (data, input) => {
         if (input === 'create_employee') {
-          data._navigate_url = '/employees?action=new';
+          data._start_new_flow = FlowType.EMPLOYEE_CREATE;
           return 'completed';
         }
         if (input === 'go_dashboard') {
-          data._navigate_url = '/dashboard';
+          data._navigate_url = '/modules/dashboard';
           return 'completed';
         }
         if (input === 'restart') return 'welcome';
@@ -508,10 +508,10 @@ Has visto las capacidades principales de MAYA:
       ],
       nextStep: (data, input) => {
         if (input === 'create_employee') {
-          data._navigate_url = '/employees?action=new';
+          data._start_new_flow = FlowType.EMPLOYEE_CREATE;
           return 'completed';
         }
-        data._navigate_url = '/dashboard';
+        data._navigate_url = '/modules/dashboard';
         return 'completed';
       },
       canGoBack: false
@@ -560,11 +560,11 @@ Has visto cómo funciona MAYA de principio a fin. Ahora puedes:
       ],
       nextStep: (data, input) => {
         if (input === 'go_dashboard') {
-          data._navigate_url = '/dashboard';
+          data._navigate_url = '/modules/dashboard';
           return 'completed';
         }
         if (input === 'create_employee') {
-          data._navigate_url = '/employees';
+          data._start_new_flow = FlowType.EMPLOYEE_CREATE;
           return 'completed';
         }
         return 'completed';

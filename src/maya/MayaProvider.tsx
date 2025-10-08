@@ -465,6 +465,37 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
     
     setActiveFlow(result.flowState);
     
+    // 🆕 FASE 0: Detectar inicio de nuevo flujo después de completed
+    if (result.currentStep.id === 'completed' && result.flowState.accumulatedData._start_new_flow) {
+      const nextFlowType = result.flowState.accumulatedData._start_new_flow;
+      console.log('🔄 MAYA: Flow completed, starting new flow', { nextFlow: nextFlowType });
+      
+      // Add final step message
+      const stepMessage: ChatMessage = {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: result.currentStep.message,
+        timestamp: new Date().toISOString(),
+        isFlowMessage: true,
+        flowId: result.flowState.flowId,
+        stepId: result.currentStep.id
+      };
+      
+      chatService.addMessage(stepMessage);
+      setChatHistory([...chatService.getConversation().messages]);
+      
+      // Complete current flow
+      flowManager.completeFlow(result.flowState);
+      setActiveFlow(null);
+      
+      // Start new flow after a small delay
+      setTimeout(() => {
+        startGuidedFlow(nextFlowType, false); // isDemoMode = false
+      }, 300);
+      
+      return;
+    }
+    
     // 🆕 FASE 1: Detectar navegación externa después de completed
     if (result.currentStep.id === 'completed' && result.flowState.accumulatedData._navigate_url) {
       const navigateUrl = result.flowState.accumulatedData._navigate_url;
