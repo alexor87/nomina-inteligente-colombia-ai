@@ -38,6 +38,7 @@ export interface MayaMessage {
   isVisible: boolean;
   insights?: ReportInsight[];
   reportData?: any;
+  simulationResult?: any;
 }
 
 export interface ReportInsight {
@@ -52,7 +53,7 @@ export interface ReportInsight {
   actions?: string[];
 }
 
-export type EmotionalState = 
+export type EmotionalState =
   | 'neutral'
   | 'analyzing' 
   | 'celebrating'
