@@ -1791,6 +1791,11 @@ serve(async (req) => {
         response = await getEmployeeCount(userSupabase);
         break;
         
+      case 'listAllEmployees':
+        console.log('[ROUTER] Routing to listAllEmployees handler');
+        response = await listAllEmployees(userSupabase);
+        break;
+        
       // ============================================================================
       // PHASE 1: AGGREGATION HANDLERS (New - Maya Intelligence Expansion)
       // ============================================================================
@@ -2593,7 +2598,7 @@ async function getEmployeeCount(supabase: any) {
         label: '👥 Ver empleados',
         description: 'Mostrar la lista de empleados activos',
         parameters: {
-          message: 'muéstrame los empleados activos'
+          message: 'ver empleados'
         }
       }] : []
     };

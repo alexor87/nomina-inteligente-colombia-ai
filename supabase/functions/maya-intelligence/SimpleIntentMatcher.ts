@@ -918,13 +918,15 @@ export class SimpleIntentMatcher {
       };
     }
 
-    // Employee list queries
-    if (/(?:dame|dime|muestra(?:me)?|ve(?:r|amos)?|lista|mostrar|cuáles?\s+son|quiénes?\s+son)\s*(?:los\s*)?(?:nombres?|empleados?)(?:\s+(?:activos?|todos?|que\s+tengo))?/i.test(text) ||
+    // Employee list queries - ENHANCED for better detection
+    if (/^(?:ver|muestra(?:me)?|mostrar|dame|dime|lista|listado)(?:\s+(?:los\s+)?empleados?(?:\s+activos?)?)?$/i.test(text) ||
+        /(?:muestra(?:me)?|mostrar|dame|dime|ve(?:r|amos)?)\s+(?:los\s+)?empleados?\s+activos?/i.test(text) ||
         /(?:lista|listado)\s+(?:de\s+)?empleados?/i.test(text) ||
-        /(?:quiénes?\s+trabajan|quiénes?\s+son\s+los\s+empleados?)/i.test(text)) {
+        /(?:cuáles?|quiénes?)\s+son\s+(?:los\s+)?empleados?/i.test(text) ||
+        /(?:quiénes?\s+trabajan)/i.test(text)) {
       return {
         type: 'EMPLOYEE_LIST',
-        confidence: 0.92,
+        confidence: 0.99,
         method: 'listAllEmployees'
       };
     }
