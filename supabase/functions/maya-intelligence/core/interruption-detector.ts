@@ -1,4 +1,4 @@
-import { Intent } from '../types/intent.ts';
+import { Intent } from './types.ts';
 import { ConversationContext } from './conversation-state-manager.ts';
 
 export type InterruptionType = 'greeting' | 'query' | 'cancel' | 'none';
