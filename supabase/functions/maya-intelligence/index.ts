@@ -894,9 +894,9 @@ serve(async (req) => {
     if (reportActions.includes(lastMessage.toLowerCase().trim())) {
       console.log(`📊 [REPORT_ACTION] Detected: "${lastMessage}"`);
       
-      // Get report context from conversation state
-      const lastAssistantMsg = conversation.slice().reverse().find(msg => msg.role === 'assistant');
-      const reportState = lastAssistantMsg?.conversationState;
+      // Get report context from request metadata first, then fallback to last assistant message
+      const reportState = (metadata?.lastConversationState as any) ||
+        conversation.slice().reverse().find(msg => msg.role === 'assistant')?.conversationState;
       
       if (!reportState?.reportType) {
         return new Response(JSON.stringify({
