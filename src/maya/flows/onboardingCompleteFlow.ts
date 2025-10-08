@@ -278,16 +278,25 @@ Ahora voy a calcular la nómina de **${data.first_name}** usando el motor de cá
         const fmt = (n: any) => new Intl.NumberFormat('es-CO').format(Math.round(Number(n) || 0));
         const currentSalary = data.salary || 1423500;
         
-        return `🎯 **Simulador What-If**
+        return `⚡ **Esto cambia todo**
 
-Ya viste cómo liquidar un empleado. Ahora quiero mostrarte el **poder predictivo** de MAYA.
+Acabas de usar el 5% de mis capacidades. 
 
-📊 **Escenario:**
-¿Qué pasaría si contratas 2 empleados más con el perfil de ${data.first_name}?
-• Salario: $${fmt(currentSalary)}
-• Contrato: ${data.contract_type || 'Indefinido'}
+Imagina tener **24/7** disponible:
+• Un experto en nómina
+• Un abogado laboral que conoce cada artículo
+• Un asesor de seguridad social actualizado
+• Un analista financiero que predice el futuro
 
-¿Quieres ver el impacto financiero?`;
+**Todo en una conversación natural. Eso es MAYA.**
+
+Ahora, veamos mi capacidad de **predicción financiera**:
+
+Si contratas 2 personas como ${data.first_name}, ¿cuánto te costaría realmente?
+🎯 Salario: $${fmt(currentSalary)} cada uno
+📋 Contrato: ${data.contract_type || 'Indefinido'}
+
+Los números te van a impactar...`;
       },
       quickReplies: [
         { label: '✅ Sí, ver simulación', value: 'confirm' },
