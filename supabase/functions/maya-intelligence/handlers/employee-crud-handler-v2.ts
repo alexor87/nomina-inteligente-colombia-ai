@@ -113,6 +113,13 @@ export class EmployeeCrudHandlerV2 extends BaseHandler {
     const parsedData = this.parseEmployeeDataFromMessage(userMessage, convContext);
     console.log(`🔍 [V2] Parsed data:`, parsedData);
     
+    // Validate if any useful data was extracted
+    const hasUsefulData = Object.values(parsedData).some(value => value !== undefined && value !== null);
+    
+    if (!hasUsefulData && userMessage.length > 0) {
+      console.log(`⚠️ [V2] No useful data extracted from message: "${userMessage.substring(0, 100)}"`);
+    }
+    
     for (const [key, value] of Object.entries(parsedData)) {
       if (value !== undefined && value !== null) {
         convContext = ConversationStateManager.updateData(convContext, key, value);

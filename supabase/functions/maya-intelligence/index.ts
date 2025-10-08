@@ -694,7 +694,85 @@ serve(async (req) => {
       const loadedContext = await sessionManager.loadContext(sessionId || '');
       
       if (loadedContext && loadedContext.flowType === FlowType.EMPLOYEE_CREATE && !ConversationStateManager.isFlowComplete(loadedContext)) {
-        console.log(`🚨 [STATE_GATE] ACTIVE - Forcing EMPLOYEE_CREATE (state: ${loadedContext.currentState})`);
+        console.log(`🚨 [STATE_GATE] ACTIVE - Checking for interruptions (state: ${loadedContext.currentState})`);
+        
+        // ===== INTERRUPTION DETECTION =====
+        const { InterruptionDetector } = await import('./core/interruption-detector.ts');
+        const interruption = InterruptionDetector.detect(lastMessage, loadedContext);
+        
+        console.log(`🔍 [INTERRUPTION] Type: ${interruption.interruptionType}, Is interruption: ${interruption.isInterruption}`);
+        
+        // Handle interruptions
+        if (interruption.isInterruption) {
+          if (interruption.interruptionType === 'greeting') {
+            // Respond to greeting and maintain flow
+            const { StateResponseBuilder } = await import('./core/state-response-builder.ts');
+            const greetingResponse = StateResponseBuilder.buildInterruptionResponse(
+              'greeting',
+              loadedContext,
+              lastMessage
+            );
+            
+            // Save context (no changes, just maintaining flow)
+            await sessionManager.saveContext(loadedContext);
+            
+            return new Response(JSON.stringify({
+              message: greetingResponse.message,
+              emotionalState: 'encouraging',
+              conversationState: loadedContext,
+              quickReplies: greetingResponse.quickReplies
+            }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          } else if (interruption.interruptionType === 'cancel') {
+            // Cancel flow and return to IDLE
+            console.log(`❌ [INTERRUPTION] Flow cancelled by user`);
+            const cancelledContext = ConversationStateManager.transitionTo(
+              loadedContext,
+              ConversationState.IDLE,
+              'user_cancellation',
+              'User cancelled the flow'
+            );
+            
+            await sessionManager.saveContext(cancelledContext);
+            
+            return new Response(JSON.stringify({
+              message: "❌ He cancelado la creación del empleado. ¿En qué más puedo ayudarte?",
+              emotionalState: 'neutral',
+              conversationState: cancelledContext,
+              quickReplies: []
+            }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          } else if (interruption.interruptionType === 'query' && interruption.detectedIntent) {
+            // Handle out-of-context query, then re-prompt for flow
+            console.log(`🔀 [INTERRUPTION] Out-of-context query detected: ${interruption.detectedIntent.type}`);
+            
+            // Route the query intent
+            const queryResponse = await intentRouter.route(interruption.detectedIntent, richContext);
+            
+            // After answering, re-prompt for the flow
+            const { StateResponseBuilder } = await import('./core/state-response-builder.ts');
+            const flowPrompt = StateResponseBuilder.buildStateResponse(loadedContext.state, loadedContext);
+            
+            const combinedMessage = `${queryResponse.message}\n\n---\n\n**Volviendo al flujo de creación:**\n${flowPrompt.message}`;
+            
+            // Save context (no changes, maintaining flow)
+            await sessionManager.saveContext(loadedContext);
+            
+            return new Response(JSON.stringify({
+              message: combinedMessage,
+              emotionalState: 'encouraging',
+              conversationState: loadedContext,
+              quickReplies: flowPrompt.quickReplies
+            }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+        }
+        
+        // ===== NO INTERRUPTION - Continue with flow =====
+        console.log(`➡️ [STATE_GATE] No interruption, continuing flow`);
         stateGateActive = true;
         preservedContext = loadedContext;
         

@@ -420,6 +420,33 @@ export class StateResponseBuilder {
   }
 
   /**
+   * Build response for interruptions during active flows
+   */
+  static buildInterruptionResponse(
+    interruptionType: 'greeting' | 'query',
+    context: ConversationContext,
+    userMessage: string
+  ): { message: string; quickReplies: QuickReplyOption[] } {
+    const currentStatePrompt = this.buildStateResponse(context.state, context);
+    
+    if (interruptionType === 'greeting') {
+      const greetings = ['¡Hola!', '¡Hola! 👋', '¡Hey!', 'Hola'];
+      const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
+      
+      return {
+        message: `${randomGreeting} ${currentStatePrompt.message}`,
+        quickReplies: currentStatePrompt.quickReplies || []
+      };
+    }
+    
+    // For 'query' type, this is handled separately in the main flow
+    return {
+      message: currentStatePrompt.message,
+      quickReplies: currentStatePrompt.quickReplies || []
+    };
+  }
+
+  /**
    * Obtener emotional state apropiado para un estado
    */
   private static getEmotionalStateForState(state: ConversationState): EmotionalState {
