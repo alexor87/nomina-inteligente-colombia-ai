@@ -50,7 +50,8 @@ export class ReportsHandler {
         request.periodId || request.period,
         request.companyId,
         request.filters,
-        supabaseClient
+        supabaseClient,
+        request.period
       );
 
       if (!reportData || reportData.data.length === 0) {
@@ -73,7 +74,8 @@ export class ReportsHandler {
           request.periodId || request.period,
           request.companyId,
           request.filters,
-          supabaseClient
+          supabaseClient,
+          request.period
         );
       }
 
@@ -118,20 +120,36 @@ export class ReportsHandler {
     periodOrId: string,
     companyId: string,
     filters: any,
-    supabaseClient: any
+    supabaseClient: any,
+    rawPeriod?: string
   ): Promise<ReportData> {
-    console.log('[ReportsHandler] fetchReportData called with:', { reportType, periodOrId, companyId });
+    console.log('[ReportsHandler] fetchReportData called with:', { reportType, periodOrId, companyId, rawPeriod });
     
-    // NUEVO: Detectar si es solicitud de año completo
-    const isYearRequest = periodOrId === 'current_year' || 
-                          periodOrId === 'last_year' || 
-                          /^\d{4}$/.test(periodOrId);
+    // NUEVO: Detectar si es solicitud de año completo, incluyendo 'MULTIPLE' y etiquetas locales como "Año 2025"
+    const normalized = String(periodOrId || '').toLowerCase().trim();
+    const hasYearInRaw = rawPeriod ? /\b(?:año|ano)\s+(\d{4})\b/i.test(rawPeriod) : false;
+    const isYearRequest = normalized === 'current_year' ||
+                          normalized === 'last_year' ||
+                          /^\d{4}$/.test(normalized) ||
+                          normalized === 'multiple' ||
+                          hasYearInRaw;
     
     if (isYearRequest) {
       // Determinar año
-      const year = periodOrId === 'current_year' ? new Date().getFullYear() :
-                   periodOrId === 'last_year' ? new Date().getFullYear() - 1 :
-                   parseInt(periodOrId);
+      let year: number | undefined;
+      if (normalized === 'current_year') {
+        year = new Date().getFullYear();
+      } else if (normalized === 'last_year') {
+        year = new Date().getFullYear() - 1;
+      } else if (/^\d{4}$/.test(normalized)) {
+        year = parseInt(normalized, 10);
+      } else if (hasYearInRaw && rawPeriod) {
+        const m = rawPeriod.match(/\b(?:año|ano)\s+(\d{4})\b/i);
+        if (m) year = parseInt(m[1], 10);
+      }
+      if (!year) {
+        throw new Error(`No se pudo determinar el año a partir de: ${rawPeriod || periodOrId}`);
+      }
       
       console.log('[ReportsHandler] Fetching yearly data for:', year);
       
@@ -291,20 +309,37 @@ export class ReportsHandler {
     currentPeriodOrId: string,
     companyId: string,
     filters: any,
-    supabaseClient: any
+    supabaseClient: any,
+    rawPeriod?: string
   ): Promise<any[] | undefined> {
     try {
-      console.log('[ReportsHandler] Fetching previous period data for:', currentPeriodOrId);
+      console.log('[ReportsHandler] Fetching previous period data for:', { currentPeriodOrId, rawPeriod });
       
-      // NUEVO: Si es reporte anual, obtener año anterior completo
-      const isYearRequest = currentPeriodOrId === 'current_year' || 
-                            currentPeriodOrId === 'last_year' || 
-                            /^\d{4}$/.test(currentPeriodOrId);
+      // NUEVO: Si es reporte anual, obtener año anterior completo (soporta 'MULTIPLE' y "Año 2025")
+      const normalized = String(currentPeriodOrId || '').toLowerCase().trim();
+      const hasYearInRaw = rawPeriod ? /\b(?:año|ano)\s+(\d{4})\b/i.test(rawPeriod) : false;
+      const isYearRequest = normalized === 'current_year' ||
+                            normalized === 'last_year' ||
+                            /^\d{4}$/.test(normalized) ||
+                            normalized === 'multiple' ||
+                            hasYearInRaw;
       
       if (isYearRequest) {
-        const currentYear = currentPeriodOrId === 'current_year' ? new Date().getFullYear() :
-                            currentPeriodOrId === 'last_year' ? new Date().getFullYear() - 1 :
-                            parseInt(currentPeriodOrId);
+        let currentYear: number | undefined;
+        if (normalized === 'current_year') {
+          currentYear = new Date().getFullYear();
+        } else if (normalized === 'last_year') {
+          currentYear = new Date().getFullYear() - 1;
+        } else if (/^\d{4}$/.test(normalized)) {
+          currentYear = parseInt(normalized, 10);
+        } else if (hasYearInRaw && rawPeriod) {
+          const m = rawPeriod.match(/\b(?:año|ano)\s+(\d{4})\b/i);
+          if (m) currentYear = parseInt(m[1], 10);
+        }
+        if (!currentYear) {
+          console.warn('[ReportsHandler] No se pudo inferir el año para comparación a partir de', { currentPeriodOrId, rawPeriod });
+          return undefined;
+        }
         const previousYear = currentYear - 1;
         
         console.log('[ReportsHandler] Fetching previous year data:', previousYear);
