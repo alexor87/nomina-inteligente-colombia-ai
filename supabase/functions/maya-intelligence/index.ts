@@ -543,7 +543,8 @@ serve(async (req) => {
       global: { headers: { Authorization: authHeader } }
     });
 
-    const { conversation, sessionId, richContext, metadata, idempotencyKey, actionType, actionParameters } = await req.json();
+    const body = await req.json();
+    const { conversation, sessionId, richContext, metadata, idempotencyKey, actionType, actionParameters } = body;
     console.log(`📦 [METADATA] Received metadata:`, metadata ? 'present' : 'missing');
     console.log(`🔑 [IDEMPOTENCY] Received key:`, idempotencyKey ? 'present' : 'missing');
     
@@ -557,16 +558,6 @@ serve(async (req) => {
       });
     }
     
-    if (!conversation || !Array.isArray(conversation)) {
-      return new Response(JSON.stringify({
-        error: 'Invalid conversation format',
-        message: 'Formato de conversación inválido'
-      }), { 
-        status: 400, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      });
-    }
-
     // Validate richContext if provided
     if (richContext?.companyId) {
       console.log(`🔍 [CONTEXT_VALIDATION] Received companyId: ${richContext.companyId}`);
@@ -759,6 +750,19 @@ serve(async (req) => {
           status: 500
         });
       }
+    }
+
+    // ============================================================================
+    // CONVERSATION VALIDATION - For normal chat flows
+    // ============================================================================
+    if (!conversation || !Array.isArray(conversation)) {
+      return new Response(JSON.stringify({
+        error: 'Invalid conversation format',
+        message: 'Formato de conversación inválido'
+      }), { 
+        status: 400, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
     }
     
     // ============================================================================

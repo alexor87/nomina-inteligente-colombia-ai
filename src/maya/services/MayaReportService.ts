@@ -221,6 +221,14 @@ export class MayaReportService {
       includeComparison: request.includeComparison
     };
     
+    console.log('🚀 [MayaReportService] Invocando edge function:', {
+      action: 'generate_report',
+      reportType: request.reportType,
+      period: request.period,
+      hasPeriodId: !!request.periodId,
+      hasCompanyId: !!request.companyId
+    });
+    
     const { data: result, error } = await supabase.functions.invoke('maya-intelligence', {
       body: {
         action: 'generate_report',
