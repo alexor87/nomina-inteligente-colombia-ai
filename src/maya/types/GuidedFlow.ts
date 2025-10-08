@@ -5,7 +5,8 @@ export enum FlowType {
   BENEFITS_CALCULATE = 'BENEFITS_CALCULATE',
   WHAT_IF_SIMULATION = 'WHAT_IF_SIMULATION',
   PROACTIVE_SCAN = 'PROACTIVE_SCAN',
-  ONBOARDING_DEMO_LIQUIDATION = 'ONBOARDING_DEMO_LIQUIDATION'
+  ONBOARDING_DEMO_LIQUIDATION = 'ONBOARDING_DEMO_LIQUIDATION',
+  ONBOARDING_COMPLETE = 'ONBOARDING_COMPLETE'
 }
 
 export enum ReportType {
@@ -73,4 +74,5 @@ export interface FlowState {
   history: string[];
   startedAt: string;
   lastUpdatedAt: string;
+  isDemoMode?: boolean;
 }

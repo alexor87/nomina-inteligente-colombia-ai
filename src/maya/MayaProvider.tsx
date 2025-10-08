@@ -35,7 +35,7 @@ interface MayaProviderValue {
   loadConversations: () => Promise<void>;
   loadConversation: (conversationId: string) => Promise<void>;
   createNewConversation: () => Promise<string>;
-  startGuidedFlow: (flowType: FlowType) => void;
+  startGuidedFlow: (flowType: FlowType, isDemoMode?: boolean) => void;
   advanceFlow: (userInput: string) => Promise<void>;
   goBackInFlow: () => void;
   cancelFlow: () => void;
@@ -389,8 +389,8 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
   }, [conversationManager, companyId, loadConversations, loadConversation]);
 
   // Guided Flow functions
-  const startGuidedFlow = useCallback((flowType: FlowType) => {
-    const flowState = flowManager.startFlow(flowType);
+  const startGuidedFlow = useCallback((flowType: FlowType, isDemoMode: boolean = false) => {
+    const flowState = flowManager.startFlow(flowType, isDemoMode);
     setActiveFlow(flowState);
     
     const initialStep = flowManager.getCurrentStep(flowState);
@@ -410,7 +410,7 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
     chatService.addMessage(flowMessage);
     setChatHistory([...chatService.getConversation().messages]);
     
-    console.log('🚀 Flow started:', flowType, initialStep);
+    console.log('🚀 Flow started:', flowType, { isDemoMode }, initialStep);
   }, [flowManager, chatService]);
 
   // 🆕 FASE 1: Cleanup y navegación externa (DECLARAR ANTES de advanceFlow)

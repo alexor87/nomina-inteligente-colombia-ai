@@ -5,6 +5,7 @@ import { reportsGenerationFlow } from '../flows/reportsGenerationFlow';
 import { whatIfSimulationFlow } from '../flows/whatIfSimulationFlow';
 import { proactiveDetectionFlow } from '../flows/proactiveDetectionFlow';
 import { onboardingDemoFlow } from '../flows/onboardingDemoFlow';
+import { onboardingCompleteFlow } from '../flows/onboardingCompleteFlow';
 
 export class GuidedFlowManager {
   private static instance: GuidedFlowManager;
@@ -19,6 +20,7 @@ export class GuidedFlowManager {
     this.registerFlow(whatIfSimulationFlow);
     this.registerFlow(proactiveDetectionFlow);
     this.registerFlow(onboardingDemoFlow);
+    this.registerFlow(onboardingCompleteFlow);
   }
 
   static getInstance(): GuidedFlowManager {
@@ -33,7 +35,7 @@ export class GuidedFlowManager {
     console.log(`✅ Flow registered: ${flow.name}`);
   }
 
-  startFlow(flowId: FlowType): FlowState {
+  startFlow(flowId: FlowType, isDemoMode: boolean = false): FlowState {
     const flow = this.flows.get(flowId);
     if (!flow) {
       throw new Error(`Flow ${flowId} not found`);
@@ -45,13 +47,14 @@ export class GuidedFlowManager {
       accumulatedData: {},
       history: [],
       startedAt: new Date().toISOString(),
-      lastUpdatedAt: new Date().toISOString()
+      lastUpdatedAt: new Date().toISOString(),
+      isDemoMode
     };
 
     const sessionId = `${flowId}_${Date.now()}`;
     this.activeFlows.set(sessionId, flowState);
 
-    console.log(`🚀 Flow started: ${flow.name}`, flowState);
+    console.log(`🚀 Flow started: ${flow.name}`, { isDemoMode, flowState });
     return flowState;
   }
 
@@ -326,10 +329,15 @@ export class GuidedFlowManager {
 
         return actionResult;
       }
+
+      // ========== ONBOARDING COMPLETE FLOW ==========
+      if (flowState.flowId === FlowType.ONBOARDING_COMPLETE) {
+        return await this.executeOnboardingComplete(flowState);
+      }
       
       switch (flowState.flowId) {
         case FlowType.EMPLOYEE_CREATE:
-          return await this.executeEmployeeCreation(flowState.accumulatedData);
+          return await this.executeEmployeeCreation(flowState.accumulatedData, flowState.isDemoMode);
         
         case FlowType.PAYROLL_CALCULATE:
           return await this.executePayrollCalculation(flowState.accumulatedData);
@@ -436,7 +444,41 @@ export class GuidedFlowManager {
     };
   }
 
-  private async executeEmployeeCreation(data: Record<string, any>): Promise<any> {
+  private async executeEmployeeCreation(data: Record<string, any>, isDemoMode: boolean = false): Promise<any> {
+    console.log('📤 Creating employee with data:', { data, isDemoMode });
+
+    // ========== DEMO MODE: SIMULATE WITHOUT PERSISTING ==========
+    if (isDemoMode) {
+      console.log('🎭 DEMO MODE: Simulating employee creation without database persistence');
+      
+      // Simulate processing delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      const mockEmployee = {
+        id: `demo-${Date.now()}`,
+        cedula: data.document_number,
+        tipoDocumento: data.document_type,
+        nombre: data.first_name,
+        apellido: data.last_name,
+        salarioBase: Number(data.salary),
+        tipoContrato: data.contract_type,
+        fechaIngreso: data.start_date,
+        periodicidadPago: data.payment_frequency,
+        estado: 'activo'
+      };
+      
+      console.log('✅ Demo employee created:', mockEmployee);
+      
+      return {
+        success: true,
+        employeeId: mockEmployee.id,
+        employeeName: `${mockEmployee.nombre} ${mockEmployee.apellido}`,
+        data: mockEmployee,
+        isDemo: true
+      };
+    }
+
+    // ========== REAL MODE: PERSIST TO DATABASE ==========
     const { EmployeeCRUDService } = await import('@/services/EmployeeCRUDService');
     
     // Map flow data to EmployeeCRUDService format
@@ -468,18 +510,19 @@ export class GuidedFlowManager {
       arl: data.arl_input || undefined
     };
     
-    console.log('📤 Creating employee with data:', employeeData);
+    console.log('📤 Creating real employee with data:', employeeData);
     
     // Call CRUD service
     const createdEmployee = await EmployeeCRUDService.create(employeeData);
     
-    console.log('✅ Employee created:', createdEmployee);
+    console.log('✅ Real employee created:', createdEmployee);
     
     return {
       success: true,
       employeeId: createdEmployee.id,
       employeeName: `${createdEmployee.nombre} ${createdEmployee.apellido}`,
-      data: createdEmployee
+      data: createdEmployee,
+      isDemo: false
     };
   }
 
@@ -857,6 +900,174 @@ export class GuidedFlowManager {
     } catch (error: any) {
       console.error('❌ [DEMO] Liquidation failed:', error);
       throw new Error(error.message || 'Error ejecutando demo de liquidación');
+    }
+  }
+
+  /**
+   * Execute onboarding complete flow - unified employee creation + payroll calculation
+   */
+  private async executeOnboardingComplete(flowState: FlowState): Promise<any> {
+    const { currentStep, accumulatedData } = flowState;
+    console.log(`🎯 [ONBOARDING] Executing step: ${currentStep}`, accumulatedData);
+
+    try {
+      // ========== CALCULATING PAYROLL ==========
+      if (currentStep === 'calculating_payroll') {
+        const { PayrollCalculationSimple } = await import('@/services/PayrollCalculationSimple');
+        
+        const calculationInput = {
+          salarioBase: Number(accumulatedData.salary),
+          diasTrabajados: Number(accumulatedData.worked_days_input) || 30,
+          year: new Date().getFullYear().toString()
+        };
+        
+        const result = PayrollCalculationSimple.calculate(calculationInput);
+        
+        console.log('✅ [ONBOARDING] Payroll calculated:', result);
+        
+        // Store result for next steps
+        accumulatedData._payroll_calculation = result;
+        
+        return {
+          success: true,
+          calculationResult: result
+        };
+      }
+
+      // ========== GENERATING PDF ==========
+      if (currentStep === 'generating_pdf') {
+        const { supabase } = await import('@/integrations/supabase/client');
+        
+        const calcResult = accumulatedData._payroll_calculation;
+        if (!calcResult) {
+          throw new Error('No calculation result found');
+        }
+
+        // Get user company info
+        const { data: { user } } = await supabase.auth.getUser();
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('company_id')
+          .eq('user_id', user?.id)
+          .single();
+        
+        const { data: company } = await supabase
+          .from('companies')
+          .select('*')
+          .eq('id', profile?.company_id)
+          .single();
+
+        // Generate PDF
+        const { data: pdfResult, error } = await supabase.functions.invoke('generate-voucher-pdf', {
+          body: {
+            isDemo: true,
+            employee: {
+              nombre: accumulatedData.first_name,
+              apellido: accumulatedData.last_name,
+              cedula: accumulatedData.document_number,
+              tipo_documento: accumulatedData.document_type,
+              cargo: 'Empleado Demo',
+              salario_base: calcResult.salarioBase,
+              auxilio_transporte: calcResult.auxilioTransporte,
+              total_devengado: calcResult.totalDevengado,
+              salud_empleado: calcResult.saludEmpleado,
+              pension_empleado: calcResult.pensionEmpleado,
+              total_deducciones: calcResult.totalDeducciones,
+              neto_pagado: calcResult.netoPagar
+            },
+            period: {
+              startDate: accumulatedData.start_date || new Date().toISOString().split('T')[0],
+              endDate: accumulatedData.start_date || new Date().toISOString().split('T')[0],
+              type: 'Demo'
+            },
+            companyInfo: company || {
+              razon_social: 'Empresa Demo',
+              nit: '900000000-0',
+              email: 'demo@empresa.com'
+            }
+          }
+        });
+
+        if (error) {
+          console.error('❌ [ONBOARDING] PDF generation failed:', error);
+          throw new Error('Error generando PDF');
+        }
+
+        console.log('📄 [ONBOARDING] PDF generated');
+        
+        // Store PDF for email/download
+        accumulatedData._pdf_base64 = pdfResult?.pdfBase64;
+
+        return {
+          success: true,
+          pdfGenerated: true
+        };
+      }
+
+      // ========== SENDING EMAIL ==========
+      if (currentStep === 'sending_email') {
+        const { supabase } = await import('@/integrations/supabase/client');
+        
+        const pdfBase64 = accumulatedData._pdf_base64;
+        const calcResult = accumulatedData._payroll_calculation;
+        
+        if (!pdfBase64) {
+          throw new Error('No PDF found to send');
+        }
+
+        const { data, error } = await supabase.functions.invoke('send-demo-payroll-email', {
+          body: {
+            userEmail: accumulatedData.email_input,
+            employeeName: `${accumulatedData.first_name} ${accumulatedData.last_name}`,
+            pdfBase64: pdfBase64,
+            period: `Demo - ${new Date().toLocaleDateString('es-CO')}`,
+            netPay: calcResult?.netoPagar || 0
+          }
+        });
+
+        if (error) {
+          console.error('❌ [ONBOARDING] Email send failed:', error);
+          throw new Error('Error enviando email');
+        }
+
+        console.log('✅ [ONBOARDING] Email sent successfully');
+
+        return {
+          success: true,
+          emailSent: true
+        };
+      }
+
+      // ========== DOWNLOADING PDF ==========
+      if (currentStep === 'downloading_pdf') {
+        const pdfBase64 = accumulatedData._pdf_base64;
+        
+        if (!pdfBase64) {
+          throw new Error('No PDF found to download');
+        }
+
+        // Trigger browser download
+        const link = document.createElement('a');
+        link.href = `data:application/pdf;base64,${pdfBase64}`;
+        link.download = `comprobante-demo-${accumulatedData.first_name}-${accumulatedData.last_name}.pdf`;
+        link.click();
+
+        console.log('💾 [ONBOARDING] PDF download triggered');
+
+        return {
+          success: true,
+          pdfDownloaded: true
+        };
+      }
+
+      return {
+        success: true,
+        message: 'Step executed'
+      };
+
+    } catch (error: any) {
+      console.error('❌ [ONBOARDING] Execution error:', error);
+      throw new Error(error.message || 'Error en el onboarding');
     }
   }
 
