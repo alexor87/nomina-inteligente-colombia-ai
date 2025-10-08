@@ -50,8 +50,9 @@ export class MayaReportService {
       // 4. Enriquecer con insights de AI
       const aiResult = await this.enhanceWithAI(reportData, {
         ...request,
-        periodId: periodResolution.periodId,
-        period: periodResolution.periodName
+        // Para reportes anuales, enviar el period original para que el backend lo detecte
+        periodId: periodResolution.isYearlyReport ? undefined : periodResolution.periodId,
+        period: periodResolution.isYearlyReport ? request.period : periodResolution.periodName
       });
       
       console.log('✅ [MayaReportService] Reporte generado exitosamente');
