@@ -264,14 +264,9 @@ Ahora voy a calcular la nómina de **${data.first_name}** usando el motor de cá
       },
       quickReplies: [
         { label: '📄 Generar comprobante PDF', value: 'generate_pdf' },
-        { label: '🎯 ¿Y si contrato más gente?', value: 'simulate' },
         { label: '🔄 Recalcular', value: 'recalculate' }
       ],
-      nextStep: (data, input) => {
-        if (input === 'recalculate') return 'worked_days_input';
-        if (input === 'simulate') return 'mini_simulator_intro';
-        return 'generating_pdf';
-      },
+      nextStep: (data, input) => input === 'recalculate' ? 'worked_days_input' : 'generating_pdf',
       canGoBack: false
     },
 
@@ -285,20 +280,20 @@ Ahora voy a calcular la nómina de **${data.first_name}** usando el motor de cá
         
         return `🎯 **Simulador What-If**
 
-Voy a mostrarte el poder predictivo de MAYA.
+Ya viste cómo liquidar un empleado. Ahora quiero mostrarte el **poder predictivo** de MAYA.
 
 📊 **Escenario:**
-Contratar 2 empleados adicionales con el mismo perfil de ${data.first_name}:
+¿Qué pasaría si contratas 2 empleados más con el perfil de ${data.first_name}?
 • Salario: $${fmt(currentSalary)}
 • Contrato: ${data.contract_type || 'Indefinido'}
 
 ¿Quieres ver el impacto financiero?`;
       },
       quickReplies: [
-        { label: '✅ Sí, simular', value: 'confirm' },
-        { label: '⏭️ Saltar simulación', value: 'skip' }
+        { label: '✅ Sí, ver simulación', value: 'confirm' },
+        { label: '⏭️ Saltar al final', value: 'skip' }
       ],
-      nextStep: (data, input) => input === 'skip' ? 'generating_pdf' : 'mini_simulator_execution',
+      nextStep: (data, input) => input === 'skip' ? 'demo_completed' : 'mini_simulator_execution',
       canGoBack: true
     },
 
@@ -360,15 +355,21 @@ Contratar 2 empleados adicionales con el mismo perfil de ${data.first_name}:
 ¡Esto es solo una muestra del poder de MAYA! 🚀`;
       },
       quickReplies: [
-        { label: '📄 Generar comprobante', value: 'continue_pdf' },
-        { label: '🏠 Ir al dashboard', value: 'go_dashboard' }
+        { label: '✅ Crear empleado real', value: 'create_employee' },
+        { label: '🏠 Ir al dashboard', value: 'go_dashboard' },
+        { label: '🔄 Reiniciar demo', value: 'restart' }
       ],
       nextStep: (data, input) => {
+        if (input === 'create_employee') {
+          data._navigate_url = '/employees?action=new';
+          return 'completed';
+        }
         if (input === 'go_dashboard') {
           data._navigate_url = '/dashboard';
           return 'completed';
         }
-        return 'generating_pdf';
+        if (input === 'restart') return 'welcome';
+        return 'completed';
       },
       canGoBack: false
     },
@@ -410,15 +411,11 @@ Contratar 2 empleados adicionales con el mismo perfil de ${data.first_name}:
       },
       quickReplies: [
         { label: '📧 Enviar por email', value: 'send_email' },
-        { label: '💾 Descargar PDF', value: 'download_pdf' },
-        { label: '✅ Registrar empleado real', value: 'register_real' },
-        { label: '🔄 Nueva demo', value: 'restart' }
+        { label: '💾 Descargar PDF', value: 'download_pdf' }
       ],
       nextStep: (data, input) => {
         if (input === 'send_email') return 'email_input';
         if (input === 'download_pdf') return 'downloading_pdf';
-        if (input === 'register_real') return 'transition_to_real';
-        if (input === 'restart') return 'welcome';
         return 'completed';
       },
       canGoBack: false
@@ -456,21 +453,11 @@ Preparando comprobante para envío...`,
 
 El comprobante ha sido enviado a **${data.email_input}**
 
-Revisa tu bandeja de entrada (y spam si no lo ves).`,
+Ahora déjame mostrarte algo más...`,
       quickReplies: [
-        { label: '✅ Registrar empleado real', value: 'register_real' },
-        { label: '🔄 Nueva demo', value: 'restart' },
-        { label: '🏠 Ir al sistema', value: 'go_home' }
+        { label: '➡️ Continuar', value: 'continue' }
       ],
-      nextStep: (data, input) => {
-        if (input === 'register_real') return 'transition_to_real';
-        if (input === 'restart') return 'welcome';
-        if (input === 'go_home') {
-          data._navigate_url = '/dashboard';
-          return 'completed';
-        }
-        return 'completed';
-      },
+      nextStep: 'mini_simulator_intro',
       canGoBack: false
     },
 
@@ -486,19 +473,36 @@ Revisa tu bandeja de entrada (y spam si no lo ves).`,
     pdf_downloaded: {
       id: 'pdf_downloaded',
       type: FlowStepType.RESULT,
-      message: '✅ **PDF descargado**\n\nEl comprobante se guardó en tu carpeta de descargas.',
+      message: '✅ **PDF descargado**\n\nEl comprobante se guardó en tu carpeta de descargas.\n\nAhora déjame mostrarte algo más...',
       quickReplies: [
-        { label: '✅ Registrar empleado real', value: 'register_real' },
-        { label: '🔄 Nueva demo', value: 'restart' },
-        { label: '🏠 Ir al sistema', value: 'go_home' }
+        { label: '➡️ Continuar', value: 'continue' }
+      ],
+      nextStep: 'mini_simulator_intro',
+      canGoBack: false
+    },
+
+    // =========== DEMO COMPLETADO (SKIP SIMULATOR) ===========
+    demo_completed: {
+      id: 'demo_completed',
+      type: FlowStepType.RESULT,
+      message: `✨ **¡Demo completado!**
+
+Has visto las capacidades principales de MAYA:
+✅ Creación de empleados
+✅ Liquidación de nómina en tiempo real
+✅ Generación de comprobantes
+
+¿Qué quieres hacer ahora?`,
+      quickReplies: [
+        { label: '✅ Crear empleado real', value: 'create_employee' },
+        { label: '🏠 Ir al dashboard', value: 'go_dashboard' }
       ],
       nextStep: (data, input) => {
-        if (input === 'register_real') return 'transition_to_real';
-        if (input === 'restart') return 'welcome';
-        if (input === 'go_home') {
-          data._navigate_url = '/dashboard';
+        if (input === 'create_employee') {
+          data._navigate_url = '/employees?action=new';
           return 'completed';
         }
+        data._navigate_url = '/dashboard';
         return 'completed';
       },
       canGoBack: false
