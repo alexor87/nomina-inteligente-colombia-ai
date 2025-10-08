@@ -1359,7 +1359,7 @@ serve(async (req) => {
             {
               id: `save_email_${employee.id}_${Date.now()}`,
               type: 'confirm',
-              label: '✅ Sí, guardar',
+              label: 'Sí, guardar',
               description: 'Guardar email en perfil del empleado',
               parameters: { employeeId: employee.id, email: providedEmail },
               requiresConfirmation: false,
@@ -1368,7 +1368,7 @@ serve(async (req) => {
             {
               id: `cancel_save_${Date.now()}`,
               type: 'cancel',
-              label: '❌ No, solo enviar',
+              label: 'No, solo enviar',
               description: 'No guardar el email',
               parameters: {},
               requiresConfirmation: false,
@@ -1379,7 +1379,7 @@ serve(async (req) => {
             {
               id: `save_email_${employee.id}_${Date.now()}`,
               type: 'confirm',
-              label: '✅ Sí, guardar',
+              label: 'Sí, guardar',
               description: 'Guardar email en perfil del empleado',
               parameters: { employeeId: employee.id, email: providedEmail },
               requiresConfirmation: false,
@@ -1388,7 +1388,7 @@ serve(async (req) => {
             {
               id: `cancel_save_${Date.now()}`,
               type: 'cancel',
-              label: '❌ No, solo enviar',
+              label: 'No, solo enviar',
               description: 'No guardar el email',
               parameters: {},
               requiresConfirmation: false,

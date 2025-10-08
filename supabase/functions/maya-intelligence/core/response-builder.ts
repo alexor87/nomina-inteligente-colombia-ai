@@ -220,7 +220,7 @@ export class ResponseBuilder {
     return {
       id: `send_voucher_${employeeId}_${periodId}_${Date.now()}`,
       type: 'send_voucher',
-      label: isPrimary ? `📄 ${periodName} (sugerido)` : `📄 ${periodName}`,
+      label: isPrimary ? `${periodName} (sugerido)` : periodName,
       description: `Generar desprendible para ${periodName}`,
       parameters: {
         employeeId,
@@ -237,7 +237,7 @@ export class ResponseBuilder {
     return {
       id: `expand_periods_${employeeId}_${Date.now()}`,
       type: 'expand_periods',
-      label: '📅 Ver más períodos',
+      label: 'Ver más períodos',
       description: `Mostrar períodos adicionales para ${employeeName}`,
       parameters: {
         employeeId,
@@ -347,7 +347,7 @@ export class ResponseBuilder {
     return {
       id: `confirm_send_voucher_${employeeId}_${Date.now()}`,
       type: 'confirm_send_voucher',
-      label: `✅ Sí, enviar a ${email}`,
+      label: `Sí, enviar a ${email}`,
       description: `Enviar comprobante${periodName ? ` del ${periodName}` : ''} al email ${email}`,
       parameters: {
         employeeId,

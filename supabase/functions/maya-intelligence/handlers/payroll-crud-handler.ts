@@ -42,7 +42,7 @@ export class PayrollCrudHandler extends BaseHandler {
     const previewAction: ExecutableAction = {
       id: `preview_payroll_${Date.now()}`,
       type: 'preview_payroll',
-      label: `📊 Calcular y Previsualizar: ${periodName}`,
+      label: `Calcular y Previsualizar: ${periodName}`,
       description: `Cargar empleados y calcular valores (mismo cálculo que manual)`,
       parameters: {
         periodName: periodName,
@@ -55,7 +55,7 @@ export class PayrollCrudHandler extends BaseHandler {
     const liquidateAction: ExecutableAction = {
       id: `liquidate_payroll_complete_${Date.now()}`,
       type: 'liquidate_payroll_complete',
-      label: `💰 Liquidar Completo: ${periodName}`,
+      label: `Liquidar Completo: ${periodName}`,
       description: `Ejecutar liquidación completa (PayrollLiquidationService.liquidatePayroll)`,
       parameters: {
         periodName: periodName,
