@@ -47,6 +47,7 @@ export const MayaHistorySidebar: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const prevDeletingRef = useRef(isDeleting);
   const isDeletingRef = useRef(false);
+  const justDeletedRef = useRef(false);
  
   // Diagnostics: log overlay mount/unmount
   useEffect(() => {
@@ -84,6 +85,11 @@ export const MayaHistorySidebar: React.FC = () => {
   // ⚡ Recargar conversaciones cuando cambia currentConversationId (pero no durante eliminación)
   useEffect(() => {
     if (!isDeleting && currentConversationId) {
+      // Skip reload si acabamos de eliminar (ya se hizo manual)
+      if (justDeletedRef.current) {
+        justDeletedRef.current = false;
+        return;
+      }
       loadConversations();
       loadArchivedConversations();
     }
@@ -212,10 +218,10 @@ export const MayaHistorySidebar: React.FC = () => {
       return;
     }
     isDeletingRef.current = true;
-    setIsDeleting(true);
-    await new Promise((res) => setTimeout(res, 120));
     
     try {
+      setIsDeleting(true);
+      
       // 1. Validar que existe una conversación para eliminar
       if (!id) {
         throw new Error('ID de conversación inválido');
@@ -234,6 +240,9 @@ export const MayaHistorySidebar: React.FC = () => {
           // Continuar aunque falle la limpieza
         }
       }
+      
+      // Marcar que acabamos de eliminar para evitar recarga duplicada
+      justDeletedRef.current = true;
       
       // 4. Recargar lista de conversaciones una sola vez
       try {
@@ -257,10 +266,14 @@ export const MayaHistorySidebar: React.FC = () => {
       setIsDeleting(false);
       isDeletingRef.current = false;
       
-      // Failsafe: cerrar cualquier overlay residual de Radix
-      try {
-        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-      } catch {}
+      // Solo dispatch Escape si estamos en mobile con overlay visible
+      if (isMobile && !collapsed) {
+        try {
+          requestAnimationFrame(() => {
+            document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+          });
+        } catch {}
+      }
       
       // En mobile, colapsar el sidebar después de eliminar
       if (isMobile) {

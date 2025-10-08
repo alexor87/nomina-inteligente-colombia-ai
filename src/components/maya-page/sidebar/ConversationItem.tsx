@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Edit2, Archive, Trash2, ArchiveRestore, MoreHorizontal } from 'lucide-react';
+import { Edit2, Archive, Trash2, ArchiveRestore, MoreHorizontal, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +22,7 @@ interface ConversationItemProps {
   onDelete: () => void;
   mode?: 'active' | 'archived';
   onUnarchive?: (id: string) => Promise<void>;
+  isDeleting?: boolean;
 }
 
 export const ConversationItem: React.FC<ConversationItemProps> = ({
@@ -32,7 +33,8 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
   onArchive,
   onDelete,
   mode = 'active',
-  onUnarchive
+  onUnarchive,
+  isDeleting = false
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -118,9 +120,14 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
                         onSelect={() => onDelete()}
+                        disabled={isDeleting}
                         className="text-destructive focus:text-destructive"
                       >
-                        <Trash2 className="h-4 w-4 mr-2" />
+                        {isDeleting ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4 mr-2" />
+                        )}
                         Eliminar
                       </DropdownMenuItem>
                     </>
@@ -141,9 +148,14 @@ export const ConversationItem: React.FC<ConversationItemProps> = ({
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
                         onSelect={() => onDelete()}
+                        disabled={isDeleting}
                         className="text-destructive focus:text-destructive"
                       >
-                        <Trash2 className="h-4 w-4 mr-2" />
+                        {isDeleting ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4 mr-2" />
+                        )}
                         Eliminar
                       </DropdownMenuItem>
                     </>

@@ -35,6 +35,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
   const [filteredConversations, setFilteredConversations] = useState(conversations);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [pendingConversation, setPendingConversation] = useState<ConversationSummary | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (searchQuery.trim()) {
@@ -79,11 +80,17 @@ export const ConversationList: React.FC<ConversationListProps> = ({
     setDeleteDialogOpen(true);
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!pendingConversation) return;
     const id = pendingConversation.id;
-    setPendingConversation(null);
-    void onDeleteConversation(id);
+    
+    try {
+      setIsDeleting(true);
+      await onDeleteConversation(id);
+    } finally {
+      setPendingConversation(null);
+      setIsDeleting(false);
+    }
   };
 
   return (
@@ -109,6 +116,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
                   onDelete={() => handleDeleteRequest(conversation)}
                   mode={mode}
                   onUnarchive={onUnarchiveConversation}
+                  isDeleting={isDeleting}
                 />
               ))}
             </ConversationGroupSection>

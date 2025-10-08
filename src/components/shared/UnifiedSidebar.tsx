@@ -51,6 +51,7 @@ export const UnifiedSidebar: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const prevDeletingRef = useRef(isDeleting);
   const isDeletingRef = useRef(false);
+  const justDeletedRef = useRef(false);
 
   // Diagnostics: log overlay mount/unmount
   useEffect(() => {
@@ -88,6 +89,11 @@ export const UnifiedSidebar: React.FC = () => {
   // ⚡ Recargar conversaciones cuando cambia currentConversationId (pero no durante eliminación)
   useEffect(() => {
     if (!isDeleting && currentConversationId && user?.id && companyId) {
+      // Skip reload si acabamos de eliminar (ya se hizo manual)
+      if (justDeletedRef.current) {
+        justDeletedRef.current = false;
+        return;
+      }
       loadConversations();
       loadArchivedConversations();
     }
@@ -219,14 +225,17 @@ export const UnifiedSidebar: React.FC = () => {
     
     try {
       setIsDeleting(true);
-      await new Promise((res) => setTimeout(res, 120));
       
       await conversationManager.deleteConversation(id);
+      
       // Si es la conversación actual, limpiar el ID y el estado SIN generar mensaje
       if (id === currentConversationId) {
         conversationManager.clearCurrentConversationId();
         await clearConversation(true);
       }
+      
+      // Marcar que acabamos de eliminar para evitar recarga duplicada
+      justDeletedRef.current = true;
       
       // Cargar conversaciones UNA SOLA VEZ
       await loadConversations();
@@ -240,10 +249,14 @@ export const UnifiedSidebar: React.FC = () => {
       setIsDeleting(false);
       isDeletingRef.current = false;
       
-      // Failsafe: cerrar cualquier overlay residual de Radix
-      try {
-        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-      } catch {}
+      // Solo dispatch Escape si estamos en mobile con overlay visible
+      if (isMobile && !collapsed) {
+        try {
+          requestAnimationFrame(() => {
+            document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+          });
+        } catch {}
+      }
       
       if (isMobile) {
         setCollapsed(true);
