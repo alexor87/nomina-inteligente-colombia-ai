@@ -39,10 +39,13 @@ export interface MayaReportResult {
 export interface PeriodResolution {
   periodId: string;
   periodName: string;
+  periodIds?: string[]; // NUEVO: Lista de IDs para reportes anuales
+  isYearlyReport?: boolean; // NUEVO: Marca si es reporte anual
 }
 
 export interface ReportFilters {
   periodId?: string;
+  periodIds?: string[]; // NUEVO: Lista de IDs para reportes anuales
   employeeIds?: string[];
   costCenters?: string[];
   contractTypes?: string[];

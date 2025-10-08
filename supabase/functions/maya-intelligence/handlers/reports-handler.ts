@@ -122,7 +122,89 @@ export class ReportsHandler {
   ): Promise<ReportData> {
     console.log('[ReportsHandler] fetchReportData called with:', { reportType, periodOrId, companyId });
     
-    // Resolver período por ID o nombre
+    // NUEVO: Detectar si es solicitud de año completo
+    const isYearRequest = periodOrId === 'current_year' || 
+                          periodOrId === 'last_year' || 
+                          /^\d{4}$/.test(periodOrId);
+    
+    if (isYearRequest) {
+      // Determinar año
+      const year = periodOrId === 'current_year' ? new Date().getFullYear() :
+                   periodOrId === 'last_year' ? new Date().getFullYear() - 1 :
+                   parseInt(periodOrId);
+      
+      console.log('[ReportsHandler] Fetching yearly data for:', year);
+      
+      // Obtener todos los períodos cerrados del año
+      const { data: yearPeriods, error: periodsError } = await supabaseClient
+        .from('payroll_periods_real')
+        .select('id, periodo')
+        .eq('company_id', companyId)
+        .eq('estado', 'cerrado')
+        .gte('fecha_inicio', `${year}-01-01`)
+        .lt('fecha_inicio', `${year + 1}-01-01`)
+        .order('fecha_inicio', { ascending: true });
+      
+      if (periodsError) {
+        console.error('[ReportsHandler] Error fetching year periods:', periodsError);
+        throw periodsError;
+      }
+      
+      if (!yearPeriods || yearPeriods.length === 0) {
+        throw new Error(`No se encontraron períodos cerrados para el año ${year}`);
+      }
+      
+      console.log('[ReportsHandler] Found', yearPeriods.length, 'periods for year', year);
+      
+      // Obtener datos de todos los períodos del año
+      const allPayrollData: any[] = [];
+      
+      for (const period of yearPeriods) {
+        let query = supabaseClient
+          .from('payrolls')
+          .select(`
+            *,
+            employee:employees(id, nombre, apellido, centro_costos, tipo_contrato)
+          `)
+          .eq('company_id', companyId)
+          .eq('period_id', period.id);
+        
+        // Aplicar filtros
+        if (filters?.employeeIds && filters.employeeIds.length > 0) {
+          query = query.in('employee_id', filters.employeeIds);
+        }
+        
+        const { data, error } = await query;
+        
+        if (error) {
+          console.error('[ReportsHandler] Error fetching period data:', error);
+          continue; // Saltar período con error
+        }
+        
+        if (data) {
+          allPayrollData.push(...data);
+        }
+      }
+      
+      console.log('[ReportsHandler] Total records aggregated:', allPayrollData.length);
+      
+      // Calcular summary agregado
+      const totalAmount = allPayrollData.reduce((sum, r) => sum + (r.neto_pagado || 0), 0);
+      const averageAmount = allPayrollData.length > 0 ? totalAmount / allPayrollData.length : 0;
+      
+      return {
+        type: reportType,
+        period: `Año ${year}`,
+        data: allPayrollData,
+        summary: {
+          totalRecords: allPayrollData.length,
+          totalAmount,
+          averageAmount
+        }
+      };
+    }
+    
+    // CÓDIGO ORIGINAL: Resolver período único por ID o nombre
     let periodData;
     if (this.looksLikeUUID(periodOrId)) {
       console.log('[ReportsHandler] Resolving period by UUID:', periodOrId);
@@ -214,7 +296,55 @@ export class ReportsHandler {
     try {
       console.log('[ReportsHandler] Fetching previous period data for:', currentPeriodOrId);
       
-      // Resolver período actual por ID o nombre
+      // NUEVO: Si es reporte anual, obtener año anterior completo
+      const isYearRequest = currentPeriodOrId === 'current_year' || 
+                            currentPeriodOrId === 'last_year' || 
+                            /^\d{4}$/.test(currentPeriodOrId);
+      
+      if (isYearRequest) {
+        const currentYear = currentPeriodOrId === 'current_year' ? new Date().getFullYear() :
+                            currentPeriodOrId === 'last_year' ? new Date().getFullYear() - 1 :
+                            parseInt(currentPeriodOrId);
+        const previousYear = currentYear - 1;
+        
+        console.log('[ReportsHandler] Fetching previous year data:', previousYear);
+        
+        // Obtener todos los períodos cerrados del año anterior
+        const { data: previousYearPeriods } = await supabaseClient
+          .from('payroll_periods_real')
+          .select('id')
+          .eq('company_id', companyId)
+          .eq('estado', 'cerrado')
+          .gte('fecha_inicio', `${previousYear}-01-01`)
+          .lt('fecha_inicio', `${previousYear + 1}-01-01`);
+        
+        if (!previousYearPeriods || previousYearPeriods.length === 0) {
+          console.log('[ReportsHandler] No previous year periods found');
+          return undefined;
+        }
+        
+        console.log('[ReportsHandler] Found', previousYearPeriods.length, 'periods for previous year', previousYear);
+        
+        // Obtener datos de todos los períodos del año anterior
+        const allPreviousData: any[] = [];
+        
+        for (const period of previousYearPeriods) {
+          const { data } = await supabaseClient
+            .from('payrolls')
+            .select('neto_pagado, employee_id')
+            .eq('company_id', companyId)
+            .eq('period_id', period.id);
+          
+          if (data) {
+            allPreviousData.push(...data);
+          }
+        }
+        
+        console.log('[ReportsHandler] Previous year total records:', allPreviousData.length);
+        return allPreviousData;
+      }
+      
+      // CÓDIGO ORIGINAL: Resolver período actual por ID o nombre
       let currentPeriodData;
       if (this.looksLikeUUID(currentPeriodOrId)) {
         const { data } = await supabaseClient
