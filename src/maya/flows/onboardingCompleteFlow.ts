@@ -194,34 +194,26 @@ Esto es solo una **demostración** - nada se guardará en tu cuenta aún.
         { label: '✅ Continuar', value: 'continue' },
         { label: '✏️ Editar', value: 'edit' }
       ],
-      nextStep: (data, input) => input === 'edit' ? 'first_name' : 'payroll_intro',
+      nextStep: (data, input) => input === 'edit' ? 'first_name' : 'worked_days_input',
       canGoBack: true
     },
 
     // =========== LIQUIDACIÓN DE NÓMINA ===========
-    payroll_intro: {
-      id: 'payroll_intro',
-      type: FlowStepType.GREETING,
+    worked_days_input: {
+      id: 'worked_days_input',
+      type: FlowStepType.INPUT,
       message: (data) => `💰 **Paso 2: Liquidar nómina**
 
 Ahora voy a calcular la nómina de **${data.first_name}** usando el motor de cálculo real del sistema.
 
 ¿Para cuántos días trabajados?`,
+      inputPlaceholder: '30',
+      inputType: 'number',
       quickReplies: [
         { label: '📅 30 días (mes completo)', value: '30' },
         { label: '📆 15 días (quincena)', value: '15' },
-        { label: '✏️ Otro', value: 'custom' }
+        { label: '✏️ Otro valor', value: '' }
       ],
-      nextStep: 'worked_days_input',
-      canGoBack: true
-    },
-
-    worked_days_input: {
-      id: 'worked_days_input',
-      type: FlowStepType.INPUT,
-      message: '¿Cuántos días trabajó en el período?',
-      inputPlaceholder: '30',
-      inputType: 'number',
       validationRules: [
         { type: 'required', message: 'Días requeridos' },
         { type: 'min', value: 1, message: 'Mínimo 1 día' },

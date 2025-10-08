@@ -915,11 +915,19 @@ export class GuidedFlowManager {
       if (currentStep === 'calculating_payroll') {
         const { PayrollCalculationSimple } = await import('@/services/PayrollCalculationSimple');
         
+        console.log('🔍 [DEBUG] Accumulated data:', {
+          salary: accumulatedData.salary,
+          worked_days_input: accumulatedData.worked_days_input,
+          allData: accumulatedData
+        });
+        
         const calculationInput = {
           salarioBase: Number(accumulatedData.salary),
           diasTrabajados: Number(accumulatedData.worked_days_input) || 30,
           year: new Date().getFullYear().toString()
         };
+        
+        console.log('🔍 [DEBUG] Calculation input:', calculationInput);
         
         const result = PayrollCalculationSimple.calculate(calculationInput);
         
