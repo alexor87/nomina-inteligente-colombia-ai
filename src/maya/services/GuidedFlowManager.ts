@@ -326,6 +326,15 @@ export class GuidedFlowManager {
         case FlowType.PAYROLL_CALCULATE:
           return await this.executePayrollCalculation(flowState.accumulatedData);
         
+        case FlowType.REPORTS_GENERATE:
+          return await this.executeReportGeneration(flowState.accumulatedData);
+        
+        case FlowType.WHAT_IF_SIMULATION:
+          return await this.executeWhatIfSimulation(flowState.accumulatedData);
+        
+        case FlowType.PROACTIVE_SCAN:
+          return await this.executeProactiveScan(flowState.accumulatedData);
+        
         default:
           throw new Error(`No executor for flow type: ${flowState.flowId}`);
       }
@@ -570,6 +579,194 @@ export class GuidedFlowManager {
     } catch (error: any) {
       console.error('❌ [MAYA] Payroll calculation error:', error);
       throw new Error(error.message || 'Error al calcular la nómina');
+    }
+  }
+
+  private async executeReportGeneration(data: Record<string, any>): Promise<any> {
+    const { supabase } = await import('@/integrations/supabase/client');
+    
+    try {
+      console.log('📊 [MAYA] Generando reporte:', data.report_type);
+      
+      // Get current user's company
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuario no autenticado');
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!profile?.company_id) throw new Error('No se encontró la empresa del usuario');
+
+      // Build report request
+      const reportRequest = {
+        reportType: data.report_type,
+        period: data.period_name || data.periodo,
+        periodId: data.selected_period_id,
+        companyId: profile.company_id,
+        filters: {
+          employeeIds: data.employee_filters || [],
+          costCenters: data.cost_center_filters || [],
+          contractTypes: data.contract_type_filters || []
+        },
+        includeComparison: data.include_comparison === 'yes'
+      };
+
+      console.log('📤 [MAYA] Invocando maya-intelligence con reportRequest:', reportRequest);
+
+      // Call maya-intelligence edge function
+      const { data: reportResult, error } = await supabase.functions.invoke('maya-intelligence', {
+        body: {
+          message: `generate_report:${data.report_type}`,
+          reportRequest,
+          sessionId: `report-flow-${Date.now()}`
+        }
+      });
+
+      if (error) {
+        console.error('❌ [MAYA] Error generando reporte:', error);
+        throw new Error(`Error al generar el reporte: ${error.message}`);
+      }
+
+      console.log('✅ [MAYA] Reporte generado exitosamente');
+
+      return {
+        success: true,
+        reportType: data.report_type,
+        narrative: reportResult.narrative,
+        insights: reportResult.insights || [],
+        reportData: reportResult.data,
+        executableActions: reportResult.contextualActions || []
+      };
+
+    } catch (error: any) {
+      console.error('❌ [MAYA] Report generation error:', error);
+      throw new Error(error.message || 'Error al generar el reporte');
+    }
+  }
+
+  private async executeWhatIfSimulation(data: Record<string, any>): Promise<any> {
+    const { supabase } = await import('@/integrations/supabase/client');
+    
+    try {
+      console.log('🔮 [MAYA] Ejecutando simulación What-If:', data.scenario_type);
+      
+      // Get current user's company
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuario no autenticado');
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!profile?.company_id) throw new Error('No se encontró la empresa del usuario');
+
+      // Build simulation request
+      const simulationRequest = {
+        scenarioType: data.scenario_type,
+        companyId: profile.company_id,
+        currentPeriodId: data.selected_period_id,
+        parameters: {
+          newHires: data.new_hires_count ? Number(data.new_hires_count) : undefined,
+          averageSalary: data.average_salary ? Number(data.average_salary) : undefined,
+          percentageIncrease: data.percentage_increase ? Number(data.percentage_increase) : undefined,
+          affectedEmployees: data.affected_employees_count ? Number(data.affected_employees_count) : undefined,
+          overtimeHours: data.overtime_hours ? Number(data.overtime_hours) : undefined,
+          bonusAmount: data.bonus_amount ? Number(data.bonus_amount) : undefined,
+          months: data.projection_months ? Number(data.projection_months) : 12
+        }
+      };
+
+      console.log('📤 [MAYA] Invocando maya-intelligence con simulationRequest:', simulationRequest);
+
+      // Call maya-intelligence edge function
+      const { data: simulationResult, error } = await supabase.functions.invoke('maya-intelligence', {
+        body: {
+          message: `what_if_simulation:${data.scenario_type}`,
+          simulationRequest,
+          sessionId: `simulation-flow-${Date.now()}`
+        }
+      });
+
+      if (error) {
+        console.error('❌ [MAYA] Error en simulación:', error);
+        throw new Error(`Error al ejecutar la simulación: ${error.message}`);
+      }
+
+      console.log('✅ [MAYA] Simulación completada exitosamente');
+
+      return {
+        success: true,
+        scenarioType: data.scenario_type,
+        narrative: simulationResult.narrative,
+        simulationResult: simulationResult.data,
+        executableActions: simulationResult.contextualActions || []
+      };
+
+    } catch (error: any) {
+      console.error('❌ [MAYA] Simulation error:', error);
+      throw new Error(error.message || 'Error al ejecutar la simulación');
+    }
+  }
+
+  private async executeProactiveScan(data: Record<string, any>): Promise<any> {
+    const { supabase } = await import('@/integrations/supabase/client');
+    
+    try {
+      console.log('🔍 [MAYA] Ejecutando escaneo proactivo');
+      
+      // Get current user's company
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuario no autenticado');
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!profile?.company_id) throw new Error('No se encontró la empresa del usuario');
+
+      // Build scan request
+      const scanRequest = {
+        companyId: profile.company_id,
+        scanTypes: data.scan_types || ['payroll_anomalies', 'compliance_issues', 'cost_opportunities'],
+        periodId: data.selected_period_id
+      };
+
+      console.log('📤 [MAYA] Invocando maya-intelligence con scanRequest:', scanRequest);
+
+      // Call maya-intelligence edge function
+      const { data: scanResult, error } = await supabase.functions.invoke('maya-intelligence', {
+        body: {
+          message: 'proactive_scan',
+          scanRequest,
+          sessionId: `scan-flow-${Date.now()}`
+        }
+      });
+
+      if (error) {
+        console.error('❌ [MAYA] Error en escaneo proactivo:', error);
+        throw new Error(`Error al ejecutar el escaneo: ${error.message}`);
+      }
+
+      console.log('✅ [MAYA] Escaneo proactivo completado');
+
+      return {
+        success: true,
+        narrative: scanResult.narrative,
+        alerts: scanResult.alerts || [],
+        proactiveAlerts: scanResult.data,
+        executableActions: scanResult.contextualActions || []
+      };
+
+    } catch (error: any) {
+      console.error('❌ [MAYA] Proactive scan error:', error);
+      throw new Error(error.message || 'Error al ejecutar el escaneo proactivo');
     }
   }
 
