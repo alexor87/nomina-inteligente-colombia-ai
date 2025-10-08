@@ -938,6 +938,24 @@ async function executeLiquidatePayrollCompleteAction(action: any) {
         .eq('id', actualPeriodId);
     }
 
+    // Step 7: Calculate social benefit provisions automatically
+    console.log(`[execute-maya-action] 💰 Calculating social benefit provisions for period ${actualPeriodId}...`);
+    try {
+      const { data: provisionData, error: provisionError } = await supabase.functions.invoke('provision-social-benefits', {
+        body: { period_id: actualPeriodId }
+      });
+
+      if (provisionError) {
+        console.warn(`[execute-maya-action] ⚠️ Provisions calculation warning: ${provisionError.message}`);
+      } else if (provisionData?.success) {
+        console.log(`[execute-maya-action] ✅ Provisions calculated: ${provisionData.provisions_created || 0} records created`);
+      } else {
+        console.warn(`[execute-maya-action] ⚠️ Provisions calculation returned no success flag`);
+      }
+    } catch (provisionErr) {
+      console.warn(`[execute-maya-action] ⚠️ Non-critical error calculating provisions: ${provisionErr.message}`);
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
