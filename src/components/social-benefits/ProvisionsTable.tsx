@@ -121,7 +121,7 @@ export const ProvisionsTable: React.FC<ProvisionsTableProps> = ({
             <Label htmlFor="period">Período</Label>
             <Select
               onValueChange={setPeriodId}
-              defaultValue={filters.periodId || ''}
+              value={filters.periodId || ''}
               disabled={loadingPeriods}
             >
               <SelectTrigger className="w-full">
@@ -141,7 +141,7 @@ export const ProvisionsTable: React.FC<ProvisionsTableProps> = ({
             <Label htmlFor="benefitType">Tipo de Beneficio</Label>
             <Select
               onValueChange={setBenefitType}
-              defaultValue={filters.benefitType}
+              value={filters.benefitType}
             >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Todos" />
