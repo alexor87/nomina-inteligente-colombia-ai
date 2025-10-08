@@ -264,9 +264,112 @@ Ahora voy a calcular la nómina de **${data.first_name}** usando el motor de cá
       },
       quickReplies: [
         { label: '📄 Generar comprobante PDF', value: 'generate_pdf' },
+        { label: '🎯 ¿Y si contrato más gente?', value: 'simulate' },
         { label: '🔄 Recalcular', value: 'recalculate' }
       ],
-      nextStep: (data, input) => input === 'recalculate' ? 'worked_days_input' : 'generating_pdf',
+      nextStep: (data, input) => {
+        if (input === 'recalculate') return 'worked_days_input';
+        if (input === 'simulate') return 'mini_simulator_intro';
+        return 'generating_pdf';
+      },
+      canGoBack: false
+    },
+
+    // =========== MINI WHAT-IF SIMULATOR ===========
+    mini_simulator_intro: {
+      id: 'mini_simulator_intro',
+      type: FlowStepType.GREETING,
+      message: (data) => {
+        const fmt = (n: any) => new Intl.NumberFormat('es-CO').format(Math.round(Number(n) || 0));
+        const currentSalary = data.salary || 1423500;
+        
+        return `🎯 **Simulador What-If**
+
+Voy a mostrarte el poder predictivo de MAYA.
+
+📊 **Escenario:**
+Contratar 2 empleados adicionales con el mismo perfil de ${data.first_name}:
+• Salario: $${fmt(currentSalary)}
+• Contrato: ${data.contract_type || 'Indefinido'}
+
+¿Quieres ver el impacto financiero?`;
+      },
+      quickReplies: [
+        { label: '✅ Sí, simular', value: 'confirm' },
+        { label: '⏭️ Saltar simulación', value: 'skip' }
+      ],
+      nextStep: (data, input) => input === 'skip' ? 'generating_pdf' : 'mini_simulator_execution',
+      canGoBack: true
+    },
+
+    mini_simulator_execution: {
+      id: 'mini_simulator_execution',
+      type: FlowStepType.EXECUTION,
+      message: `⚙️ **Simulando escenario...**
+
+🧮 Calculando costos adicionales
+📊 Proyectando seguridad social
+💰 Analizando impacto financiero
+📈 Generando proyección 3 meses`,
+      nextStep: 'mini_simulator_result',
+      canGoBack: false
+    },
+
+    mini_simulator_result: {
+      id: 'mini_simulator_result',
+      type: FlowStepType.RESULT,
+      message: (data) => {
+        const fmt = (n: any) => new Intl.NumberFormat('es-CO').format(Math.round(Number(n) || 0));
+        const salary = Number(data.salary) || 1423500;
+        
+        // Cálculos simplificados para el demo (2 empleados)
+        const salariesIncrease = salary * 2;
+        const transportAllowance = salary <= 2 * 1423500 ? 200000 * 2 : 0;
+        
+        // Seguridad Social Empresa (8.5% salud + 12% pensión + 0.522% ARL)
+        const socialSecurityEmployer = salariesIncrease * 0.21022;
+        
+        // Parafiscales (4% caja + 3% ICBF + 2% SENA)
+        const parafiscales = salariesIncrease * 0.09;
+        
+        // Prestaciones sociales mensuales (prima 8.33% + cesantías 8.33% + vacaciones 4.17%)
+        const provisions = salariesIncrease * 0.2083;
+        
+        const totalMonthlyIncrease = salariesIncrease + transportAllowance + socialSecurityEmployer + parafiscales + provisions;
+        const costPerEmployee = totalMonthlyIncrease / 2;
+        const percentageIncrease = ((totalMonthlyIncrease / (salary * 1.53)) * 100); // 1.53 es el factor de carga prestacional
+        
+        return `✅ **Simulación completada**
+
+📊 **Impacto de contratar 2 empleados más:**
+
+💰 **Costo Mensual Adicional:** $${fmt(totalMonthlyIncrease)}
+📈 **Incremento:** ${percentageIncrease.toFixed(1)}%
+
+💼 **Desglose:**
+• Salarios: $${fmt(salariesIncrease)}
+• Aux. Transporte: $${fmt(transportAllowance)}
+• Seg. Social: $${fmt(socialSecurityEmployer)}
+• Parafiscales: $${fmt(parafiscales)}
+• Prestaciones: $${fmt(provisions)}
+
+📅 **Proyección 3 meses:** $${fmt(totalMonthlyIncrease * 3)}
+
+💡 **Insight:** Cada empleado nuevo representa un costo mensual de aproximadamente $${fmt(costPerEmployee)} incluyendo todas las prestaciones.
+
+¡Esto es solo una muestra del poder de MAYA! 🚀`;
+      },
+      quickReplies: [
+        { label: '📄 Generar comprobante', value: 'continue_pdf' },
+        { label: '🏠 Ir al dashboard', value: 'go_dashboard' }
+      ],
+      nextStep: (data, input) => {
+        if (input === 'go_dashboard') {
+          data._navigate_url = '/dashboard';
+          return 'completed';
+        }
+        return 'generating_pdf';
+      },
       canGoBack: false
     },
 
