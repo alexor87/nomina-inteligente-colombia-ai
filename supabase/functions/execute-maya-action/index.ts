@@ -824,7 +824,7 @@ async function executeLiquidatePayrollCompleteAction(action: any) {
       console.log(`[execute-maya-action] 🧮 Calculating payroll for employee ${employee.id} with ${novedades?.length || 0} novedades`);
 
       // Call payroll-calculations edge function (normative backend)
-      const { data: calculation, error: calcError } = await supabase.functions.invoke('payroll-calculations', {
+      const { data: response, error: calcError } = await supabase.functions.invoke('payroll-calculations', {
         body: {
           action: 'calculate',
           data: {
@@ -846,9 +846,12 @@ async function executeLiquidatePayrollCompleteAction(action: any) {
         throw new Error(`Error en cálculo de empleado: ${calcError.message}`);
       }
 
-      if (!calculation) {
+      if (!response || !response.data) {
         throw new Error(`No se recibieron datos de cálculo para empleado ${employee.id}`);
       }
+
+      // Extract calculation data from response
+      const calculation = response.data;
 
       console.log(`[execute-maya-action] ✅ Calculated for employee ${employee.id} - Gross: ${calculation.grossPay}, Net: ${calculation.netPay}`);
 
