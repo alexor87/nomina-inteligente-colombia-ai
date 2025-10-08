@@ -74,6 +74,9 @@ export enum FlowType {
   PAYROLL_LIQUIDATE = 'PAYROLL_LIQUIDATE',
   VACATION_REGISTER = 'VACATION_REGISTER',
   DATABASE_QUERY = 'DATABASE_QUERY',
+  REPORTS_GENERATE = 'REPORTS_GENERATE',
+  WHAT_IF_SIMULATION = 'WHAT_IF_SIMULATION',
+  PROACTIVE_SCAN = 'PROACTIVE_SCAN',
 }
 
 /**
@@ -455,7 +458,10 @@ export class ConversationStateManager {
       [FlowType.VOUCHER_SEND]: [ConversationState.VOUCHER_READY],
       [FlowType.PAYROLL_LIQUIDATE]: [ConversationState.PAYROLL_LIQUIDATE_READY],
       [FlowType.VACATION_REGISTER]: [ConversationState.VACATION_REGISTER_READY],
-      [FlowType.DATABASE_QUERY]: [ConversationState.IDLE]
+      [FlowType.DATABASE_QUERY]: [ConversationState.IDLE],
+      [FlowType.REPORTS_GENERATE]: [ConversationState.IDLE],
+      [FlowType.WHAT_IF_SIMULATION]: [ConversationState.IDLE],
+      [FlowType.PROACTIVE_SCAN]: [ConversationState.IDLE]
     };
 
     return terminalStates[flowType]?.includes(state) ?? false;
@@ -473,7 +479,10 @@ export class ConversationStateManager {
       [FlowType.VOUCHER_SEND]: ConversationState.VOUCHER_START,
       [FlowType.PAYROLL_LIQUIDATE]: ConversationState.PAYROLL_LIQUIDATE_START,
       [FlowType.VACATION_REGISTER]: ConversationState.VACATION_REGISTER_START,
-      [FlowType.DATABASE_QUERY]: ConversationState.IDLE
+      [FlowType.DATABASE_QUERY]: ConversationState.IDLE,
+      [FlowType.REPORTS_GENERATE]: ConversationState.IDLE,
+      [FlowType.WHAT_IF_SIMULATION]: ConversationState.IDLE,
+      [FlowType.PROACTIVE_SCAN]: ConversationState.IDLE
     };
 
     return initialStates[flowType] ?? ConversationState.IDLE;

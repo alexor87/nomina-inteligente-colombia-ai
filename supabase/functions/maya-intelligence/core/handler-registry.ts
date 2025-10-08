@@ -10,6 +10,7 @@ import { EmployeeHandler } from '../handlers/employee-handler.ts';
 import { EmployeeCrudHandler } from '../handlers/employee-crud-handler.ts';
 import { PayrollCrudHandler } from '../handlers/payroll-crud-handler.ts';
 import { DatabaseQueryHandler } from '../handlers/database-query-handler.ts';
+import { ProactiveDetectionHandler } from '../handlers/proactive-detection-handler.ts';
 import { ResponseBuilder } from './response-builder.ts';
 
 export class HandlerRegistry {
@@ -30,8 +31,7 @@ export class HandlerRegistry {
       new EmployeeHandler(this.logger, openaiKey),
       new PayrollCrudHandler(this.logger, openaiKey),
       new DatabaseQueryHandler(this.logger, openaiKey, supabaseClient),
-      // Future handlers can be added here:
-      // new ReportHandler(this.logger, openaiKey),
+      new ProactiveDetectionHandler(this.logger, openaiKey, supabaseClient),
     ];
     
     this.logger.info('[HandlerRegistry] Initialized with handlers:', {
@@ -152,6 +152,7 @@ export class HandlerRegistry {
       'EmployeeCrudHandler': ['EMPLOYEE_CREATE', 'EMPLOYEE_UPDATE', 'EMPLOYEE_DELETE'],
       'PayrollCrudHandler': ['PAYROLL_LIQUIDATE', 'VACATION_REGISTER', 'ABSENCE_REGISTER'],
       'DatabaseQueryHandler': ['DATA_QUERY', 'ANALYTICS_REQUEST', 'REPORT_INSIGHTS', 'COMPARISON_ANALYSIS'],
+      'ProactiveDetectionHandler': ['PROACTIVE_SCAN'],
     };
     
     return capabilities[handler.constructor.name] || [];

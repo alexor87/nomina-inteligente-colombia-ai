@@ -406,7 +406,10 @@ export class StateResponseBuilder {
       [FlowType.VOUCHER_SEND]: 'envío de comprobante',
       [FlowType.PAYROLL_LIQUIDATE]: 'liquidación de nómina',
       [FlowType.VACATION_REGISTER]: 'registro de vacaciones',
-      [FlowType.DATABASE_QUERY]: 'consulta'
+      [FlowType.DATABASE_QUERY]: 'consulta',
+      [FlowType.REPORTS_GENERATE]: 'generación de reporte',
+      [FlowType.WHAT_IF_SIMULATION]: 'simulación What-If',
+      [FlowType.PROACTIVE_SCAN]: 'escaneo proactivo'
     };
 
     return {
