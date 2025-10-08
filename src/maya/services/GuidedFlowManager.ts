@@ -121,7 +121,7 @@ export class GuidedFlowManager {
     }
 
     // Store data from current step
-    if (userInput && userInput !== 'cancel' && currentStep.type !== 'greeting') {
+    if (userInput && userInput !== 'cancel' && (currentStep.dataKey || currentStep.type !== 'greeting')) {
       // Use dataKey if exists, otherwise use step id
       const dataKey = currentStep.dataKey || currentStep.id;
       flowState.accumulatedData[dataKey] = userInput;
