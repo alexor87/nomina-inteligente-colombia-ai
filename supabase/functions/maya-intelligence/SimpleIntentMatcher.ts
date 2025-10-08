@@ -919,7 +919,7 @@ export class SimpleIntentMatcher {
     }
 
     // Employee list queries
-    if (/(?:dame|dime|muestra|lista|cuáles?\s+son|quiénes?\s+son)\s*(?:los\s*)?(?:nombres?|empleados?)/i.test(text) ||
+    if (/(?:dame|dime|muestra(?:me)?|ve(?:r|amos)?|lista|mostrar|cuáles?\s+son|quiénes?\s+son)\s*(?:los\s*)?(?:nombres?|empleados?)(?:\s+(?:activos?|todos?|que\s+tengo))?/i.test(text) ||
         /(?:lista|listado)\s+(?:de\s+)?empleados?/i.test(text) ||
         /(?:quiénes?\s+trabajan|quiénes?\s+son\s+los\s+empleados?)/i.test(text)) {
       return {
