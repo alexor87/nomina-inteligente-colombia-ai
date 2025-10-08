@@ -134,6 +134,42 @@ export class MayaChatService {
     // Generate idempotency key for this request
     const idempotencyKey = this.generateIdempotencyKey();
 
+    // ✅ CRITICAL FIX: Extract action parameters if this is an action_ message
+    let actionType: string | undefined;
+    let actionParameters: Record<string, any> | undefined;
+    
+    if (userMessage.startsWith('action_')) {
+      actionType = userMessage.replace('action_', '');
+      
+      // Find the last assistant message with executable actions
+      const lastAssistantMessage = [...this.currentConversation.messages]
+        .reverse()
+        .find(m => m.role === 'assistant' && m.executableActions && m.executableActions.length > 0);
+      
+      if (lastAssistantMessage?.executableActions) {
+        // Find matching action
+        const matchingAction = lastAssistantMessage.executableActions.find((action: any) =>
+          action.type === actionType ||
+          action.type === 'liquidate_payroll_complete' ||
+          action.id === `action_${actionType}` ||
+          action.id === 'liquidate_complete'
+        );
+        
+        if (matchingAction?.parameters) {
+          actionParameters = matchingAction.parameters;
+          console.log('✅ [FRONTEND] Extracted action parameters:', {
+            actionType,
+            periodId: actionParameters.periodId,
+            startDate: actionParameters.startDate,
+            endDate: actionParameters.endDate,
+            companyId: actionParameters.companyId
+          });
+        } else {
+          console.warn('⚠️ [FRONTEND] No matching action found for:', actionType);
+        }
+      }
+    }
+
     try {
       console.log('🤖 MAYA Chat: Calling maya-intelligence function...');
       
@@ -157,13 +193,15 @@ export class MayaChatService {
         sessionId: this.currentConversation.sessionId
       });
 
-      // Call MAYA intelligence with idempotency key
+      // Call MAYA intelligence with idempotency key and action parameters
       const { data, error } = await supabase.functions.invoke('maya-intelligence', {
         body: {
           conversation: simplifiedConversation,
           sessionId: this.currentConversation.sessionId,
           richContext: context,
           idempotencyKey,
+          ...(actionType && { actionType }),
+          ...(actionParameters && { actionParameters }),
           metadata: {
             messageCount: this.currentConversation.messages.length,
             companyId: this.currentConversation.companyId,

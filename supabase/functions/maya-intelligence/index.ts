@@ -743,15 +743,30 @@ serve(async (req) => {
       const actionType = lastMessage.replace('action_', '');
       
       try {
-        // CRITICAL FIX: Extract original parameters from previous executable actions
-        const originalParams = extractActionParametersFromContext(conversation, actionType);
+        // ✅ CRITICAL FIX: Use provided parameters from frontend if available
+        const providedActionParams = payload.actionParameters;
         
-        // Build action with ORIGINAL parameters preserved + rich context
+        let actionParams: Record<string, any>;
+        
+        if (providedActionParams && Object.keys(providedActionParams).length > 0) {
+          console.log(`✅ [PARAM_SOURCE] Using parameters from frontend:`, {
+            periodId: providedActionParams.periodId,
+            startDate: providedActionParams.startDate,
+            endDate: providedActionParams.endDate,
+            companyId: providedActionParams.companyId
+          });
+          actionParams = providedActionParams;
+        } else {
+          console.log(`⚠️ [PARAM_SOURCE] No frontend params, extracting from conversation history`);
+          actionParams = extractActionParametersFromContext(conversation, actionType);
+        }
+        
+        // Build action with parameters + rich context
         const action = {
           type: actionType,
           parameters: {
-            ...originalParams,   // ✅ Preserve specific action parameters (periodId, startDate, endDate)
-            ...richContext,      // Add general context
+            ...actionParams,     // ✅ Specific action parameters (periodId, startDate, endDate)
+            ...richContext,      // General context
             autoTriggered: true
           }
         };
