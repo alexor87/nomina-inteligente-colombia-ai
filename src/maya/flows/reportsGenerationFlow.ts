@@ -148,7 +148,6 @@ export const reportsGenerationFlow: GuidedFlow = {
         }
 
         return `✅ **Reporte generado exitosamente**\n\n` +
-               `📊 **${r.reportTitle || 'Reporte'}**\n` +
                `${r.summary || ''}\n\n` +
                `🎯 **Insights principales:**\n${r.insights || 'Analizando datos...'}\n\n` +
                `¿Qué quieres hacer ahora?`;
