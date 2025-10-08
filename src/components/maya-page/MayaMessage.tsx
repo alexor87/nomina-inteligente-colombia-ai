@@ -85,21 +85,28 @@ export const MayaMessage: React.FC<MayaMessageProps> = ({
         {/* Quick replies for assistant messages */}
         {!isUser && message.quickReplies && message.quickReplies.length > 0 && (
           <div className="flex flex-wrap gap-2 mt-3">
-            {message.quickReplies.map((reply: any, idx: number) => (
-              <Button
-                key={idx}
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  sendMessage(reply.value);
-                  if (onQuickReply) onQuickReply(reply.value);
-                }}
-                className="bg-white backdrop-blur-sm border border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900 hover:border-gray-300 text-xs h-8 px-3 transition-all"
-              >
-                {reply.icon && <span className="mr-1.5">{reply.icon}</span>}
-                {reply.label}
-              </Button>
-            ))}
+            {message.quickReplies.map((reply: any, idx: number) => {
+              // Remove icon from label if it starts with the icon emoji
+              const displayLabel = reply.icon && reply.label.startsWith(reply.icon)
+                ? reply.label.slice(reply.icon.length).trim()
+                : reply.label;
+              
+              return (
+                <Button
+                  key={idx}
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    sendMessage(reply.value);
+                    if (onQuickReply) onQuickReply(reply.value);
+                  }}
+                  className="bg-white backdrop-blur-sm border border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900 hover:border-gray-300 text-xs h-8 px-3 transition-all"
+                >
+                  {reply.icon && <span className="mr-1.5">{reply.icon}</span>}
+                  {displayLabel}
+                </Button>
+              );
+            })}
           </div>
         )}
 

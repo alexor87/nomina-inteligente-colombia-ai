@@ -14,10 +14,10 @@ export const reportsGenerationFlow: GuidedFlow = {
       dataKey: 'report_type',
       message: '📊 ¡Perfecto! Voy a ayudarte a generar un reporte con insights automáticos.\n\n¿Qué tipo de reporte necesitas?',
       quickReplies: [
-        { label: '💰 Resumen de nómina', value: 'payroll_summary', icon: '💰' },
-        { label: '📈 Costos laborales', value: 'labor_cost', icon: '📈' },
-        { label: '🏥 Seguridad social', value: 'social_security', icon: '🏥' },
-        { label: '📋 Historial de novedades', value: 'novelty_history', icon: '📋' }
+        { label: 'Resumen de nómina', value: 'payroll_summary', icon: '💰' },
+        { label: 'Costos laborales', value: 'labor_cost', icon: '📈' },
+        { label: 'Seguridad social', value: 'social_security', icon: '🏥' },
+        { label: 'Historial de novedades', value: 'novelty_history', icon: '📋' }
       ],
       nextStep: 'period_selection',
       canGoBack: false
@@ -34,11 +34,11 @@ export const reportsGenerationFlow: GuidedFlow = {
           .toLocaleDateString('es-CO', { month: 'long', year: 'numeric' });
         
         return [
-          { label: `📅 ${currentMonth}`, value: 'current_month', icon: '📅' },
-          { label: `📆 ${lastMonth}`, value: 'last_month', icon: '📆' },
-          { label: '📊 Trimestre actual', value: 'current_quarter', icon: '📊' },
-          { label: '📈 Año actual', value: 'current_year', icon: '📈' },
-          { label: '🔧 Personalizado', value: 'custom', icon: '🔧' }
+          { label: currentMonth, value: 'current_month', icon: '📅' },
+          { label: lastMonth, value: 'last_month', icon: '📆' },
+          { label: 'Trimestre actual', value: 'current_quarter', icon: '📊' },
+          { label: 'Año actual', value: 'current_year', icon: '📈' },
+          { label: 'Personalizado', value: 'custom', icon: '🔧' }
         ];
       },
       nextStep: (data, input) => {
@@ -62,10 +62,10 @@ export const reportsGenerationFlow: GuidedFlow = {
       dataKey: 'filter_type',
       message: '🎯 ¿Quieres aplicar filtros adicionales?',
       quickReplies: [
-        { label: '👥 Por empleados', value: 'employees', icon: '👥' },
-        { label: '🏢 Por centro de costos', value: 'cost_center', icon: '🏢' },
-        { label: '📝 Por tipo de contrato', value: 'contract_type', icon: '📝' },
-        { label: '✅ Sin filtros, continuar', value: 'none', icon: '✅' }
+        { label: 'Por empleados', value: 'employees', icon: '👥' },
+        { label: 'Por centro de costos', value: 'cost_center', icon: '🏢' },
+        { label: 'Por tipo de contrato', value: 'contract_type', icon: '📝' },
+        { label: 'Sin filtros, continuar', value: 'none', icon: '✅' }
       ],
       nextStep: (data, input) => {
         if (input === 'none') return 'preview';
@@ -119,9 +119,9 @@ export const reportsGenerationFlow: GuidedFlow = {
                `¿Generar el reporte con análisis automático?`;
       },
       quickReplies: [
-        { label: '✅ Sí, generar', value: 'confirm', icon: '✅' },
-        { label: '✏️ Modificar', value: 'back', icon: '✏️' },
-        { label: '❌ Cancelar', value: 'cancel', icon: '❌' }
+        { label: 'Sí, generar', value: 'confirm', icon: '✅' },
+        { label: 'Modificar', value: 'back', icon: '✏️' },
+        { label: 'Cancelar', value: 'cancel', icon: '❌' }
       ],
       nextStep: (data, input) => {
         if (input === 'confirm') return 'execution';
@@ -158,17 +158,17 @@ export const reportsGenerationFlow: GuidedFlow = {
         
         if (!r.success) {
           return [
-            { label: '🔄 Intentar de nuevo', value: 'retry', icon: '🔄' },
-            { label: '🏠 Volver al inicio', value: 'home', icon: '🏠' }
+            { label: 'Intentar de nuevo', value: 'retry', icon: '🔄' },
+            { label: 'Volver al inicio', value: 'home', icon: '🏠' }
           ];
         }
 
         return [
-          { label: '📥 Exportar Excel', value: 'export_excel', icon: '📥' },
-          { label: '📄 Exportar PDF', value: 'export_pdf', icon: '📄' },
-          { label: '🔍 Ver detalle', value: 'view_detail', icon: '🔍' },
-          { label: '📈 Comparar períodos', value: 'compare', icon: '📈' },
-          { label: '🔧 Otro reporte', value: 'new', icon: '🔧' }
+          { label: 'Exportar Excel', value: 'export_excel', icon: '📥' },
+          { label: 'Exportar PDF', value: 'export_pdf', icon: '📄' },
+          { label: 'Ver detalle', value: 'view_detail', icon: '🔍' },
+          { label: 'Comparar períodos', value: 'compare', icon: '📈' },
+          { label: 'Otro reporte', value: 'new', icon: '🔧' }
         ];
       },
       nextStep: (data, input) => {

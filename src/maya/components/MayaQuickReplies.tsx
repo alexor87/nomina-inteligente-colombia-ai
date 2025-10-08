@@ -16,25 +16,32 @@ export const MayaQuickReplies: React.FC<MayaQuickRepliesProps> = ({
 }) => {
   return (
     <div className="flex flex-wrap gap-2 mt-2">
-      {options.map((option, index) => (
-        <motion.div
-          key={option.value}
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: index * 0.05 }}
-        >
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onSelect(option.value)}
-            disabled={disabled}
-            className="h-auto py-2 px-3 text-xs hover:bg-primary hover:text-white transition-all"
+      {options.map((option, index) => {
+        // Remove icon from label if it starts with the icon emoji
+        const displayLabel = option.icon && option.label.startsWith(option.icon)
+          ? option.label.slice(option.icon.length).trim()
+          : option.label;
+        
+        return (
+          <motion.div
+            key={option.value}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: index * 0.05 }}
           >
-            {option.icon && <span className="mr-1.5">{option.icon}</span>}
-            {option.label}
-          </Button>
-        </motion.div>
-      ))}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onSelect(option.value)}
+              disabled={disabled}
+              className="h-auto py-2 px-3 text-xs hover:bg-primary hover:text-white transition-all"
+            >
+              {option.icon && <span className="mr-1.5">{option.icon}</span>}
+              {displayLabel}
+            </Button>
+          </motion.div>
+        );
+      })}
     </div>
   );
 };
