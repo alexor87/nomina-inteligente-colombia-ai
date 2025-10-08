@@ -52,6 +52,7 @@ export interface FlowStep {
   canSkip?: boolean;
   skipToStep?: string;
   subFlowId?: string;
+  dataKey?: string;
 }
 
 export interface GuidedFlow {

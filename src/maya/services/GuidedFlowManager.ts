@@ -122,9 +122,15 @@ export class GuidedFlowManager {
 
     // Store data from current step
     if (userInput && userInput !== 'cancel' && currentStep.type !== 'greeting') {
-      // Map step IDs to data keys
-      const dataKey = currentStep.id;
+      // Use dataKey if exists, otherwise use step id
+      const dataKey = currentStep.dataKey || currentStep.id;
       flowState.accumulatedData[dataKey] = userInput;
+      
+      console.log(`💾 [FLOW] Guardando dato:`, { 
+        stepId: currentStep.id, 
+        dataKey, 
+        value: userInput 
+      });
     }
 
     // Add current step to history
@@ -607,9 +613,15 @@ export class GuidedFlowManager {
         periodId: data.selected_period_id,
         companyId: profile.company_id,
         filters: {
-          employeeIds: data.employee_filters,
-          costCenters: data.cost_center_filters,
-          contractTypes: data.contract_type_filters
+          employeeIds: data.filter_type === 'employees' 
+            ? data.filter_values?.split(',').map((s: string) => s.trim())
+            : undefined,
+          costCenters: data.filter_type === 'cost_center'
+            ? data.filter_values?.split(',').map((s: string) => s.trim())
+            : undefined,
+          contractTypes: data.filter_type === 'contract_type'
+            ? data.filter_values?.split(',').map((s: string) => s.trim())
+            : undefined
         },
         includeComparison: true
       };

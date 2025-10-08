@@ -11,6 +11,7 @@ export const reportsGenerationFlow: GuidedFlow = {
     greeting: {
       id: 'greeting',
       type: FlowStepType.GREETING,
+      dataKey: 'report_type',
       message: '📊 ¡Perfecto! Voy a ayudarte a generar un reporte con insights automáticos.\n\n¿Qué tipo de reporte necesitas?',
       quickReplies: [
         { label: '💰 Resumen de nómina', value: 'payroll_summary', icon: '💰' },
@@ -24,7 +25,8 @@ export const reportsGenerationFlow: GuidedFlow = {
     period_selection: {
       id: 'period_selection',
       type: FlowStepType.SELECT,
-      message: (data) => `Excelente, vamos a generar un reporte de **${data.reportType}**.\n\n¿De qué período?`,
+      dataKey: 'period',
+      message: (data) => `Excelente, vamos a generar un reporte de **${data.report_type}**.\n\n¿De qué período?`,
       quickReplies: (data) => {
         const now = new Date();
         const currentMonth = now.toLocaleDateString('es-CO', { month: 'long', year: 'numeric' });
@@ -47,6 +49,7 @@ export const reportsGenerationFlow: GuidedFlow = {
     custom_period: {
       id: 'custom_period',
       type: FlowStepType.INPUT,
+      dataKey: 'period',
       message: '📅 Indícame el período en lenguaje natural.\n\nEjemplos:\n- "Enero a marzo 2024"\n- "Últimos 6 meses"\n- "Q1 2024"',
       inputPlaceholder: 'Ej: Enero a marzo 2024',
       inputType: 'text',
@@ -56,6 +59,7 @@ export const reportsGenerationFlow: GuidedFlow = {
     additional_filters: {
       id: 'additional_filters',
       type: FlowStepType.SELECT,
+      dataKey: 'filter_type',
       message: '🎯 ¿Quieres aplicar filtros adicionales?',
       quickReplies: [
         { label: '👥 Por empleados', value: 'employees', icon: '👥' },
@@ -74,13 +78,14 @@ export const reportsGenerationFlow: GuidedFlow = {
     filter_selection: {
       id: 'filter_selection',
       type: FlowStepType.INPUT,
+      dataKey: 'filter_values',
       message: (data) => {
         const filterLabels: Record<string, string> = {
           employees: '👥 Escribe los nombres de los empleados separados por coma',
           cost_center: '🏢 Escribe los centros de costos separados por coma',
           contract_type: '📝 Escribe los tipos de contrato separados por coma'
         };
-        return filterLabels[data.filterType] || 'Ingresa los filtros';
+        return filterLabels[data.filter_type] || 'Ingresa los filtros';
       },
       inputPlaceholder: 'Ej: Juan Pérez, María López',
       inputType: 'text',
@@ -98,10 +103,14 @@ export const reportsGenerationFlow: GuidedFlow = {
           novelty_history: 'Historial de novedades'
         };
         
+        const filterInfo = data.filter_type && data.filter_values
+          ? `${data.filter_type}: ${data.filter_values}`
+          : 'Ninguno';
+        
         return `📋 **Resumen del reporte:**\n\n` +
-               `• **Tipo:** ${reportLabels[data.reportType] || data.reportType}\n` +
-               `• **Período:** ${data.periodLabel || data.period}\n` +
-               `• **Filtros:** ${data.filters || 'Ninguno'}\n\n` +
+               `• **Tipo:** ${reportLabels[data.report_type] || data.report_type}\n` +
+               `• **Período:** ${data.period}\n` +
+               `• **Filtros:** ${filterInfo}\n\n` +
                `¿Generar el reporte con análisis automático?`;
       },
       quickReplies: [
