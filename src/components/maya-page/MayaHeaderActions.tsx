@@ -1,31 +1,16 @@
-import React, { useState } from 'react';
-import { Plus, X, AlertTriangle } from 'lucide-react';
+import React from 'react';
+import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { motion } from 'framer-motion';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 
 interface MayaHeaderActionsProps {
   onNewConversation: () => void;
-  onDeleteConversation: () => void;
-  hasActiveConversation: boolean;
 }
 
 export const MayaHeaderActions: React.FC<MayaHeaderActionsProps> = ({ 
-  onNewConversation,
-  onDeleteConversation,
-  hasActiveConversation 
+  onNewConversation
 }) => {
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   return (
     <>
       <div className="flex items-center gap-2">
@@ -58,48 +43,7 @@ export const MayaHeaderActions: React.FC<MayaHeaderActionsProps> = ({
           <Plus className="h-4 w-4 mr-1.5" />
           <span className="text-xs font-medium">Nueva</span>
         </Button>
-
-        {/* Delete button - Solo visible si hay conversación activa */}
-        {hasActiveConversation && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowDeleteDialog(true)}
-            className="text-red-600 hover:text-red-700 hover:bg-red-50 h-8 px-2"
-            title="Eliminar conversación"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        )}
       </div>
-
-      {/* Delete Confirmation Modal */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-red-600">
-              <AlertTriangle className="h-5 w-5" />
-              ¿Eliminar conversación?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta acción no se puede deshacer. La conversación y todos sus mensajes 
-              serán eliminados permanentemente del historial.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                onDeleteConversation();
-                setShowDeleteDialog(false);
-              }}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              Sí, eliminar permanentemente
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 };

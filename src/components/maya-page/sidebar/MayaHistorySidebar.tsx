@@ -205,28 +205,50 @@ export const MayaHistorySidebar: React.FC = () => {
   };
 
   const handleDeleteConversation = async (id: string) => {
+    setIsDeleting(true);
+    
     try {
-      setIsDeleting(true);
-      
+      // 1. Validar que existe una conversación para eliminar
+      if (!id) {
+        throw new Error('ID de conversación inválido');
+      }
+
+      // 2. Eliminar de la base de datos
       await conversationManager.deleteConversation(id);
       
-      // Si es la conversación actual, limpiar el ID
+      // 3. Si es la conversación actual, limpiar el estado
       if (id === currentConversationId) {
-        conversationManager.clearCurrentConversationId();
-        // Llamar clearConversation para limpiar el estado
-        await clearConversation();
+        try {
+          conversationManager.clearCurrentConversationId();
+          await clearConversation();
+        } catch (clearError) {
+          console.error('Error clearing conversation state:', clearError);
+          // Continuar aunque falle la limpieza
+        }
       }
       
-      // Cargar conversaciones UNA SOLA VEZ
-      await loadConversations();
-      await loadArchivedConversations();
+      // 4. Recargar lista de conversaciones
+      try {
+        await Promise.all([
+          loadConversations(),
+          loadArchivedConversations()
+        ]);
+      } catch (loadError) {
+        console.error('Error reloading conversations:', loadError);
+        // Continuar aunque falle la recarga
+      }
       
       toast.success('Conversación eliminada');
     } catch (error) {
       console.error('Error deleting conversation:', error);
-      toast.error('Error al eliminar');
+      toast.error('Error al eliminar', {
+        description: error instanceof Error ? error.message : 'No se pudo eliminar la conversación'
+      });
     } finally {
+      // Asegurar que siempre se limpia el estado
       setIsDeleting(false);
+      
+      // En mobile, colapsar el sidebar después de eliminar
       if (isMobile) {
         setCollapsed(true);
         localStorage.setItem(STORAGE_KEY, 'true');

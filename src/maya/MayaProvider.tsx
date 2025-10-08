@@ -920,10 +920,7 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
       // 4. Reset a fase inicial
       await setPhase('initial');
       
-      // 5. Recargar lista de conversaciones
-      await loadConversations();
-      
-      // 6. Mostrar confirmación
+      // 5. Mostrar confirmación (la recarga de lista se hace en el sidebar)
       toast.success('Conversación eliminada', {
         description: 'La conversación ha sido eliminada permanentemente'
       });
