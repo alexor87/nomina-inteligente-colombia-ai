@@ -186,7 +186,7 @@ export class ReportsHandler {
     console.log('[ReportsHandler] Fetched payroll records:', safeData.length);
 
     // Calcular summary
-    const totalAmount = safeData.reduce((sum: number, r: any) => sum + (r.total_neto || 0), 0);
+    const totalAmount = safeData.reduce((sum: number, r: any) => sum + (r.neto_pagado || 0), 0);
     const averageAmount = safeData.length > 0 ? totalAmount / safeData.length : 0;
 
     return {
@@ -286,8 +286,8 @@ export class ReportsHandler {
 
     // Layer 1: Comparación temporal
     if (previousData && previousData.length > 0) {
-      const currentTotal = currentData.reduce((sum, r) => sum + (r.total_neto || 0), 0);
-      const previousTotal = previousData.reduce((sum, r) => sum + (r.total_neto || 0), 0);
+      const currentTotal = currentData.reduce((sum, r) => sum + (r.neto_pagado || 0), 0);
+      const previousTotal = previousData.reduce((sum, r) => sum + (r.neto_pagado || 0), 0);
       const change = currentTotal - previousTotal;
       const changePercentage = previousTotal !== 0 ? (change / previousTotal) * 100 : 0;
 
@@ -309,7 +309,7 @@ export class ReportsHandler {
     const costCenterGroups = new Map<string, number>();
     currentData.forEach(record => {
       const cc = record.employee?.centro_costos || 'Sin especificar';
-      const value = record.total_neto || 0;
+      const value = record.neto_pagado || 0;
       costCenterGroups.set(cc, (costCenterGroups.get(cc) || 0) + value);
     });
 
@@ -332,14 +332,14 @@ export class ReportsHandler {
     }
 
     // Layer 3: Detección de anomalías
-    const values = currentData.map(r => r.total_neto || 0);
+    const values = currentData.map(r => r.neto_pagado || 0);
     const mean = values.reduce((sum, v) => sum + v, 0) / values.length;
     const stdDev = Math.sqrt(
       values.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / values.length
     );
 
     const outliers = currentData.filter(record => {
-      const value = record.total_neto || 0;
+      const value = record.neto_pagado || 0;
       return Math.abs(value - mean) > 2 * stdDev;
     });
 
@@ -349,8 +349,8 @@ export class ReportsHandler {
         type: 'anomaly',
         severity: 'warning',
         title: `⚠️ Costo atípico detectado`,
-        description: `${outlier.employee?.nombre || 'Un empleado'} tiene un valor de ${this.formatCurrency(outlier.total_neto)} que se desvía significativamente del promedio.`,
-        value: outlier.total_neto
+        description: `${outlier.employee?.nombre || 'Un empleado'} tiene un valor de ${this.formatCurrency(outlier.neto_pagado)} que se desvía significativamente del promedio.`,
+        value: outlier.neto_pagado
       });
     }
 
