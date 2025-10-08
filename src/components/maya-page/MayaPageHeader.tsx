@@ -35,22 +35,12 @@ export const MayaPageHeader: React.FC = () => {
               </Button>
             </Link>
           )}
-          <motion.div
-            animate={{ 
-              rotate: [0, 5, -5, 0],
-            }}
-            transition={{ 
-              duration: 4,
-              repeat: Infinity,
-              ease: "easeInOut"
-            }}
-            className="relative"
-          >
-            <div className="absolute inset-0 bg-blue-500/20 rounded-full blur-lg opacity-40 animate-pulse" />
+          <div className="relative">
+            <div className="absolute inset-0 bg-blue-500/20 rounded-full blur-lg opacity-40" />
             <div className="relative w-11 h-11 bg-primary rounded-full flex items-center justify-center shadow-xl ring-2 ring-blue-100">
               <Brain className="h-5 w-5 text-white" />
             </div>
-          </motion.div>
+          </div>
           
           <div>
             <h1 className="text-xl font-bold text-gray-900">
