@@ -498,7 +498,11 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
       quickReplies: result.currentStep.quickReplies,
       isFlowMessage: true,
       flowId: result.flowState.flowId,
-      stepId: result.currentStep.id
+      stepId: result.currentStep.id,
+      // ✅ Incluir executableActions si existen en el resultado de ejecución
+      ...(result.flowState.accumulatedData._executionResult?.executableActions && {
+        executableActions: result.flowState.accumulatedData._executionResult.executableActions
+      })
     };
     
     console.log('💬 Adding flow step message:', {
