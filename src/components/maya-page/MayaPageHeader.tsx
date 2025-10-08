@@ -2,14 +2,19 @@ import React from 'react';
 import { Brain, Sparkles, ArrowLeft } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useMaya } from '@/maya/MayaProvider';
+import { FlowType } from '@/maya/types/GuidedFlow';
 import { motion } from 'framer-motion';
 import { MayaHeaderActions } from './MayaHeaderActions';
 import { Button } from '@/components/ui/button';
 
 export const MayaPageHeader: React.FC = () => {
-  const { clearConversation, deleteCurrentConversation, currentConversationId } = useMaya();
+  const { clearConversation, deleteCurrentConversation, currentConversationId, startGuidedFlow } = useMaya();
   const location = useLocation();
   const comesFromModules = location.state?.from?.startsWith('/modules');
+
+  const handleStartOnboarding = () => {
+    startGuidedFlow(FlowType.ONBOARDING_COMPLETE, true);
+  };
 
   return (
     <motion.header 
@@ -62,6 +67,7 @@ export const MayaPageHeader: React.FC = () => {
           onNewConversation={clearConversation}
           onDeleteConversation={deleteCurrentConversation}
           currentConversationId={currentConversationId}
+          onStartOnboarding={handleStartOnboarding}
         />
       </div>
     </motion.header>

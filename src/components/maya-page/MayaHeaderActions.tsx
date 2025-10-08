@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, X } from 'lucide-react';
+import { Plus, X, Rocket } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { motion } from 'framer-motion';
@@ -9,12 +9,14 @@ interface MayaHeaderActionsProps {
   onNewConversation: () => void;
   onDeleteConversation: () => Promise<void>;
   currentConversationId: string | null;
+  onStartOnboarding: () => void;
 }
 
 export const MayaHeaderActions: React.FC<MayaHeaderActionsProps> = ({ 
   onNewConversation,
   onDeleteConversation,
-  currentConversationId
+  currentConversationId,
+  onStartOnboarding
 }) => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
@@ -43,6 +45,24 @@ export const MayaHeaderActions: React.FC<MayaHeaderActionsProps> = ({
             />
             IA • Activo
           </Badge>
+        </motion.div>
+
+        {/* Onboarding demo button */}
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ delay: 0.4 }}
+        >
+          <Button
+            variant="default"
+            size="sm"
+            onClick={onStartOnboarding}
+            className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white h-8 px-3 shadow-md"
+          >
+            <Rocket className="h-3.5 w-3.5 mr-1.5" />
+            <span className="text-xs font-medium hidden sm:inline">Probar Demo</span>
+            <span className="text-xs font-medium sm:hidden">Demo</span>
+          </Button>
         </motion.div>
 
         {/* New conversation button */}
