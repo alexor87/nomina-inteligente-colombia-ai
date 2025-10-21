@@ -138,6 +138,14 @@ export const NOVEDAD_CATEGORIES = {
         constitutivo_default: true, // ✅ CORREGIDO: Recargos SÍ son constitutivos de IBC
         subtipos: ['nocturno', 'nocturno_dominical', 'nocturno_festivo']
       },
+      recargo_dominical: {
+        label: 'Recargo Dominical',
+        requiere_horas: true,
+        requiere_dias: false,
+        auto_calculo: true,
+        constitutivo_default: true, // ✅ Recargos dominicales SÍ son constitutivos de IBC
+        subtipos: ['dominical', 'festivo']
+      },
       bonificacion: {
         label: 'Bonificación',
         requiere_horas: false,
