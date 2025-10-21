@@ -275,15 +275,46 @@ export const NOVEDAD_CATEGORIES = {
   }
 } as const;
 
-// Factores corregidos según legislación colombiana (Art. 168 CST)
+// ⚠️ NOTA: Estos factores son HISTÓRICOS (vigentes hasta 30 junio 2025)
+// Los cálculos reales usan el backend que aplica Ley 2466/2025 automáticamente
+// Desde 1 julio 2025: dominicales/festivos usan factores progresivos (80% → 90% → 100%)
 export const HORAS_EXTRA_FACTORS = {
-  diurnas: 1.25,
-  nocturnas: 1.75,
-  dominicales_diurnas: 2.0,
-  dominicales_nocturnas: 2.5,
-  festivas_diurnas: 2.0,
-  festivas_nocturnas: 2.5
+  diurnas: 1.25,                    // ✅ 25% extra diurna (Art. 168 CST - vigente)
+  nocturnas: 1.75,                  // ✅ 75% extra nocturna (Art. 168 CST - vigente)
+  dominicales_diurnas: 2.0,         // ⚠️ Histórico: ahora 2.05 (1.25 + 0.80) desde 1 jul 2025
+  dominicales_nocturnas: 2.5,       // ⚠️ Histórico: ahora 2.55 (1.75 + 0.80) desde 1 jul 2025
+  festivas_diurnas: 2.0,            // ⚠️ Histórico: ahora 2.05 desde 1 jul 2025
+  festivas_nocturnas: 2.5           // ⚠️ Histórico: ahora 2.55 desde 1 jul 2025
 } as const;
+
+// ✅ NUEVO: Función informativa para obtener factor de hora extra vigente según Ley 2466/2025
+export const getHorasExtraFactorVigente = (
+  subtipo: keyof typeof HORAS_EXTRA_FACTORS, 
+  fecha: Date = new Date()
+): number => {
+  // Determinar recargo dominical vigente según Ley 2466/2025
+  const getRecargoDominical = (fecha: Date): number => {
+    if (fecha < new Date('2025-07-01')) return 0.75; // 75% antes de reforma
+    if (fecha < new Date('2026-07-01')) return 0.80; // 80% 1er año
+    if (fecha < new Date('2027-07-01')) return 0.90; // 90% 2do año
+    return 1.00; // 100% desde 2027
+  };
+
+  const recargoDominical = getRecargoDominical(fecha);
+  
+  switch(subtipo) {
+    case 'dominicales_diurnas':
+    case 'festivas_diurnas':
+      return 1.25 + recargoDominical; // Extra diurna + recargo dominical/festivo
+    
+    case 'dominicales_nocturnas':
+    case 'festivas_nocturnas':
+      return 1.75 + recargoDominical; // Extra nocturna + recargo dominical/festivo
+    
+    default:
+      return HORAS_EXTRA_FACTORS[subtipo]; // Factores normales (diurnas, nocturnas)
+  }
+};
 
 /**
  * ⚠️ FUNCIONES COMPLETAMENTE ELIMINADAS - SOLO BACKEND

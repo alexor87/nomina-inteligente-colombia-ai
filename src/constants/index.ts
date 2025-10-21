@@ -23,12 +23,25 @@ export const PORCENTAJES_NOMINA = {
   VACACIONES: 0.0417, // 4.17%
 };
 
+// ⚠️ HISTÓRICO: Constantes informativas (los cálculos reales están en el backend)
 export const RECARGOS = {
-  NOCTURNO: 0.35, // 35%
-  EXTRA_DIURNA: 0.25, // 25%
-  EXTRA_NOCTURNA: 0.75, // 75%
-  DOMINICAL: 0.75, // 75% - ⚠️ ELIMINADO: RecargosCalculationService (solo backend)
-  FESTIVO: 0.75, // 75%
+  NOCTURNO: 0.35, // 35% - Art. 168 CST (vigente)
+  EXTRA_DIURNA: 0.25, // 25% - Art. 168 CST (vigente)
+  EXTRA_NOCTURNA: 0.75, // 75% - Art. 168 CST (vigente)
+  
+  // ⚠️ HISTÓRICO: Valores antes de Ley 2466/2025
+  // Desde 1 julio 2025: 80% (progresivo hasta 100% en 2027)
+  // Ver backend: getRecargoDominicalFestivo() para valor vigente
+  DOMINICAL: 0.75, // Histórico (antes 1 julio 2025)
+  FESTIVO: 0.75,   // Histórico (antes 1 julio 2025)
+};
+
+// ✅ NUEVO: Función para obtener recargo dominical vigente según Ley 2466/2025
+export const getRecargoDominicalVigente = (fecha: Date = new Date()): number => {
+  if (fecha < new Date('2025-07-01')) return 0.75; // 75% antes de reforma
+  if (fecha < new Date('2026-07-01')) return 0.80; // 80% 1er año
+  if (fecha < new Date('2027-07-01')) return 0.90; // 90% 2do año
+  return 1.00; // 100% desde 2027
 };
 
 export const TIPOS_CONTRATO = [
