@@ -28,7 +28,7 @@ export interface UsePayrollNovedadesUnifiedReturn {
   loadNovedadesTotals: (employeeIds: string[]) => void;
   getEmployeeNovedades: (employeeId: string) => Promise<{ totalNeto: number; devengos: number; deducciones: number }>;
   getEmployeeNovedadesSync: (employeeId: string) => NovedadesTotals;
-  refreshEmployeeNovedades: (employeeId: string) => Promise<void>;
+  refreshEmployeeNovedades: (employeeId: string) => Promise<NovedadesTotals | null>;
   lastRefreshTime: number;
   getEmployeeNovedadesList: (employeeId: string) => Promise<PayrollNovedad[]>;
   novedadesTotals: Record<string, NovedadesTotals>;
@@ -176,11 +176,15 @@ export const usePayrollNovedadesUnified = (
   }, [periodId]);
 
   // ✅ CONSOLIDADO: Refresh employee novedades usando store global + estado síncrono
-  const refreshEmployeeNovedades = useCallback(async (employeeId: string) => {
-    if (!periodId) return;
+  const refreshEmployeeNovedades = useCallback(async (employeeId: string): Promise<NovedadesTotals | null> => {
+    if (!periodId) return null;
     
     try {
       console.log('🔄 Refrescando novedades específicas del empleado:', employeeId);
+      
+      // ✅ CRÍTICO: Invalidar caché ANTES de calcular para forzar recálculo fresco
+      NovedadesCalculationService.invalidateCache(employeeId, periodId);
+      
       const employeeNovedades = await NovedadesEnhancedService.getNovedadesByEmployee(employeeId, periodId);
       setEmployeeNovedades(employeeId, employeeNovedades);
       
@@ -191,8 +195,11 @@ export const usePayrollNovedadesUnified = (
         [employeeId]: backendTotals
       }));
       console.log('✅ Totales síncronos refrescados para empleado:', employeeId, backendTotals);
+      
+      return backendTotals; // ✅ RETORNAR los totales calculados
     } catch (error) {
       console.error(`Error refreshing novedades for employee ${employeeId}:`, error);
+      return null;
     }
   }, [periodId, setEmployeeNovedades]);
 
@@ -374,10 +381,8 @@ export const usePayrollNovedadesUnified = (
       // ✅ CRÍTICO: Si conocemos el empleado afectado, refrescar su cache específicamente
       if (employeeId) {
         console.log('🔄 Refrescando cache específico del empleado en store global:', employeeId);
-        // ✅ CRÍTICO: Invalidar caché antes de refrescar
-        NovedadesCalculationService.invalidateCache(employeeId, periodId);
-        refreshEmployeeNovedades(employeeId).then(() => {
-          console.log('✅ Cache del empleado actualizado exitosamente en store global');
+        refreshEmployeeNovedades(employeeId).then((freshTotals) => {
+          console.log('✅ Cache del empleado actualizado exitosamente en store global', freshTotals);
           
           // ✅ CRÍTICO: Actualizar lastRefreshTime DESPUÉS de actualizar novedadesTotals
           const newRefreshTime = Date.now();
