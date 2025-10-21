@@ -110,14 +110,6 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
     }
   }, [employees, currentPeriodId, loadNovedadesTotals]);
 
-  // ♻️ Re-cargar totales de novedades cuando cambie lastRefreshTime (p. ej., al eliminar/crear)
-  useEffect(() => {
-    if (!currentPeriodId || employees.length === 0) return;
-    const employeeIds = employees.map(emp => emp.id);
-    console.log('♻️ Reloading novedadesTotals por cambio de lastRefreshTime:', lastRefreshTime, employeeIds);
-    loadNovedadesTotals(employeeIds);
-  }, [lastRefreshTime, currentPeriodId, employees.length, loadNovedadesTotals]);
-
   useEffect(() => {
     const recalculateAllEmployees = async () => {
       // Re-entrancy protection with pending queue
