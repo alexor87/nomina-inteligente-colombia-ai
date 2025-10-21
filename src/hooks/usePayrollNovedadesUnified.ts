@@ -74,15 +74,12 @@ export const usePayrollNovedadesUnified = (
   // ✅ NUEVO: Estado síncrono para renderizado React
   const [novedadesTotals, setNovedadesTotals] = useState<Record<string, NovedadesTotals>>({});
 
-  // ✅ NUEVO: Usar store global en lugar de estado local
-  const {
-    employeeNovedadesCache,
-    lastRefreshTime,
-    setEmployeeNovedades,
-    updateEmployeeNovedades,
-    removeNovedadFromCache,
-    setLastRefreshTime
-  } = useEmployeeNovedadesCacheStore();
+  // ✅ FIXED: Usar selectores individuales para detectar cambios reactivos
+  const lastRefreshTime = useEmployeeNovedadesCacheStore(state => state.lastRefreshTime);
+  const setLastRefreshTime = useEmployeeNovedadesCacheStore(state => state.setLastRefreshTime);
+  const setEmployeeNovedades = useEmployeeNovedadesCacheStore(state => state.setEmployeeNovedades);
+  const updateEmployeeNovedades = useEmployeeNovedadesCacheStore(state => state.updateEmployeeNovedades);
+  const removeNovedadFromCache = useEmployeeNovedadesCacheStore(state => state.removeNovedadFromCache);
 
   // ✅ FIXED: Handle both string and options parameter
   const options: UsePayrollNovedadesUnifiedOptions = typeof optionsOrPeriodId === 'string' 
