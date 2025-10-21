@@ -357,18 +357,37 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       let hasPendingSubmissions = false;
       
       for (const entry of dataArray) {
+        // ✅ CORRECCIÓN: Mapear tipo y subtipo correctamente para recargos
+        let tipoNovedadToSave = selectedType!;
+        let subtipoToSave = entry.subtipo || entry.tipo || undefined;
+        
+        // Si es recargo, derivar el tipo correcto según el subtipo seleccionado
+        if (selectedType === 'recargo_nocturno') {
+          const entryType = entry.subtipo || entry.tipo;
+          if (entryType === 'dominical') {
+            tipoNovedadToSave = 'recargo_dominical';
+            subtipoToSave = 'dominical';
+          } else if (entryType === 'nocturno') {
+            tipoNovedadToSave = 'recargo_nocturno';
+            subtipoToSave = 'nocturno';
+          } else if (entryType === 'nocturno_dominical') {
+            tipoNovedadToSave = 'recargo_nocturno';
+            subtipoToSave = 'dominical';
+          }
+        }
+        
         const submitData: CreateNovedadData = {
           empleado_id: employeeId,
           periodo_id: periodId,
           company_id: companyId || '',
-          tipo_novedad: selectedType!,
+          tipo_novedad: tipoNovedadToSave,
           valor: entry.valor || 0,
           horas: entry.horas || undefined,
           dias: entry.dias || undefined,
           observacion: entry.observacion || undefined,
           fecha_inicio: entry.fecha_inicio || undefined,
           fecha_fin: entry.fecha_fin || undefined,
-          subtipo: entry.subtipo || entry.tipo || undefined,
+          subtipo: subtipoToSave,
           base_calculo: entry.base_calculo || undefined
         };
 

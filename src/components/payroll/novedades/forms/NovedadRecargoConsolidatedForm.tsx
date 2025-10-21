@@ -115,8 +115,25 @@ export const NovedadRecargoConsolidatedForm: React.FC<NovedadRecargoConsolidated
     try {
       const fechaParaCalculo = new Date(fechaEspecifica + 'T00:00:00');
       
+      // ✅ CORRECCIÓN CRÍTICA: Mapear tipo seleccionado a tipoNovedad y subtipo correctos
+      let tipoNovedadMapped: string;
+      let subtipoMapped: string;
+      
+      if (tipo === 'dominical') {
+        tipoNovedadMapped = 'recargo_dominical';
+        subtipoMapped = 'dominical';
+      } else if (tipo === 'nocturno') {
+        tipoNovedadMapped = 'recargo_nocturno';
+        subtipoMapped = 'nocturno';
+      } else { // nocturno_dominical
+        tipoNovedadMapped = 'recargo_nocturno';
+        subtipoMapped = 'dominical';
+      }
+      
       console.log('🎯 RECARGO CONSOLIDADO: Calculando:', {
-        tipo,
+        tipoSeleccionado: tipo,
+        tipoNovedadBackend: tipoNovedadMapped,
+        subtipoBackend: subtipoMapped,
         horas,
         salario: employeeSalary,
         fecha: fechaEspecifica
@@ -129,8 +146,8 @@ export const NovedadRecargoConsolidatedForm: React.FC<NovedadRecargoConsolidated
         body: {
           action: 'calculate-novedad',
           data: {
-            tipoNovedad: 'recargo_nocturno',
-            subtipo: tipo,
+            tipoNovedad: tipoNovedadMapped,
+            subtipo: subtipoMapped,
             salarioBase: employeeSalary,
             horas: horas,
             fechaPeriodo: fechaParaCalculo.toISOString().split('T')[0]
@@ -150,7 +167,7 @@ export const NovedadRecargoConsolidatedForm: React.FC<NovedadRecargoConsolidated
       }
 
       const valor = data.data?.valor || 0;
-      console.log('✅ BACKEND success:', { tipo, valor });
+      console.log('✅ BACKEND success:', { tipoMapped: tipoNovedadMapped, subtipoMapped, valor });
       return valor;
 
     } catch (error) {

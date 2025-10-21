@@ -183,7 +183,7 @@ class NovedadesCalculationServiceClass {
             valor: novedad.valor,
             dias: safeDays,
             horas: (novedad as any).horas,
-            constitutivo_salario: novedad.tipo_novedad === 'horas_extra' || novedad.tipo_novedad === 'recargo_nocturno'
+            constitutivo_salario: novedad.tipo_novedad === 'horas_extra' || novedad.tipo_novedad === 'recargo_nocturno' || novedad.tipo_novedad === 'recargo_dominical'
           };
         })
       };
@@ -294,7 +294,7 @@ class NovedadesCalculationServiceClass {
             valor: novedad.valor,
             dias: safeDays,
             horas: (novedad as any).horas,
-            constitutivo_salario: novedad.tipo_novedad === 'horas_extra' || novedad.tipo_novedad === 'recargo_nocturno'
+            constitutivo_salario: novedad.tipo_novedad === 'horas_extra' || novedad.tipo_novedad === 'recargo_nocturno' || novedad.tipo_novedad === 'recargo_dominical'
           };
         })
       };

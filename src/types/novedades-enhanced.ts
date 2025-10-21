@@ -75,6 +75,7 @@ export type NovedadType =
   // Devengados
   | 'horas_extra'
   | 'recargo_nocturno'
+  | 'recargo_dominical'
   | 'vacaciones'
   | 'licencia_remunerada'
   | 'licencia_no_remunerada'
@@ -97,6 +98,7 @@ export type NovedadType =
 export const NOVEDAD_TYPE_LABELS: Record<NovedadType, string> = {
   horas_extra: 'Horas Extra',
   recargo_nocturno: 'Recargo Nocturno',
+  recargo_dominical: 'Recargo Dominical',
   vacaciones: 'Vacaciones',
   licencia_remunerada: 'Licencia Remunerada',
   licencia_no_remunerada: 'Licencia No Remunerada',
