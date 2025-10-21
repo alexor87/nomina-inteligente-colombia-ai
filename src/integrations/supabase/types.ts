@@ -2934,6 +2934,7 @@ export type Database = {
           cedula: string
           employee_id: string
           nombre: string
+          tipo_documento: string
         }[]
       }
       get_employee_identity_for_period_v2: {
@@ -3108,7 +3109,7 @@ export type Database = {
       }
       l2_normalize: {
         Args: { "": string } | { "": unknown } | { "": unknown }
-        Returns: string
+        Returns: unknown
       }
       log_security_violation: {
         Args: {
@@ -3156,10 +3157,20 @@ export type Database = {
         Returns: {
           content: string
           document_type: string
+          embedding_hint: string
+          examples: string[]
           id: string
+          keywords: string[]
+          note: string
           reference: string
           similarity: number
+          source_url: string
+          sources: string[]
+          summary: string
+          temporal_validity: string
           title: string
+          topic: string
+          year: number
         }[]
       }
       sparsevec_out: {
@@ -3257,6 +3268,7 @@ export type Database = {
         | "multa"
         | "descuento_voluntario"
         | "licencia_no_remunerada"
+        | "recargo_dominical"
       social_benefit_type:
         | "cesantias"
         | "intereses_cesantias"
@@ -3415,6 +3427,7 @@ export const Constants = {
         "multa",
         "descuento_voluntario",
         "licencia_no_remunerada",
+        "recargo_dominical",
       ],
       social_benefit_type: [
         "cesantias",
