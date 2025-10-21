@@ -107,23 +107,59 @@ const calcularValorHoraRecargoBase = (salarioMensual: number, fecha: Date): numb
   return valorHora;
 };
 
-// ✅ Factor legal para horas extra COMPLETO - Cumplimiento normativo total
-const getOvertimeFactor = (subtipoRaw?: string): number => {
+/**
+ * ===============================
+ *  LEY 2466/2025 - RECARGO DOMINICAL/FESTIVO PROGRESIVO
+ * ===============================
+ * Incremento progresivo del recargo dominical y festivo sobre hora ordinaria:
+ * - Hasta 30/jun/2025: 75% (0.75)
+ * - 1/jul/2025 - 30/jun/2026: 80% (0.80) 
+ * - 1/jul/2026 - 30/jun/2027: 90% (0.90)
+ * - Desde 1/jul/2027: 100% (1.00)
+ */
+const getRecargoDominicalFestivo = (fecha: Date): number => {
+  if (fecha < new Date('2025-07-01')) {
+    console.log(`🗓️ Recargo dominical/festivo: 75% (antes de reforma)`);
+    return 0.75;
+  } else if (fecha < new Date('2026-07-01')) {
+    console.log(`🗓️ Recargo dominical/festivo: 80% (Ley 2466/2025 Fase 1)`);
+    return 0.80;
+  } else if (fecha < new Date('2027-07-01')) {
+    console.log(`🗓️ Recargo dominical/festivo: 90% (Ley 2466/2025 Fase 2)`);
+    return 0.90;
+  } else {
+    console.log(`🗓️ Recargo dominical/festivo: 100% (Ley 2466/2025 Final)`);
+    return 1.00;
+  }
+};
+
+// ✅ Factor legal para horas extra COMPLETO - Incluye Ley 2466/2025 (Recargo dominical progresivo)
+const getOvertimeFactor = (subtipoRaw?: string, fecha?: Date): number => {
   const s = String(subtipoRaw || '').toLowerCase().trim();
+  const fechaCalculo = fecha || new Date();
   
   // Horas extra nocturnas (75%)
   if (s === 'nocturnas' || s === 'nocturna') return 1.75;
   
-  // Horas extra dominicales/festivas (75% = 1.75 factor)
+  // Horas extra dominicales/festivas (75% = 1.75 factor) - genéricos sin especificar diurna/nocturna
   if (s === 'dominicales' || s === 'dominical') return 1.75;
   if (s === 'festivas' || s === 'festiva') return 1.75;
   
-  // Casos específicos del frontend - ✅ CORRECCIÓN: Factores dominicales correctos
-  if (s === 'dominicales_diurnas' || s === 'dominical_diurna') return 2.0; // 100%
-  if (s === 'dominicales_nocturnas' || s === 'dominical_nocturna') return 2.5; // 150%
-  if (s === 'festivas_diurnas' || s === 'festiva_diurna') return 2.0; // 100%
-  if (s === 'festivas_nocturnas' || s === 'festiva_nocturna') return 2.5; // 150%
-  if (s === 'nocturna_dominical') return 2.5; // 150%
+  // ✅ LEY 2466/2025: Horas extra DOMINICALES/FESTIVAS DIURNAS (25% extra + recargo dominical progresivo)
+  if (s === 'dominicales_diurnas' || s === 'dominical_diurna' || s === 'festivas_diurnas' || s === 'festiva_diurna') {
+    const recargoDominical = getRecargoDominicalFestivo(fechaCalculo);
+    const factorTotal = 1.25 + recargoDominical; // 25% extra diurna + recargo dominical vigente
+    console.log(`✅ FACTOR DIURNO DOMINICAL/FESTIVO: 1.25 + ${recargoDominical} = ${factorTotal} (fecha: ${fechaCalculo.toISOString().slice(0, 10)})`);
+    return factorTotal;
+  }
+  
+  // ✅ LEY 2466/2025: Horas extra DOMINICALES/FESTIVAS NOCTURNAS (75% extra nocturna + recargo dominical progresivo)
+  if (s === 'dominicales_nocturnas' || s === 'dominical_nocturna' || s === 'festivas_nocturnas' || s === 'festiva_nocturna' || s === 'nocturna_dominical') {
+    const recargoDominical = getRecargoDominicalFestivo(fechaCalculo);
+    const factorTotal = 1.75 + recargoDominical; // 75% extra nocturna + recargo dominical vigente
+    console.log(`✅ FACTOR NOCTURNO DOMINICAL/FESTIVO: 1.75 + ${recargoDominical} = ${factorTotal} (fecha: ${fechaCalculo.toISOString().slice(0, 10)})`);
+    return factorTotal;
+  }
   
   // Horas extra diurnas (25%)
   return 1.25;
@@ -546,7 +582,7 @@ async function calculateNovedadesTotals(supabase: any, data: any) {
     } else if (tipo_novedad === 'horas_extra') {
       const horasNum = Number(horas || 0);
       if (horasNum > 0) {
-        const factor = getOvertimeFactor(subtipo);
+        const factor = getOvertimeFactor(subtipo, fecha);
         valorCalculado = Math.round(valorHoraExtraBase * horasNum * factor);
         detalleCalculo = `Horas extra ${subtipo || 'diurnas'}: ${horasNum} h × $${Math.round(valorHoraExtraBase).toLocaleString()} × ${factor} = $${valorCalculado.toLocaleString()}`;
 
@@ -672,7 +708,7 @@ async function calculateSingleNovedad(supabase: any, data: any) {
 
   } else if (tipoNovedad === 'horas_extra') {
     const horasNum = Number(horas || 0);
-    const factor = getOvertimeFactor(subtipo);
+    const factor = getOvertimeFactor(subtipo, fecha);
     valor = Math.round(valorHoraExtraBase * horasNum * factor);
     factorCalculo = factor;
     detalleCalculo = `Horas extra ${subtipo || 'diurnas'}: ${horasNum} h × $${Math.round(valorHoraExtraBase).toLocaleString()} × ${factor} = $${valor.toLocaleString()}`;
@@ -692,25 +728,15 @@ async function calculateSingleNovedad(supabase: any, data: any) {
     let tipoDescripcion = 'nocturno';
     
     if (tipoNovedad === 'recargo_dominical') {
-      // ✅ NUEVO: Recargo dominical puro con factores progresivos
-      if (fecha < new Date('2025-07-01')) {
-        factorRecargo = 0.75; // 75%
-      } else if (fecha < new Date('2026-07-01')) {
-        factorRecargo = 0.80; // 80%
-      } else if (fecha < new Date('2027-07-01')) {
-        factorRecargo = 0.90; // 90%
-      } else {
-        factorRecargo = 1.00; // 100%
-      }
+      // ✅ LEY 2466/2025: Usar función centralizada
+      factorRecargo = getRecargoDominicalFestivo(fecha);
       tipoDescripcion = 'dominical';
     } else {
       const s = String(subtipo || '').toLowerCase().trim();
       if (s === 'dominical' || s === 'nocturno_dominical') {
-        // ✅ CORRECCIÓN CRÍTICA: Nocturno (35%) + Dominical vigente
-        const factorDominical = fecha < new Date('2025-07-01') ? 0.75 : 
-                                 fecha < new Date('2026-07-01') ? 0.80 :
-                                 fecha < new Date('2027-07-01') ? 0.90 : 1.00;
-        factorRecargo = 0.35 + factorDominical; // Máximo 110%
+        // ✅ LEY 2466/2025: Nocturno (35%) + Dominical vigente
+        const factorDominical = getRecargoDominicalFestivo(fecha);
+        factorRecargo = 0.35 + factorDominical; // Máximo 135%
         tipoDescripcion = 'nocturno dominical';
       } else if (s === 'nocturno') {
         factorRecargo = 0.35; // 35% para nocturno ordinario
