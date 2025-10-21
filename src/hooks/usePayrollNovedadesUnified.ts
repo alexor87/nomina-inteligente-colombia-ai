@@ -378,15 +378,20 @@ export const usePayrollNovedadesUnified = (
         NovedadesCalculationService.invalidateCache(employeeId, periodId);
         refreshEmployeeNovedades(employeeId).then(() => {
           console.log('✅ Cache del empleado actualizado exitosamente en store global');
+          
+          // ✅ CRÍTICO: Actualizar lastRefreshTime DESPUÉS de actualizar novedadesTotals
+          const newRefreshTime = Date.now();
+          setLastRefreshTime(newRefreshTime);
+          console.log('⏰ Nuevo lastRefreshTime establecido en store global:', newRefreshTime);
         }).catch(err => {
           console.error('❌ Error refrescando cache del empleado:', err);
         });
+      } else {
+        // Si no hay employeeId, actualizar lastRefreshTime inmediatamente
+        const newRefreshTime = Date.now();
+        setLastRefreshTime(newRefreshTime);
+        console.log('⏰ Nuevo lastRefreshTime establecido en store global (sin employeeId):', newRefreshTime);
       }
-
-      // Forzar recálculo dependiente (triggers en tablas) - CRÍTICO PARA SINCRONIZACIÓN
-      const newRefreshTime = Date.now();
-      setLastRefreshTime(newRefreshTime);
-      console.log('⏰ Nuevo lastRefreshTime establecido en store global:', newRefreshTime);
       
       // ✅ MEJORADO: Invalidación más agresiva y específica
       queryClient.invalidateQueries({ 
