@@ -3192,32 +3192,17 @@ export type Database = {
         Returns: number
       }
       search_legal_knowledge: {
-        Args:
-          | {
-              filter_validity?: string
-              match_count?: number
-              match_threshold?: number
-              query_embedding: string
-            }
-          | {
-              match_count?: number
-              match_threshold?: number
-              query_embedding: string
-            }
+        Args: {
+          match_count?: number
+          match_threshold?: number
+          query_embedding: string
+        }
         Returns: {
           content: string
           document_type: string
-          embedding_hint: string
-          examples: string[]
           id: string
-          keywords: string[]
-          note: string
           reference: string
           similarity: number
-          source_url: string
-          sources: string[]
-          summary: string
-          temporal_validity: string
           title: string
           topic: string
           year: number
