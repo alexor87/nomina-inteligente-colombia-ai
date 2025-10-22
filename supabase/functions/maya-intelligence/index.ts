@@ -4094,18 +4094,23 @@ async function handleConversation(message: string, conversation: any[]) {
     try {
       console.log('[RAG] Generando embedding para búsqueda...');
       
-      // Generar embedding del mensaje del usuario
-      const embeddingResponse = await fetch('https://ai.gateway.lovable.dev/v1/embeddings', {
+      // Generar embedding del mensaje del usuario usando OpenAI
+      const openaiKey = Deno.env.get('OPENAI_API_KEY');
+      if (!openaiKey) {
+        console.warn('[RAG] ⚠️ OPENAI_API_KEY no configurado, saltando RAG');
+      }
+      
+      const embeddingResponse = openaiKey ? await fetch('https://api.openai.com/v1/embeddings', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${lovableKey}`,
+          'Authorization': `Bearer ${openaiKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'text-embedding-ada-002',
+          model: 'text-embedding-3-small',
           input: message,
         }),
-      });
+      }) : null;
       
       if (embeddingResponse.ok) {
         const embeddingData = await embeddingResponse.json();

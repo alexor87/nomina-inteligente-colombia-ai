@@ -19,22 +19,22 @@ serve(async (req) => {
       throw new Error('Text is required');
     }
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY not configured');
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+    if (!OPENAI_API_KEY) {
+      throw new Error('OPENAI_API_KEY not configured');
     }
 
     console.log('[generate-embedding] Generating embedding for text:', text.substring(0, 100) + '...');
 
-    // Usar Lovable AI para generar embeddings
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/embeddings', {
+    // Usar OpenAI directamente para generar embeddings
+    const response = await fetch('https://api.openai.com/v1/embeddings', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'text-embedding-ada-002', // Modelo compatible con OpenAI
+        model: 'text-embedding-3-small',
         input: text,
       }),
     });

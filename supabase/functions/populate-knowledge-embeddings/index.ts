@@ -18,9 +18,9 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY not configured');
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+    if (!OPENAI_API_KEY) {
+      throw new Error('OPENAI_API_KEY not configured');
     }
 
     console.log('[populate-embeddings] Starting embedding generation...');
@@ -47,15 +47,15 @@ serve(async (req) => {
 
         console.log(`[populate-embeddings] Processing document ${doc.id}: ${doc.title}`);
 
-        // Generar embedding usando Lovable AI
-        const response = await fetch('https://ai.gateway.lovable.dev/v1/embeddings', {
+        // Generar embedding usando OpenAI
+        const response = await fetch('https://api.openai.com/v1/embeddings', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+            'Authorization': `Bearer ${OPENAI_API_KEY}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: 'text-embedding-ada-002',
+            model: 'text-embedding-3-small',
             input: textToEmbed,
           }),
         });
