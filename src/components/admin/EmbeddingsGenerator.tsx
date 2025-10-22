@@ -57,7 +57,7 @@ export const EmbeddingsGenerator = () => {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="text-sm text-muted-foreground">
-          <p>Esta herramienta procesará todos los documentos en <code>legal_knowledge_base</code> que no tienen embeddings y generará vectores semánticos usando Lovable AI.</p>
+          <p>Esta herramienta procesará todos los documentos en <code>legal_knowledge_base</code> que no tienen embeddings y generará vectores semánticos usando OpenAI text-embedding-3-small.</p>
           <p className="mt-2">Los embeddings permiten a Maya realizar búsquedas semánticas precisas sobre legislación laboral colombiana.</p>
         </div>
 
