@@ -314,6 +314,14 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
 
   const handleCloseNovedadModal = async () => {
     console.log('🚪 Cerrando modal de novedades');
+    
+    // ✅ CRÍTICO: Refrescar novedades del empleado antes de cerrar
+    if (selectedEmployee) {
+      console.log('🔄 Refrescando novedades antes de cerrar modal para:', selectedEmployee.name);
+      await refreshEmployeeNovedades(selectedEmployee.id);
+      console.log('✅ Novedades refrescadas, columna actualizada');
+    }
+    
     setNovedadModalOpen(false);
     setSelectedEmployee(null);
     novedadChangedRef.current = false;
