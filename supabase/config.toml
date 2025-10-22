@@ -4,6 +4,9 @@ project_id = "xrmorlkakwujyozgmilf"
 [functions.maya-intelligence]
 verify_jwt = true
 
+[functions.process-embedding-queue]
+verify_jwt = false
+
 [functions.calculate-social-benefits]
 verify_jwt = true
 
