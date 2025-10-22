@@ -9,6 +9,7 @@ import { usePayrollLiquidationSimplified } from '@/hooks/usePayrollLiquidationSi
 import { useSimplePeriodSelection } from '@/hooks/useSimplePeriodSelection';
 import { EmployeeAddModal } from '@/components/payroll/modals/EmployeeAddModal';
 import { NoveltyImportDrawer } from '@/components/payroll/novelties-import/NoveltyImportDrawer';
+import { PayrollEmptyState } from '@/components/payroll/liquidation/PayrollEmptyState';
 import { useCurrentCompany } from '@/hooks/useCurrentCompany';
 import { MayaProvider } from '@/maya/MayaProvider';
 import { MayaFloatingAssistant } from '@/maya/MayaFloatingAssistant';
@@ -254,6 +255,11 @@ const PayrollLiquidationPageSimplified = () => {
     setPeriodSelected(false);
   };
 
+  const handleNavigateToEmployees = () => {
+    console.log('🚀 Navegando al módulo de empleados');
+    navigate('/modules/employees');
+  };
+
   // 🎯 NUEVA FUNCIÓN: Detectar situación de fin de año
   const checkEndOfYearSituation = async () => {
     if (!companyId) return;
@@ -411,6 +417,18 @@ const PayrollLiquidationPageSimplified = () => {
                 Cambiar Período
               </Button>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Estado vacío cuando hay período seleccionado pero sin empleados */}
+      {selectedPeriod && periodSelected && employees.length === 0 && !isLoadingEmployees && (
+        <Card>
+          <CardContent className="p-0">
+            <PayrollEmptyState
+              periodLabel={selectedPeriod.label}
+              onNavigateToEmployees={handleNavigateToEmployees}
+            />
           </CardContent>
         </Card>
       )}
