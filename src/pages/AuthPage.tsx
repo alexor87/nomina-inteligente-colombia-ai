@@ -126,13 +126,13 @@ const AuthPage = () => {
       
       toast({
         title: "¡Cuenta creada exitosamente!",
-        description: "Ya puedes iniciar sesión con tus credenciales",
+        description: "Ahora configuremos tu empresa para completar el proceso.",
       });
 
-      // Clear signup form and switch to login tab
-      setSignupForm({ email: '', password: '', confirmPassword: '', firstName: '', lastName: '' });
-      setLoginForm({ email: signupForm.email, password: '' });
-      setActiveTab('login');
+      // Redirigir al wizard completo de empresa
+      setTimeout(() => {
+        navigate('/register/company');
+      }, 1500);
       
     } catch (error: any) {
       toast({
