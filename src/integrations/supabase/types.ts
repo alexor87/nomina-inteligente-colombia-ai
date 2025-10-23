@@ -3110,46 +3110,26 @@ export type Database = {
             Returns: Json
           }
       normalize_biweekly_period_labels: { Args: never; Returns: number }
-      search_legal_knowledge:
-        | {
-            Args: {
-              match_count?: number
-              match_threshold?: number
-              query_embedding: string
-            }
-            Returns: {
-              category: string
-              content: string
-              examples: Json
-              id: string
-              keywords: string[]
-              metadata: Json
-              priority: number
-              similarity: number
-              sources: Json
-              subcategory: string
-              summary: string
-              temporal_validity: Json
-              title: string
-            }[]
-          }
-        | {
-            Args: {
-              match_count?: number
-              match_threshold?: number
-              query_embedding: string
-            }
-            Returns: {
-              content: string
-              document_type: string
-              id: string
-              reference: string
-              similarity: number
-              title: string
-              topic: string
-              year: number
-            }[]
-          }
+      search_legal_knowledge: {
+        Args: {
+          match_count?: number
+          match_threshold?: number
+          query_embedding: string
+        }
+        Returns: {
+          category: string
+          content: string
+          examples: string[]
+          id: string
+          keywords: string[]
+          metadata: Json
+          similarity: number
+          sources: string[]
+          summary: string
+          temporal_validity: Json
+          title: string
+        }[]
+      }
       sync_existing_vacation_data: { Args: never; Returns: string }
       sync_historical_payroll_data: {
         Args: { p_company_id?: string; p_period_id: string }
