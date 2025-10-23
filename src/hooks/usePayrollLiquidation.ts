@@ -210,7 +210,25 @@ export const usePayrollLiquidation = () => {
         return;
       }
 
-      // Eliminar el registro de nómina
+      console.log(`🗑️ Removiendo empleado ${employeeId} del período ${currentPeriodId}`);
+
+      // 1. PRIMERO: Eliminar novedades del empleado para este período
+      const { data: deletedNovedades, error: novedadesDeleteError } = await supabase
+        .from('payroll_novedades')
+        .delete()
+        .eq('empleado_id', employeeId)
+        .eq('periodo_id', currentPeriodId)
+        .select('id');
+
+      if (novedadesDeleteError) {
+        console.error('❌ Error eliminando novedades:', novedadesDeleteError);
+        // Continuar con la eliminación del payroll de todos modos
+      } else {
+        const novedadesCount = deletedNovedades?.length || 0;
+        console.log(`✅ Novedades eliminadas: ${novedadesCount}`);
+      }
+
+      // 2. SEGUNDO: Eliminar el registro de nómina
       const { error: deleteError } = await supabase
         .from('payrolls')
         .delete()
@@ -218,11 +236,13 @@ export const usePayrollLiquidation = () => {
 
       if (deleteError) throw deleteError;
 
+      console.log(`✅ Empleado ${employeeId} removido exitosamente`);
+
       // Actualizar el estado local
       setEmployees(prevEmployees => prevEmployees.filter(emp => emp.id !== employeeId));
       toast({
         title: "Empleado removido",
-        description: "El empleado ha sido removido del período actual.",
+        description: "El empleado y sus novedades han sido removidos del período actual.",
       });
 
     } catch (error) {
