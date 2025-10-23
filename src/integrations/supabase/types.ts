@@ -3117,17 +3117,20 @@ export type Database = {
           query_embedding: string
         }
         Returns: {
-          category: string
           content: string
+          document_type: string
           examples: string[]
           id: string
           keywords: string[]
           metadata: Json
+          note: string
+          reference: string
           similarity: number
           sources: string[]
           summary: string
-          temporal_validity: Json
+          temporal_validity: string
           title: string
+          topic: string
         }[]
       }
       sync_existing_vacation_data: { Args: never; Returns: string }

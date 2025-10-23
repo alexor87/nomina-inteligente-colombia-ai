@@ -4130,7 +4130,8 @@ async function handleConversation(message: string, conversation: any[]) {
         if (!searchError && relevantDocs && relevantDocs.length > 0) {
           console.log(`[RAG] ✅ ${relevantDocs.length} documentos encontrados:`);
           relevantDocs.forEach((doc: any, i: number) => {
-            console.log(`  ${i + 1}. ${doc.title} (${(doc.similarity * 100).toFixed(1)}% relevancia)`);
+            console.log(`  ${i + 1}. ${doc.title} ${doc.reference ? `(${doc.reference})` : ''} - ${(doc.similarity * 100).toFixed(1)}% relevancia`);
+            console.log(`     - Tipo: ${doc.document_type || 'N/A'}, Topic: ${doc.topic || 'N/A'}`);
             console.log(`     - Sources: ${doc.sources?.length || 0}, Examples: ${doc.examples?.length || 0}`);
             console.log(`     - Preview: ${doc.content.substring(0, 200)}...`);
           });
@@ -4138,9 +4139,18 @@ async function handleConversation(message: string, conversation: any[]) {
           // Construir contexto legal enriquecido con todos los campos disponibles
           legalContext = '\n\n**CONTEXTO LEGAL ACTUALIZADO:**\n\n';
           relevantDocs.forEach((doc: any, index: number) => {
-            // Encabezado con metadata
-            legalContext += `### 📚 ${index + 1}. ${doc.title}\n`;
-            legalContext += `**Tipo:** ${doc.document_type} | **Relevancia:** ${(doc.similarity * 100).toFixed(1)}%\n`;
+            // Encabezado con metadata completa
+            legalContext += `### 📚 ${index + 1}. ${doc.title}`;
+            if (doc.reference) {
+              legalContext += ` (${doc.reference})`;
+            }
+            legalContext += `\n`;
+            legalContext += `**Tipo:** ${doc.document_type || 'N/A'} | **Tema:** ${doc.topic || 'N/A'} | **Relevancia:** ${(doc.similarity * 100).toFixed(1)}%\n`;
+            
+            // Vigencia temporal (si existe)
+            if (doc.temporal_validity) {
+              legalContext += `**⏰ Vigente desde:** ${doc.temporal_validity}\n`;
+            }
             
             // Resumen ejecutivo (si existe)
             if (doc.summary) {
@@ -4171,6 +4181,11 @@ async function handleConversation(message: string, conversation: any[]) {
             // Notas especiales (si existen)
             if (doc.note) {
               legalContext += `⚠️ **Nota importante:** ${doc.note}\n\n`;
+            }
+            
+            // Keywords para contexto adicional
+            if (doc.keywords && doc.keywords.length > 0) {
+              legalContext += `🔑 **Palabras clave:** ${doc.keywords.join(', ')}\n\n`;
             }
             
             legalContext += '---\n\n';
