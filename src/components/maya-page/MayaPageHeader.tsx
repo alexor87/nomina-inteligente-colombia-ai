@@ -6,6 +6,9 @@ import { FlowType } from '@/maya/types/GuidedFlow';
 import { motion } from 'framer-motion';
 import { MayaHeaderActions } from './MayaHeaderActions';
 import { Button } from '@/components/ui/button';
+import { CompanySelector } from '@/components/layout/CompanySelector';
+import { NotificationBell } from '@/components/layout/NotificationBell';
+import { UserMenu } from '@/components/layout/UserMenu';
 
 export const MayaPageHeader: React.FC = () => {
   const { clearConversation, deleteCurrentConversation, currentConversationId, startGuidedFlow } = useMaya();
@@ -53,12 +56,23 @@ export const MayaPageHeader: React.FC = () => {
           </div>
         </div>
 
-        <MayaHeaderActions 
-          onNewConversation={clearConversation}
-          onDeleteConversation={deleteCurrentConversation}
-          currentConversationId={currentConversationId}
-          onStartOnboarding={handleStartOnboarding}
-        />
+        <div className="flex items-center gap-3">
+          {/* Acciones específicas de MAYA */}
+          <MayaHeaderActions 
+            onNewConversation={clearConversation}
+            onDeleteConversation={deleteCurrentConversation}
+            currentConversationId={currentConversationId}
+            onStartOnboarding={handleStartOnboarding}
+          />
+          
+          {/* Separador visual */}
+          <div className="h-6 w-px bg-gray-300" />
+          
+          {/* Componentes globales de navegación */}
+          <CompanySelector />
+          <NotificationBell />
+          <UserMenu />
+        </div>
       </div>
     </motion.header>
   );
