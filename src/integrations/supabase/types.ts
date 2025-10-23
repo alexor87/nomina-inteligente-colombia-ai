@@ -2409,7 +2409,7 @@ export type Database = {
           company_id: string | null
           created_at: string
           id: string
-          ip_address: unknown | null
+          ip_address: unknown
           query_attempted: string | null
           table_name: string
           user_agent: string | null
@@ -2422,7 +2422,7 @@ export type Database = {
           company_id?: string | null
           created_at?: string
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           query_attempted?: string | null
           table_name: string
           user_agent?: string | null
@@ -2435,7 +2435,7 @@ export type Database = {
           company_id?: string | null
           created_at?: string
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           query_attempted?: string | null
           table_name?: string
           user_agent?: string | null
@@ -2720,7 +2720,7 @@ export type Database = {
           created_at: string
           error_message: string | null
           id: string
-          ip_address: unknown | null
+          ip_address: unknown
           method: string | null
           recipient_email: string | null
           recipient_phone: string | null
@@ -2735,7 +2735,7 @@ export type Database = {
           created_at?: string
           error_message?: string | null
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           method?: string | null
           recipient_email?: string | null
           recipient_phone?: string | null
@@ -2750,7 +2750,7 @@ export type Database = {
           created_at?: string
           error_message?: string | null
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           method?: string | null
           recipient_email?: string | null
           recipient_phone?: string | null
@@ -2829,10 +2829,6 @@ export type Database = {
         Args: { p_period_id: string }
         Returns: Json
       }
-      binary_quantize: {
-        Args: { "": string } | { "": unknown }
-        Returns: unknown
-      }
       calculate_period_intersection_days: {
         Args: {
           absence_end: string
@@ -2854,30 +2850,18 @@ export type Database = {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
       }
-      clean_abandoned_draft_periods: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
-      clean_duplicate_periods: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
+      clean_abandoned_draft_periods: { Args: never; Returns: number }
+      clean_duplicate_periods: { Args: never; Returns: Json }
       clean_specific_duplicate_periods: {
         Args: { p_company_id?: string }
         Returns: Json
       }
-      cleanup_expired_commands: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
+      cleanup_expired_commands: { Args: never; Returns: undefined }
       complete_incomplete_registration: {
         Args: { p_company_name?: string; p_nit?: string; p_user_email: string }
         Returns: Json
       }
-      consolidate_duplicate_periods: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
+      consolidate_duplicate_periods: { Args: never; Returns: Json }
       create_company_with_setup: {
         Args: {
           p_ciudad?: string
@@ -2916,16 +2900,13 @@ export type Database = {
         Args: { p_company_id?: string }
         Returns: Json
       }
-      diagnose_maya_auth: {
-        Args:
-          | { p_company_id?: string }
-          | { p_requesting_user_id: string; p_target_company_id: string }
-        Returns: Json
-      }
-      ensure_admin_role_for_company_users: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
+      diagnose_maya_auth:
+        | {
+            Args: { p_requesting_user_id: string; p_target_company_id: string }
+            Returns: Json
+          }
+        | { Args: { p_company_id?: string }; Returns: Json }
+      ensure_admin_role_for_company_users: { Args: never; Returns: undefined }
       execute_maya_safe_query: {
         Args: {
           requesting_user_id: string
@@ -2938,18 +2919,9 @@ export type Database = {
         Args: { sql_query: string; target_company_id: string }
         Returns: Json
       }
-      fix_malformed_fragmented_absences: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      fix_missing_admin_roles: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      force_sync_existing_novedades: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
+      fix_malformed_fragmented_absences: { Args: never; Returns: string }
+      fix_missing_admin_roles: { Args: never; Returns: string }
+      force_sync_existing_novedades: { Args: never; Returns: string }
       generate_payroll_records_for_period: {
         Args: { p_period_id: string }
         Returns: Json
@@ -2971,22 +2943,27 @@ export type Database = {
           sort_order: number
         }[]
       }
-      get_current_user_company_id: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      get_employee_identity_for_period: {
-        Args:
-          | { p_employee_ids: string[]; p_period_id: string }
-          | { p_employee_ids: string[]; p_period_id: string }
-        Returns: {
-          apellido: string
-          cedula: string
-          employee_id: string
-          nombre: string
-          tipo_documento: string
-        }[]
-      }
+      get_current_user_company_id: { Args: never; Returns: string }
+      get_employee_identity_for_period:
+        | {
+            Args: { p_employee_ids: string[]; p_period_id: string }
+            Returns: {
+              apellido: string
+              cedula: string
+              employee_id: string
+              nombre: string
+              tipo_documento: string
+            }[]
+          }
+        | {
+            Args: { p_employee_ids: string[]; p_period_id: string }
+            Returns: {
+              apellido: string
+              cedula: string
+              employee_id: string
+              nombre: string
+            }[]
+          }
       get_employee_identity_for_period_v2: {
         Args: { p_employee_ids: string[]; p_period_id: string }
         Returns: {
@@ -3012,7 +2989,7 @@ export type Database = {
         }[]
       }
       get_employees_limited: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           apellido: string
           cargo: string
@@ -3085,26 +3062,7 @@ export type Database = {
         Args: { _company_id: string; _user_id: string }
         Returns: string
       }
-      halfvec_avg: {
-        Args: { "": number[] }
-        Returns: unknown
-      }
-      halfvec_out: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      halfvec_send: {
-        Args: { "": unknown }
-        Returns: string
-      }
-      halfvec_typmod_in: {
-        Args: { "": unknown[] }
-        Returns: number
-      }
-      has_company_access: {
-        Args: { p_company_id: string }
-        Returns: boolean
-      }
+      has_company_access: { Args: { p_company_id: string }; Returns: boolean }
       has_role: {
         Args: {
           _company_id?: string
@@ -3121,46 +3079,7 @@ export type Database = {
         }
         Returns: boolean
       }
-      hnsw_bit_support: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      hnsw_halfvec_support: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      hnsw_sparsevec_support: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      hnswhandler: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      is_support_user: {
-        Args: { _user_id?: string }
-        Returns: boolean
-      }
-      ivfflat_bit_support: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      ivfflat_halfvec_support: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      ivfflathandler: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      l2_norm: {
-        Args: { "": unknown } | { "": unknown }
-        Returns: number
-      }
-      l2_normalize: {
-        Args: { "": string } | { "": unknown } | { "": unknown }
-        Returns: unknown
-      }
+      is_support_user: { Args: { _user_id?: string }; Returns: boolean }
       log_security_violation: {
         Args: {
           p_action: string
@@ -3171,26 +3090,26 @@ export type Database = {
         }
         Returns: undefined
       }
-      maya_query_router: {
-        Args:
-          | {
-              company_id: string
-              params: Json
-              query_type: string
-              user_id: string
-            }
-          | {
+      maya_query_router:
+        | {
+            Args: {
               params: Json
               query_type: string
               requesting_user_id: string
               target_company_id: string
             }
-        Returns: Json
-      }
-      normalize_biweekly_period_labels: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
+            Returns: Json
+          }
+        | {
+            Args: {
+              company_id: string
+              params: Json
+              query_type: string
+              user_id: string
+            }
+            Returns: Json
+          }
+      normalize_biweekly_period_labels: { Args: never; Returns: number }
       search_legal_knowledge: {
         Args: {
           match_count?: number
@@ -3208,30 +3127,12 @@ export type Database = {
           year: number
         }[]
       }
-      sparsevec_out: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      sparsevec_send: {
-        Args: { "": unknown }
-        Returns: string
-      }
-      sparsevec_typmod_in: {
-        Args: { "": unknown[] }
-        Returns: number
-      }
-      sync_existing_vacation_data: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
+      sync_existing_vacation_data: { Args: never; Returns: string }
       sync_historical_payroll_data: {
         Args: { p_company_id?: string; p_period_id: string }
         Returns: Json
       }
-      sync_payroll_periods: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
+      sync_payroll_periods: { Args: never; Returns: undefined }
       user_has_access_to_company: {
         Args: { p_company_id: string; p_user_id: string }
         Returns: boolean
@@ -3248,34 +3149,7 @@ export type Database = {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
       }
-      vector_avg: {
-        Args: { "": number[] }
-        Returns: string
-      }
-      vector_dims: {
-        Args: { "": string } | { "": unknown }
-        Returns: number
-      }
-      vector_norm: {
-        Args: { "": string }
-        Returns: number
-      }
-      vector_out: {
-        Args: { "": string }
-        Returns: unknown
-      }
-      vector_send: {
-        Args: { "": string }
-        Returns: string
-      }
-      vector_typmod_in: {
-        Args: { "": unknown[] }
-        Returns: number
-      }
-      verify_demo_data_cleanup: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
+      verify_demo_data_cleanup: { Args: never; Returns: Json }
     }
     Enums: {
       app_role:
