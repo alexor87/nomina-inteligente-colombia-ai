@@ -1,14 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useMaya } from '@/maya/MayaProvider';
 import { Button } from '@/components/ui/button';
-import { Send, Loader2 } from 'lucide-react';
+import { Send } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { CommandChips } from './CommandChips';
 
 export const MayaInputArea: React.FC = () => {
-  const { sendMessage } = useMaya();
+  const { sendMessage, isProcessing } = useMaya();
   const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Auto-resize textarea
@@ -21,18 +20,16 @@ export const MayaInputArea: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || isLoading) return;
+    if (!input.trim() || isProcessing) return;
 
     const message = input.trim();
     setInput('');
-    setIsLoading(true);
 
     try {
       await sendMessage(message);
     } catch (error) {
       console.error('Error sending message:', error);
     } finally {
-      setIsLoading(false);
       textareaRef.current?.focus();
     }
   };
@@ -69,7 +66,7 @@ export const MayaInputArea: React.FC = () => {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Escribe tu mensaje... (Enter para enviar, Shift+Enter para nueva línea)"
-              disabled={isLoading}
+              disabled={isProcessing}
               rows={1}
               className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 resize-none transition-all disabled:opacity-50"
               style={{ minHeight: '48px', maxHeight: '200px' }}
@@ -79,17 +76,10 @@ export const MayaInputArea: React.FC = () => {
           {/* Send button */}
           <Button
             type="submit"
-            disabled={!input.trim() || isLoading}
+            disabled={!input.trim() || isProcessing}
             className="relative bg-primary hover:bg-primary/90 text-white shadow-lg disabled:opacity-40 disabled:cursor-not-allowed h-12 w-12 p-0 rounded-xl transition-all"
           >
-            {/* Glow effect on hover */}
-            <div className="absolute inset-0 bg-blue-500 opacity-0 group-hover:opacity-10 blur-xl rounded-xl transition-opacity" />
-            
-            {isLoading ? (
-              <Loader2 className="h-5 w-5 animate-spin relative z-10" />
-            ) : (
-              <Send className="h-5 w-5 relative z-10" />
-            )}
+            <Send className="h-5 w-5" />
           </Button>
         </div>
 

@@ -7,9 +7,8 @@ import { TypingIndicator } from './TypingIndicator';
 import { FlowType } from '@/maya/types/GuidedFlow';
 
 export const MayaChatArea: React.FC = () => {
-  const { chatHistory, startGuidedFlow } = useMaya();
+  const { chatHistory, startGuidedFlow, isProcessing } = useMaya();
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [isLoading] = React.useState(false); // Will be connected to actual loading state
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -183,7 +182,7 @@ export const MayaChatArea: React.FC = () => {
             ))}
             
             {/* Typing indicator */}
-            {isLoading && (
+            {isProcessing && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}

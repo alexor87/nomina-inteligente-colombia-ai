@@ -16,6 +16,7 @@ interface MayaProviderValue {
   currentMessage: MayaMessage | null;
   isVisible: boolean;
   isChatMode: boolean;
+  isProcessing: boolean;
   chatHistory: ChatMessage[];
   conversations: ConversationSummary[];
   currentConversationId: string | null;
@@ -72,6 +73,7 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
     const persistedConversation = MayaChatService.getInstance().getConversation();
     return persistedConversation.messages.length > 0;
   });
+  const [isProcessing, setIsProcessing] = useState(false);
   const [mayaEngine] = useState(() => MayaEngine.getInstance());
   const [chatService] = useState(() => MayaChatService.getInstance());
   const [conversationManager] = useState(() => MayaConversationManager.getInstance());
@@ -437,114 +439,117 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
   const advanceFlow = useCallback(async (userInput: string) => {
     if (!activeFlow) return;
     
-    // 🆕 FASE 3: Crear conversación si no existe (para quick replies)
-    if (!currentConversationId) {
-      console.log('🆕 MAYA: Creating conversation for flow action');
-      try {
-        await createNewConversation();
-      } catch (error) {
-        console.error('❌ MAYA: Failed to create conversation for flow', error);
-        // Continue anyway - flow can work without DB persistence
+    setIsProcessing(true);
+    
+    try {
+      // 🆕 FASE 3: Crear conversación si no existe (para quick replies)
+      if (!currentConversationId) {
+        console.log('🆕 MAYA: Creating conversation for flow action');
+        try {
+          await createNewConversation();
+        } catch (error) {
+          console.error('❌ MAYA: Failed to create conversation for flow', error);
+          // Continue anyway - flow can work without DB persistence
+        }
       }
-    }
-    
-    const result = await flowManager.advance(activeFlow, userInput);
-    
-    if (result.validationError) {
-      // Show validation error
-      const errorMessage: ChatMessage = {
-        id: Date.now().toString(),
-        role: 'system',
-        content: `❌ ${result.validationError}`,
-        timestamp: new Date().toISOString()
-      };
-      chatService.addMessage(errorMessage);
-      setChatHistory([...chatService.getConversation().messages]);
-      return;
-    }
-    
-    setActiveFlow(result.flowState);
-    
-    // 🆕 FASE 0: Detectar inicio de nuevo flujo después de completed
-    if (result.currentStep.id === 'completed' && result.flowState.accumulatedData._start_new_flow) {
-      const nextFlowType = result.flowState.accumulatedData._start_new_flow;
-      console.log('🔄 MAYA: Flow completed, starting new flow', { nextFlow: nextFlowType });
       
-      // Add final step message
+      const result = await flowManager.advance(activeFlow, userInput);
+      
+      if (result.validationError) {
+        // Show validation error
+        const errorMessage: ChatMessage = {
+          id: Date.now().toString(),
+          role: 'system',
+          content: `❌ ${result.validationError}`,
+          timestamp: new Date().toISOString()
+        };
+        chatService.addMessage(errorMessage);
+        setChatHistory([...chatService.getConversation().messages]);
+        return;
+      }
+      
+      setActiveFlow(result.flowState);
+      
+      // 🆕 FASE 0: Detectar inicio de nuevo flujo después de completed
+      if (result.currentStep.id === 'completed' && result.flowState.accumulatedData._start_new_flow) {
+        const nextFlowType = result.flowState.accumulatedData._start_new_flow;
+        console.log('🔄 MAYA: Flow completed, starting new flow', { nextFlow: nextFlowType });
+        
+        // Add final step message
+        const stepMessage: ChatMessage = {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: result.currentStep.message,
+          timestamp: new Date().toISOString(),
+          isFlowMessage: true,
+          flowId: result.flowState.flowId,
+          stepId: result.currentStep.id
+        };
+        
+        chatService.addMessage(stepMessage);
+        setChatHistory([...chatService.getConversation().messages]);
+        
+        // Complete current flow
+        flowManager.completeFlow(result.flowState);
+        setActiveFlow(null);
+        
+        // Start new flow after a small delay
+        setTimeout(() => {
+          startGuidedFlow(nextFlowType, false); // isDemoMode = false
+        }, 300);
+        
+        return;
+      }
+      
+      // 🆕 FASE 1: Detectar navegación externa después de completed
+      if (result.currentStep.id === 'completed' && result.flowState.accumulatedData._navigate_url) {
+        const navigateUrl = result.flowState.accumulatedData._navigate_url;
+        console.log('🚀 MAYA: Flow completed with navigation', { url: navigateUrl });
+        
+        // Add final step message
+        const stepMessage: ChatMessage = {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: result.currentStep.message,
+          timestamp: new Date().toISOString(),
+          isFlowMessage: true,
+          flowId: result.flowState.flowId,
+          stepId: result.currentStep.id
+        };
+        
+        chatService.addMessage(stepMessage);
+        setChatHistory([...chatService.getConversation().messages]);
+        
+        // Trigger navigation via callback
+        completeFlowAndNavigate(navigateUrl);
+        return;
+      }
+      
+      // Add next step message
       const stepMessage: ChatMessage = {
         id: Date.now().toString(),
         role: 'assistant',
         content: result.currentStep.message,
         timestamp: new Date().toISOString(),
+        quickReplies: result.currentStep.quickReplies,
         isFlowMessage: true,
         flowId: result.flowState.flowId,
-        stepId: result.currentStep.id
+        stepId: result.currentStep.id,
+        // ✅ Incluir executableActions si existen en el resultado de ejecución
+        ...(result.flowState.accumulatedData._executionResult?.executableActions && {
+          executableActions: result.flowState.accumulatedData._executionResult.executableActions
+        })
       };
+      
+      console.log('💬 Adding flow step message:', {
+        stepId: result.currentStep.id,
+        hasQuickReplies: !!result.currentStep.quickReplies,
+        quickRepliesCount: result.currentStep.quickReplies?.length || 0,
+        quickReplies: result.currentStep.quickReplies
+      });
       
       chatService.addMessage(stepMessage);
       setChatHistory([...chatService.getConversation().messages]);
-      
-      // Complete current flow
-      flowManager.completeFlow(result.flowState);
-      setActiveFlow(null);
-      
-      // Start new flow after a small delay
-      setTimeout(() => {
-        startGuidedFlow(nextFlowType, false); // isDemoMode = false
-      }, 300);
-      
-      return;
-    }
-    
-    // 🆕 FASE 1: Detectar navegación externa después de completed
-    if (result.currentStep.id === 'completed' && result.flowState.accumulatedData._navigate_url) {
-      const navigateUrl = result.flowState.accumulatedData._navigate_url;
-      console.log('🚀 MAYA: Flow completed with navigation', { url: navigateUrl });
-      
-      // Add final step message
-      const stepMessage: ChatMessage = {
-        id: Date.now().toString(),
-        role: 'assistant',
-        content: result.currentStep.message,
-        timestamp: new Date().toISOString(),
-        isFlowMessage: true,
-        flowId: result.flowState.flowId,
-        stepId: result.currentStep.id
-      };
-      
-      chatService.addMessage(stepMessage);
-      setChatHistory([...chatService.getConversation().messages]);
-      
-      // Trigger navigation via callback
-      completeFlowAndNavigate(navigateUrl);
-      return;
-    }
-    
-    // Add next step message
-    const stepMessage: ChatMessage = {
-      id: Date.now().toString(),
-      role: 'assistant',
-      content: result.currentStep.message,
-      timestamp: new Date().toISOString(),
-      quickReplies: result.currentStep.quickReplies,
-      isFlowMessage: true,
-      flowId: result.flowState.flowId,
-      stepId: result.currentStep.id,
-      // ✅ Incluir executableActions si existen en el resultado de ejecución
-      ...(result.flowState.accumulatedData._executionResult?.executableActions && {
-        executableActions: result.flowState.accumulatedData._executionResult.executableActions
-      })
-    };
-    
-    console.log('💬 Adding flow step message:', {
-      stepId: result.currentStep.id,
-      hasQuickReplies: !!result.currentStep.quickReplies,
-      quickRepliesCount: result.currentStep.quickReplies?.length || 0,
-      quickReplies: result.currentStep.quickReplies
-    });
-    
-    chatService.addMessage(stepMessage);
-    setChatHistory([...chatService.getConversation().messages]);
     
     // Handle execution step
     if (result.currentStep.type === 'execution') {
@@ -772,6 +777,9 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
       flowManager.completeFlow(result.flowState);
       setActiveFlow(null);
     }
+    } finally {
+      setIsProcessing(false);
+    }
   }, [activeFlow, flowManager, chatService, completeFlowAndNavigate, createNewConversation, currentConversationId]);
 
   const goBackInFlow = useCallback(() => {
@@ -822,35 +830,37 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
   const sendMessage = useCallback(async (message: string, conversationState?: Record<string, any>) => {
     console.log('📨 MAYA: Sending message with state', { message, conversationState });
     
-    // If we're in a flow, advance it instead of sending regular message
-    if (activeFlow) {
-      await advanceFlow(message);
-      return;
-    }
-    
-    // 🆕 Auto-crear conversación si es el primer mensaje
-    if (!currentConversationId) {
-      console.log('🎬 MAYA: Primera interacción, creando conversación automáticamente...');
-      try {
-        const newConvId = await createNewConversation();
-        
-        // ✨ Título instantáneo: usar las primeras palabras del mensaje
-        const instantTitle = message.length > 40 
-          ? message.substring(0, 40) + '...' 
-          : message;
-        
-        await conversationManager.updateConversationTitle(newConvId, instantTitle);
-        await loadConversations(); // ⚡ Actualizar sidebar INMEDIATAMENTE
-        
-        toast.success('Nueva conversación iniciada');
-        console.log('✅ MAYA: Conversación creada con título instantáneo', { title: instantTitle });
-      } catch (error) {
-        console.error('❌ MAYA: Error creando conversación, continuando sin BD', error);
-        // Continuar sin BD (fallback a localStorage)
-      }
-    }
+    setIsProcessing(true);
     
     try {
+      // If we're in a flow, advance it instead of sending regular message
+      if (activeFlow) {
+        await advanceFlow(message);
+        return;
+      }
+      
+      // 🆕 Auto-crear conversación si es el primer mensaje
+      if (!currentConversationId) {
+        console.log('🎬 MAYA: Primera interacción, creando conversación automáticamente...');
+        try {
+          const newConvId = await createNewConversation();
+          
+          // ✨ Título instantáneo: usar las primeras palabras del mensaje
+          const instantTitle = message.length > 40 
+            ? message.substring(0, 40) + '...' 
+            : message;
+          
+          await conversationManager.updateConversationTitle(newConvId, instantTitle);
+          await loadConversations(); // ⚡ Actualizar sidebar INMEDIATAMENTE
+          
+          toast.success('Nueva conversación iniciada');
+          console.log('✅ MAYA: Conversación creada con título instantáneo', { title: instantTitle });
+        } catch (error) {
+          console.error('❌ MAYA: Error creando conversación, continuando sin BD', error);
+          // Continuar sin BD (fallback a localStorage)
+        }
+      }
+      
       // Generate rich contextual data
       const richContext = generatePageContext();
       
@@ -884,6 +894,8 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
     } catch (error) {
       console.error('Error sending message to MAYA:', error);
       throw error;
+    } finally {
+      setIsProcessing(false);
     }
   }, [chatService, generatePageContext, currentConversationId, conversationManager, loadConversations, createNewConversation, activeFlow, advanceFlow]);
 
@@ -1252,6 +1264,7 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
     currentMessage,
     isVisible,
     isChatMode,
+    isProcessing,
     chatHistory,
     conversations,
     currentConversationId,
