@@ -4085,9 +4085,87 @@ async function handleConversation(message: string, conversation: any[]) {
     };
   }
   
-  // ============================================================================
-  // RAG: Búsqueda de contexto legal relevante
-  // ============================================================================
+// ============================================================================
+// GUARDRAILS: Helpers para evitar alucinaciones legales
+// ============================================================================
+function getDivisorForDate(date = new Date()): number {
+  const t2023 = new Date('2023-07-15');
+  const t2024 = new Date('2024-07-15');
+  const t2025Recargos = new Date('2025-07-01'); // Ley 2338 recargos
+  
+  if (date >= t2025Recargos) return 220;
+  if (date >= t2024) return 230;
+  if (date >= t2023) return 235;
+  return 240;
+}
+
+function buildRecargoNocturnoAnswer(now = new Date()): { message: string; emotionalState: string } {
+  const divisor = getDivisorForDate(now);
+  const ejemploSalario = 1423500; // SMLV 2025
+  const hora = Math.round(ejemploSalario / divisor);
+  const recargo = Math.round(hora * 0.35);
+  
+  return {
+    message: `El recargo nocturno es del **35%** sobre la hora ordinaria.\n\n` +
+      `🕙 **Horario nocturno:** 10:00 p.m. a 6:00 a.m. (Art. 168 CST)\n\n` +
+      `📊 **Cálculo:**\n` +
+      `• Hora ordinaria = Salario mensual ÷ ${divisor} horas\n` +
+      `• Recargo nocturno = Hora ordinaria × 0.35\n\n` +
+      `💡 **Ejemplo con SMLV 2025 ($${ejemploSalario.toLocaleString()}):**\n` +
+      `• Hora ordinaria ≈ $${hora.toLocaleString()}\n` +
+      `• Recargo nocturno ≈ $${recargo.toLocaleString()} por hora\n\n` +
+      `¿Tienes un salario específico que quieras calcular?`,
+    emotionalState: 'professional'
+  };
+}
+
+function buildSafeNoContextResponse(): { message: string; emotionalState: string } {
+  return {
+    message: 'No cuento con contexto legal actualizado para confirmarlo. ¿Podrías reformular tu pregunta con palabras clave específicas?\n\n' +
+      '💡 **Ejemplos útiles:**\n' +
+      '• "recargo nocturno Art. 168"\n' +
+      '• "horario nocturno 10:00 p.m. a 6:00 a.m."\n' +
+      '• "divisor 220 horas Colombia 2025"',
+    emotionalState: 'thinking'
+  };
+}
+
+function isRecargoNocturnoQuery(text: string): boolean {
+  const lowerText = text.toLowerCase();
+  return /(recargo|horario)\s+nocturn|noche|nocturno/i.test(lowerText);
+}
+
+function sanitizeNocturnoResponse(message: string, hasLegalContext: boolean, now = new Date()): { message: string; emotionalState: string } | null {
+  const lowerMessage = message.toLowerCase();
+  const isNocturno = isRecargoNocturnoQuery(message);
+  const cites161 = /art[\.\s]*161/i.test(message);
+  const cites240 = /\b240\b/.test(message) && /(hora|divisor)/i.test(message);
+  const hasLegalCitations = /art\.|artículo|cst|código|ley\s+\d+/i.test(message);
+  
+  // Guard 1: Si no hay contexto y el LLM citó leyes → fail-closed
+  if (!hasLegalContext && hasLegalCitations) {
+    console.log('[SANITIZER] 🚫 Sin RAG pero LLM citó leyes → respuesta segura');
+    return buildSafeNoContextResponse();
+  }
+  
+  // Guard 2: Si menciona recargo nocturno y cita Art. 161 → respuesta determinista
+  if (isNocturno && cites161) {
+    console.log('[SANITIZER] 🚫 Detectado Art. 161 en recargo nocturno → reescribiendo con Art. 168');
+    return buildRecargoNocturnoAnswer(now);
+  }
+  
+  // Guard 3: Si menciona recargo nocturno y usa divisor 240 (y estamos en 2025+) → respuesta determinista
+  if (isNocturno && cites240 && now >= new Date('2025-07-01')) {
+    console.log('[SANITIZER] 🚫 Detectado divisor 240 para 2025+ → reescribiendo con 220h');
+    return buildRecargoNocturnoAnswer(now);
+  }
+  
+  return null; // No sanitization needed
+}
+
+// ============================================================================
+// RAG: Búsqueda de contexto legal relevante
+// ============================================================================
   let legalContext = '';
   
   // RAG siempre activo si hay OPENAI_API_KEY
@@ -4134,7 +4212,7 @@ async function handleConversation(message: string, conversation: any[]) {
           const { data: lexDocs, error: lexError } = await supabase
             .from('legal_knowledge_base')
             .select('id, title, reference, topic, document_type, temporal_validity, content, summary, keywords, sources, examples, note')
-            .or('title.ilike.%recargo%,title.ilike.%nocturno%,topic.ilike.%recargo%,topic.ilike.%nocturno%,reference.ilike.%168%,content.ilike.%nocturn%,content.ilike.%10:00 PM%,content.ilike.%220 horas%')
+            .or('title.ilike.%recargo%,title.ilike.%nocturno%,topic.ilike.%recargo%,topic.ilike.%nocturno%,reference.ilike.%168%,reference.ilike.%art 168%,reference.ilike.%artículo 168%,reference.ilike.%cst 168%,content.ilike.%nocturn%,content.ilike.%10:00 PM%,content.ilike.%10:00 p. m.%,content.ilike.%10 pm%,content.ilike.%220 horas%,content.ilike.%divisor 220%,keywords.cs.{recargo,nocturno,art168}')
             .limit(3);
           
           if (!lexError && lexDocs && lexDocs.length > 0) {
@@ -4220,6 +4298,19 @@ async function handleConversation(message: string, conversation: any[]) {
       console.error('[RAG] Error en búsqueda:', ragError);
       // Continuar sin RAG en caso de error
     }
+  }
+  
+  // ============================================================================
+  // GUARD: Fail-closed sin RAG para consultas legales específicas
+  // ============================================================================
+  if (!legalContext && isRecargoNocturnoQuery(message)) {
+    console.log('[GUARD] 🚫 Consulta recargo nocturno sin RAG → respuesta determinista');
+    return buildRecargoNocturnoAnswer();
+  }
+  
+  if (!legalContext && /art\.|artículo|código|cst|ley \d+/i.test(message)) {
+    console.log('[GUARD] 🚫 Consulta legal sin RAG → respuesta segura');
+    return buildSafeNoContextResponse();
   }
   
   // ============================================================================
@@ -4331,8 +4422,19 @@ ${legalContext}`;
     
     if (response.ok) {
       const data = await response.json();
+      const llmMessage = data.choices[0]?.message?.content || 'No pude procesar tu mensaje.';
+      
+      // ============================================================================
+      // POST-LLM SANITIZER: Validar respuesta antes de enviar al usuario
+      // ============================================================================
+      const sanitized = sanitizeNocturnoResponse(llmMessage, !!legalContext);
+      if (sanitized) {
+        console.log('[SANITIZER] ✅ Respuesta reescrita por guardrails');
+        return sanitized;
+      }
+      
       return {
-        message: data.choices[0]?.message?.content || 'No pude procesar tu mensaje.',
+        message: llmMessage,
         emotionalState: 'neutral'
       };
     }
