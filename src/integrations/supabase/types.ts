@@ -3119,15 +3119,16 @@ export type Database = {
         Returns: {
           content: string
           document_type: string
-          examples: Json
+          examples: string[]
           id: string
           keywords: string[]
+          metadata: Json
           note: string
           reference: string
           similarity: number
-          sources: Json
+          sources: string[]
           summary: string
-          temporal_validity: Json
+          temporal_validity: string
           title: string
           topic: string
         }[]

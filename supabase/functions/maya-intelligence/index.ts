@@ -4122,9 +4122,15 @@ async function handleConversation(message: string, conversation: any[]) {
             match_count: 8
           });
         
-        // Fallback léxico si no hay resultados vectoriales
-        if (!searchError && (!relevantDocs || relevantDocs.length === 0)) {
-          console.log('[RAG] ⚠️ Sin resultados vectoriales. Activando fallback léxico...');
+        // Fallback léxico si hay error RPC O no hay resultados vectoriales
+        if (searchError || !relevantDocs || relevantDocs.length === 0) {
+          if (searchError) {
+            console.log('[RAG] ❌ Error en RPC search_legal_knowledge:', searchError.message);
+            console.log('[RAG] 🔄 Activando fallback léxico por error RPC...');
+          } else {
+            console.log('[RAG] ⚠️ Sin resultados vectoriales. Activando fallback léxico...');
+          }
+          
           const { data: lexDocs, error: lexError } = await supabase
             .from('legal_knowledge_base')
             .select('id, title, reference, topic, document_type, temporal_validity, content, summary, keywords, sources, examples, note')
@@ -4134,6 +4140,9 @@ async function handleConversation(message: string, conversation: any[]) {
           if (!lexError && lexDocs && lexDocs.length > 0) {
             console.log(`[RAG] ✅ Fallback léxico: ${lexDocs.length} documentos encontrados`);
             relevantDocs = lexDocs.map((doc: any) => ({ ...doc, similarity: 0.35 })); // Asignar similitud artificial
+            searchError = null; // Clear error since fallback succeeded
+          } else if (lexError) {
+            console.error('[RAG] ❌ Error en fallback léxico:', lexError);
           }
         }
         
@@ -4304,6 +4313,11 @@ ${legalContext}`;
             const hasNonColombianCountry = /venezuela|perú|méxico|chile|argentina|ecuador|panamá|costa rica/i.test(lowerContent);
             if (hasNonColombianCountry) {
               console.log('🚫 [HISTORY_FILTER] Removed assistant message with non-Colombian reference');
+              return false;
+            }
+            // If no legal context, exclude assistant messages that might contain legal citations
+            if (!legalContext && /art\.|artículo|cst|código|ley \d+/i.test(lowerContent)) {
+              console.log('🚫 [HISTORY_FILTER] Removed assistant message with legal citation (no RAG context)');
               return false;
             }
             return true;
