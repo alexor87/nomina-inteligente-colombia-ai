@@ -4123,7 +4123,7 @@ async function handleConversation(message: string, conversation: any[]) {
         const { data: relevantDocs, error: searchError } = await supabase
           .rpc('search_legal_knowledge', {
             query_embedding: queryEmbedding,
-            match_threshold: 0.68,
+            match_threshold: 0.55,
             match_count: 5
           });
         
