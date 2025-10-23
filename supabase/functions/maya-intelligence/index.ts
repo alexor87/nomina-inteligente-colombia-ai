@@ -4090,17 +4090,12 @@ async function handleConversation(message: string, conversation: any[]) {
   // ============================================================================
   let legalContext = '';
   
-  if (lovableKey) {
+  // RAG siempre activo si hay OPENAI_API_KEY
+  if (openaiKey) {
     try {
       console.log('[RAG] Generando embedding para búsqueda...');
       
-      // Generar embedding del mensaje del usuario usando OpenAI
-      const openaiKey = Deno.env.get('OPENAI_API_KEY');
-      if (!openaiKey) {
-        console.warn('[RAG] ⚠️ OPENAI_API_KEY no configurado, saltando RAG');
-      }
-      
-      const embeddingResponse = openaiKey ? await fetch('https://api.openai.com/v1/embeddings', {
+      const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${openaiKey}`,
@@ -4110,22 +4105,37 @@ async function handleConversation(message: string, conversation: any[]) {
           model: 'text-embedding-3-small',
           input: message,
         }),
-      }) : null;
+      });
       
       if (embeddingResponse.ok) {
         const embeddingData = await embeddingResponse.json();
         const queryEmbedding = embeddingData.data[0].embedding;
         
-        console.log('[RAG] Buscando documentos relevantes...');
+        console.log('[RAG] Buscando documentos relevantes con umbral 0.30...');
         
-        // Buscar documentos relevantes usando búsqueda semántica
+        // Buscar documentos relevantes usando búsqueda semántica con umbral bajo
         const supabase = createClient(supabaseUrl, serviceRoleKey);
-        const { data: relevantDocs, error: searchError } = await supabase
+        let { data: relevantDocs, error: searchError } = await supabase
           .rpc('search_legal_knowledge', {
             query_embedding: queryEmbedding,
-            match_threshold: 0.55,
-            match_count: 5
+            match_threshold: 0.30,
+            match_count: 8
           });
+        
+        // Fallback léxico si no hay resultados vectoriales
+        if (!searchError && (!relevantDocs || relevantDocs.length === 0)) {
+          console.log('[RAG] ⚠️ Sin resultados vectoriales. Activando fallback léxico...');
+          const { data: lexDocs, error: lexError } = await supabase
+            .from('legal_knowledge_base')
+            .select('id, title, reference, topic, document_type, temporal_validity, content, summary, keywords, sources, examples, note')
+            .or('title.ilike.%recargo%,title.ilike.%nocturno%,topic.ilike.%recargo%,topic.ilike.%nocturno%,reference.ilike.%168%,content.ilike.%nocturn%,content.ilike.%10:00 PM%,content.ilike.%220 horas%')
+            .limit(3);
+          
+          if (!lexError && lexDocs && lexDocs.length > 0) {
+            console.log(`[RAG] ✅ Fallback léxico: ${lexDocs.length} documentos encontrados`);
+            relevantDocs = lexDocs.map((doc: any) => ({ ...doc, similarity: 0.35 })); // Asignar similitud artificial
+          }
+        }
         
         if (!searchError && relevantDocs && relevantDocs.length > 0) {
           console.log(`[RAG] ✅ ${relevantDocs.length} documentos encontrados:`);
@@ -4212,8 +4222,9 @@ async function handleConversation(message: string, conversation: any[]) {
 ${legalContext ? '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━' : ''}
 ${legalContext ? '🔴 TIENES CONTEXTO LEGAL ACTUALIZADO ABAJO - ES TU ÚNICA FUENTE DE VERDAD' : ''}
 ${legalContext ? '🔴 USA SOLO ARTÍCULOS, CIFRAS Y DATOS QUE APAREZCAN EXPLÍCITAMENTE EN EL CONTEXTO' : ''}
+${legalContext ? '🔴 VERIFICA: Art. 168 CST (no 161), 220h divisor (no 240), 10PM-6AM horario' : ''}
 ${legalContext ? '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━' : ''}
-${!legalContext ? '⚠️ No tienes contexto legal para esta consulta. Sé honesto sobre lo que no sabes.' : ''}
+${!legalContext ? '⚠️ SIN CONTEXTO LEGAL: No inventes artículos ni cifras. Pide reformular la pregunta.' : ''}
 
 Eres MAYA, asistente laboral colombiano experto en nómina y legislación vigente ${currentYear}.
 
@@ -4230,7 +4241,7 @@ Eres MAYA, asistente laboral colombiano experto en nómina y legislación vigent
 3. Ejemplo numérico simple (si aplica)
 4. Pregunta de seguimiento (si falta información)
 
-✅ **EJEMPLO DE RESPUESTA IDEAL:**
+✅ **EJEMPLO DE RESPUESTA IDEAL (con contexto RAG):**
 
 Usuario: "¿Cómo se calcula el recargo nocturno?"
 
@@ -4242,8 +4253,7 @@ MAYA: "El recargo nocturno es del 35% sobre la hora ordinaria.
 • Hora ordinaria = Salario mensual ÷ 220 horas
 • Recargo nocturno = Hora ordinaria × 0.35
 
-💡 Ejemplo:
-Si ganas $1.423.500/mes:
+💡 Ejemplo con SMLV 2025 ($1.423.500):
 - Hora ordinaria = $6.470
 - Recargo nocturno = $2.265/hora
 
@@ -4253,15 +4263,18 @@ Si ganas $1.423.500/mes:
 - Respuestas de 500+ palabras con formato académico
 - Fórmulas LaTeX complejas sin contexto práctico
 - Explicaciones teóricas sin ejemplos concretos
-- Inventar artículos o cifras que no estén en el contexto RAG
+- **CRÍTICO: Inventar artículos (ej: Art. 161 cuando es Art. 168) o cifras (ej: 240h cuando es 220h)**
+- **CRÍTICO: Citar números sin contexto RAG**
 
 🎯 **REGLAS RAG (NO NEGOCIABLES):**
-1. ✅ Usa EXACTAMENTE los artículos del contexto (ej: Art. 168, no Art. 161)
-2. ✅ Usa EXACTAMENTE los divisores del contexto (ej: 220 horas, no 240)
-3. ✅ Usa EXACTAMENTE los horarios del contexto (ej: 10:00 PM - 6:00 AM)
-4. ❌ Si NO hay contexto RAG, di: "No tengo esa información ahora. ¿Puedes reformular?"
-5. ✅ Si hay ejemplos (💡) en el contexto, úsalos
-6. ✅ Si hay notas (⚠️) en el contexto, inclúyelas
+1. ✅ Con contexto: Usa EXACTAMENTE los artículos del contexto (ej: Art. 168, NUNCA Art. 161)
+2. ✅ Con contexto: Usa EXACTAMENTE los divisores del contexto (ej: 220 horas para 2025-07+, NUNCA 240)
+3. ✅ Con contexto: Usa EXACTAMENTE los horarios del contexto (ej: 10:00 PM - 6:00 AM)
+4. ❌ **SIN contexto RAG**: NO cites artículos específicos ni números (no Art. 161, no 240h, no horarios específicos)
+5. ❌ **SIN contexto RAG**: Responde: "No cuento con contexto legal actualizado para confirmarlo. ¿Podrías reformular con palabras clave? Ej: 'recargo nocturno Art. 168'"
+6. ✅ Si hay ejemplos (💡) en el contexto, úsalos textualmente
+7. ✅ Si hay notas (⚠️) en el contexto, inclúyelas
+8. ✅ Para consultas de 2025-07 en adelante: divisor es **220 horas** (nueva ley), no 240
 
 📌 **DATOS COLOMBIA ${currentYear}:**
 - SMLV: $1.423.500
@@ -4298,7 +4311,7 @@ ${legalContext}`;
           { role: 'user', content: message }
         ],
         max_tokens: 1000,
-        temperature: 0.7 // Aumentada para mayor exploración del contexto RAG
+        temperature: legalContext ? 0.7 : 0.2 // Baja cuando no hay RAG para evitar inventar datos
       }),
     });
     
