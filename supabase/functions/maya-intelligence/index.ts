@@ -4176,7 +4176,6 @@ async function handleConversation(message: string, conversation: any[]) {
             legalContext += '---\n\n';
           });
           
-          console.log('[RAG] Contexto legal enriquecido agregado al prompt');
           console.log('[RAG] CONTEXTO COMPLETO ENVIADO AL MODELO (primeros 800 chars):');
           console.log(legalContext.substring(0, 800) + '...\n');
         } else {
