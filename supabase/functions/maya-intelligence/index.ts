@@ -4237,8 +4237,6 @@ async function handleConversation(message: string, conversation: any[]) {
 // ============================================================================
 // GUARDRAILS: Helpers para evitar alucinaciones legales
 // ============================================================================
-const isRecargoNocturnoQuery = (text: string) => /\b(recargo|hora|trabajo)\s+(nocturno|noche|nocturna)/i.test(text);
-const isRecargoDominicalQuery = (text: string) => /\b(recargo|hora|trabajo)\s+(dominical|domingo|festivo|feriado)/i.test(text);
 
 function getDivisorForDate(date = new Date()): number {
   const t2023 = new Date('2023-07-15');
@@ -4381,7 +4379,7 @@ function isRecargoDominicalQuery(text: string): boolean {
   return /(recargo|trabajo|hora)\s+(dominical|festivo|domingo|festiv)|dominical|domingo.*festivo|festivo.*domingo/i.test(lowerText);
 }
 
-function sanitizeNocturnoResponse(message: string, hasLegalContext: boolean, now = new Date()): { message: string; emotionalState: string } | null {
+function sanitizeNocturnoResponse(message: string, hasLegalContext: boolean, originalQuery = '', now = new Date()): { message: string; emotionalState: string } | null {
   const lowerMessage = message.toLowerCase();
   const isNocturno = isRecargoNocturnoQuery(message);
   const isDominical = isRecargoDominicalQuery(message);
@@ -4708,7 +4706,7 @@ ${legalContext}`;
       // ============================================================================
       // POST-LLM SANITIZER: Validar respuesta antes de enviar al usuario
       // ============================================================================
-      const sanitized = sanitizeNocturnoResponse(llmMessage, !!legalContext);
+      const sanitized = sanitizeNocturnoResponse(llmMessage, !!legalContext, message);
       if (sanitized) {
         console.log('[SANITIZER] ✅ Respuesta reescrita por guardrails');
         return sanitized;
