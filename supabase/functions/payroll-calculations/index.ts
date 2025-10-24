@@ -168,6 +168,126 @@ const getOvertimeFactor = (subtipoRaw?: string, fecha?: Date): number => {
 // Normalizador simple
 const normalize = (v?: string) => String(v || '').toLowerCase().trim();
 
+/**
+ * ===============================
+ *  PURE CALCULATION FUNCTIONS (NO DATABASE)
+ * ===============================
+ */
+
+// ✅ FUNCIÓN PURA: Calcular recargos sin dependencias de BD
+function calculatePureSurcharge(params: {
+  type: 'nocturno' | 'dominical' | 'nocturno_dominical',
+  salarioBase: number,
+  horas: number,
+  fecha: Date
+}): {
+  valor: number,
+  valorHora: number,
+  divisor: number,
+  factor: number,
+  detalleCalculo: string,
+  jornadaInfo: any
+} {
+  const { type, salarioBase, horas, fecha } = params;
+  
+  const horasMensuales = getHorasParaRecargos(fecha);
+  const valorHora = salarioBase / horasMensuales;
+  
+  let factor = 0.35; // nocturno por defecto
+  let tipoDescripcion = 'nocturno';
+  
+  if (type === 'dominical') {
+    factor = getRecargoDominicalFestivo(fecha);
+    tipoDescripcion = 'dominical';
+  } else if (type === 'nocturno_dominical') {
+    const factorDominical = getRecargoDominicalFestivo(fecha);
+    factor = 0.35 + factorDominical;
+    tipoDescripcion = 'nocturno dominical';
+  }
+  
+  const valor = Math.round(valorHora * horas * factor);
+  const detalleCalculo = `Recargo ${tipoDescripcion}: ${horas}h × $${Math.round(valorHora).toLocaleString()} × ${factor.toFixed(2)} = $${valor.toLocaleString()}`;
+  
+  const jornada = getJornadaLegal(fecha);
+  
+  console.log('✅ calculatePureSurcharge (sin BD):', {
+    type,
+    salarioBase,
+    horas,
+    horasMensuales,
+    valorHora: Math.round(valorHora),
+    factor,
+    valor
+  });
+  
+  return {
+    valor,
+    valorHora,
+    divisor: horasMensuales,
+    factor,
+    detalleCalculo,
+    jornadaInfo: {
+      horasSemanales: jornada.horasSemanales,
+      horasMensuales,
+      divisorHorario: horasMensuales,
+      valorHoraOrdinaria: Math.round(valorHora),
+      ley: 'Ley 2101 de 2021',
+      descripcion: 'Cálculo de recargo con divisor mensual legal (220h desde 01/07/2025)'
+    }
+  };
+}
+
+// ✅ FUNCIÓN PURA: Obtener contexto legal sin BD
+function getLegalContextForSurcharge(
+  type: 'nocturno' | 'dominical' | 'nocturno_dominical',
+  fecha: Date
+): {
+  legalContext: string,
+  factorDisplay: string,
+  normativa: string
+} {
+  if (type === 'nocturno') {
+    return {
+      legalContext: `**Artículo 168 del Código Sustantivo del Trabajo**: El trabajo nocturno (entre las 9:00 PM y las 6:00 AM) tiene un recargo del **35%** sobre el valor de la hora ordinaria.`,
+      factorDisplay: '35%',
+      normativa: 'Art. 168 CST'
+    };
+  }
+  
+  if (type === 'dominical') {
+    const factorDominical = getRecargoDominicalFestivo(fecha);
+    const porcentaje = Math.round(factorDominical * 100);
+    
+    let legalContext = '';
+    if (fecha >= new Date('2027-07-01')) {
+      legalContext = `**Ley 2466 de 2025 - Fase Final**: A partir del 1 de julio de 2027, el recargo dominical será del **100%** del valor de la hora ordinaria.`;
+    } else if (fecha >= new Date('2026-07-01')) {
+      legalContext = `**Ley 2466 de 2025 - Fase 2**: Desde el 1 de julio de 2026 hasta el 30 de junio de 2027, el recargo dominical es del **90%** del valor de la hora ordinaria (transición progresiva hacia 100%).`;
+    } else if (fecha >= new Date('2025-07-01')) {
+      legalContext = `**Ley 2466 de 2025 - Fase 1**: Desde el 1 de julio de 2025 hasta el 30 de junio de 2026, el recargo dominical es del **80%** del valor de la hora ordinaria (transición progresiva hacia 100%).`;
+    } else {
+      legalContext = `**Artículo 179 del CST (antes de Ley 2466)**: El recargo dominical tradicional es del **75%** del valor de la hora ordinaria.`;
+    }
+    
+    return {
+      legalContext,
+      factorDisplay: `${porcentaje}%`,
+      normativa: 'Art. 179 CST + Ley 2466/2025'
+    };
+  }
+  
+  // nocturno_dominical
+  const factorDominical = getRecargoDominicalFestivo(fecha);
+  const factorTotal = 0.35 + factorDominical;
+  const porcentajeTotal = Math.round(factorTotal * 100);
+  
+  return {
+    legalContext: `**Combinación Nocturno + Dominical**: Se suma el recargo nocturno (35%) más el recargo dominical vigente (${Math.round(factorDominical * 100)}%), resultando en un **${porcentajeTotal}%** total.`,
+    factorDisplay: `${porcentajeTotal}%`,
+    normativa: 'Art. 168 + Art. 179 CST + Ley 2466/2025'
+  };
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -663,13 +783,36 @@ async function calculateSingleNovedad(supabase: any, data: any) {
 
   const year = fechaPeriodo ? new Date(fechaPeriodo).getFullYear().toString() : '2025';
   const config = OFFICIAL_VALUES[year as keyof typeof OFFICIAL_VALUES] || OFFICIAL_VALUES['2025'];
-  const policy = await getCompanyPolicy(supabase);
-
+  
   console.log('🧩 calculateSingleNovedad:', {
+    tipoNovedad, subtipo, salarioBase, horas, dias, fechaPeriodo, year
+  });
+
+  // ✅ RECARGOS: usar función pura (sin BD)
+  const fecha = fechaPeriodo ? new Date(fechaPeriodo) : new Date();
+  if (tipoNovedad === 'recargo_nocturno' || tipoNovedad === 'recargo_dominical') {
+    const type = tipoNovedad === 'recargo_dominical' 
+      ? 'dominical' 
+      : (subtipo === 'dominical' || subtipo === 'nocturno_dominical')
+        ? 'nocturno_dominical'
+        : 'nocturno';
+    
+    console.log('🚀 USANDO FUNCIÓN PURA para recargo (sin BD):', { tipoNovedad, subtipo, type });
+    return calculatePureSurcharge({
+      type,
+      salarioBase,
+      horas: Number(horas || 0),
+      fecha
+    });
+  }
+
+  // ✅ INCAPACIDADES: consultar política (requiere BD)
+  const policy = tipoNovedad === 'incapacidad' ? await getCompanyPolicy(supabase) : null;
+  
+  console.log('🧩 calculateSingleNovedad (con policy si necesario):', {
     tipoNovedad, subtipo, salarioBase, horas, dias, fechaPeriodo, year, policy
   });
 
-  const fecha = fechaPeriodo ? new Date(fechaPeriodo) : new Date();
   const j = getJornadaLegal(fecha);
   const valorDiario = salarioBase / 30;
   const valorHoraExtraBase = calcularValorHoraExtraBase(salarioBase, fecha);
@@ -680,6 +823,9 @@ async function calculateSingleNovedad(supabase: any, data: any) {
   let detalleCalculo = '';
 
   if (tipoNovedad === 'incapacidad') {
+    if (!policy) {
+      throw new Error('Policy required for incapacity calculation but not loaded');
+    }
     const diasInt = Number(dias || 0);
     const appliedDailyRaw = valorDiario * 0.6667;
     const smldv = config.salarioMinimo / 30;
@@ -807,75 +953,33 @@ async function explainSurcharge(supabase: any, data: any) {
   const salarioBase = salary || OFFICIAL_VALUES['2025'].salarioMinimo;
   const fecha = date ? new Date(date) : new Date();
   
-  console.log('🔧 explainSurcharge called:', { type, salary, hours, date });
+  console.log('🔧 explainSurcharge called (PURE - sin BD):', { type, salary, hours, date });
   
-  // Calcular usando la lógica existente
-  const tipoNovedad = type === 'dominical' ? 'recargo_dominical' : 'recargo_nocturno';
-  const subtipo = type === 'nocturno_dominical' ? 'dominical' : undefined;
-  
-  const calculation = await calculateSingleNovedad(supabase, {
-    tipoNovedad,
-    subtipo,
+  // ✅ Usar función pura (sin BD)
+  const calculation = calculatePureSurcharge({
+    type,
     salarioBase,
     horas: hours,
-    fechaPeriodo: fecha.toISOString()
+    fecha
   });
   
-  // Obtener contexto legal
-  const jornada = calculation.jornadaInfo;
-  const divisor = jornada.horasMensuales;
-  const valorHora = jornada.valorHoraOrdinaria;
+  // ✅ Obtener contexto legal (también sin BD)
+  const { legalContext, factorDisplay, normativa } = getLegalContextForSurcharge(type, fecha);
   
-  let legalContext = '';
-  let factorDisplay = '';
-  let normativa = '';
-  
-  if (type === 'nocturno') {
-    legalContext = `**Artículo 168 del Código Sustantivo del Trabajo**: El trabajo nocturno (entre las 9:00 PM y las 6:00 AM) tiene un recargo del **35%** sobre el valor de la hora ordinaria.`;
-    factorDisplay = '35%';
-    normativa = 'Art. 168 CST';
-  } else if (type === 'dominical') {
-    const factorDominical = getRecargoDominicalFestivo(fecha);
-    const porcentaje = Math.round(factorDominical * 100);
-    
-    if (fecha >= new Date('2027-07-01')) {
-      legalContext = `**Ley 2466 de 2025 - Fase Final**: A partir del 1 de julio de 2027, el recargo dominical será del **100%** del valor de la hora ordinaria.`;
-      factorDisplay = '100%';
-    } else if (fecha >= new Date('2026-07-01')) {
-      legalContext = `**Ley 2466 de 2025 - Fase 2**: Desde el 1 de julio de 2026 hasta el 30 de junio de 2027, el recargo dominical es del **90%** del valor de la hora ordinaria (transición progresiva hacia 100%).`;
-      factorDisplay = '90%';
-    } else if (fecha >= new Date('2025-07-01')) {
-      legalContext = `**Ley 2466 de 2025 - Fase 1**: Desde el 1 de julio de 2025 hasta el 30 de junio de 2026, el recargo dominical es del **80%** del valor de la hora ordinaria (transición progresiva hacia 100%).`;
-      factorDisplay = '80%';
-    } else {
-      legalContext = `**Artículo 179 del CST (antes de Ley 2466)**: El recargo dominical tradicional es del **75%** del valor de la hora ordinaria.`;
-      factorDisplay = '75%';
-    }
-    normativa = 'Art. 179 CST + Ley 2466/2025';
-  } else if (type === 'nocturno_dominical') {
-    const factorDominical = getRecargoDominicalFestivo(fecha);
-    const factorTotal = 0.35 + factorDominical;
-    const porcentajeTotal = Math.round(factorTotal * 100);
-    
-    legalContext = `**Combinación Nocturno + Dominical**: Se suma el recargo nocturno (35%) más el recargo dominical vigente (${Math.round(factorDominical * 100)}%), resultando en un **${porcentajeTotal}%** total.`;
-    factorDisplay = `${porcentajeTotal}%`;
-    normativa = 'Art. 168 + Art. 179 CST + Ley 2466/2025';
-  }
-  
-  const formula = `Salario Base ($${salarioBase.toLocaleString()}) ÷ ${divisor}h mensuales = $${Math.round(valorHora).toLocaleString()} por hora\n${hours} hora(s) × $${Math.round(valorHora).toLocaleString()} × ${factorDisplay} = $${calculation.valor.toLocaleString()}`;
+  const formula = `Salario Base ($${salarioBase.toLocaleString()}) ÷ ${calculation.divisor}h mensuales = $${Math.round(calculation.valorHora).toLocaleString()} por hora\n${hours} hora(s) × $${Math.round(calculation.valorHora).toLocaleString()} × ${factorDisplay} = $${calculation.valor.toLocaleString()}`;
   
   return {
     valor: calculation.valor,
-    valorHora,
-    divisor,
-    factor: calculation.factorCalculo,
+    valorHora: calculation.valorHora,
+    divisor: calculation.divisor,
+    factor: calculation.factor,
     factorDisplay,
     horas: hours,
     salarioBase,
     formula,
     legalContext,
     normativa,
-    jornadaInfo: jornada,
+    jornadaInfo: calculation.jornadaInfo,
     detalleCalculo: calculation.detalleCalculo
   };
 }
