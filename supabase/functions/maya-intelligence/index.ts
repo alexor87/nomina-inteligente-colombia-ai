@@ -1688,6 +1688,75 @@ serve(async (req) => {
     // ENHANCED SAFETY OVERRIDES - ANTI-HALLUCINATION PROTECTION
     // ============================================================================
     
+    // ============================================================================
+    // PRIORITY: CALCULATION REQUEST DETECTION (antes de employee name detection)
+    // ============================================================================
+    const extractedSalary = extractSalaryAmount(lastMessage);
+    const isCalculationRequest = /\b(calcula|calculalo|calculame|calcular|hazlo|para\s+(?:un\s+)?salario|con\s+(?:un\s+)?salario)\b/i.test(lastMessage);
+    
+    if (extractedSalary && isCalculationRequest) {
+      console.log(`🧮 [CALCULATION_REQUEST] Detected: salary=$${extractedSalary.toLocaleString()}, query="${lastMessage}"`);
+      
+      // Detectar tipo de recargo en el mensaje actual o en el contexto previo
+      const isNocturno = /\b(nocturno|noche|10\s*pm|22:00)/i.test(lastMessage);
+      const isDominical = /\b(dominical|domingo|festivo|feriado)/i.test(lastMessage);
+      
+      // Si no está claro en el mensaje actual, revisar el último mensaje del asistente
+      let calculationType = '';
+      if (isNocturno) {
+        calculationType = 'nocturno';
+      } else if (isDominical) {
+        calculationType = 'dominical';
+      } else {
+        // Inferir del último mensaje de MAYA
+        const lastAssistantMsg = conversation.filter(m => m.role === 'assistant').slice(-1)[0];
+        if (lastAssistantMsg?.content) {
+          if (/recargo nocturno/i.test(lastAssistantMsg.content)) {
+            calculationType = 'nocturno';
+          } else if (/recargo dominical/i.test(lastAssistantMsg.content)) {
+            calculationType = 'dominical';
+          }
+        }
+      }
+      
+      if (calculationType === 'nocturno') {
+        console.log(`🌙 [CALCULATION] Computing night surcharge for $${extractedSalary.toLocaleString()}`);
+        const result = buildRecargoNocturnoAnswer(new Date(), extractedSalary);
+        return new Response(JSON.stringify({
+          ...result,
+          sessionId,
+          timestamp: new Date().toISOString()
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } else if (calculationType === 'dominical') {
+        console.log(`📅 [CALCULATION] Computing Sunday surcharge for $${extractedSalary.toLocaleString()}`);
+        const result = buildRecargoDominicalAnswer(new Date(), extractedSalary);
+        return new Response(JSON.stringify({
+          ...result,
+          sessionId,
+          timestamp: new Date().toISOString()
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } else {
+        // Ambiguo: preguntar qué tipo de recargo
+        console.log(`❓ [CALCULATION] Salary detected but calculation type unclear`);
+        return new Response(JSON.stringify({
+          message: `Perfecto, calculemos para un salario de **$${extractedSalary.toLocaleString()}**.\n\n¿Qué tipo de recargo quieres calcular?`,
+          emotionalState: 'encouraging',
+          quickReplies: [
+            { label: '🌙 Recargo nocturno', value: `recargo nocturno para ${extractedSalary}` },
+            { label: '📅 Recargo dominical', value: `recargo dominical para ${extractedSalary}` }
+          ],
+          sessionId,
+          timestamp: new Date().toISOString()
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+    
     // Enhanced Safety Override: Detect ANY employee name in query and force validation
     const detectedEmployeeName = detectEmployeeNameInQuery(lastMessage);
     
@@ -2466,11 +2535,12 @@ function detectEmployeeNameInQuery(text: string): string | null {
   
   // 🚫 CALCULATION EXCLUSIONS: Frases que indican cálculo hipotético, no búsqueda de empleado
   const calculationExclusions = [
-    /\b(calcula|calculalo|calculame|calcular|calcúlame|calculámelo)\b/i,
-    /\b(para\s+un\s+salario\s+de|con\s+salario\s+de|salario\s+de\s+\d)/i,
-    /\bsalario\s+de\s+[\d\.,]+\s*(millones?|mil|pesos?|cop)?\b/i,
-    /\b[\d\.,]+\s*(millones?|mil|pesos?|cop)\b/i,
+    /\b(calcula|calculalo|calculame|calcular|calcúlame|calculámelo|hazlo|para|con)\b/i,
+    /\b(para\s+un\s+salario|con\s+(?:un\s+)?salario|salario\s+de)\b/i,
+    /\bsalario\s+de\s+[\d\.,]+\s*(millones?|mil|pesos?|cop|m\b|mm\b)?\b/i,
+    /\b[\d\.,]+\s*(millones?|mil|pesos?|cop|m\b|mm\b)\b/i,
     /\$\s*[\d\.,]+/i, // Detección de montos con signo $
+    /\b(?:para|con)\s+[\d\.,]+/i, // "para 2000000", "con 2.5 millones"
   ];
 
   for (const exclusion of calculationExclusions) {
@@ -4089,6 +4159,65 @@ async function handlePayrollComparison(supabase: any, params: any) {
 // END PHASE 1: AGGREGATION HANDLERS
 // ============================================================================
 
+// ============================================================================
+// SALARY AMOUNT EXTRACTOR - Detecta montos en diversos formatos
+// ============================================================================
+function extractSalaryAmount(text: string): number | null {
+  const lowerText = text.toLowerCase();
+  
+  // Patrón 1: $X.XXX.XXX o $X,XXX,XXX
+  const dollarPattern = /\$\s*([\d,.]+)/;
+  const dollarMatch = lowerText.match(dollarPattern);
+  if (dollarMatch) {
+    const cleaned = dollarMatch[1].replace(/[.,]/g, '');
+    const amount = parseInt(cleaned, 10);
+    if (!isNaN(amount) && amount > 0) {
+      console.log(`💰 [EXTRACTOR] Found dollar amount: $${amount.toLocaleString()}`);
+      return amount;
+    }
+  }
+  
+  // Patrón 2: X millones, X.X millones
+  const millionPattern = /([\d,.]+)\s*(?:millones?|m\b|mm\b)/i;
+  const millionMatch = text.match(millionPattern);
+  if (millionMatch) {
+    const numStr = millionMatch[1].replace(/,/g, '.');
+    const num = parseFloat(numStr);
+    if (!isNaN(num) && num > 0) {
+      const amount = Math.round(num * 1000000);
+      console.log(`💰 [EXTRACTOR] Found millions: ${num}M = $${amount.toLocaleString()}`);
+      return amount;
+    }
+  }
+  
+  // Patrón 3: XXX mil, XXX.XXX
+  const thousandPattern = /([\d,.]+)\s*(?:mil\b)/i;
+  const thousandMatch = text.match(thousandPattern);
+  if (thousandMatch) {
+    const numStr = thousandMatch[1].replace(/,/g, '.');
+    const num = parseFloat(numStr);
+    if (!isNaN(num) && num > 0) {
+      const amount = Math.round(num * 1000);
+      console.log(`💰 [EXTRACTOR] Found thousands: ${num}k = $${amount.toLocaleString()}`);
+      return amount;
+    }
+  }
+  
+  // Patrón 4: Números grandes sin formato (>= 500000)
+  const plainNumberPattern = /\b(\d{6,})\b/;
+  const plainMatch = text.match(plainNumberPattern);
+  if (plainMatch) {
+    const amount = parseInt(plainMatch[1], 10);
+    if (!isNaN(amount) && amount >= 500000) {
+      console.log(`💰 [EXTRACTOR] Found plain number: $${amount.toLocaleString()}`);
+      return amount;
+    }
+  }
+  
+  console.log(`💰 [EXTRACTOR] No salary amount found in: "${text}"`);
+  return null;
+}
+
 async function handleConversation(message: string, conversation: any[]) {
   const now = new Date();
   const currentMonth = now.toLocaleDateString('es-CO', { month: 'long' });
@@ -4108,6 +4237,9 @@ async function handleConversation(message: string, conversation: any[]) {
 // ============================================================================
 // GUARDRAILS: Helpers para evitar alucinaciones legales
 // ============================================================================
+const isRecargoNocturnoQuery = (text: string) => /\b(recargo|hora|trabajo)\s+(nocturno|noche|nocturna)/i.test(text);
+const isRecargoDominicalQuery = (text: string) => /\b(recargo|hora|trabajo)\s+(dominical|domingo|festivo|feriado)/i.test(text);
+
 function getDivisorForDate(date = new Date()): number {
   const t2023 = new Date('2023-07-15');
   const t2024 = new Date('2024-07-15');
@@ -4119,23 +4251,40 @@ function getDivisorForDate(date = new Date()): number {
   return 240;
 }
 
-function buildRecargoNocturnoAnswer(now = new Date()): { message: string; emotionalState: string } {
+function buildRecargoNocturnoAnswer(now = new Date(), salaryOverride?: number): { message: string; emotionalState: string; quickReplies?: any[] } {
   const divisor = getDivisorForDate(now);
-  const ejemploSalario = 1423500; // SMLV 2025
+  const ejemploSalario = salaryOverride || 1423500; // SMLV 2025 por defecto
   const hora = Math.round(ejemploSalario / divisor);
   const recargo = Math.round(hora * 0.35);
+  const valorTotal = hora + recargo;
+  const factor = 1.35;
+  
+  const isCustomSalary = !!salaryOverride;
+  const salarioLabel = isCustomSalary ? 'tu salario especificado' : 'SMLV 2025';
+  
+  const quickReplies = isCustomSalary ? [
+    { label: '🔄 Calcular con otro salario', value: 'calcular recargo nocturno con otro salario' },
+    { label: '📅 Recargo dominical', value: `calcular recargo dominical para ${ejemploSalario}` },
+    { label: '📖 Ver normativa', value: 'cuál es la normativa del recargo nocturno' }
+  ] : [
+    { label: '💰 Calcular con mi salario', value: 'calcular recargo nocturno para mi salario' },
+    { label: '📅 Recargo dominical', value: 'recargo dominical' }
+  ];
   
   return {
     message: `El recargo nocturno es del **35%** sobre la hora ordinaria.\n\n` +
       `🕙 **Horario nocturno:** 10:00 p.m. a 6:00 a.m. (Art. 168 CST)\n\n` +
       `📊 **Cálculo:**\n` +
       `• Hora ordinaria = Salario mensual ÷ ${divisor} horas\n` +
-      `• Recargo nocturno = Hora ordinaria × 0.35\n\n` +
-      `💡 **Ejemplo con SMLV 2025 ($${ejemploSalario.toLocaleString()}):**\n` +
-      `• Hora ordinaria ≈ $${hora.toLocaleString()}\n` +
-      `• Recargo nocturno ≈ $${recargo.toLocaleString()} por hora\n\n` +
-      `¿Tienes un salario específico que quieras calcular?`,
-    emotionalState: 'professional'
+      `• Recargo nocturno = Hora ordinaria × 0.35\n` +
+      `• **Valor total hora nocturna = Hora ordinaria × ${factor}**\n\n` +
+      `💡 **${isCustomSalary ? 'Cálculo' : 'Ejemplo'} con ${salarioLabel} ($${ejemploSalario.toLocaleString()}):**\n` +
+      `• Hora ordinaria = $${hora.toLocaleString()}\n` +
+      `• Solo recargo = $${recargo.toLocaleString()} por hora\n` +
+      `• **Valor total hora nocturna = $${valorTotal.toLocaleString()}**` +
+      (isCustomSalary ? '' : `\n\n¿Quieres calcularlo para un salario específico?`),
+    emotionalState: 'professional',
+    quickReplies
   };
 }
 
@@ -4151,14 +4300,18 @@ function getRecargoDominicalRate(date = new Date()): number {
   return 1.00;                          // Desde julio 2027: 100%
 }
 
-function buildRecargoDominicalAnswer(now = new Date()): { message: string; emotionalState: string } {
+function buildRecargoDominicalAnswer(now = new Date(), salaryOverride?: number): { message: string; emotionalState: string; quickReplies?: any[] } {
   const divisor = getDivisorForDate(now);
   const recargoDominical = getRecargoDominicalRate(now);
   const porcentaje = Math.round(recargoDominical * 100);
   const factor = 1 + recargoDominical;
-  const ejemploSalario = 1423500; // SMLV 2025
+  const ejemploSalario = salaryOverride || 1423500; // SMLV 2025 por defecto
   const hora = Math.round(ejemploSalario / divisor);
+  const soloRecargo = Math.round(hora * recargoDominical);
   const valorDominical = Math.round(hora * factor);
+  
+  const isCustomSalary = !!salaryOverride;
+  const salarioLabel = isCustomSalary ? 'tu salario especificado' : 'SMLV 2025';
   
   // Determinar el período vigente para el mensaje
   let periodoVigente = '';
@@ -4176,22 +4329,34 @@ function buildRecargoDominicalAnswer(now = new Date()): { message: string; emoti
     periodoVigente = 'vigente desde julio 2027';
   }
   
+  const quickReplies = isCustomSalary ? [
+    { label: '🔄 Calcular con otro salario', value: 'calcular recargo dominical con otro salario' },
+    { label: '🌙 Recargo nocturno', value: `calcular recargo nocturno para ${ejemploSalario}` },
+    { label: '📖 Ver Ley 2466', value: 'qué dice la ley 2466 sobre recargo dominical' }
+  ] : [
+    { label: '💰 Calcular con mi salario', value: 'calcular recargo dominical para mi salario' },
+    { label: '🌙 Recargo nocturno', value: 'recargo nocturno' }
+  ];
+  
   return {
     message: `El recargo dominical/festivo es del **${porcentaje}%** sobre la hora ordinaria (${periodoVigente}).\n\n` +
-      `📅 **Recargo dominical:** +${porcentaje}% (Art. 179 CST + Ley 2466/2025)\n\n` +
+      `📅 **Días con recargo:** Domingos + festivos nacionales (Art. 179 CST)\n\n` +
       `📊 **Cálculo:**\n` +
       `• Hora ordinaria = Salario mensual ÷ ${divisor} horas\n` +
-      `• Recargo dominical = Hora ordinaria × ${factor.toFixed(2)}\n\n` +
-      `💡 **Ejemplo con SMLV 2025 ($${ejemploSalario.toLocaleString()}):**\n` +
-      `• Hora ordinaria ≈ $${hora.toLocaleString()}\n` +
-      `• Hora dominical/festiva ≈ $${valorDominical.toLocaleString()}\n\n` +
-      `⚡ **Ley 2466/2025 - Incremento progresivo:**\n` +
-      `• Hasta jun 2025: 75%\n` +
-      `• Jul 2025 - jun 2026: 80% ← ${now >= jul2025 && now < jul2026 ? '**ACTUAL**' : ''}\n` +
-      `• Jul 2026 - jun 2027: 90%\n` +
-      `• Desde jul 2027: 100%\n\n` +
-      `¿Necesitas calcular un salario específico?`,
-    emotionalState: 'professional'
+      `• Recargo dominical = Hora ordinaria × ${recargoDominical.toFixed(2)}\n` +
+      `• **Valor total hora dominical = Hora ordinaria × ${factor.toFixed(2)}**\n\n` +
+      `💡 **${isCustomSalary ? 'Cálculo' : 'Ejemplo'} con ${salarioLabel} ($${ejemploSalario.toLocaleString()}):**\n` +
+      `• Hora ordinaria = $${hora.toLocaleString()}\n` +
+      `• Solo recargo = $${soloRecargo.toLocaleString()} por hora\n` +
+      `• **Valor total hora dominical = $${valorDominical.toLocaleString()}**\n\n` +
+      `📈 **Incremento progresivo (Ley 2466/2025):**\n` +
+      `• Hasta junio 2025: 75%\n` +
+      `• Julio 2025 - junio 2026: 80%\n` +
+      `• Julio 2026 - junio 2027: 90%\n` +
+      `• Desde julio 2027: 100%` +
+      (isCustomSalary ? '' : `\n\n¿Quieres calcularlo para un salario específico?`),
+    emotionalState: 'professional',
+    quickReplies
   };
 }
 
@@ -4236,28 +4401,31 @@ function sanitizeNocturnoResponse(message: string, hasLegalContext: boolean, now
     return buildSafeNoContextResponse();
   }
   
+  // Extraer monto si está presente en la consulta original
+  const extractedAmount = extractSalaryAmount(originalQuery || '');
+  
   // Guard 2: Si menciona recargo nocturno y cita Art. 161 → respuesta determinista
   if (isNocturno && cites161) {
     console.log('[SANITIZER] 🚫 Detectado Art. 161 en recargo nocturno → reescribiendo con Art. 168');
-    return buildRecargoNocturnoAnswer(now);
+    return buildRecargoNocturnoAnswer(now, extractedAmount || undefined);
   }
   
   // Guard 3: Si menciona recargo nocturno y usa divisor 240 (y estamos en 2025+) → respuesta determinista
   if (isNocturno && cites240 && now >= new Date('2025-07-01')) {
     console.log('[SANITIZER] 🚫 Detectado divisor 240 para 2025+ → reescribiendo con 220h');
-    return buildRecargoNocturnoAnswer(now);
+    return buildRecargoNocturnoAnswer(now, extractedAmount || undefined);
   }
   
   // Guard 4: Si menciona recargo dominical con 75% post-julio 2025 → respuesta determinista
   if (isDominical && (mentions75 || uses175Factor) && isPost2025July) {
     console.log('[SANITIZER] 🚫 Detectado recargo dominical 75% post-julio 2025 → reescribiendo con tasa vigente');
-    return buildRecargoDominicalAnswer(now);
+    return buildRecargoDominicalAnswer(now, extractedAmount || undefined);
   }
   
   // Guard 5: Si menciona recargo dominical sin tasa correcta → respuesta determinista
   if (isDominical && !hasLegalContext) {
     console.log('[SANITIZER] 🚫 Consulta recargo dominical sin RAG → respuesta determinista');
-    return buildRecargoDominicalAnswer(now);
+    return buildRecargoDominicalAnswer(now, extractedAmount || undefined);
   }
   
   return null; // No sanitization needed
@@ -4403,14 +4571,16 @@ function sanitizeNocturnoResponse(message: string, hasLegalContext: boolean, now
   // ============================================================================
   // GUARD: Fail-closed sin RAG para consultas legales específicas
   // ============================================================================
+  const extractedAmount = extractSalaryAmount(message);
+  
   if (!legalContext && isRecargoNocturnoQuery(message)) {
     console.log('[GUARD] 🚫 Consulta recargo nocturno sin RAG → respuesta determinista');
-    return buildRecargoNocturnoAnswer();
+    return buildRecargoNocturnoAnswer(undefined, extractedAmount || undefined);
   }
   
   if (!legalContext && isRecargoDominicalQuery(message)) {
     console.log('[GUARD] 🚫 Consulta recargo dominical sin RAG → respuesta determinista');
-    return buildRecargoDominicalAnswer();
+    return buildRecargoDominicalAnswer(undefined, extractedAmount || undefined);
   }
   
   if (!legalContext && /art\.|artículo|código|cst|ley \d+/i.test(message)) {
