@@ -4119,6 +4119,62 @@ function buildRecargoNocturnoAnswer(now = new Date()): { message: string; emotio
   };
 }
 
+function getRecargoDominicalRate(date = new Date()): number {
+  // Ley 2466/2025 - Incremento progresivo del recargo dominical/festivo
+  const jul2025 = new Date('2025-07-01');
+  const jul2026 = new Date('2026-07-01');
+  const jul2027 = new Date('2027-07-01');
+  
+  if (date < jul2025) return 0.75;      // Hasta junio 2025: 75%
+  if (date < jul2026) return 0.80;      // Julio 2025 - Junio 2026: 80%
+  if (date < jul2027) return 0.90;      // Julio 2026 - Junio 2027: 90%
+  return 1.00;                          // Desde julio 2027: 100%
+}
+
+function buildRecargoDominicalAnswer(now = new Date()): { message: string; emotionalState: string } {
+  const divisor = getDivisorForDate(now);
+  const recargoDominical = getRecargoDominicalRate(now);
+  const porcentaje = Math.round(recargoDominical * 100);
+  const factor = 1 + recargoDominical;
+  const ejemploSalario = 1423500; // SMLV 2025
+  const hora = Math.round(ejemploSalario / divisor);
+  const valorDominical = Math.round(hora * factor);
+  
+  // Determinar el período vigente para el mensaje
+  let periodoVigente = '';
+  const jul2025 = new Date('2025-07-01');
+  const jul2026 = new Date('2026-07-01');
+  const jul2027 = new Date('2027-07-01');
+  
+  if (now < jul2025) {
+    periodoVigente = 'hasta junio 2025';
+  } else if (now < jul2026) {
+    periodoVigente = 'vigente julio 2025 - junio 2026';
+  } else if (now < jul2027) {
+    periodoVigente = 'vigente julio 2026 - junio 2027';
+  } else {
+    periodoVigente = 'vigente desde julio 2027';
+  }
+  
+  return {
+    message: `El recargo dominical/festivo es del **${porcentaje}%** sobre la hora ordinaria (${periodoVigente}).\n\n` +
+      `📅 **Recargo dominical:** +${porcentaje}% (Art. 179 CST + Ley 2466/2025)\n\n` +
+      `📊 **Cálculo:**\n` +
+      `• Hora ordinaria = Salario mensual ÷ ${divisor} horas\n` +
+      `• Recargo dominical = Hora ordinaria × ${factor.toFixed(2)}\n\n` +
+      `💡 **Ejemplo con SMLV 2025 ($${ejemploSalario.toLocaleString()}):**\n` +
+      `• Hora ordinaria ≈ $${hora.toLocaleString()}\n` +
+      `• Hora dominical/festiva ≈ $${valorDominical.toLocaleString()}\n\n` +
+      `⚡ **Ley 2466/2025 - Incremento progresivo:**\n` +
+      `• Hasta jun 2025: 75%\n` +
+      `• Jul 2025 - jun 2026: 80% ← ${now >= jul2025 && now < jul2026 ? '**ACTUAL**' : ''}\n` +
+      `• Jul 2026 - jun 2027: 90%\n` +
+      `• Desde jul 2027: 100%\n\n` +
+      `¿Necesitas calcular un salario específico?`,
+    emotionalState: 'professional'
+  };
+}
+
 function buildSafeNoContextResponse(): { message: string; emotionalState: string } {
   return {
     message: 'No cuento con contexto legal actualizado para confirmarlo. ¿Podrías reformular tu pregunta con palabras clave específicas?\n\n' +
@@ -4135,12 +4191,24 @@ function isRecargoNocturnoQuery(text: string): boolean {
   return /(recargo|horario)\s+nocturn|noche|nocturno/i.test(lowerText);
 }
 
+function isRecargoDominicalQuery(text: string): boolean {
+  const lowerText = text.toLowerCase();
+  return /(recargo|trabajo|hora)\s+(dominical|festivo|domingo|festiv)|dominical|domingo.*festivo|festivo.*domingo/i.test(lowerText);
+}
+
 function sanitizeNocturnoResponse(message: string, hasLegalContext: boolean, now = new Date()): { message: string; emotionalState: string } | null {
   const lowerMessage = message.toLowerCase();
   const isNocturno = isRecargoNocturnoQuery(message);
+  const isDominical = isRecargoDominicalQuery(message);
   const cites161 = /art[\.\s]*161/i.test(message);
   const cites240 = /\b240\b/.test(message) && /(hora|divisor)/i.test(message);
   const hasLegalCitations = /art\.|artículo|cst|código|ley\s+\d+/i.test(message);
+  
+  // Detectar referencias a recargo dominical con porcentaje incorrecto
+  const mentions75 = /75\s*%/.test(message) && /(dominical|festivo|domingo)/i.test(message);
+  const uses175Factor = /1\.?75/.test(message) && /(dominical|festivo|domingo)/i.test(message);
+  const currentRecargo = getRecargoDominicalRate(now);
+  const isPost2025July = now >= new Date('2025-07-01');
   
   // Guard 1: Si no hay contexto y el LLM citó leyes → fail-closed
   if (!hasLegalContext && hasLegalCitations) {
@@ -4158,6 +4226,18 @@ function sanitizeNocturnoResponse(message: string, hasLegalContext: boolean, now
   if (isNocturno && cites240 && now >= new Date('2025-07-01')) {
     console.log('[SANITIZER] 🚫 Detectado divisor 240 para 2025+ → reescribiendo con 220h');
     return buildRecargoNocturnoAnswer(now);
+  }
+  
+  // Guard 4: Si menciona recargo dominical con 75% post-julio 2025 → respuesta determinista
+  if (isDominical && (mentions75 || uses175Factor) && isPost2025July) {
+    console.log('[SANITIZER] 🚫 Detectado recargo dominical 75% post-julio 2025 → reescribiendo con tasa vigente');
+    return buildRecargoDominicalAnswer(now);
+  }
+  
+  // Guard 5: Si menciona recargo dominical sin tasa correcta → respuesta determinista
+  if (isDominical && !hasLegalContext) {
+    console.log('[SANITIZER] 🚫 Consulta recargo dominical sin RAG → respuesta determinista');
+    return buildRecargoDominicalAnswer(now);
   }
   
   return null; // No sanitization needed
@@ -4308,6 +4388,11 @@ function sanitizeNocturnoResponse(message: string, hasLegalContext: boolean, now
     return buildRecargoNocturnoAnswer();
   }
   
+  if (!legalContext && isRecargoDominicalQuery(message)) {
+    console.log('[GUARD] 🚫 Consulta recargo dominical sin RAG → respuesta determinista');
+    return buildRecargoDominicalAnswer();
+  }
+  
   if (!legalContext && /art\.|artículo|código|cst|ley \d+/i.test(message)) {
     console.log('[GUARD] 🚫 Consulta legal sin RAG → respuesta segura');
     return buildSafeNoContextResponse();
@@ -4322,7 +4407,7 @@ function sanitizeNocturnoResponse(message: string, hasLegalContext: boolean, now
 ${legalContext ? '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━' : ''}
 ${legalContext ? '🔴 TIENES CONTEXTO LEGAL ACTUALIZADO ABAJO - ES TU ÚNICA FUENTE DE VERDAD' : ''}
 ${legalContext ? '🔴 USA SOLO ARTÍCULOS, CIFRAS Y DATOS QUE APAREZCAN EXPLÍCITAMENTE EN EL CONTEXTO' : ''}
-${legalContext ? '🔴 VERIFICA: Art. 168 CST (no 161), 220h divisor (no 240), 10PM-6AM horario' : ''}
+${legalContext ? '🔴 VERIFICA: Art. 168 CST (no 161), 220h divisor (no 240), 10PM-6AM horario, recargo dominical 80% (oct 2025)' : ''}
 ${legalContext ? '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━' : ''}
 ${!legalContext ? '⚠️ SIN CONTEXTO LEGAL: No inventes artículos ni cifras. Pide reformular la pregunta.' : ''}
 
@@ -4375,6 +4460,12 @@ MAYA: "El recargo nocturno es del 35% sobre la hora ordinaria.
 6. ✅ Si hay ejemplos (💡) en el contexto, úsalos textualmente
 7. ✅ Si hay notas (⚠️) en el contexto, inclúyelas
 8. ✅ Para consultas de 2025-07 en adelante: divisor es **220 horas** (nueva ley), no 240
+9. ✅ **RECARGO DOMINICAL PROGRESIVO (Ley 2466/2025):** 
+   - Hasta jun 2025: 75%
+   - Jul 2025 - jun 2026: **80%** ← VIGENTE ahora (octubre 2025)
+   - Jul 2026 - jun 2027: 90%
+   - Desde jul 2027: 100%
+   - **NUNCA uses 75% para fechas posteriores a julio 2025**
 
 📌 **DATOS COLOMBIA ${currentYear}:**
 - SMLV: $1.423.500
