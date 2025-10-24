@@ -37,6 +37,7 @@ export interface LLMClassification {
   confidence: number;
   extractedContext: ExtractedContext;
   reasoning?: string;
+  toolCall?: any; // Tool call from OpenAI if calculation was requested
 }
 
 export class LLMQueryClassifier {
@@ -127,9 +128,9 @@ Clasifica esta query y extrae los parámetros relevantes.`;
                 name: "classify_query",
                 description: "Classify a payroll query and extract structured parameters",
                 parameters: {
-                  type: "object",
-                  properties: {
-                    queryType: {
+          type: "object",
+          properties: {
+            queryType: {
                       type: "string",
                       enum: ["EXPLANATION", "TEMPORAL_FOLLOWUP", "EMPLOYEE_FOLLOWUP", "AGGREGATION", "DIRECT_INTENT"],
                       description: "The type of query classification"
@@ -191,6 +192,32 @@ Clasifica esta query y extrae los parámetros relevantes.`;
                   additionalProperties: false
                 }
               }
+            },
+            {
+              type: "function",
+              function: {
+                name: "calculate_surcharge",
+                description: "Calculate night surcharge, Sunday surcharge, or combined night+Sunday surcharge with legal context and detailed explanation",
+                parameters: {
+                  type: "object",
+                  properties: {
+                    type: {
+                      type: "string",
+                      enum: ["nocturno", "dominical", "nocturno_dominical"],
+                      description: "Type of surcharge: nocturno (night), dominical (Sunday/holiday), or nocturno_dominical (combined)"
+                    },
+                    salary: {
+                      type: "number",
+                      description: "Monthly base salary for calculation. If not provided, uses minimum wage"
+                    },
+                    hours: {
+                      type: "number",
+                      description: "Number of hours to calculate. Defaults to 1 if not specified"
+                    }
+                  },
+                  required: ["type"]
+                }
+              }
             }
           ],
           tool_choice: { type: "function", function: { name: "classify_query" } },
@@ -239,7 +266,10 @@ Clasifica esta query y extrae los parámetros relevantes.`;
         queryType: result.queryType as LLMQueryType,
         confidence: result.confidence,
         extractedContext: result.extractedContext,
-        reasoning: result.reasoning
+        reasoning: result.reasoning,
+        toolCall: data.choices?.[0]?.message?.tool_calls?.find(
+          (tc: any) => tc.function.name === 'calculate_surcharge'
+        )
       };
 
     } catch (error) {

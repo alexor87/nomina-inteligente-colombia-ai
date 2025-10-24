@@ -1685,11 +1685,86 @@ serve(async (req) => {
     }
 
     // ============================================================================
+    // TOOL-CALLING: Detectar si el LLM llamó a herramientas de cálculo
+    // ============================================================================
+    if (classification.toolCall) {
+      console.log('🔧 [TOOL-CALL] LLM invocó herramienta:', classification.toolCall.function.name);
+      
+      if (classification.toolCall.function.name === 'calculate_surcharge') {
+        const args = JSON.parse(classification.toolCall.function.arguments);
+        console.log('📊 [TOOL-CALL] Argumentos:', args);
+        
+        // Llamar al backend de cálculo
+        const { data: calcData, error: calcError } = await userSupabase.functions.invoke(
+          'payroll-calculations',
+          {
+            body: {
+              action: 'explain-surcharge',
+              type: args.type,
+              salary: args.salary,
+              hours: args.hours || 1,
+              date: new Date().toISOString()
+            }
+          }
+        );
+        
+        if (calcError || !calcData?.success) {
+          console.error('❌ Error calculando recargo:', calcError);
+          return new Response(JSON.stringify({
+            message: 'Lo siento, tuve un problema al realizar el cálculo. ¿Podrías intentarlo nuevamente?',
+            emotionalState: 'helpful',
+            sessionId,
+            timestamp: new Date().toISOString()
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const calc = calcData.data;
+        
+        // Formatear respuesta conversacional
+        const tipoTexto = args.type === 'nocturno' 
+          ? 'recargo nocturno' 
+          : args.type === 'dominical'
+            ? 'recargo dominical'
+            : 'recargo nocturno dominical';
+        
+        const responseMessage = `Perfecto, te explico cómo se calcula el **${tipoTexto}**:
+
+${calc.legalContext}
+
+### 📊 Cálculo con salario de $${calc.salarioBase.toLocaleString()}
+
+${calc.formula}
+
+**Resultado:** El valor del recargo es **$${calc.valor.toLocaleString()}** por ${calc.horas} hora(s) trabajada(s).
+
+${calc.jornadaInfo.descripcion ? `\n**Nota:** ${calc.jornadaInfo.descripcion}` : ''}`;
+
+        const quickReplies = [
+          { text: 'Calcular con otro salario', action: 'calculation_followup' },
+          { text: 'Ver más horas', action: 'calculation_hours' },
+          { text: 'Otros tipos de recargo', action: 'surcharge_types' }
+        ];
+        
+        return new Response(JSON.stringify({
+          message: responseMessage,
+          emotionalState: 'helpful',
+          quickReplies,
+          sessionId,
+          timestamp: new Date().toISOString()
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
+    // ============================================================================
     // ENHANCED SAFETY OVERRIDES - ANTI-HALLUCINATION PROTECTION
     // ============================================================================
     
     // ============================================================================
-    // PRIORITY: CALCULATION REQUEST DETECTION (antes de employee name detection)
+    // LEGACY: CALCULATION REQUEST DETECTION - Mantener para backward compatibility
     // ============================================================================
     const extractedSalary = extractSalaryAmount(lastMessage);
     const isCalculationRequest = /\b(calcula|calculalo|calculame|calcular|hazlo|para\s+(?:un\s+)?salario|con\s+(?:un\s+)?salario)\b/i.test(lastMessage);
@@ -4235,8 +4310,11 @@ async function handleConversation(message: string, conversation: any[]) {
   }
   
 // ============================================================================
-// GUARDRAILS: Helpers para evitar alucinaciones legales
+// GUARDRAILS: Helpers para evitar alucinaciones legales (DEPRECATED - usar backend)
 // ============================================================================
+// ⚠️ DEPRECATED: Estas funciones están deprecadas en favor del backend de cálculos
+// Las mantenemos temporalmente para backward compatibility pero deberían eliminarse
+// una vez confirmado que el tool-calling funciona correctamente.
 
 function getDivisorForDate(date = new Date()): number {
   const t2023 = new Date('2023-07-15');
@@ -4249,6 +4327,7 @@ function getDivisorForDate(date = new Date()): number {
   return 240;
 }
 
+// ⚠️ DEPRECATED: buildRecargoNocturnoAnswer - usar backend + tool-calling
 function buildRecargoNocturnoAnswer(now = new Date(), salaryOverride?: number): { message: string; emotionalState: string; quickReplies?: any[] } {
   const divisor = getDivisorForDate(now);
   const ejemploSalario = salaryOverride || 1423500; // SMLV 2025 por defecto
@@ -4286,6 +4365,7 @@ function buildRecargoNocturnoAnswer(now = new Date(), salaryOverride?: number): 
   };
 }
 
+// ⚠️ DEPRECATED: getRecargoDominicalRate - usar backend + tool-calling
 function getRecargoDominicalRate(date = new Date()): number {
   // Ley 2466/2025 - Incremento progresivo del recargo dominical/festivo
   const jul2025 = new Date('2025-07-01');
@@ -4298,6 +4378,7 @@ function getRecargoDominicalRate(date = new Date()): number {
   return 1.00;                          // Desde julio 2027: 100%
 }
 
+// ⚠️ DEPRECATED: buildRecargoDominicalAnswer - usar backend + tool-calling
 function buildRecargoDominicalAnswer(now = new Date(), salaryOverride?: number): { message: string; emotionalState: string; quickReplies?: any[] } {
   const divisor = getDivisorForDate(now);
   const recargoDominical = getRecargoDominicalRate(now);
@@ -4358,6 +4439,7 @@ function buildRecargoDominicalAnswer(now = new Date(), salaryOverride?: number):
   };
 }
 
+// ⚠️ DEPRECATED: buildSafeNoContextResponse - no necesario con tool-calling
 function buildSafeNoContextResponse(): { message: string; emotionalState: string } {
   return {
     message: 'No cuento con contexto legal actualizado para confirmarlo. ¿Podrías reformular tu pregunta con palabras clave específicas?\n\n' +
@@ -4369,16 +4451,19 @@ function buildSafeNoContextResponse(): { message: string; emotionalState: string
   };
 }
 
+// ⚠️ DEPRECATED: isRecargoNocturnoQuery - detección ahora por LLM tool-calling
 function isRecargoNocturnoQuery(text: string): boolean {
   const lowerText = text.toLowerCase();
   return /(recargo|horario)\s+nocturn|noche|nocturno/i.test(lowerText);
 }
 
+// ⚠️ DEPRECATED: isRecargoDominicalQuery - detección ahora por LLM tool-calling
 function isRecargoDominicalQuery(text: string): boolean {
   const lowerText = text.toLowerCase();
   return /(recargo|trabajo|hora)\s+(dominical|festivo|domingo|festiv)|dominical|domingo.*festivo|festivo.*domingo/i.test(lowerText);
 }
 
+// ⚠️ DEPRECATED: sanitizeNocturnoResponse - no necesario con backend authoritative
 function sanitizeNocturnoResponse(message: string, hasLegalContext: boolean, originalQuery = '', now = new Date()): { message: string; emotionalState: string } | null {
   const lowerMessage = message.toLowerCase();
   const isNocturno = isRecargoNocturnoQuery(message);
@@ -4655,6 +4740,34 @@ MAYA: "El recargo nocturno es del 35% sobre la hora ordinaria.
    - Desde jul 2027: 100%
    - **NUNCA uses 75% para fechas posteriores a julio 2025**
 
+🛠️ **HERRAMIENTAS DISPONIBLES:**
+Tienes acceso a herramientas de cálculo backend que debes usar cuando el usuario pida cálculos específicos:
+
+**Cuándo usar la herramienta calculate_surcharge:**
+✅ Usuario da un salario específico para calcular (ej: "calcula el recargo nocturno para 2 millones")
+✅ Usuario pide calcular con un valor (ej: "cuánto es el recargo dominical con un salario de $1.500.000")
+✅ Usuario solicita un cálculo explícito (ej: "quiero calcular el recargo nocturno dominical para mi salario de X")
+✅ Usuario menciona "calcula", "calculalo", "calcúlame" junto con un monto
+
+**Cuándo NO usar herramientas (solo explicar):**
+❌ Preguntas teóricas sin valores específicos (ej: "cómo se calcula el recargo nocturno")
+❌ Consultas sobre porcentajes o legislación (ej: "qué porcentaje es el recargo dominical")
+❌ Solicitudes de explicación general (ej: "explícame los recargos")
+❌ Usuario solo pregunta "cuánto es" sin dar un salario específico
+
+**Tipos de recargo disponibles:**
+- nocturno: Recargo del 35% (Art. 168 CST)
+- dominical: Recargo progresivo según Ley 2466/2025 (80% actual)
+- nocturno_dominical: Combinación de ambos
+
+**Ejemplo de uso correcto:**
+- Usuario: "calcula el recargo nocturno para 2000000"
+  → Usa herramienta con type="nocturno", salary=2000000
+- Usuario: "cuánto es el recargo dominical con salario de 1423500"
+  → Usa herramienta con type="dominical", salary=1423500
+- Usuario: "cómo se calcula el recargo nocturno"
+  → NO uses herramienta, solo explica la teoría
+
 📌 **DATOS COLOMBIA ${currentYear}:**
 - SMLV: $1.423.500
 - Auxilio transporte: $200.000
@@ -4704,14 +4817,8 @@ ${legalContext}`;
       const llmMessage = data.choices[0]?.message?.content || 'No pude procesar tu mensaje.';
       
       // ============================================================================
-      // POST-LLM SANITIZER: Validar respuesta antes de enviar al usuario
+      // POST-LLM RESPONSE - Ya no sanitize porque usamos backend authoritative
       // ============================================================================
-      const sanitized = sanitizeNocturnoResponse(llmMessage, !!legalContext, message);
-      if (sanitized) {
-        console.log('[SANITIZER] ✅ Respuesta reescrita por guardrails');
-        return sanitized;
-      }
-      
       return {
         message: llmMessage,
         emotionalState: 'neutral'

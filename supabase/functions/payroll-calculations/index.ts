@@ -209,6 +209,12 @@ serve(async (req) => {
       return new Response(JSON.stringify({ success: true, data: result }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
+    } else if (action === 'explain-surcharge') {
+      // ✅ NUEVO: explicación detallada de recargos para MAYA
+      const result = await explainSurcharge(supabase, data)
+      return new Response(JSON.stringify({ success: true, data: result }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     } else {
       throw new Error(`Acción no válida: ${action}`)
     }
@@ -794,6 +800,84 @@ async function calculateSingleNovedad(supabase: any, data: any) {
 
   console.log('✅ calculateSingleNovedad result:', result);
   return result;
+}
+
+async function explainSurcharge(supabase: any, data: any) {
+  const { type, salary, hours = 1, date } = data;
+  const salarioBase = salary || OFFICIAL_VALUES['2025'].salarioMinimo;
+  const fecha = date ? new Date(date) : new Date();
+  
+  console.log('🔧 explainSurcharge called:', { type, salary, hours, date });
+  
+  // Calcular usando la lógica existente
+  const tipoNovedad = type === 'dominical' ? 'recargo_dominical' : 'recargo_nocturno';
+  const subtipo = type === 'nocturno_dominical' ? 'dominical' : undefined;
+  
+  const calculation = await calculateSingleNovedad(supabase, {
+    tipoNovedad,
+    subtipo,
+    salarioBase,
+    horas: hours,
+    fechaPeriodo: fecha.toISOString()
+  });
+  
+  // Obtener contexto legal
+  const jornada = calculation.jornadaInfo;
+  const divisor = jornada.horasMensuales;
+  const valorHora = jornada.valorHoraOrdinaria;
+  
+  let legalContext = '';
+  let factorDisplay = '';
+  let normativa = '';
+  
+  if (type === 'nocturno') {
+    legalContext = `**Artículo 168 del Código Sustantivo del Trabajo**: El trabajo nocturno (entre las 9:00 PM y las 6:00 AM) tiene un recargo del **35%** sobre el valor de la hora ordinaria.`;
+    factorDisplay = '35%';
+    normativa = 'Art. 168 CST';
+  } else if (type === 'dominical') {
+    const factorDominical = getRecargoDominicalFestivo(fecha);
+    const porcentaje = Math.round(factorDominical * 100);
+    
+    if (fecha >= new Date('2027-07-01')) {
+      legalContext = `**Ley 2466 de 2025 - Fase Final**: A partir del 1 de julio de 2027, el recargo dominical será del **100%** del valor de la hora ordinaria.`;
+      factorDisplay = '100%';
+    } else if (fecha >= new Date('2026-07-01')) {
+      legalContext = `**Ley 2466 de 2025 - Fase 2**: Desde el 1 de julio de 2026 hasta el 30 de junio de 2027, el recargo dominical es del **90%** del valor de la hora ordinaria (transición progresiva hacia 100%).`;
+      factorDisplay = '90%';
+    } else if (fecha >= new Date('2025-07-01')) {
+      legalContext = `**Ley 2466 de 2025 - Fase 1**: Desde el 1 de julio de 2025 hasta el 30 de junio de 2026, el recargo dominical es del **80%** del valor de la hora ordinaria (transición progresiva hacia 100%).`;
+      factorDisplay = '80%';
+    } else {
+      legalContext = `**Artículo 179 del CST (antes de Ley 2466)**: El recargo dominical tradicional es del **75%** del valor de la hora ordinaria.`;
+      factorDisplay = '75%';
+    }
+    normativa = 'Art. 179 CST + Ley 2466/2025';
+  } else if (type === 'nocturno_dominical') {
+    const factorDominical = getRecargoDominicalFestivo(fecha);
+    const factorTotal = 0.35 + factorDominical;
+    const porcentajeTotal = Math.round(factorTotal * 100);
+    
+    legalContext = `**Combinación Nocturno + Dominical**: Se suma el recargo nocturno (35%) más el recargo dominical vigente (${Math.round(factorDominical * 100)}%), resultando en un **${porcentajeTotal}%** total.`;
+    factorDisplay = `${porcentajeTotal}%`;
+    normativa = 'Art. 168 + Art. 179 CST + Ley 2466/2025';
+  }
+  
+  const formula = `Salario Base ($${salarioBase.toLocaleString()}) ÷ ${divisor}h mensuales = $${Math.round(valorHora).toLocaleString()} por hora\n${hours} hora(s) × $${Math.round(valorHora).toLocaleString()} × ${factorDisplay} = $${calculation.valor.toLocaleString()}`;
+  
+  return {
+    valor: calculation.valor,
+    valorHora,
+    divisor,
+    factor: calculation.factorCalculo,
+    factorDisplay,
+    horas: hours,
+    salarioBase,
+    formula,
+    legalContext,
+    normativa,
+    jornadaInfo: jornada,
+    detalleCalculo: calculation.detalleCalculo
+  };
 }
 
 async function validateEmployee(data: any) {
