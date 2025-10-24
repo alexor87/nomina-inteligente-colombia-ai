@@ -1690,7 +1690,11 @@ serve(async (req) => {
     
     // Enhanced Safety Override: Detect ANY employee name in query and force validation
     const detectedEmployeeName = detectEmployeeNameInQuery(lastMessage);
-    if (detectedEmployeeName && !intent.resolvedByLLM && !['EMPLOYEE_SEARCH', 'EMPLOYEE_SALARY', 'EMPLOYEE_PAID_TOTAL'].includes(intent.type)) {
+    
+    // ✅ Verificar si el "nombre" es en realidad un monto
+    const looksLikeMoney = detectedEmployeeName ? /^(de|\d|[\d\.,]+|millones?|mil|pesos?)$/i.test(detectedEmployeeName) : false;
+    
+    if (detectedEmployeeName && !intent.resolvedByLLM && !looksLikeMoney && !['EMPLOYEE_SEARCH', 'EMPLOYEE_SALARY', 'EMPLOYEE_PAID_TOTAL'].includes(intent.type)) {
       console.log(`🚨 [SECURITY] Employee name "${detectedEmployeeName}" detected in non-employee query - validating`);
       
       const validation = await validateEmployeeExists(userSupabase, detectedEmployeeName);
@@ -2460,6 +2464,22 @@ function detectEmployeeNameInQuery(text: string): string | null {
     }
   }
   
+  // 🚫 CALCULATION EXCLUSIONS: Frases que indican cálculo hipotético, no búsqueda de empleado
+  const calculationExclusions = [
+    /\b(calcula|calculalo|calculame|calcular|calcúlame|calculámelo)\b/i,
+    /\b(para\s+un\s+salario\s+de|con\s+salario\s+de|salario\s+de\s+\d)/i,
+    /\bsalario\s+de\s+[\d\.,]+\s*(millones?|mil|pesos?|cop)?\b/i,
+    /\b[\d\.,]+\s*(millones?|mil|pesos?|cop)\b/i,
+    /\$\s*[\d\.,]+/i, // Detección de montos con signo $
+  ];
+
+  for (const exclusion of calculationExclusions) {
+    if (exclusion.test(lowerText)) {
+      console.log(`💰 [EMPLOYEE_DETECTION] Excluded: "${text}" (calculation context)`);
+      return null; // No es un nombre de empleado, es un cálculo hipotético
+    }
+  }
+  
   // Pattern 1: Follow-up queries "y a [name]?", "y [name]?", etc.
   const followUpPatterns = [
     /^(?:y\s+)?(?:a|para)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*)\s*\??$/i,
@@ -2474,10 +2494,10 @@ function detectEmployeeNameInQuery(text: string): string | null {
     }
   }
   
-  // Pattern 2: Salary queries
+  // Pattern 2: Salary queries (mejorado con lookahead negativo para evitar montos)
   const salaryPatterns = [
-    /(?:cuál|cual|cuánto|cuanto|qué|que)\s+(?:es\s+el\s+)?(?:salario|sueldo|gana|cobra)\s+de\s+([a-záéíóúñ\s]+)/i,
-    /(?:salario|sueldo|gana|cobra)\s+(?:de|del|de\s+la)\s+([a-záéíóúñ\s]+)/i
+    /(?:cuál|cual|cuánto|cuanto|qué|que)\s+(?:es\s+el\s+)?(?:salario|sueldo|gana|cobra)\s+de\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*)(?!\s*(?:\d|millon|mil|\$|peso|cop))/i,
+    /(?:salario|sueldo|gana|cobra)\s+(?:de|del|de\s+la)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)*)(?!\s*(?:\d|millon|mil|\$|peso|cop))/i
   ];
   
   for (const pattern of salaryPatterns) {
