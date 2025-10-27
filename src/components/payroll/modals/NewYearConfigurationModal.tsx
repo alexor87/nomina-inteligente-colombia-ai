@@ -172,7 +172,7 @@ export const NewYearConfigurationModal: React.FC<NewYearConfigurationModalProps>
                   </div>
                 </div>
                 <div>
-                  <span className="text-muted-foreground">Auxilio Transporte:</span>
+                  <span className="text-muted-foreground">Auxilio Transporte / Conectividad:</span>
                   <div className="font-medium">
                     ${configuration.auxilioTransporte.toLocaleString()}
                   </div>

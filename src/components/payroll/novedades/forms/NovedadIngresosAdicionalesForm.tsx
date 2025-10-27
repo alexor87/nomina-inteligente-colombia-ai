@@ -37,9 +37,9 @@ const ingresoTypes = [
   },
   { 
     value: 'auxilio_transporte_adicional', 
-    label: 'Auxilio de Transporte Adicional', 
+    label: 'Auxilio de Transporte / Conectividad Adicional', 
     constitutivo: false,
-    description: 'Transporte adicional al legal'
+    description: 'Auxilio de transporte adicional otorgado al empleado'
   },
   { 
     value: 'prima_extralegal', 

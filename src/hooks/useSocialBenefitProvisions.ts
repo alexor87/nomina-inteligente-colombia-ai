@@ -191,7 +191,7 @@ export const useSocialBenefitProvisions = () => {
       'Días': r.days_count,
       'Salario Base': r.base_salary,
       'Promedio Variable': r.variable_average,
-      'Auxilio Transporte': r.transport_allowance,
+      'Auxilio Transporte / Conectividad': r.transport_allowance,
       'Otros Incluidos': r.other_included,
       'Valor Provisionado': r.provision_amount,
       'Método Cálculo': r.calculation_method ?? '',

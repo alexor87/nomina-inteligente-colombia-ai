@@ -203,7 +203,7 @@ export class PayrollCalculationEnhancedService {
     const valorHoraOrdinaria = hourlyRate;
     const extraPay = input.extraHours * hourlyRate * 1.25;
 
-    // ✅ CORRECCIÓN ALELUYA: Auxilio de transporte proporcional
+    // ✅ CORRECCIÓN ALELUYA: Auxilio de transporte / conectividad proporcional
     let transportAllowance = 0;
     if (input.baseSalary <= (config.salarioMinimo * 2)) {
       // COMO ALELUYA: (auxilio_mensual / 30) × días_trabajados
@@ -242,7 +242,7 @@ export class PayrollCalculationEnhancedService {
     
     console.log(`💳 Neto a pagar: $${netPay.toFixed(2)} (Devengado: ${grossPay.toFixed(2)} - Deducciones: ${deductionResult.totalDeducciones.toFixed(2)})`);
 
-    // Base para aportes patronales (sin auxilio de transporte)
+    // Base para aportes patronales (sin auxilio de transporte / conectividad)
     const payrollBase = regularPay + extraPay + input.bonuses;
 
     // Aportes del empleador

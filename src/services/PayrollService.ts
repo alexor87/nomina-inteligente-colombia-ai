@@ -23,7 +23,7 @@ export class PayrollService {
     // Cálculo del salario proporcional
     const salarioProporcional = (salarioBase * diasTrabajados) / 30;
     
-    // Auxilio de transporte (solo para salarios <= 2 SMLV)
+    // Auxilio de transporte / conectividad (solo para salarios <= 2 SMLV)
     const auxilioTransporte = salarioBase <= (config.salarioMinimo * 2) ? 
       (config.auxilioTransporte * diasTrabajados) / 30 : 0;
 
@@ -35,7 +35,7 @@ export class PayrollService {
     const pagoRecargoNocturno = recargoNocturno;
     const pagoRecargoDominical = recargoDominical;
 
-    // Base para prestaciones sociales (salario proporcional + auxilio de transporte)
+    // Base para prestaciones sociales (salario proporcional + auxilio de transporte / conectividad)
     const baseParaPrestaciones = salarioProporcional + auxilioTransporte;
 
     // PROVISIONES DEL EMPLEADOR (NO se pagan al empleado, se apartan)

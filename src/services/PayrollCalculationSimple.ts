@@ -41,7 +41,7 @@ export class PayrollCalculationSimple {
     // ✅ 1. SALARIO PROPORCIONAL: (salario_base / 30) * dias_trabajados
     const salarioProporcional = (input.salarioBase / 30) * input.diasTrabajados;
 
-    // ✅ 2. AUXILIO DE TRANSPORTE: Solo si salario ≤ 2 SMMLV
+    // ✅ 2. AUXILIO DE TRANSPORTE / CONECTIVIDAD: Solo si salario ≤ 2 SMMLV
     const limiteAuxilio = config.salarioMinimo * 2;
     let auxilioTransporte = 0;
     
@@ -89,7 +89,7 @@ export class PayrollCalculationSimple {
   }
 
   /**
-   * Validar si un empleado debe recibir auxilio de transporte
+   * Validar si un empleado debe recibir auxilio de transporte / conectividad
    */
   static shouldReceiveTransportAllowance(salarioBase: number, year: string = '2025'): boolean {
     const config = ConfigurationService.getConfiguration(year);

@@ -43,7 +43,7 @@ export const usePayrollCorrection = () => {
 
       toast({
         title: "✅ Nómina corregida exitosamente",
-        description: `${correctedEmployees.length} empleados procesados. ${employeesWithTransport.length} con auxilio de transporte.`,
+        description: `${correctedEmployees.length} empleados procesados. ${employeesWithTransport.length} con auxilio de transporte / conectividad.`,
         className: "border-green-200 bg-green-50"
       });
 

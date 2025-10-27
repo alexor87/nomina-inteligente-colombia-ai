@@ -93,7 +93,7 @@ const VoucherPreview: React.FC<VoucherPreviewProps> = ({
           <h4 className="font-semibold text-gray-700 mb-2">Período Laborado</h4>
           <div className="space-y-1 text-sm">
             <p><span className="font-medium">Días Trabajados:</span> {employee.workedDays}</p>
-            <p><span className="font-medium">Auxilio Transporte:</span> {formatCurrency(employee.transportAllowance)}</p>
+            <p><span className="font-medium">Auxilio Transporte / Conectividad:</span> {formatCurrency(employee.transportAllowance)}</p>
           </div>
         </div>
       </div>
@@ -110,7 +110,7 @@ const VoucherPreview: React.FC<VoucherPreviewProps> = ({
               <span>{formatCurrency(employee.baseSalary)}</span>
             </div>
             <div className="flex justify-between">
-              <span>Aux. de Transporte:</span>
+              <span>Aux. de Transporte / Conectividad:</span>
               <span>{formatCurrency(employee.transportAllowance)}</span>
             </div>
             <div className="flex justify-between">

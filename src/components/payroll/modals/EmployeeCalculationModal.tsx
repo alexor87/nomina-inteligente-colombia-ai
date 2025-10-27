@@ -45,7 +45,7 @@ export const EmployeeCalculationModal: React.FC<EmployeeCalculationModalProps> =
       note: "🔄 Calculado en backend con divisor correcto"
     },
     {
-      title: "Auxilio de Transporte",
+      title: "Auxilio de Transporte / Conectividad",
       formula: `Según legislación vigente`,
       calculation: `Calculado automáticamente`,
       result: formatCurrency(employee.transportAllowance || 0),

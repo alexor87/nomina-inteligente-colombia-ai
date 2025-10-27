@@ -254,7 +254,7 @@ Ahora voy a calcular la nómina de **${data.first_name}** usando el motor de cá
 
 💰 **Devengado:** $${fmt(result.totalDevengado)}
   • Salario: $${fmt(result.salarioProporcional)}
-  • Aux. Transporte: $${fmt(result.auxilioTransporte)}
+  • Aux. Transporte / Conectividad: $${fmt(result.auxilioTransporte)}
 
 📉 **Deducciones:** $${fmt(result.totalDeducciones)}
   • Salud (4%): $${fmt(result.saludEmpleado)}
@@ -352,7 +352,7 @@ Los números te van a impactar...`;
 
 💼 **Desglose:**
 • Salarios: $${fmt(salariesIncrease)}
-• Aux. Transporte: $${fmt(transportAllowance)}
+• Aux. Transporte / Conectividad: $${fmt(transportAllowance)}
 • Seg. Social: $${fmt(socialSecurityEmployer)}
 • Parafiscales: $${fmt(parafiscales)}
 • Prestaciones: $${fmt(provisions)}

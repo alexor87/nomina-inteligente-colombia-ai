@@ -449,7 +449,7 @@ export const VersionSnapshotViewer: React.FC<VersionSnapshotViewerProps> = ({
                         <span className="text-muted-foreground">Pensión:</span> {PeriodVersionComparisonService.formatCurrency(payroll.pension_empleado)}
                       </div>
                       <div>
-                        <span className="text-muted-foreground">Aux. Transporte:</span> {PeriodVersionComparisonService.formatCurrency(payroll.auxilio_transporte)}
+                        <span className="text-muted-foreground">Aux. Transporte / Conectividad:</span> {PeriodVersionComparisonService.formatCurrency(payroll.auxilio_transporte)}
                       </div>
                     </div>
                   </Card>

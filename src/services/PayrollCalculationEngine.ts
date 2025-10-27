@@ -71,11 +71,11 @@ export class PayrollCalculationEngine {
 
   /**
    * ⚠️ MÉTODO ELIMINADO - USAR BACKEND
-   * @deprecated Auxilio de transporte se calcula en el backend
+   * @deprecated Auxilio de transporte / conectividad se calcula en el backend
    */
   private calculateTransportAllowance(baseSalary: number): number {
     console.error('❌ calculateTransportAllowance eliminado del frontend');
-    throw new Error('Usar backend para auxilio de transporte');
+    throw new Error('Usar backend para auxilio de transporte / conectividad');
   }
 
   /**

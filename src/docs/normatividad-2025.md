@@ -93,16 +93,16 @@ Factor = 1.75 (extra nocturna) + Recargo Dominical vigente
 
 ## 💰 Valores Legales 2025
 
-### Salario Mínimo y Auxilio de Transporte
+### Salario Mínimo y Auxilio de Transporte / Conectividad
 
 | Concepto | Valor 2025 | Base Legal |
 |----------|-----------|------------|
 | **Salario Mínimo Legal Mensual (SMMLV)** | $1,423,500 | Decreto 2613/2024 |
-| **Auxilio de Transporte** | $200,000 | Decreto 2613/2024 |
+| **Auxilio de Transporte / Conectividad** | $200,000 | Decreto 2613/2024 |
 
-### Límite para Auxilio de Transporte
+### Límite para Auxilio de Transporte / Conectividad
 
-Los trabajadores que devenguen hasta **2 SMMLV** ($2,847,000) tienen derecho al auxilio de transporte.
+Los trabajadores que devenguen hasta **2 SMMLV** ($2,847,000) tienen derecho al auxilio de transporte / conectividad.
 
 ### Unidad de Valor Tributario (UVT)
 
@@ -117,7 +117,7 @@ Los trabajadores que devenguen hasta **2 SMMLV** ($2,847,000) tienen derecho al 
 - **Código Sustantivo del Trabajo (CST)** - Ley Laboral Colombiana
 - **Ley 2101 de 2021** - Reducción progresiva de jornada laboral
 - **Ley 2466 de 2025** - Aumento progresivo recargo dominical y festivo
-- **Decreto 2613 de 2024** - Salario mínimo y auxilio de transporte 2025
+- **Decreto 2613 de 2024** - Salario mínimo y auxilio de transporte / conectividad 2025
 - **Artículo 161 CST** - Jornada ordinaria
 - **Artículo 168 CST** - Tasas de recargos por trabajo extra
 - **Artículo 179 CST** - Trabajo dominical y festivo

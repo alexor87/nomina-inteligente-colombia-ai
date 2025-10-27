@@ -220,7 +220,7 @@ export class PayrollLiquidationNewService {
       const dailySalary = Number(baseSalary) / 30;
       const proportionalSalary = Math.round(dailySalary * workedDays);
       
-      // 2. Auxilio de transporte proporcional (si aplica) - ✅ VALORES DINÁMICOS
+      // 2. Auxilio de transporte / conectividad proporcional (si aplica) - ✅ VALORES DINÁMICOS
       let transportAllowance = 0;
       const transportLimit = config.salarioMinimo * 2; // Límite 2 SMMLV
       if (Number(baseSalary) <= transportLimit) {

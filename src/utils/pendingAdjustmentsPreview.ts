@@ -150,7 +150,7 @@ export const getNovedadTypeDescription = (tipoNovedad: string): string => {
     'incapacidad': 'Incapacidad',
     'licencia_remunerada': 'Licencia Remunerada',
     'vacaciones': 'Vacaciones',
-    'auxilio_transporte': 'Auxilio de Transporte',
+    'auxilio_transporte': 'Auxilio de Transporte / Conectividad',
     'auxilio_alimentacion': 'Auxilio de Alimentación'
   };
   

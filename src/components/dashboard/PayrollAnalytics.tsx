@@ -33,7 +33,7 @@ const distributionData = [
   { name: 'Salarios Base', value: 70, color: '#3B82F6' },
   { name: 'Horas Extra', value: 8, color: '#10B981' },
   { name: 'Bonificaciones', value: 12, color: '#F59E0B' },
-  { name: 'Aux. Transporte', value: 10, color: '#8B5CF6' },
+  { name: 'Aux. Transporte / Conectividad', value: 10, color: '#8B5CF6' },
 ];
 
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6'];

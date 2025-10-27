@@ -126,7 +126,7 @@ Ahora dime, ¿cuál es su **salario mensual**?`;
 **📅 Días trabajados:** 30 días (mes completo)
 
 **Calcularé:**
-- ✅ Devengados (salario + auxilio de transporte si aplica)
+- ✅ Devengados (salario + auxilio de transporte / conectividad si aplica)
 - ✅ Deducciones (salud + pensión)
 - ✅ Neto a pagar
 
@@ -163,7 +163,7 @@ Ahora dime, ¿cuál es su **salario mensual**?`;
 
 **Devengados:**
 💵 Salario Base: ${formatCurrency(result.salarioBase)}
-🚌 Auxilio de Transporte: ${formatCurrency(result.auxilioTransporte)}
+🚌 Auxilio de Transporte / Conectividad: ${formatCurrency(result.auxilioTransporte)}
 **━━━━━━━━━━━━━━━━**
 **💰 Total Devengado: ${formatCurrency(result.totalDevengado)}**
 
