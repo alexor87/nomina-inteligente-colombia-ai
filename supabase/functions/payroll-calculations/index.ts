@@ -737,24 +737,59 @@ async function calculateNovedadesTotals(supabase: any, data: any) {
       }
     }
 
-    // ✅ NUEVO: Agregar al breakdown detallado
+    // ✅ LISTA COMPLETA DE DEDUCCIONES según NovedadType
+    const DEDUCTION_TYPES = [
+      'libranza',               // Préstamos y Libranzas
+      'descuento_voluntario',   // Deducciones Especiales
+      'ausencia',               // Ausencia Injustificada
+      'multa',                  // Multas
+      'retencion_fuente',       // Retención en la Fuente
+      'fondo_solidaridad',      // Fondo de Solidaridad
+      'licencia_no_remunerada', // Licencia No Remunerada (reduce salario)
+      'salud',                  // Deducción de salud
+      'pension',                // Deducción de pensión
+      'descuento',              // Descuento genérico (legacy)
+      'prestamo'                // Préstamo genérico (legacy)
+    ];
+
+    // ✅ LISTA COMPLETA DE DEVENGOS según NovedadType
+    const EARNING_TYPES = [
+      'incapacidad',
+      'horas_extra',
+      'bonificacion',
+      'comision',
+      'prima',
+      'recargo_nocturno',
+      'recargo_dominical',
+      'vacaciones',
+      'licencia_remunerada',
+      'otros_ingresos'
+    ];
+
+    // ✅ Clasificar como devengo o deducción
+    let esDevengo = true;
+    if (EARNING_TYPES.includes(tipo_novedad)) {
+      totalDevengos += valorCalculado;
+      esDevengo = true;
+    } else if (DEDUCTION_TYPES.includes(tipo_novedad)) {
+      totalDeducciones += valorCalculado;
+      esDevengo = false;
+    } else {
+      // ⚠️ Logging para tipos desconocidos
+      console.warn(`⚠️ Tipo de novedad desconocido: ${tipo_novedad}. Tratándose como devengo por defecto.`);
+      totalDevengos += valorCalculado;
+      esDevengo = true;
+    }
+
+    // ✅ Agregar al breakdown detallado con flag esDevengo
     breakdown.push({
       tipo_novedad,
       subtipo: subtipo || 'default',
       valorOriginal,
       valorCalculado,
-      detalleCalculo
+      detalleCalculo,
+      esDevengo
     });
-
-    // Clasificar como devengo o deducción
-    if (['incapacidad', 'horas_extra', 'bonificacion', 'comision', 'prima', 'recargo_nocturno', 'recargo_dominical'].includes(tipo_novedad)) {
-      totalDevengos += valorCalculado;
-    } else if (['descuento', 'prestamo', 'multa'].includes(tipo_novedad)) {
-      totalDeducciones += valorCalculado;
-    } else {
-      // Por defecto, considerar como devengo
-      totalDevengos += valorCalculado;
-    }
   }
 
   const totalNeto = totalDevengos - totalDeducciones;
