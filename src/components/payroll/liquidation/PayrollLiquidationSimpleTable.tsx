@@ -9,6 +9,7 @@ import { useCurrentCompany } from '@/hooks/useCurrentCompany';
 import { formatCurrency } from '@/lib/utils';
 import { ConfigurationService } from '@/services/ConfigurationService';
 import { CreateNovedadData } from '@/types/novedades-enhanced';
+import { NovedadesEnhancedService } from '@/services/NovedadesEnhancedService';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -210,25 +211,37 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
         const currentWorkedDays = workedDays;
         const periodType = periodForCalculation.tipo_periodo;
 
-        // ✅ Preparar inputs para batch
-        const batchInputs = await Promise.all(
-          employees.map(async (employee) => {
-            const novedadesList = await getEmployeeNovedadesList(employee.id);
-            const novedadesForIBC: NovedadForIBC[] = convertNovedadesToIBC(novedadesList);
-            
-            return {
-              baseSalary: employee.baseSalary,
-              workedDays: currentWorkedDays,
-              extraHours: 0,
-              disabilities: 0,
-              bonuses: 0,
-              absences: 0,
-              periodType: periodType,
-              novedades: novedadesForIBC,
-              year: year
-            };
-          })
-        );
+        // ✅ UNA SOLA LLAMADA para todas las novedades del período
+        console.log('📥 Obteniendo todas las novedades del período en una sola llamada...');
+        const allNovedades = await NovedadesEnhancedService.getNovedades(companyId!, currentPeriodId);
+        
+        // ✅ Agrupar novedades por empleado en memoria
+        const novedadesByEmployee = new Map<string, typeof allNovedades>();
+        allNovedades.forEach(novedad => {
+          if (!novedadesByEmployee.has(novedad.empleado_id)) {
+            novedadesByEmployee.set(novedad.empleado_id, []);
+          }
+          novedadesByEmployee.get(novedad.empleado_id)!.push(novedad);
+        });
+        console.log(`✅ ${allNovedades.length} novedades agrupadas para ${novedadesByEmployee.size} empleados`);
+
+        // ✅ Preparar inputs para batch (SÍNCRONO - sin más llamadas HTTP)
+        const batchInputs = employees.map((employee) => {
+          const employeeNovedades = novedadesByEmployee.get(employee.id) || [];
+          const novedadesForIBC: NovedadForIBC[] = convertNovedadesToIBC(employeeNovedades);
+          
+          return {
+            baseSalary: employee.baseSalary,
+            workedDays: currentWorkedDays,
+            extraHours: 0,
+            disabilities: 0,
+            bonuses: 0,
+            absences: 0,
+            periodType: periodType,
+            novedades: novedadesForIBC,
+            year: year
+          };
+        });
 
         setCalculationProgress({ current: employees.length / 2, total: employees.length });
 
