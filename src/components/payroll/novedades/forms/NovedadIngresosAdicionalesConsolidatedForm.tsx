@@ -27,12 +27,6 @@ interface NovedadIngresosAdicionalesConsolidatedFormProps {
 
 const ingresoTypes = [
   { 
-    value: 'bonificacion', 
-    label: 'Bonificación', 
-    constitutivo: true,
-    description: 'Pagos adicionales por productividad, metas, etc.'
-  },
-  { 
     value: 'comision', 
     label: 'Comisión', 
     constitutivo: true,
@@ -43,12 +37,6 @@ const ingresoTypes = [
     label: 'Auxilio de Alimentación', 
     constitutivo: false,
     description: 'Subsidio para alimentación (no constitutivo hasta cierto monto)'
-  },
-  { 
-    value: 'auxilio_transporte_adicional', 
-    label: 'Auxilio de Transporte / Conectividad Adicional', 
-    constitutivo: false,
-    description: 'Auxilio de transporte adicional otorgado al empleado'
   },
   { 
     value: 'prima_extralegal', 
