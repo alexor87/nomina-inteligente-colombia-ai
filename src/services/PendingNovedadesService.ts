@@ -84,8 +84,9 @@ export class PendingNovedadesService {
                   fecha_fin: novedad.novedadData.fecha_fin,
                   dias: novedad.novedadData.dias,
                   horas: novedad.novedadData.horas,
-                  constitutivo_salario: novedad.novedadData.constitutivo_salario,
-                  base_calculo: typeof novedad.novedadData.base_calculo === 'object' 
+                  constitutivo_salario: novedad.novedadData.constitutivo_salario ?? 
+                    (['horas_extra', 'recargo_nocturno', 'recargo_dominical', 'comision'].includes(novedad.novedadData.tipo_novedad) ? true : false),
+                  base_calculo: typeof novedad.novedadData.base_calculo === 'object'
                     ? JSON.stringify(novedad.novedadData.base_calculo) 
                     : novedad.novedadData.base_calculo,
                   creado_por: (await supabase.auth.getUser()).data.user?.id

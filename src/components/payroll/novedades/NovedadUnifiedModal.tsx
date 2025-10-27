@@ -388,7 +388,8 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
           fecha_inicio: entry.fecha_inicio || undefined,
           fecha_fin: entry.fecha_fin || undefined,
           subtipo: subtipoToSave,
-          base_calculo: entry.base_calculo || undefined
+          base_calculo: entry.base_calculo || undefined,
+          constitutivo_salario: entry.constitutivo_salario
         };
 
         const result = await onSubmit(submitData);

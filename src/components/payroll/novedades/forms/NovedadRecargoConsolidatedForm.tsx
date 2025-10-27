@@ -20,7 +20,7 @@ interface RecargoEntry {
 
 interface NovedadRecargoConsolidatedFormProps {
   onBack: () => void;
-  onSubmit: (entries: RecargoEntry[]) => void;
+  onSubmit: (formDataArray: any[]) => void;
   employeeSalary: number;
   isSubmitting?: boolean;
   periodoFecha?: Date;
@@ -223,7 +223,19 @@ export const NovedadRecargoConsolidatedForm: React.FC<NovedadRecargoConsolidated
 
   const handleSubmit = () => {
     if (entries.length === 0) return;
-    onSubmit(entries);
+    
+    // Transform entries to format expected by parent with constitutivo_salario
+    const formDataArray = entries.map(entry => ({
+      tipo: entry.tipo,
+      subtipo: entry.tipo,
+      fecha: entry.fecha,
+      horas: entry.horas,
+      valor: entry.valor,
+      observacion: entry.observacion || undefined,
+      constitutivo_salario: true
+    }));
+    
+    onSubmit(formDataArray);
   };
 
   const totalHoras = entries.reduce((sum, entry) => sum + entry.horas, 0);

@@ -34,7 +34,7 @@ const tiposHorasExtra = [
 
 interface NovedadHorasExtraConsolidatedFormProps {
   onBack: () => void;
-  onSubmit: (entries: HorasExtraEntry[]) => void;
+  onSubmit: (formDataArray: any[]) => void;
   employeeSalary: number;
   isSubmitting?: boolean;
   periodoFecha?: Date;
@@ -150,7 +150,19 @@ export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsol
 
   const handleSubmit = () => {
     if (entries.length === 0) return;
-    onSubmit(entries);
+
+    const formDataArray = entries.map(entry => ({
+      tipo: entry.tipo,
+      subtipo: entry.tipo,
+      fecha: entry.fecha,
+      horas: entry.horas,
+      valor: entry.valor,
+      observacion: entry.observacion || undefined,
+      constitutivo_salario: true
+    }));
+
+    console.log('📋 HORAS EXTRA: Enviando batch al backend:', formDataArray);
+    onSubmit(formDataArray);
   };
 
   const totalHoras = entries.reduce((sum, entry) => sum + entry.horas, 0);
