@@ -25,6 +25,7 @@ import { PayrollCalculationBackendService } from '@/services/PayrollCalculationB
 import { convertNovedadesToIBC } from '@/utils/payrollCalculationsBackend';
 import { PayrollCalculationService } from '@/services/PayrollCalculationService';
 import { NoveltyImportDrawer } from '@/components/payroll/novelties-import/NoveltyImportDrawer';
+import { useEmployeeNovedadesCacheStore } from '@/stores/employeeNovedadesCacheStore';
 
 interface PayrollLiquidationSimpleTableProps {
   employees: PayrollEmployee[];
@@ -371,16 +372,25 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
         console.log('✅ Novedad creada exitosamente');
         novedadChangedRef.current = true;
         
-        // ✅ CRÍTICO: Refrescar las novedades del empleado
-        await refreshEmployeeNovedades(selectedEmployee.id);
-        
-        // ✅ CRÍTICO: Notificar cambio al componente padre
-        await onEmployeeNovedadesChange(selectedEmployee.id);
+        // ✅ NUEVO: Disparar recálculo batch automáticamente
+        useEmployeeNovedadesCacheStore.getState().setLastRefreshTime(Date.now());
+        console.log('⏰ lastRefreshTime actualizado - recálculo batch se ejecutará automáticamente');
         
         handleCloseNovedadModal();
+        
+        toast({
+          title: "✅ Novedad creada",
+          description: "El recálculo se ejecutará automáticamente",
+          className: "border-green-200 bg-green-50"
+        });
       }
     } catch (error) {
       console.error('❌ Error en creación de novedad:', error);
+      toast({
+        title: "❌ Error",
+        description: "No se pudo crear la novedad",
+        variant: "destructive"
+      });
     }
   };
 
@@ -388,9 +398,8 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
     console.log('🔄 Novedad modificada para empleado:', employeeId);
     novedadChangedRef.current = true;
     
-    // ✅ Optimización: Recalcular solo el empleado afectado
-    await recalculateSingleEmployee(employeeId);
-    await onEmployeeNovedadesChange(employeeId);
+    // ✅ El recálculo batch se disparará automáticamente por lastRefreshTime
+    // No es necesario recalcular individualmente
   };
 
   const handleDeleteEmployee = (employee: PayrollEmployee) => {
