@@ -69,12 +69,15 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
     pensionDeduction: number; 
     transportAllowance: number; 
   }>>({});
+  const [isCalculating, setIsCalculating] = useState(false);
+  const [calculationProgress, setCalculationProgress] = useState({ current: 0, total: 0 });
   const novedadChangedRef = useRef(false);
   const isRecalculatingRef = useRef(false);
   const pendingRecalcRef = useRef(false);
   const lastRecalcAtRef = useRef(0);
   const lastPersistedHashRef = useRef('');
   const prevKeyRef = useRef('');
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
   const { companyId } = useCurrentCompany();
 
@@ -110,31 +113,88 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
     }
   }, [employees, currentPeriodId, loadNovedadesTotals]);
 
+  // ✅ NUEVA FUNCIÓN: Calcular un solo empleado (optimización selectiva)
+  const recalculateSingleEmployee = async (employeeId: string) => {
+    const employee = employees.find(emp => emp.id === employeeId);
+    if (!employee) return;
+
+    console.log('🎯 Recalculando empleado individual:', employee.name);
+    setIsCalculating(true);
+    setCalculationProgress({ current: 1, total: 1 });
+
+    try {
+      const novedadesList = await getEmployeeNovedadesList(employeeId);
+      const novedadesForIBC: NovedadForIBC[] = convertNovedadesToIBC(novedadesList);
+
+      const currentWorkedDays = workedDays;
+      const periodType = periodForCalculation.tipo_periodo;
+      const config = getCurrentYearConfig();
+
+      const calculation = await PayrollCalculationBackendService.calculatePayroll({
+        baseSalary: employee.baseSalary,
+        workedDays: currentWorkedDays,
+        extraHours: 0,
+        disabilities: 0,
+        bonuses: 0,
+        absences: 0,
+        periodType: periodType,
+        novedades: novedadesForIBC,
+        year: year
+      });
+
+      const eligible = employee.baseSalary <= (config.salarioMinimo * 2);
+      const proratedTransport = eligible ? Math.round((config.auxilioTransporte / 30) * currentWorkedDays) : 0;
+
+      // Actualizar solo ese empleado
+      setEmployeeCalculations(prev => ({
+        ...prev,
+        [employeeId]: {
+          totalToPay: calculation.netPay,
+          ibc: calculation.ibc,
+          grossPay: calculation.grossPay,
+          deductions: calculation.totalDeductions,
+          healthDeduction: calculation.healthDeduction,
+          pensionDeduction: calculation.pensionDeduction,
+          transportAllowance: proratedTransport
+        }
+      }));
+
+      console.log('✅ Empleado individual recalculado:', employee.name);
+    } catch (error) {
+      console.error('❌ Error recalculando empleado individual:', error);
+    } finally {
+      setIsCalculating(false);
+      setCalculationProgress({ current: 0, total: 0 });
+    }
+  };
+
+  // ✅ BATCH PROCESSING con Debouncing
   useEffect(() => {
-    const recalculateAllEmployees = async () => {
-      // Re-entrancy protection with pending queue
+    // Cancelar timer anterior
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    // Agrupar cambios en 500ms
+    debounceTimerRef.current = setTimeout(async () => {
+      // Re-entrancy protection
       if (isRecalculatingRef.current) {
         console.log('⏳ Recálculo en progreso, marcando como pendiente...');
         pendingRecalcRef.current = true;
         return;
       }
 
-      // Reset pending flag and start recalculation
-      pendingRecalcRef.current = false;
-
-      // Throttling - minimum 1 second between recalculations
-      const now = Date.now();
-      if (now - lastRecalcAtRef.current < 1000) {
-        console.log('⏰ Throttling recálculo, muy pronto desde el último');
-        return;
-      }
-
       if (!currentPeriodId || employees.length === 0) return;
 
+      pendingRecalcRef.current = false;
       isRecalculatingRef.current = true;
+      const now = Date.now();
       lastRecalcAtRef.current = now;
 
-      console.log('🔄 Recalculando empleados con auxilio de transporte correcto...');
+      setIsCalculating(true);
+      setCalculationProgress({ current: 0, total: employees.length });
+
+      console.log('🚀 Recalculando empleados con BATCH PROCESSING...');
       const newCalculations: Record<string, { 
         totalToPay: number; 
         ibc: number; 
@@ -145,142 +205,94 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
         transportAllowance: number; 
       }> = {};
 
-      const config = getCurrentYearConfig();
+      try {
+        const config = getCurrentYearConfig();
+        const currentWorkedDays = workedDays;
+        const periodType = periodForCalculation.tipo_periodo;
 
-      for (const employee of employees) {
-        try {
-          const novedadesList = await getEmployeeNovedadesList(employee.id);
-          const novedadesForIBC: NovedadForIBC[] = convertNovedadesToIBC(novedadesList);
+        // ✅ Preparar inputs para batch
+        const batchInputs = await Promise.all(
+          employees.map(async (employee) => {
+            const novedadesList = await getEmployeeNovedadesList(employee.id);
+            const novedadesForIBC: NovedadForIBC[] = convertNovedadesToIBC(novedadesList);
+            
+            return {
+              baseSalary: employee.baseSalary,
+              workedDays: currentWorkedDays,
+              extraHours: 0,
+              disabilities: 0,
+              bonuses: 0,
+              absences: 0,
+              periodType: periodType,
+              novedades: novedadesForIBC,
+              year: year
+            };
+          })
+        );
 
-          const constitutivas = novedadesForIBC.filter(n => n.constitutivo_salario);
-          const noConstitutivas = novedadesForIBC.filter(n => !n.constitutivo_salario);
-          
-          console.log('📊 Análisis normativo de novedades:', employee.name, {
-            totalNovedades: novedadesForIBC.length,
-            constitutivas: constitutivas.length,
-            noConstitutivas: noConstitutivas.length,
-            impactoIBC: constitutivas.reduce((sum, n) => sum + n.valor, 0),
-            detalleConstitutivas: constitutivas.map(n => `${n.tipo_novedad}: $${n.valor}`),
-            detalleNoConstitutivas: noConstitutivas.map(n => `${n.tipo_novedad}: $${n.valor}`)
-          });
+        setCalculationProgress({ current: employees.length / 2, total: employees.length });
 
-          const currentWorkedDays = workedDays;
-          const periodType = periodForCalculation.tipo_periodo;
-          
-          console.log('🎯 Calculando empleado con período correcto:', {
-            employee: employee.name,
-            workedDays: currentWorkedDays,
-            periodType,
-            baseSalary: employee.baseSalary
-          });
-
-          console.log('💰 ENVIANDO AL BACKEND - IBC NORMATIVO:', {
-            employee: employee.name,
-            salarioOriginal: employee.baseSalary,
-            periodType,
-            novedadesCount: novedadesForIBC.length
-          });
-
-          const calculation = await PayrollCalculationBackendService.calculatePayroll({
-            baseSalary: employee.baseSalary,
-            workedDays: currentWorkedDays,
-            extraHours: 0,
-            disabilities: 0,
-            bonuses: 0,
-            absences: 0,
-            periodType: periodType,
-            novedades: novedadesForIBC,
-            year: year
-          });
-
+        // ✅ UNA SOLA LLAMADA AL BACKEND para todos los empleados
+        console.log(`📦 Calculando ${employees.length} empleados en batch...`);
+        const batchResults = await PayrollCalculationBackendService.calculateBatch(batchInputs);
+        
+        // ✅ Mapear resultados
+        employees.forEach((employee, index) => {
+          const calculation = batchResults[index];
           const eligible = employee.baseSalary <= (config.salarioMinimo * 2);
           const proratedTransport = eligible ? Math.round((config.auxilioTransporte / 30) * currentWorkedDays) : 0;
-          
-           console.log('🚌 CORRECCIÓN AUXILIO DE TRANSPORTE:', {
-             employee: employee.name,
-             salarioBase: employee.baseSalary,
-             limite2SMMLV: config.salarioMinimo * 2,
-             eligible,
-             auxilioMensual: config.auxilioTransporte,
-             diasTrabajados: currentWorkedDays,
-             proratedTransport,
-             backendTransport: calculation.transportAllowance
-           });
-
-           // ✅ BACKEND AUTHORITATIVE: Use backend values directly - no frontend adjustments
-           // Backend now includes transport allowance in grossPay and calculates netPay correctly
-           const adjustedGrossPay = calculation.grossPay; // Backend includes transport allowance
-           const adjustedNetPay = calculation.netPay; // Backend calculated: grossPay - deductions
-
-           console.log('✅ BACKEND AUTHORITATIVE CALCULATION:', {
-             employee: employee.name,
-             backendGrossPay: calculation.grossPay,
-             backendNetPay: calculation.netPay,
-             backendTransport: calculation.transportAllowance,
-             proratedTransport,
-             totalDevengado: adjustedGrossPay,
-             netoPagado: adjustedNetPay,
-             mathematicalCheck: `${adjustedGrossPay} - ${calculation.healthDeduction + calculation.pensionDeduction} = ${adjustedNetPay}`
-           });
 
           newCalculations[employee.id] = {
-            totalToPay: adjustedNetPay,
+            totalToPay: calculation.netPay,
             ibc: calculation.ibc,
-            grossPay: adjustedGrossPay,
+            grossPay: calculation.grossPay,
             deductions: calculation.totalDeductions,
             healthDeduction: calculation.healthDeduction,
             pensionDeduction: calculation.pensionDeduction,
             transportAllowance: proratedTransport
           };
+        });
 
-          console.log('✅ Empleado calculado con auxilio corregido:', employee.name, {
-            ibc: calculation.ibc,
-            netPay: adjustedNetPay,
-            grossPay: adjustedGrossPay,
-            transportAllowance: proratedTransport,
-            healthDeduction: calculation.healthDeduction,
-            pensionDeduction: calculation.pensionDeduction
-          });
+        console.log(`✅ Batch completado: ${employees.length} empleados en una llamada`);
 
-        } catch (error) {
-          console.error('❌ Error calculando empleado:', employee.name, error);
-          newCalculations[employee.id] = {
-            totalToPay: 0,
-            ibc: employee.baseSalary,
-            grossPay: 0,
-            deductions: 0,
-            healthDeduction: 0,
-            pensionDeduction: 0,
-            transportAllowance: 0
-          };
-        }
-      }
+        setEmployeeCalculations(newCalculations);
 
-      setEmployeeCalculations(newCalculations);
-
-      // Only persist if calculations have changed
-      const calculationsHash = JSON.stringify(newCalculations);
-      if (updateEmployeeCalculationsInDB && Object.keys(newCalculations).length > 0 && lastPersistedHashRef.current !== calculationsHash) {
-        console.log('💾 Activando persistencia automática de cálculos...');
-        try {
+        // Persistir si hay cambios
+        const calculationsHash = JSON.stringify(newCalculations);
+        if (updateEmployeeCalculationsInDB && Object.keys(newCalculations).length > 0 && lastPersistedHashRef.current !== calculationsHash) {
+          console.log('💾 Persistiendo cálculos batch en BD...');
           await updateEmployeeCalculationsInDB(newCalculations);
           lastPersistedHashRef.current = calculationsHash;
-          console.log('✅ Cálculos persistidos automáticamente en BD');
-        } catch (error) {
-          console.error('❌ Error persistiendo cálculos:', error);
+          console.log('✅ Cálculos batch persistidos');
+        }
+
+      } catch (error) {
+        console.error('❌ Error en batch calculation:', error);
+        toast({
+          title: "Error en cálculo",
+          description: "Hubo un problema calculando la nómina. Intenta de nuevo.",
+          variant: "destructive"
+        });
+      } finally {
+        setIsCalculating(false);
+        setCalculationProgress({ current: 0, total: 0 });
+        isRecalculatingRef.current = false;
+        
+        // Check if there's a pending recalculation
+        if (pendingRecalcRef.current) {
+          console.log('🔄 Ejecutando recálculo pendiente...');
+          setTimeout(() => {
+            debounceTimerRef.current = setTimeout(() => {}, 0);
+          }, 100);
         }
       }
+    }, 500); // ✅ Debounce de 500ms
 
-      isRecalculatingRef.current = false;
-      
-      // Check if there's a pending recalculation
-      if (pendingRecalcRef.current) {
-        console.log('🔄 Ejecutando recálculo pendiente...');
-        setTimeout(recalculateAllEmployees, 100);
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
       }
     };
-
-    recalculateAllEmployees();
   }, [employees.length, currentPeriodId, lastRefreshTime, year]);
 
   const periodForCalculation = {
@@ -362,6 +374,9 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
   const handleNovedadChange = async (employeeId: string) => {
     console.log('🔄 Novedad modificada para empleado:', employeeId);
     novedadChangedRef.current = true;
+    
+    // ✅ Optimización: Recalcular solo el empleado afectado
+    await recalculateSingleEmployee(employeeId);
     await onEmployeeNovedadesChange(employeeId);
   };
 
@@ -402,6 +417,14 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
 
   return (
     <>
+      {isCalculating && (
+        <div className="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 px-4 py-3 rounded-lg mb-4 border border-blue-200">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span className="font-medium">
+            Calculando nómina... {calculationProgress.current > 0 && `(${calculationProgress.current}/${calculationProgress.total})`}
+          </span>
+        </div>
+      )}
       <div className="w-full overflow-x-auto">
         <Table className="min-w-max">
           <TableHeader>
