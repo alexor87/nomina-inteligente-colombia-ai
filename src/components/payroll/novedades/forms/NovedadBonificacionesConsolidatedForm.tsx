@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
+
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, DollarSign, Info, Plus, Trash2 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
@@ -178,16 +178,18 @@ export const NovedadBonificacionesConsolidatedForm: React.FC<NovedadBonificacion
             )}
           </div>
 
-          <div className="flex items-center space-x-2 p-3 bg-white rounded border border-blue-200">
-            <Checkbox 
-              id="constitutivo" 
-              checked={newEntry.constitutivo}
-              onCheckedChange={(checked) => setNewEntry(prev => ({ ...prev, constitutivo: checked === true }))}
-            />
-            <Label htmlFor="constitutivo" className="text-sm text-gray-700">
-              ¿Es constitutivo de salario?
-            </Label>
-          </div>
+          {newEntry.tipo_novedad && (
+            <div className="p-3 bg-white rounded border border-blue-200">
+              <div className="flex items-center gap-2">
+                <Info className="h-4 w-4 text-blue-600" />
+                <span className="text-sm font-medium text-gray-700">
+                  {newEntry.constitutivo 
+                    ? '✓ Constitutiva de salario (afecta prestaciones sociales y aportes)'
+                    : '○ No constitutiva de salario (no afecta prestaciones sociales)'}
+                </span>
+              </div>
+            </div>
+          )}
 
           <div>
             <Label htmlFor="observacion" className="text-gray-700">Observaciones</Label>
