@@ -400,9 +400,19 @@ async function calculatePayroll(supabase: any, data: any) {
     novedades = []
   } = data;
 
+  // ✅ LISTA DE DEDUCCIONES EXPLÍCITAS
+  const DEDUCTION_TYPES = [
+    'libranza',               // Préstamos y Libranzas
+    'descuento_voluntario',   // Deducciones Especiales
+    'retencion_fuente',       // Retención en la Fuente
+    'fondo_solidaridad',      // Fondo de Solidaridad
+    'multa'                   // Multas
+  ];
+
   const dailySalary = baseSalary / 30;
   let regularPay = 0; // ✅ Se calculará después de procesar novedades
   let extraPay = bonuses; // Legacy field compatibility
+  let additionalDeductions = 0; // ✅ NUEVO: Para acumular deducciones explícitas
 
   // ✅ PROCESAR NOVEDADES CON POLÍTICAS
   console.log('📋 Processing novedades:', novedades.length);
@@ -411,6 +421,7 @@ async function calculatePayroll(supabase: any, data: any) {
   let totalIncapacityValue = 0;
   let totalIncapacityDays = 0;
   let totalConstitutiveNovedades = 0;
+  const deduccionesDetectadas: string[] = [];
 
   for (const novedad of novedades) {
     console.log('🔍 Procesando novedad:', { 
@@ -437,6 +448,13 @@ async function calculatePayroll(supabase: any, data: any) {
       
       console.log('🏥 SUMA ACUMULADA - totalIncapacityDays:', totalIncapacityDays, 'totalIncapacityValue:', totalIncapacityValue);
       // ✅ NO sumar novedad.valor aquí - ya está calculado en totalIncapacityValue
+    } else if (DEDUCTION_TYPES.includes(novedad.tipo_novedad)) {
+      // ✅ DEDUCCIONES EXPLÍCITAS: Restar del salario
+      const valorDeduccion = Math.max(0, Number(novedad.valor || 0));
+      additionalDeductions += valorDeduccion;
+      deduccionesDetectadas.push(`${novedad.tipo_novedad}: $${valorDeduccion.toLocaleString()}`);
+      console.log(`💸 DEDUCCIÓN detectada: ${novedad.tipo_novedad} → $${valorDeduccion.toLocaleString()}`);
+      // ✅ NO sumar a extraPay
     } else if (novedad.constitutivo_salario) {
       // Other constitutive novedades
       totalConstitutiveNovedades += novedad.valor || 0;
@@ -511,7 +529,15 @@ async function calculatePayroll(supabase: any, data: any) {
 
   const healthDeduction = Math.round(ibcSalud * 0.04);
   const pensionDeduction = Math.round(ibcSalud * 0.04);
-  const totalDeductions = healthDeduction + pensionDeduction;
+  const totalDeductions = healthDeduction + pensionDeduction + additionalDeductions;
+  
+  console.log('💰 DEDUCCIONES TOTALES:', {
+    healthDeduction,
+    pensionDeduction,
+    additionalDeductions,
+    totalDeductions,
+    deduccionesDetectadas: deduccionesDetectadas.join(', ') || 'ninguna'
+  });
 
   // ✅ netPay now correctly calculated: grossPay (with transport) - deductions
   const netPay = grossPay - totalDeductions;
