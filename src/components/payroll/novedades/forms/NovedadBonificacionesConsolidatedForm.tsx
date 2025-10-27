@@ -37,12 +37,6 @@ const tiposBonificacion = [
     label: 'Bonificación No Salarial',
     description: 'No afecta el cálculo de prestaciones sociales',
     defaultConstitutivo: false
-  },
-  { 
-    value: 'auxilio_conectividad', 
-    label: 'Auxilio de Conectividad Digital',
-    description: 'Solo para empleados con salario ≤ 2 SMMLV',
-    defaultConstitutivo: false
   }
 ];
 
@@ -76,12 +70,6 @@ export const NovedadBonificacionesConsolidatedForm: React.FC<NovedadBonificacion
     }
 
     const valorNum = parseFloat(newEntry.valor);
-    
-    // Validación específica para auxilio de conectividad
-    if (newEntry.tipo_novedad === 'auxilio_conectividad' && employeeSalary > 2600000) {
-      alert('El auxilio de conectividad solo aplica para salarios ≤ 2 SMMLV');
-      return;
-    }
     
     // Validación para bonificaciones no salariales
     if (newEntry.tipo_novedad === 'bonificacion_no_salarial' && valorNum > employeeSalary * 0.4) {

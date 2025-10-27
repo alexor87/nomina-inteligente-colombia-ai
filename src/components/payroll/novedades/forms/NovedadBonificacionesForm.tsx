@@ -27,12 +27,6 @@ const tiposBonificacion = [
     label: 'Bonificación No Salarial',
     description: 'No afecta el cálculo de prestaciones sociales',
     info: 'Límite: hasta 40% del salario para mantener naturaleza no salarial'
-  },
-  { 
-    value: 'auxilio_conectividad', 
-    label: 'Auxilio de Conectividad Digital',
-    description: 'Solo para empleados con salario ≤ 2 SMMLV',
-    limit: 'Máximo: $162,000 mensuales'
   }
 ];
 
@@ -64,9 +58,6 @@ export const NovedadBonificacionesForm: React.FC<NovedadBonificacionesFormProps>
     
     const valorNum = parseFloat(valor);
     
-    if (selectedTipo.value === 'auxilio_conectividad' && employeeSalary > 2600000) {
-      return { type: 'error', message: 'El auxilio de conectividad solo aplica para salarios ≤ 2 SMMLV' };
-    }
     
     if (selectedTipo.value === 'bonificacion_no_salarial' && valorNum > employeeSalary * 0.4) {
       return { type: 'warning', message: 'La bonificación supera el 40% del salario, podría perder su naturaleza no salarial' };
@@ -121,8 +112,8 @@ export const NovedadBonificacionesForm: React.FC<NovedadBonificacionesFormProps>
               {selectedTipo.warning && (
                 <p className="text-sm text-orange-600 mt-1">⚠️ {selectedTipo.warning}</p>
               )}
-              {selectedTipo.limit && (
-                <p className="text-sm text-green-600 mt-1">ℹ️ {selectedTipo.limit}</p>
+              {'info' in selectedTipo && selectedTipo.info && (
+                <p className="text-sm text-green-600 mt-1">ℹ️ {selectedTipo.info}</p>
               )}
             </div>
           )}
