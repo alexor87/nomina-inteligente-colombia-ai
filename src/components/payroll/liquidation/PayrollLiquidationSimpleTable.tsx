@@ -10,8 +10,6 @@ import { formatCurrency } from '@/lib/utils';
 import { ConfigurationService } from '@/services/ConfigurationService';
 import { CreateNovedadData } from '@/types/novedades-enhanced';
 import { NovedadesEnhancedService } from '@/services/NovedadesEnhancedService';
-import { PayrollPerformanceService } from '@/services/payroll-intelligent/PayrollPerformanceService';
-import { useVirtualizer } from '@tanstack/react-virtual';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -83,15 +81,6 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
   const { companyId } = useCurrentCompany();
-  
-  // ✅ FASE 2: Virtualización de UI
-  const tableContainerRef = useRef<HTMLDivElement>(null);
-  const rowVirtualizer = useVirtualizer({
-    count: employees.length,
-    getScrollElement: () => tableContainerRef.current,
-    estimateSize: () => 60,
-    overscan: 10,
-  });
 
   const {
     loadNovedadesTotals,
@@ -254,50 +243,34 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
           };
         });
 
-        // ✅ FASE 1: BATCH PROCESSING CONTROLADO con PayrollPerformanceService
-        console.log(`🚀 Procesando ${employees.length} empleados con batches controlados...`);
+        setCalculationProgress({ current: employees.length / 2, total: employees.length });
+
+        // ✅ UNA SOLA LLAMADA AL BACKEND para todos los empleados
+        console.log(`📦 Calculando ${employees.length} empleados en batch...`);
+        const batchResults = await PayrollCalculationBackendService.calculateBatch(batchInputs);
         
-        const batchResults = await PayrollPerformanceService.processEmployeesInBatches(
-          batchInputs,
-          async (batch) => {
-            // Procesar batch de 100 empleados por vez
-            return await PayrollCalculationBackendService.calculateBatch(batch);
-          },
-          (processed, total, batchResults) => {
-            // ✅ Callback de progreso - actualizar UI incrementalmente
-            setCalculationProgress({ current: processed, total });
-            
-            // ✅ Actualizar cálculos batch por batch (UI se actualiza progresivamente)
-            const batchCalcs: typeof newCalculations = {};
-            batchResults.forEach((calc, idx) => {
-              const empIndex = processed - batchResults.length + idx;
-              const employee = employees[empIndex];
-              if (employee) {
-                const eligible = employee.baseSalary <= (config.salarioMinimo * 2);
-                const proratedTransport = eligible ? Math.round((config.auxilioTransporte / 30) * currentWorkedDays) : 0;
-                
-                batchCalcs[employee.id] = {
-                  totalToPay: calc.netPay,
-                  ibc: calc.ibc,
-                  grossPay: calc.grossPay,
-                  deductions: calc.totalDeductions,
-                  healthDeduction: calc.healthDeduction,
-                  pensionDeduction: calc.pensionDeduction,
-                  transportAllowance: proratedTransport
-                };
-                
-                newCalculations[employee.id] = batchCalcs[employee.id];
-              }
-            });
-            
-            // Actualizar estado incrementalmente (las filas se actualizan batch por batch)
-            setEmployeeCalculations(prev => ({ ...prev, ...batchCalcs }));
-          }
-        );
+        // ✅ Mapear resultados
+        employees.forEach((employee, index) => {
+          const calculation = batchResults[index];
+          const eligible = employee.baseSalary <= (config.salarioMinimo * 2);
+          const proratedTransport = eligible ? Math.round((config.auxilioTransporte / 30) * currentWorkedDays) : 0;
 
-        console.log(`✅ Procesamiento por batches completado: ${employees.length} empleados`);
+          newCalculations[employee.id] = {
+            totalToPay: calculation.netPay,
+            ibc: calculation.ibc,
+            grossPay: calculation.grossPay,
+            deductions: calculation.totalDeductions,
+            healthDeduction: calculation.healthDeduction,
+            pensionDeduction: calculation.pensionDeduction,
+            transportAllowance: proratedTransport
+          };
+        });
 
-        // Persistir si hay cambios (newCalculations ya está actualizado por los callbacks)
+        console.log(`✅ Batch completado: ${employees.length} empleados en una llamada`);
+
+        setEmployeeCalculations(newCalculations);
+
+        // Persistir si hay cambios
         const calculationsHash = JSON.stringify(newCalculations);
         if (updateEmployeeCalculationsInDB && Object.keys(newCalculations).length > 0 && lastPersistedHashRef.current !== calculationsHash) {
           console.log('💾 Persistiendo cálculos batch en BD...');
@@ -465,17 +438,11 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
           </span>
         </div>
       )}
-      
-      {/* ✅ FASE 2: Virtualización - Contenedor con altura fija y scroll */}
-      <div 
-        ref={tableContainerRef}
-        className="w-full overflow-auto border rounded-lg"
-        style={{ height: '600px' }}
-      >
-        <Table className="min-w-max relative">
-          <TableHeader className="sticky top-0 bg-background z-20">
+      <div className="w-full overflow-x-auto">
+        <Table className="min-w-max">
+          <TableHeader>
             <TableRow>
-              <TableHead className="sticky left-0 bg-background z-30 min-w-[200px]">Nombre Empleado</TableHead>
+              <TableHead className="sticky left-0 bg-background z-10 min-w-[200px]">Nombre Empleado</TableHead>
               <TableHead className="text-right min-w-[120px]">Salario Base</TableHead>
               <TableHead className="text-right min-w-[120px]">IBC</TableHead>
               <TableHead className="text-center min-w-[100px]">Días Trabajados</TableHead>
@@ -483,30 +450,20 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
               <TableHead className="text-right min-w-[140px] bg-red-100 font-semibold">Total Deducciones</TableHead>
               <TableHead className="text-center min-w-[100px]">Novedades</TableHead>
               <TableHead className="text-right min-w-[140px] bg-blue-100 font-bold">Neto Pagado</TableHead>
-              <TableHead className="text-center min-w-[100px] sticky right-0 bg-background z-30">Acciones</TableHead>
+              <TableHead className="text-center min-w-[100px] sticky right-0 bg-background z-10">Acciones</TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody style={{ height: `${rowVirtualizer.getTotalSize()}px` }}>
-            {/* ✅ FASE 2: Solo renderizar filas visibles */}
-            {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-              const employee = employees[virtualRow.index];
+          <TableBody>
+            {employees.map((employee) => {
+              // ✅ CRÍTICO: No usar getEmployeeNovedades directamente (ahora es async)
+              // Los totales ahora se calculan en el backend y se deben obtener de otra forma
               const totalToPay = getTotalToPay(employee);
               const ibc = getEmployeeIBC(employee);
               const transportAllowance = getEmployeeTransportAllowance(employee);
               const calc = employeeCalculations[employee.id];
 
               return (
-                <TableRow 
-                  key={employee.id}
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    height: `${virtualRow.size}px`,
-                    transform: `translateY(${virtualRow.start}px)`
-                  }}
-                >
+                <TableRow key={employee.id}>
                   <TableCell className="sticky left-0 bg-background z-10">
                     <div className="font-medium">{employee.name}</div>
                     <div className="text-sm text-gray-500">{employee.position}</div>
