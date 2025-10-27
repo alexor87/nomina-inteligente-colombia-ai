@@ -44,6 +44,13 @@ const parseBaseCalculo = (bc: unknown): BaseCalculoData | undefined => {
 };
 
 const mapDbRowToApp = (n: any): AppPayrollNovedad => {
+  // ✅ Fallback normativo por si hay registros antiguos sin bandera
+  const defaultConstitutivo = getDefaultConstitutivoByType(n.tipo_novedad as DatabaseNovedadType);
+  const constitutivo =
+    typeof n.constitutivo_salario === 'boolean'
+      ? n.constitutivo_salario
+      : defaultConstitutivo;
+
   return {
     id: n.id,
     company_id: n.company_id,
@@ -62,6 +69,7 @@ const mapDbRowToApp = (n: any): AppPayrollNovedad => {
     creado_por: n.creado_por || undefined,
     created_at: n.created_at,
     updated_at: n.updated_at,
+    constitutivo_salario: constitutivo, // ✅ Campo crítico para cálculo de IBC
   };
 };
 
