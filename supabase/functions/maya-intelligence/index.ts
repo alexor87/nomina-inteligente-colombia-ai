@@ -542,6 +542,13 @@ serve(async (req) => {
     const userSupabase = createClient(supabaseUrl, supabaseKey, {
       global: { headers: { Authorization: authHeader } }
     });
+    
+    // Create admin client for demonstrative calculations (no JWT required)
+    const supabaseAdmin = createClient(
+      supabaseUrl,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      { auth: { persistSession: false } }
+    );
 
     const body = await req.json();
     const { conversation, sessionId, richContext, metadata, idempotencyKey, actionType, actionParameters } = body;
@@ -1715,8 +1722,15 @@ serve(async (req) => {
             }
           }
           
-          // Llamar al backend de cálculo
-          const { data: calcData, error: calcError } = await userSupabase.functions.invoke(
+          // Llamar al backend de cálculo usando service role (cálculo puro sin BD)
+          console.log('🔧 [CALCULATION_INVOKE] Invocando payroll-calculations:', {
+            action: 'explain-surcharge',
+            type: args.type,
+            salary: finalSalary,
+            clientType: 'service_role'
+          });
+          
+          const { data: calcData, error: calcError } = await supabaseAdmin.functions.invoke(
             'payroll-calculations',
             {
               body: {
@@ -1731,9 +1745,15 @@ serve(async (req) => {
           
           if (calcError || !calcData?.success) {
             console.error('❌ Error calculando recargo:', calcError);
+            // NO CONTINUAR - retornar mensaje de error amigable inmediatamente
             return new Response(JSON.stringify({
-              message: 'Lo siento, tuve un problema al realizar el cálculo. ¿Podrías intentarlo nuevamente?',
-              emotionalState: 'helpful',
+              message: 'Disculpa, tuve un problema al realizar el cálculo. Por favor, intenta de nuevo o reformula tu pregunta. Ejemplo: "recargo nocturno para un salario de 2 millones"',
+              emotionalState: 'apologetic',
+              quickReplies: [
+                { text: 'Recargo nocturno SMLV', action: 'calc_nocturno_smlv' },
+                { text: 'Recargo dominical SMLV', action: 'calc_dominical_smlv' },
+                { text: 'Explicar sin calcular', action: 'explain_surcharges' }
+              ],
               sessionId,
               timestamp: new Date().toISOString()
             }), {
@@ -1845,7 +1865,14 @@ ${calc.jornadaInfo.descripcion ? `\n**Nota:** ${calc.jornadaInfo.descripcion}` :
           console.log(`✅ [FALLBACK_CALCULATION] Calculando ${surchargeType} para $${extractedSalary.toLocaleString()}`);
           
           try {
-            const { data: calcData, error: calcError } = await userSupabase.functions.invoke(
+            console.log('🔧 [FALLBACK_INVOKE] Invocando payroll-calculations:', {
+              action: 'explain-surcharge',
+              type: surchargeType,
+              salary: extractedSalary,
+              clientType: 'service_role'
+            });
+            
+            const { data: calcData, error: calcError } = await supabaseAdmin.functions.invoke(
               'payroll-calculations',
               {
                 body: {
@@ -1860,7 +1887,19 @@ ${calc.jornadaInfo.descripcion ? `\n**Nota:** ${calc.jornadaInfo.descripcion}` :
             
             if (calcError || !calcData?.success) {
               console.error('❌ Error en fallback calculation:', calcError);
-              throw new Error(calcError?.message || 'Error desconocido');
+              // NO CONTINUAR - retornar mensaje de error amigable inmediatamente
+              return new Response(JSON.stringify({
+                message: 'Disculpa, tuve un problema al realizar el cálculo. Por favor, intenta de nuevo. Ejemplo: "recargo nocturno para 2 millones"',
+                emotionalState: 'apologetic',
+                quickReplies: [
+                  { text: 'Recargo nocturno SMLV', action: 'calc_nocturno_smlv' },
+                  { text: 'Recargo dominical SMLV', action: 'calc_dominical_smlv' }
+                ],
+                sessionId,
+                timestamp: new Date().toISOString()
+              }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+              });
             }
             
             const calc = calcData.data;
@@ -1892,8 +1931,16 @@ ${calc.jornadaInfo.descripcion ? `\n**Nota:** ${calc.jornadaInfo.descripcion}` :
               headers: { ...corsHeaders, 'Content-Type': 'application/json' }
             });
           } catch (error) {
-            console.error('❌ [FALLBACK_CALCULATION] Error:', error);
-            // Continuar con flujo normal si falla
+            console.error('❌ [FALLBACK_CALCULATION] Critical error:', error);
+            // Error already returned inside try block, this catch is for unexpected errors
+            return new Response(JSON.stringify({
+              message: 'Disculpa, ocurrió un error inesperado. Por favor intenta de nuevo.',
+              emotionalState: 'apologetic',
+              sessionId,
+              timestamp: new Date().toISOString()
+            }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
           }
         } else {
           // Tipo de recargo no claro: preguntar
@@ -1918,8 +1965,14 @@ ${calc.jornadaInfo.descripcion ? `\n**Nota:** ${calc.jornadaInfo.descripcion}` :
       }
     }
     
+    // GUARD: No buscar empleados si el mensaje contiene un monto de salario
+    const hasSalaryAmount = extractSalaryAmount(lastMessage);
+    if (hasSalaryAmount) {
+      console.log('⚠️ [EMPLOYEE_SEARCH_GUARD] Mensaje contiene monto - omitiendo búsqueda de empleado');
+    }
+    
     // Enhanced Safety Override: Detect ANY employee name in query and force validation
-    const detectedEmployeeName = detectEmployeeNameInQuery(lastMessage);
+    const detectedEmployeeName = !hasSalaryAmount ? detectEmployeeNameInQuery(lastMessage) : null;
     
     // ✅ Verificar si el "nombre" es en realidad un monto
     const looksLikeMoney = detectedEmployeeName ? /^(de|\d|[\d\.,]+|millones?|mil|pesos?)$/i.test(detectedEmployeeName) : false;
