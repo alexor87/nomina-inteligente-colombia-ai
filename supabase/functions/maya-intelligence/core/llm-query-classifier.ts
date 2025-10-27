@@ -220,7 +220,7 @@ Clasifica esta query y extrae los parámetros relevantes.`;
               }
             }
           ],
-          tool_choice: { type: "function", function: { name: "classify_query" } },
+          tool_choice: "auto", // Allow model to choose between classify_query and calculate_surcharge
           max_completion_tokens: 500
         }),
       });
@@ -237,13 +237,33 @@ Clasifica esta query y extrae los parámetros relevantes.`;
       console.log('🔍 [LLM_CLASSIFIER] Full response:', {
         model: data.model,
         hasToolCalls: !!data.choices?.[0]?.message?.tool_calls,
+        toolCallsCount: data.choices?.[0]?.message?.tool_calls?.length || 0,
+        toolCallNames: data.choices?.[0]?.message?.tool_calls?.map((tc: any) => tc.function.name) || [],
         hasContent: !!data.choices?.[0]?.message?.content,
         finishReason: data.choices?.[0]?.finish_reason
       });
       
-      const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+      const toolCalls = data.choices?.[0]?.message?.tool_calls || [];
       
-      if (!toolCall) {
+      // Check if calculate_surcharge was called directly
+      const calculateSurchargeCall = toolCalls.find((tc: any) => tc.function.name === 'calculate_surcharge');
+      
+      if (calculateSurchargeCall) {
+        console.log('🧮 [LLM_CLASSIFIER] Direct calculation tool call detected');
+        // Return a valid classification with the tool call
+        return {
+          queryType: LLMQueryType.DIRECT_INTENT,
+          confidence: 0.95,
+          extractedContext: {},
+          reasoning: 'Direct calculation requested via tool calling',
+          toolCall: calculateSurchargeCall
+        };
+      }
+      
+      // Otherwise, look for classify_query call
+      const classifyCall = toolCalls.find((tc: any) => tc.function.name === 'classify_query');
+      
+      if (!classifyCall) {
         console.warn('⚠️ [LLM_CLASSIFIER] No tool call, attempting text fallback...');
         
         // Fallback: analizar el texto de respuesta si existe
@@ -256,7 +276,7 @@ Clasifica esta query y extrae los parámetros relevantes.`;
         throw new Error('No tool call in OpenAI response');
       }
 
-      const result = JSON.parse(toolCall.function.arguments);
+      const result = JSON.parse(classifyCall.function.arguments);
       
       console.log(`🤖 [LLM_CLASSIFIER] Classification: ${result.queryType} (${result.confidence.toFixed(2)})`);
       console.log(`   Context: ${JSON.stringify(result.extractedContext)}`);
@@ -267,9 +287,7 @@ Clasifica esta query y extrae los parámetros relevantes.`;
         confidence: result.confidence,
         extractedContext: result.extractedContext,
         reasoning: result.reasoning,
-        toolCall: data.choices?.[0]?.message?.tool_calls?.find(
-          (tc: any) => tc.function.name === 'calculate_surcharge'
-        )
+        toolCall: undefined // No direct calculation in this path
       };
 
     } catch (error) {

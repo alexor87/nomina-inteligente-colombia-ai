@@ -682,6 +682,9 @@ serve(async (req) => {
     
     // Declare intent variable
     let intent: any = null;
+    
+    // Declare LLM classification variable at function scope
+    let llmClassification: LLMClassification | null = null;
 
     // ============================================================================
     // BACKEND SESSION STATE LOADING (Phase 1 - Day 2-3)
@@ -1147,7 +1150,7 @@ serve(async (req) => {
           
           try {
             // Get LLM classification with last 3 messages for context
-            const llmClassification = await LLMQueryClassifier.classify(
+            llmClassification = await LLMQueryClassifier.classify(
               lastMessage,
               conversation.slice(-3)
             );
@@ -1687,49 +1690,67 @@ serve(async (req) => {
     // ============================================================================
     // TOOL-CALLING: Detectar si el LLM llamó a herramientas de cálculo
     // ============================================================================
-    if (classification.toolCall) {
-      console.log('🔧 [TOOL-CALL] LLM invocó herramienta:', classification.toolCall.function.name);
+    if (llmClassification?.toolCall) {
+      console.log('🔧 [TOOL-CALL] LLM invocó herramienta:', llmClassification.toolCall.function.name);
       
-      if (classification.toolCall.function.name === 'calculate_surcharge') {
-        const args = JSON.parse(classification.toolCall.function.arguments);
-        console.log('📊 [TOOL-CALL] Argumentos:', args);
-        
-        // Llamar al backend de cálculo
-        const { data: calcData, error: calcError } = await userSupabase.functions.invoke(
-          'payroll-calculations',
-          {
-            body: {
-              action: 'explain-surcharge',
-              type: args.type,
-              salary: args.salary,
-              hours: args.hours || 1,
-              date: new Date().toISOString()
+      if (llmClassification.toolCall.function.name === 'calculate_surcharge') {
+        try {
+          const args = JSON.parse(llmClassification.toolCall.function.arguments);
+          console.log('📊 [TOOL-CALL] Argumentos:', args);
+          
+          // Si no hay salary en args, intentar extraer del mensaje
+          let finalSalary = args.salary;
+          if (!finalSalary) {
+            const extractedSalary = extractSalaryAmount(lastMessage);
+            if (extractedSalary) {
+              finalSalary = extractedSalary;
+              console.log(`💰 [TOOL-CALL] Salary extraído del mensaje: $${finalSalary.toLocaleString()}`);
+            } else {
+              // Usar SMLV como fallback
+              const OFFICIAL_VALUES = {
+                '2025': { salarioMinimo: 1423500 }
+              };
+              finalSalary = OFFICIAL_VALUES['2025'].salarioMinimo;
+              console.log(`💰 [TOOL-CALL] Usando salario mínimo: $${finalSalary.toLocaleString()}`);
             }
           }
-        );
-        
-        if (calcError || !calcData?.success) {
-          console.error('❌ Error calculando recargo:', calcError);
-          return new Response(JSON.stringify({
-            message: 'Lo siento, tuve un problema al realizar el cálculo. ¿Podrías intentarlo nuevamente?',
-            emotionalState: 'helpful',
-            sessionId,
-            timestamp: new Date().toISOString()
-          }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          });
-        }
-        
-        const calc = calcData.data;
-        
-        // Formatear respuesta conversacional
-        const tipoTexto = args.type === 'nocturno' 
-          ? 'recargo nocturno' 
-          : args.type === 'dominical'
-            ? 'recargo dominical'
-            : 'recargo nocturno dominical';
-        
-        const responseMessage = `Perfecto, te explico cómo se calcula el **${tipoTexto}**:
+          
+          // Llamar al backend de cálculo
+          const { data: calcData, error: calcError } = await userSupabase.functions.invoke(
+            'payroll-calculations',
+            {
+              body: {
+                action: 'explain-surcharge',
+                type: args.type,
+                salary: finalSalary,
+                hours: args.hours || 1,
+                date: new Date().toISOString()
+              }
+            }
+          );
+          
+          if (calcError || !calcData?.success) {
+            console.error('❌ Error calculando recargo:', calcError);
+            return new Response(JSON.stringify({
+              message: 'Lo siento, tuve un problema al realizar el cálculo. ¿Podrías intentarlo nuevamente?',
+              emotionalState: 'helpful',
+              sessionId,
+              timestamp: new Date().toISOString()
+            }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+          
+          const calc = calcData.data;
+          
+          // Formatear respuesta conversacional
+          const tipoTexto = args.type === 'nocturno' 
+            ? 'recargo nocturno' 
+            : args.type === 'dominical'
+              ? 'recargo dominical'
+              : 'recargo nocturno dominical';
+          
+          const responseMessage = `Perfecto, te explico cómo se calcula el **${tipoTexto}**:
 
 ${calc.legalContext}
 
@@ -1741,21 +1762,37 @@ ${calc.formula}
 
 ${calc.jornadaInfo.descripcion ? `\n**Nota:** ${calc.jornadaInfo.descripcion}` : ''}`;
 
-        const quickReplies = [
-          { text: 'Calcular con otro salario', action: 'calculation_followup' },
-          { text: 'Ver más horas', action: 'calculation_hours' },
-          { text: 'Otros tipos de recargo', action: 'surcharge_types' }
-        ];
-        
-        return new Response(JSON.stringify({
-          message: responseMessage,
-          emotionalState: 'helpful',
-          quickReplies,
-          sessionId,
-          timestamp: new Date().toISOString()
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
+          const quickReplies = [
+            { text: 'Calcular con otro salario', action: 'calculation_followup' },
+            { text: 'Ver más horas', action: 'calculation_hours' },
+            { text: 'Otros tipos de recargo', action: 'surcharge_types' }
+          ];
+          
+          return new Response(JSON.stringify({
+            message: responseMessage,
+            emotionalState: 'helpful',
+            quickReplies,
+            conversationState: {
+              lastTopic: 'surcharge',
+              surchargeType: args.type,
+              lastSalary: finalSalary
+            },
+            sessionId,
+            timestamp: new Date().toISOString()
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        } catch (error) {
+          console.error('❌ [TOOL-CALL] Error procesando calculate_surcharge:', error);
+          return new Response(JSON.stringify({
+            message: 'Hubo un error al procesar el cálculo. ¿Podrías reformular tu pregunta?',
+            emotionalState: 'concerned',
+            sessionId,
+            timestamp: new Date().toISOString()
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
       }
     }
 
@@ -1764,71 +1801,120 @@ ${calc.jornadaInfo.descripcion ? `\n**Nota:** ${calc.jornadaInfo.descripcion}` :
     // ============================================================================
     
     // ============================================================================
-    // LEGACY: CALCULATION REQUEST DETECTION - Mantener para backward compatibility
+    // CONTEXTUAL FALLBACK: Detectar cálculos sin tool-calling
     // ============================================================================
-    const extractedSalary = extractSalaryAmount(lastMessage);
-    const isCalculationRequest = /\b(calcula|calculalo|calculame|calcular|hazlo|para\s+(?:un\s+)?salario|con\s+(?:un\s+)?salario)\b/i.test(lastMessage);
-    
-    if (extractedSalary && isCalculationRequest) {
-      console.log(`🧮 [CALCULATION_REQUEST] Detected: salary=$${extractedSalary.toLocaleString()}, query="${lastMessage}"`);
+    // Si no hubo tool-calling pero detectamos un monto y contexto de recargo
+    if (!llmClassification?.toolCall) {
+      const extractedSalary = extractSalaryAmount(lastMessage);
+      const isCalculationRequest = /\b(calcula|calculalo|calculame|calcular|hazlo|para\s+(?:un\s+)?salario|con\s+(?:un\s+)?salario)\b/i.test(lastMessage);
       
-      // Detectar tipo de recargo en el mensaje actual o en el contexto previo
-      const isNocturno = /\b(nocturno|noche|10\s*pm|22:00)/i.test(lastMessage);
-      const isDominical = /\b(dominical|domingo|festivo|feriado)/i.test(lastMessage);
-      
-      // Si no está claro en el mensaje actual, revisar el último mensaje del asistente
-      let calculationType = '';
-      if (isNocturno) {
-        calculationType = 'nocturno';
-      } else if (isDominical) {
-        calculationType = 'dominical';
-      } else {
-        // Inferir del último mensaje de MAYA
-        const lastAssistantMsg = conversation.filter(m => m.role === 'assistant').slice(-1)[0];
-        if (lastAssistantMsg?.content) {
-          if (/recargo nocturno/i.test(lastAssistantMsg.content)) {
-            calculationType = 'nocturno';
-          } else if (/recargo dominical/i.test(lastAssistantMsg.content)) {
-            calculationType = 'dominical';
+      if (extractedSalary && isCalculationRequest) {
+        console.log(`🧮 [FALLBACK_CALCULATION] Detected: salary=$${extractedSalary.toLocaleString()}, query="${lastMessage}"`);
+        
+        // Inferir tipo de recargo del contexto
+        let surchargeType: 'nocturno' | 'dominical' | null = null;
+        
+        // 1. Intentar del mensaje actual
+        if (/\b(nocturno|noche|10\s*pm|22:00)/i.test(lastMessage)) {
+          surchargeType = 'nocturno';
+        } else if (/\b(dominical|domingo|festivo|feriado)/i.test(lastMessage)) {
+          surchargeType = 'dominical';
+        }
+        
+        // 2. Si no está claro, inferir del último mensaje del asistente
+        if (!surchargeType) {
+          const lastAssistantMsg = conversation.filter(m => m.role === 'assistant').slice(-1)[0];
+          
+          // Buscar en content
+          if (lastAssistantMsg?.content) {
+            if (/recargo nocturno/i.test(lastAssistantMsg.content)) {
+              surchargeType = 'nocturno';
+            } else if (/recargo dominical/i.test(lastAssistantMsg.content)) {
+              surchargeType = 'dominical';
+            }
+          }
+          
+          // Buscar en conversationState
+          if (!surchargeType && lastAssistantMsg?.conversationState?.lastTopic === 'surcharge') {
+            surchargeType = lastAssistantMsg.conversationState.surchargeType;
+            console.log(`🔍 [CONTEXT] Tipo de recargo inferido del estado: ${surchargeType}`);
           }
         }
-      }
-      
-      if (calculationType === 'nocturno') {
-        console.log(`🌙 [CALCULATION] Computing night surcharge for $${extractedSalary.toLocaleString()}`);
-        const result = buildRecargoNocturnoAnswer(new Date(), extractedSalary);
-        return new Response(JSON.stringify({
-          ...result,
-          sessionId,
-          timestamp: new Date().toISOString()
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      } else if (calculationType === 'dominical') {
-        console.log(`📅 [CALCULATION] Computing Sunday surcharge for $${extractedSalary.toLocaleString()}`);
-        const result = buildRecargoDominicalAnswer(new Date(), extractedSalary);
-        return new Response(JSON.stringify({
-          ...result,
-          sessionId,
-          timestamp: new Date().toISOString()
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      } else {
-        // Ambiguo: preguntar qué tipo de recargo
-        console.log(`❓ [CALCULATION] Salary detected but calculation type unclear`);
-        return new Response(JSON.stringify({
-          message: `Perfecto, calculemos para un salario de **$${extractedSalary.toLocaleString()}**.\n\n¿Qué tipo de recargo quieres calcular?`,
-          emotionalState: 'encouraging',
-          quickReplies: [
-            { label: '🌙 Recargo nocturno', value: `recargo nocturno para ${extractedSalary}` },
-            { label: '📅 Recargo dominical', value: `recargo dominical para ${extractedSalary}` }
-          ],
-          sessionId,
-          timestamp: new Date().toISOString()
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
+        
+        if (surchargeType) {
+          console.log(`✅ [FALLBACK_CALCULATION] Calculando ${surchargeType} para $${extractedSalary.toLocaleString()}`);
+          
+          try {
+            const { data: calcData, error: calcError } = await userSupabase.functions.invoke(
+              'payroll-calculations',
+              {
+                body: {
+                  action: 'explain-surcharge',
+                  type: surchargeType,
+                  salary: extractedSalary,
+                  hours: 1,
+                  date: new Date().toISOString()
+                }
+              }
+            );
+            
+            if (calcError || !calcData?.success) {
+              console.error('❌ Error en fallback calculation:', calcError);
+              throw new Error(calcError?.message || 'Error desconocido');
+            }
+            
+            const calc = calcData.data;
+            const tipoTexto = surchargeType === 'nocturno' ? 'recargo nocturno' : 'recargo dominical';
+            
+            const responseMessage = `Perfecto, te explico cómo se calcula el **${tipoTexto}**:
+
+${calc.legalContext}
+
+### 📊 Cálculo con salario de $${calc.salarioBase.toLocaleString()}
+
+${calc.formula}
+
+**Resultado:** El valor del recargo es **$${calc.valor.toLocaleString()}** por ${calc.horas} hora(s) trabajada(s).
+
+${calc.jornadaInfo.descripcion ? `\n**Nota:** ${calc.jornadaInfo.descripcion}` : ''}`;
+
+            return new Response(JSON.stringify({
+              message: responseMessage,
+              emotionalState: 'helpful',
+              conversationState: {
+                lastTopic: 'surcharge',
+                surchargeType: surchargeType,
+                lastSalary: extractedSalary
+              },
+              sessionId,
+              timestamp: new Date().toISOString()
+            }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          } catch (error) {
+            console.error('❌ [FALLBACK_CALCULATION] Error:', error);
+            // Continuar con flujo normal si falla
+          }
+        } else {
+          // Tipo de recargo no claro: preguntar
+          console.log(`❓ [FALLBACK_CALCULATION] Salary detected but type unclear`);
+          return new Response(JSON.stringify({
+            message: `Perfecto, calculemos para un salario de **$${extractedSalary.toLocaleString()}**.\n\n¿Qué tipo de recargo quieres calcular?`,
+            emotionalState: 'encouraging',
+            quickReplies: [
+              { label: '🌙 Recargo nocturno', value: `recargo nocturno para ${extractedSalary}` },
+              { label: '📅 Recargo dominical', value: `recargo dominical para ${extractedSalary}` }
+            ],
+            conversationState: {
+              lastTopic: 'surcharge',
+              pendingSalary: extractedSalary
+            },
+            sessionId,
+            timestamp: new Date().toISOString()
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
       }
     }
     
