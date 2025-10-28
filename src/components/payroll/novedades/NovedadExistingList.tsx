@@ -65,6 +65,17 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
       }
     }
 
+    // Mapeo de subtipos de ingresos adicionales
+    if (tipo === 'otros_ingresos' && subtipo) {
+      const ingresosSubtipos: Record<string, string> = {
+        'comision': 'Comisión',
+        'auxilio_alimentacion': 'Auxilio de Alimentación',
+        'prima_extralegal': 'Prima Extralegal',
+        'otros_ingresos': 'Otros Ingresos'
+      };
+      return ingresosSubtipos[subtipo] || subtipo;
+    }
+
     const tipos: Record<string, string> = {
       'horas_extra': 'Horas Extra',
       'bonificacion': 'Bonificación',

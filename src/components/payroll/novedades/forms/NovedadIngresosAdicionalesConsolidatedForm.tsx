@@ -106,7 +106,7 @@ export const NovedadIngresosAdicionalesConsolidatedForm: React.FC<NovedadIngreso
     }
 
     const formDataArray = entries.map(entry => ({
-      tipo_novedad: entry.tipo_novedad,
+      subtipo: entry.tipo_novedad,
       valor: entry.valor,
       observacion: entry.observacion || undefined,
       constitutivo_salario: entry.constitutivo
