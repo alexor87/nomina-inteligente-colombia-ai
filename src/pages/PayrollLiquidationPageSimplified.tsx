@@ -467,7 +467,7 @@ const PayrollLiquidationPageSimplified = () => {
                   disabled={isLiquidating || !canProceedWithLiquidation || isRemovingEmployee || (useExhaustiveValidation && !exhaustiveValidationResults?.canProceed)}
                   className={periodAlreadyLiquidated ? "bg-orange-600 hover:bg-orange-700" : ""}
                 >
-                  {isLiquidating ? 'Liquidando...' : periodAlreadyLiquidated ? 'Re-liquidar' : `Liquidar${useAtomicLiquidation ? ' (Atómico)' : ''}`}
+                  {isLiquidating ? 'Liquidando...' : periodAlreadyLiquidated ? 'Re-liquidar' : 'Liquidar nómina'}
                   {periodAlreadyLiquidated && <RotateCcw className="h-4 w-4 ml-2" />}
                 </Button>
               </div>
