@@ -192,7 +192,9 @@ const PayrollLiquidationPageSimplified = () => {
           type: 'mensual'
         },
         summary,
-        periodId: pid || selectedPeriod.id
+        periodId: pid || selectedPeriod.id,
+        companyId: companyId || '',
+        employeeCount: employees.length
       });
       setShowSuccessModal(true);
       
@@ -224,7 +226,9 @@ const PayrollLiquidationPageSimplified = () => {
           type: 'mensual'
         },
         summary,
-        periodId: pid || selectedPeriod.id
+        periodId: pid || selectedPeriod.id,
+        companyId: companyId || '',
+        employeeCount: employees.length
       });
       setShowSuccessModal(true);
       
@@ -542,6 +546,8 @@ const PayrollLiquidationPageSimplified = () => {
           periodData={liquidationResult.periodData}
           summary={liquidationResult.summary}
           periodId={liquidationResult.periodId}
+          companyId={liquidationResult.companyId}
+          employeeCount={liquidationResult.employeeCount}
         />
       )}
 

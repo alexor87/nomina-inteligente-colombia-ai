@@ -216,6 +216,9 @@ const PayrollLiquidationPageSimple = () => {
           onClose={handleSuccessModalClose}
           periodData={liquidationResult.periodData}
           summary={liquidationResult.summary}
+          periodId={liquidationResult.periodId}
+          companyId={liquidationResult.companyId}
+          employeeCount={liquidationResult.employeeCount}
         />
       )}
     </div>

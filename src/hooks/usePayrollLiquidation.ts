@@ -321,6 +321,9 @@ export const usePayrollLiquidation = () => {
   const [liquidationResult, setLiquidationResult] = useState<{
     periodData: { startDate: string; endDate: string; type: string };
     summary: PayrollSummary;
+    periodId: string;
+    companyId: string;
+    employeeCount: number;
   } | null>(null);
 
   const liquidatePayroll = useCallback(async (startDate: string, endDate: string) => {
@@ -355,10 +358,10 @@ export const usePayrollLiquidation = () => {
         });
 
         // ✅ CORREGIDO: Registrar provisiones automáticamente usando el período correcto
+        let companyId: string | null = null;
         try {
           const { data: authData } = await supabase.auth.getUser();
           const userId = authData.user?.id;
-          let companyId: string | null = null;
           let provisionMode: 'on_liquidation' | 'monthly_consolidation' = 'on_liquidation';
 
           if (userId) {
@@ -429,10 +432,14 @@ export const usePayrollLiquidation = () => {
         }
         
         const periodType = detectPeriodType(startDate, endDate);
+        const finalPeriodId = result.periodId || currentPeriodId || '';
 
         setLiquidationResult({
           periodData: { startDate, endDate, type: periodType },
-          summary: result.summary
+          summary: result.summary,
+          periodId: finalPeriodId,
+          companyId: companyId || '',
+          employeeCount: employees.length
         });
 
         setShowSuccessModal(true);
