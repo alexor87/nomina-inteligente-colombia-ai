@@ -420,6 +420,8 @@ async function calculatePayroll(supabase: any, data: any) {
   
   let totalIncapacityValue = 0;
   let totalIncapacityDays = 0;
+  let totalLicenciaRemuneradaDays = 0;  // ✅ NUEVO: Contador de días de licencia remunerada
+  let totalLicenciaRemuneradaValue = 0; // ✅ NUEVO: Valor total de licencias remuneradas
   let totalConstitutiveNovedades = 0;
   const deduccionesDetectadas: string[] = [];
 
@@ -448,6 +450,26 @@ async function calculatePayroll(supabase: any, data: any) {
       
       console.log('🏥 SUMA ACUMULADA - totalIncapacityDays:', totalIncapacityDays, 'totalIncapacityValue:', totalIncapacityValue);
       // ✅ NO sumar novedad.valor aquí - ya está calculado en totalIncapacityValue
+      
+    } else if (novedad.tipo_novedad === 'licencia_remunerada') {
+      // ✅ NUEVO: Procesar licencias remuneradas (restan días, se agregan como concepto)
+      const licenciaDays = novedad.dias || 0;
+      const licenciaValue = Math.round(dailySalary * licenciaDays);
+      
+      totalLicenciaRemuneradaDays += licenciaDays;
+      totalLicenciaRemuneradaValue += licenciaValue;
+      
+      // ✅ Es constitutiva de salario para IBC (Decreto 1406/1999)
+      totalConstitutiveNovedades += licenciaValue;
+      
+      console.log('🏖️ LICENCIA REMUNERADA detectada (Art. 57 CST):', {
+        dias: licenciaDays,
+        valor: licenciaValue,
+        acumuladoDias: totalLicenciaRemuneradaDays,
+        acumuladoValor: totalLicenciaRemuneradaValue,
+        constitutiva: true
+      });
+      
     } else if (DEDUCTION_TYPES.includes(novedad.tipo_novedad)) {
       // ✅ DEDUCCIONES EXPLÍCITAS: Restar del salario
       const valorDeduccion = Math.max(0, Number(novedad.valor || 0));
@@ -456,9 +478,9 @@ async function calculatePayroll(supabase: any, data: any) {
       console.log(`💸 DEDUCCIÓN detectada: ${novedad.tipo_novedad} → $${valorDeduccion.toLocaleString()}`);
       // ✅ NO sumar a extraPay
     } else if (novedad.constitutivo_salario) {
-      // Other constitutive novedades
+      // Other constitutive novedades (NO incluye licencia_remunerada que ya se procesó arriba)
       totalConstitutiveNovedades += novedad.valor || 0;
-      extraPay += novedad.valor || 0;  // ✅ Solo para novedades NO-incapacidades
+      extraPay += novedad.valor || 0;
     } else {
       // ✅ Otras novedades (bonificaciones, etc.)
       extraPay += novedad.valor || 0;
@@ -468,29 +490,43 @@ async function calculatePayroll(supabase: any, data: any) {
   console.log('🔢 ANTES DE CALCULAR effectiveWorkedDays:', {
     workedDays,
     totalIncapacityDays,
+    totalLicenciaRemuneradaDays,
     'novedades.length': novedades.length
   });
   
-  // ✅ CÁLCULO NORMATIVO: Días efectivamente trabajados (sin incapacidades)
-  const effectiveWorkedDays = Math.max(0, Math.min(workedDays - totalIncapacityDays, 30));
+  // ✅ CÁLCULO NORMATIVO: Días efectivamente trabajados (sin incapacidades ni licencias remuneradas)
+  const effectiveWorkedDays = Math.max(0, Math.min(
+    workedDays - totalIncapacityDays - totalLicenciaRemuneradaDays, 
+    30
+  ));
   
   // ✅ REGULARPY: Salario solo por días efectivamente trabajados
   regularPay = Math.round((dailySalary * effectiveWorkedDays) - absences);
   
   console.log('📊 CÁLCULO FINAL - Días trabajados:', { 
     workedDays, 
-    totalIncapacityDays, 
+    totalIncapacityDays,
+    totalLicenciaRemuneradaDays,  // ✅ NUEVO
     effectiveWorkedDays,
     baseSalary,
     dailySalary: Math.round(dailySalary),
     regularPay,
-    absences
+    absences,
+    note: 'Licencias remuneradas restan días del salario base (Art. 57 CST)'
   });
 
-  // ✅ Agregar valor calculado de incapacidades DESPUÉS del loop (una sola vez)
+  // ✅ Agregar valores calculados DESPUÉS del loop (una sola vez)
   extraPay += totalIncapacityValue;
+  extraPay += totalLicenciaRemuneradaValue;  // ✅ NUEVO: Agregar licencias como concepto separado
+  
+  console.log('💰 EXTRA PAY DETALLADO:', {
+    incapacidades: totalIncapacityValue,
+    licenciasRemuneradas: totalLicenciaRemuneradaValue,  // ✅ NUEVO
+    otrasNovedades: extraPay - totalIncapacityValue - totalLicenciaRemuneradaValue,
+    totalExtraPay: extraPay
+  });
 
-  // ✅ AUXILIO DE TRANSPORTE PRORRATEADO: Solo si salario ≤ 2 SMMLV y según días EFECTIVAMENTE TRABAJADOS
+  // ✅ AUXILIO DE TRANSPORTE PRORRATEADO: Solo si salario ≤ 2 SMMLV y según días EFECTIVAMENTE TRABAJADOS (sin incapacidades ni licencias)
   const transportLimit = getTransportAssistanceLimit(year);
   const eligibleForTransport = baseSalary <= transportLimit;
   const transportAllowance = eligibleForTransport ? Math.round((config.auxilioTransporte / 30) * effectiveWorkedDays) : 0;
@@ -500,6 +536,7 @@ async function calculatePayroll(supabase: any, data: any) {
     transportLimit,
     eligibleForTransport,
     periodType,
+    effectiveWorkedDays,  // ✅ Ya incluye resta de incapacidades Y licencias
     workedDays,
     monthlyAmount: config.auxilioTransporte,
     proratedTransport: transportAllowance
@@ -973,7 +1010,15 @@ async function calculateSingleNovedad(supabase: any, data: any) {
     const diasNum = Number(dias || 0);
     valor = Math.round(valorDiario * diasNum);
     factorCalculo = Math.round(valorDiario);
-    detalleCalculo = `${tipoNovedad}: ${diasNum} días × $${Math.round(valorDiario).toLocaleString()} = $${valor.toLocaleString()}`;
+    detalleCalculo = `${tipoNovedad === 'licencia_remunerada' ? 'Licencia remunerada' : 'Vacaciones'}: ${diasNum} días × $${Math.round(valorDiario).toLocaleString()} = $${valor.toLocaleString()}`;
+    
+    console.log(`🏖️ ${tipoNovedad === 'licencia_remunerada' ? 'Licencia remunerada' : 'Vacación'} calculada:`, {
+      tipo: tipoNovedad,
+      dias: diasNum,
+      valorDiario: Math.round(valorDiario),
+      valor,
+      note: tipoNovedad === 'licencia_remunerada' ? 'Resta días del salario base, se agrega como concepto (Art. 57 CST)' : ''
+    });
 
   } else if (tipoNovedad === 'ausencia' || tipoNovedad === 'licencia_no_remunerada') {
     const diasNum = Number(dias || 0);
