@@ -347,23 +347,20 @@ export const ExpandedEmployeesTable = ({
                 
                 return (
                   <TableRow key={employee.id} className="hover:bg-muted/30">
-                    <TableCell className="sticky left-0 bg-background z-10 min-w-[200px] font-medium">
-                      <div className="flex items-center">
-                        <div>
-                          <div className="font-medium">
-                            {employee.nombre} {employee.apellido}
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            ID: {employee.id.slice(0, 8)}...
-                          </div>
-                        </div>
-                      </div>
-                      {preview.hasPending && (
-                        <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800 mt-1 animate-pulse">
-                          Ajustes pendientes
-                        </Badge>
-                      )}
-                    </TableCell>
+              <TableCell className="sticky left-0 bg-background z-10 min-w-[200px] font-medium">
+                <div className="flex items-center">
+                  <div>
+                    <div className="font-medium">
+                      {employee.nombre} {employee.apellido}
+                    </div>
+                  </div>
+                </div>
+                {preview.hasPending && (
+                  <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800 mt-1 animate-pulse">
+                    Ajustes pendientes
+                  </Badge>
+                )}
+              </TableCell>
                     
                     <TableCell className="text-right">
                       <span className="font-medium text-foreground">
