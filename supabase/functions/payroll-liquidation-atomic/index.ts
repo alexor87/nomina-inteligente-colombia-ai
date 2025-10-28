@@ -203,7 +203,7 @@ serve(async (req) => {
             .reduce((sum, n) => sum + (n.valor || 0), 0)
 
           // ✅ Calculate incapacity value (part of IBC per Decree 1406/1999)
-          const SMMLV_2025 = 1300000
+          const SMMLV_2025 = 1423500 // ✅ SMMLV oficial 2025
           const incapacidadesNovedades = (novedades || [])
             .filter(n => n.tipo_novedad === 'incapacidad')
 
