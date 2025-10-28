@@ -97,18 +97,66 @@ serve(async (req) => {
         throw new Error(`Error fetching payrolls data: ${payrollsDataError.message}`)
       }
 
-      // Process each payroll to calculate and store accurate IBC
+      // Get period information for legal days calculation
+      const { data: periodInfo, error: periodError } = await supabaseClient
+        .from('payroll_periods_real')
+        .select('fecha_inicio, fecha_fin, tipo_periodo')
+        .eq('id', data.period_id)
+        .single()
+
+      if (periodError || !periodInfo) {
+        throw new Error(`Error fetching period info: ${periodError?.message || 'Period not found'}`)
+      }
+
+      // Calculate legal days for the period
+      const calculateLegalDays = (startDate: string, endDate: string, tipoPeriodo: string): number => {
+        const start = new Date(startDate)
+        const end = new Date(endDate)
+        const diffTime = Math.abs(end.getTime() - start.getTime())
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1 // Inclusive
+        
+        // For quincenal periods, cap at 15 days
+        if (tipoPeriodo === 'quincenal') {
+          return Math.min(diffDays, 15)
+        }
+        
+        // For mensual periods, cap at 30 days
+        return Math.min(diffDays, 30)
+      }
+
+      const legalDays = calculateLegalDays(
+        periodInfo.fecha_inicio, 
+        periodInfo.fecha_fin, 
+        periodInfo.tipo_periodo || 'mensual'
+      )
+
+      console.log(`📅 Período: ${periodInfo.fecha_inicio} a ${periodInfo.fecha_fin}, días legales: ${legalDays}`)
+
+      // Process each payroll to calculate and store accurate IBC and dias_trabajados
       for (const payroll of payrollsData || []) {
         try {
           const salarioBase = payroll.employees?.salario_base || 0
-          const diasTrabajados = payroll.dias_trabajados || 30
           
           // Get novedades for this employee in this period
           const { data: novedades } = await supabaseClient
             .from('payroll_novedades')
-            .select('tipo_novedad, valor')
+            .select('tipo_novedad, valor, dias')
             .eq('periodo_id', data.period_id)
             .eq('empleado_id', payroll.employee_id)
+
+          // Calculate absences and disabilities
+          const licenciasNoRemuneradas = (novedades || [])
+            .filter(n => n.tipo_novedad === 'licencia_no_remunerada')
+            .reduce((sum, n) => sum + (n.dias || 0), 0)
+
+          const incapacidades = (novedades || [])
+            .filter(n => n.tipo_novedad === 'incapacidad')
+            .reduce((sum, n) => sum + (n.dias || 0), 0)
+
+          // Calculate effective worked days
+          const diasTrabajadosEfectivos = Math.max(0, legalDays - licenciasNoRemuneradas - incapacidades)
+          
+          console.log(`👤 Empleado ${payroll.employee_id}: días_legales=${legalDays}, ausencias=${licenciasNoRemuneradas}, incapacidades=${incapacidades}, efectivos=${diasTrabajadosEfectivos}`)
 
           // Calculate constitutive novedades
           const constitutiveTypes = ['horas_extra', 'recargo_nocturno', 'recargo_dominical', 'comision', 'bonificacion', 'vacaciones', 'licencia_remunerada', 'auxilio_conectividad']
@@ -116,8 +164,8 @@ serve(async (req) => {
             .filter(n => constitutiveTypes.includes(n.tipo_novedad))
             .reduce((sum, n) => sum + (n.valor || 0), 0)
 
-          // Calculate exact proportional IBC: (base_salary / 30 * dias_trabajados) + constitutive_novedades
-          const ibcBase = (salarioBase / 30) * diasTrabajados
+          // Calculate exact proportional IBC: (base_salary / 30 * dias_trabajados_efectivos) + constitutive_novedades
+          const ibcBase = (salarioBase / 30) * diasTrabajadosEfectivos
           let ibc = ibcBase + novedadesConstitutivas
           
           // Apply maximum cap only (25 SMMLV) - no minimum to preserve exact calculation
@@ -127,15 +175,16 @@ serve(async (req) => {
           console.log(`🧮 IBC calculation for employee ${payroll.employee_id}: base=${ibcBase}, novedades=${novedadesConstitutivas}, final=${ibc}`)
 
           // Calculate other fields
-          const transportAllowance = salarioBase <= (SMMLV_2025 * 2) ? (200000 / 30) * diasTrabajados : 0
+          const transportAllowance = salarioBase <= (SMMLV_2025 * 2) ? (200000 / 30) * diasTrabajadosEfectivos : 0
           const healthDeduction = ibc * 0.04
           const pensionDeduction = ibc * 0.04
 
-          // Update payroll with calculated values
+          // Update payroll with calculated values INCLUDING dias_trabajados
           await supabaseClient
             .from('payrolls')
             .update({ 
               estado: 'procesada',
+              dias_trabajados: diasTrabajadosEfectivos,
               ibc: Math.round(ibc),
               auxilio_transporte: Math.round(transportAllowance),
               salud_empleado: Math.round(healthDeduction),
