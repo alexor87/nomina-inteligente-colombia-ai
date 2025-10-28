@@ -27,7 +27,7 @@ const handler = async (req: Request): Promise<Response> => {
     console.log('📧 Sending demo payroll email:', { userEmail, employeeName, period });
 
     const emailResponse = await resend.emails.send({
-      from: "MAYA <onboarding@resend.dev>",
+      from: "MAYA <notificaciones@finppi.com>",
       to: [userEmail],
       subject: `Comprobante Demo - ${employeeName}`,
       html: `

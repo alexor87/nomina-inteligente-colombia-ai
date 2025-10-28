@@ -152,7 +152,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Send email with PDF attachment
     const emailResponse = await resend.emails.send({
-      from: `${companyInfo?.razon_social || 'Nómina'} <onboarding@resend.dev>`,
+      from: `${companyInfo?.razon_social || 'Nómina'} <notificaciones@finppi.com>`,
       to: emails,
       subject: `💰 Comprobante de Nómina - ${periodText}`,
       html: emailHtml,
