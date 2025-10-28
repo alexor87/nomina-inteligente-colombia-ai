@@ -132,6 +132,44 @@ serve(async (req) => {
 
       console.log(`📅 Período: ${periodInfo.fecha_inicio} a ${periodInfo.fecha_fin}, días legales: ${legalDays}`)
 
+      // Function to calculate incapacity value with policy
+      const calculateIncapacityValue = (
+        baseSalary: number,
+        days: number,
+        subtipo: string,
+        smlv: number
+      ): number => {
+        if (!days || days <= 0) return 0
+
+        const dailySalary = baseSalary / 30
+        const smldv = smlv / 30
+        
+        // Normalize subtype
+        const normalizedSubtype = ['laboral', 'arl', 'accidente_laboral', 'riesgo_laboral', 'at']
+          .includes(subtipo?.toLowerCase().trim() || '')
+          ? 'laboral'
+          : 'general'
+        
+        if (normalizedSubtype === 'laboral') {
+          // ARL: 100% desde día 1
+          return Math.round(dailySalary * days)
+        }
+        
+        // General incapacity: Standard policy (2 days 100%, rest 66.67% with floor)
+        if (days <= 2) {
+          return Math.round(dailySalary * days)
+        } else {
+          const first2Days = dailySalary * 2
+          const remainingDays = days - 2
+          const daily66 = dailySalary * 0.6667
+          const appliedDaily = Math.max(daily66, smldv)
+          const total = Math.round(first2Days + (appliedDaily * remainingDays))
+          
+          console.log(`🏥 Incapacity calculation: first2=${first2Days}, remaining=${remainingDays}, daily66=${daily66}, smldv=${smldv}, applied=${appliedDaily}, total=${total}`)
+          return total
+        }
+      }
+
       // Process each payroll to calculate and store accurate IBC and dias_trabajados
       for (const payroll of payrollsData || []) {
         try {
@@ -140,7 +178,7 @@ serve(async (req) => {
           // Get novedades for this employee in this period
           const { data: novedades } = await supabaseClient
             .from('payroll_novedades')
-            .select('tipo_novedad, valor, dias')
+            .select('tipo_novedad, valor, dias, subtipo')
             .eq('periodo_id', data.period_id)
             .eq('empleado_id', payroll.employee_id)
 
@@ -164,15 +202,31 @@ serve(async (req) => {
             .filter(n => constitutiveTypes.includes(n.tipo_novedad))
             .reduce((sum, n) => sum + (n.valor || 0), 0)
 
-          // Calculate exact proportional IBC: (base_salary / 30 * dias_trabajados_efectivos) + constitutive_novedades
+          // ✅ Calculate incapacity value (part of IBC per Decree 1406/1999)
+          const SMMLV_2025 = 1300000
+          const incapacidadesNovedades = (novedades || [])
+            .filter(n => n.tipo_novedad === 'incapacidad')
+
+          let totalIncapacityValue = 0
+          for (const inc of incapacidadesNovedades) {
+            const incValue = calculateIncapacityValue(
+              salarioBase,
+              inc.dias || 0,
+              inc.subtipo || 'general',
+              SMMLV_2025
+            )
+            totalIncapacityValue += incValue
+            console.log(`🏥 Incapacity for employee ${payroll.employee_id}: ${inc.dias} days, subtipo=${inc.subtipo}, value=${incValue}`)
+          }
+
+          // Calculate exact proportional IBC: (base_salary / 30 * dias_trabajados_efectivos) + constitutive_novedades + incapacidades
           const ibcBase = (salarioBase / 30) * diasTrabajadosEfectivos
-          let ibc = ibcBase + novedadesConstitutivas
+          let ibc = ibcBase + novedadesConstitutivas + totalIncapacityValue
           
           // Apply maximum cap only (25 SMMLV) - no minimum to preserve exact calculation
-          const SMMLV_2025 = 1300000
           ibc = Math.min(ibc, SMMLV_2025 * 25)
           
-          console.log(`🧮 IBC calculation for employee ${payroll.employee_id}: base=${ibcBase}, novedades=${novedadesConstitutivas}, final=${ibc}`)
+          console.log(`🧮 IBC calculation for employee ${payroll.employee_id}: base=${ibcBase}, novedades=${novedadesConstitutivas}, incapacidades=${totalIncapacityValue}, final=${ibc}`)
 
           // Calculate other fields
           const transportAllowance = salarioBase <= (SMMLV_2025 * 2) ? (200000 / 30) * diasTrabajadosEfectivos : 0
