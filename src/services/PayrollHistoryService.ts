@@ -158,6 +158,40 @@ export class PayrollHistoryService {
   }
 
   /**
+   * Update payroll record with recalculated values
+   */
+  static async updatePayrollRecord(
+    payrollId: string,
+    updates: {
+      dias_trabajados?: number;
+      ibc?: number;
+      auxilio_transporte?: number;
+      salud_empleado?: number;
+      pension_empleado?: number;
+      total_devengado?: number;
+      total_deducciones?: number;
+      neto_pagado?: number;
+    }
+  ): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('payrolls')
+        .update(updates)
+        .eq('id', payrollId);
+
+      if (error) {
+        console.error('Error updating payroll record:', error);
+        throw error;
+      }
+
+      console.log('✅ Payroll record updated in DB:', payrollId, updates);
+    } catch (error) {
+      console.error('Error in updatePayrollRecord:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Get all periods for current company
    */
   static async getCompanyPeriods(): Promise<PayrollPeriodData[]> {

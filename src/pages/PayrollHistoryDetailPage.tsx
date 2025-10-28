@@ -197,11 +197,24 @@ function PayrollHistoryDetailPageContent() {
 
           const result = await PayrollCalculationBackendService.calculatePayroll(calculationInput);
 
+          // Persist to database
+          await PayrollHistoryService.updatePayrollRecord(employee.payroll_id, {
+            dias_trabajados: result.effectiveWorkedDays ?? employee.dias_trabajados,
+            ibc: result.ibc,
+            auxilio_transporte: result.transportAllowance,
+            salud_empleado: result.healthDeduction,
+            pension_empleado: result.pensionDeduction,
+            total_devengado: result.grossPay,
+            total_deducciones: result.totalDeductions,
+            neto_pagado: result.netPay
+          });
+
           // Update employee in the array
           const employeeIndex = updatedEmployees.findIndex(emp => emp.id === employee.id);
           if (employeeIndex >= 0) {
             updatedEmployees[employeeIndex] = {
               ...updatedEmployees[employeeIndex],
+              dias_trabajados: result.effectiveWorkedDays ?? updatedEmployees[employeeIndex].dias_trabajados,
               total_devengado: result.grossPay,
               total_deducciones: result.totalDeductions,
               neto_pagado: result.netPay,
@@ -219,12 +232,15 @@ function PayrollHistoryDetailPageContent() {
       // Update all employees at once
       setEmployees(updatedEmployees);
       
+      // Reload employees from DB to ensure fresh data
+      await loadEmployees();
+      
       toast({
         title: "Recálculo completado",
-        description: `Valores actualizados para ${employees.length} empleados`,
+        description: `Valores actualizados y persistidos para ${employees.length} empleados`,
       });
       
-      console.log('✅ Recálculo masivo completado');
+      console.log('✅ Recálculo masivo completado y sincronizado con BD');
     } catch (error) {
       console.error('❌ Error en recálculo masivo:', error);
       toast({
@@ -383,12 +399,25 @@ function PayrollHistoryDetailPageContent() {
 
       const result = await PayrollCalculationBackendService.calculatePayroll(calculationInput);
 
+      // Persist to database
+      await PayrollHistoryService.updatePayrollRecord(employee.payroll_id, {
+        dias_trabajados: result.effectiveWorkedDays ?? employee.dias_trabajados,
+        ibc: result.ibc,
+        auxilio_transporte: result.transportAllowance,
+        salud_empleado: result.healthDeduction,
+        pension_empleado: result.pensionDeduction,
+        total_devengado: result.grossPay,
+        total_deducciones: result.totalDeductions,
+        neto_pagado: result.netPay
+      });
+
       // Update employee in local state
       setEmployees(prevEmployees => 
         prevEmployees.map(emp => 
           emp.id === employeeId 
             ? {
                 ...emp,
+                dias_trabajados: result.effectiveWorkedDays ?? emp.dias_trabajados,
                 total_devengado: result.grossPay,
                 total_deducciones: result.totalDeductions, 
                 neto_pagado: result.netPay,

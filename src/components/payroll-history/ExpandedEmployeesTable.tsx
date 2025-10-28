@@ -408,9 +408,33 @@ export const ExpandedEmployeesTable = ({
                           </div>
                         </div>
                       ) : (
-                        <span className="font-semibold text-green-600">
-                          {formatCurrency(employee.total_devengado)}
-                        </span>
+                        (() => {
+                          // Fallback: calcular devengado desde componentes si no coincide
+                          const grossCalc = (employee.salario_base / 30) * employee.dias_trabajados
+                            + (employee.auxilio_transporte || 0)
+                            + (employee.horas_extra || 0)
+                            + (employee.bonificaciones || 0)
+                            + (employee.comisiones || 0)
+                            + (employee.cesantias || 0)
+                            + (employee.prima || 0)
+                            + (employee.vacaciones || 0)
+                            + (employee.incapacidades || 0)
+                            + (employee.otros_devengos || 0);
+                          
+                          const displayedGross = Math.abs(grossCalc - employee.total_devengado) > 1 
+                            ? grossCalc 
+                            : employee.total_devengado;
+                          
+                          if (Math.abs(grossCalc - employee.total_devengado) > 1) {
+                            console.warn(`⚠️ Devengado mismatch for ${employee.nombre}: DB=${employee.total_devengado}, Calc=${grossCalc}`);
+                          }
+                          
+                          return (
+                            <span className="font-semibold text-green-600">
+                              {formatCurrency(displayedGross)}
+                            </span>
+                          );
+                        })()
                       )}
                     </TableCell>
                     
@@ -429,8 +453,12 @@ export const ExpandedEmployeesTable = ({
                         </div>
                       ) : (
                         (() => {
-                          // UI Fallback: mostrar suma de deducciones individuales si no coincide con total
-                          const calculatedDeductions = (employee.salud_empleado || 0) + (employee.pension_empleado || 0);
+                          // UI Fallback: sumar todas las deducciones individuales si no coincide con total
+                          const calculatedDeductions = (employee.salud_empleado || 0) 
+                            + (employee.pension_empleado || 0)
+                            + (employee.descuentos_varios || 0)
+                            + (employee.retencion_fuente || 0);
+                          
                           const displayedDeductions = Math.abs(calculatedDeductions - employee.total_deducciones) > 1 
                             ? calculatedDeductions 
                             : employee.total_deducciones;
