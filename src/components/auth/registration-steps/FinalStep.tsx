@@ -82,6 +82,7 @@ export const FinalStep = ({ onComplete, onCancel }: FinalStepProps) => {
         direccion: data.companyAddress,
         ciudad: data.companyCity,
         plan: 'profesional' as const,
+        periodicity: data.payrollFrequency,
       };
 
       console.log('🏢 Registrando empresa con datos:', registrationData);
@@ -90,19 +91,6 @@ export const FinalStep = ({ onComplete, onCancel }: FinalStepProps) => {
 
       if (result.success && result.company) {
         console.log('✅ Empresa registrada exitosamente');
-
-        // Guardar la frecuencia de nómina en company_settings
-        if (data.payrollFrequency) {
-          try {
-            await CompanyConfigurationService.saveCompanyConfiguration(
-              result.company.id, 
-              data.payrollFrequency
-            );
-            console.log('✅ Frecuencia de nómina guardada:', data.payrollFrequency);
-          } catch (configError) {
-            console.warn('⚠️ Error guardando configuración de nómina:', configError);
-          }
-        }
 
         toast({
           title: "¡Empresa registrada exitosamente!",

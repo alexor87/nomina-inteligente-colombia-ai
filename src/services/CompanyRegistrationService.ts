@@ -9,6 +9,7 @@ export interface CompanyRegistrationData {
   direccion?: string;
   ciudad?: string;
   plan: 'basico' | 'profesional' | 'empresarial';
+  periodicity?: 'quincenal' | 'mensual';
 }
 
 /**
@@ -86,7 +87,7 @@ export class CompanyRegistrationService {
         .from('company_settings')
         .insert({
           company_id: company.id,
-          periodicity: 'mensual',
+          periodicity: data.periodicity || 'mensual',
           created_at: new Date().toISOString()
         });
 
