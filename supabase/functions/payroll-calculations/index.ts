@@ -422,6 +422,7 @@ async function calculatePayroll(supabase: any, data: any) {
   let totalIncapacityDays = 0;
   let totalLicenciaRemuneradaDays = 0;  // ✅ NUEVO: Contador de días de licencia remunerada
   let totalLicenciaRemuneradaValue = 0; // ✅ NUEVO: Valor total de licencias remuneradas
+  let totalLicenciaNoRemuneradaDays = 0; // ✅ NUEVO: Contador de días de licencia NO remunerada
   let totalConstitutiveNovedades = 0;
   const deduccionesDetectadas: string[] = [];
 
@@ -470,6 +471,22 @@ async function calculatePayroll(supabase: any, data: any) {
         constitutiva: true
       });
       
+    } else if (novedad.tipo_novedad === 'licencia_no_remunerada') {
+      // ✅ NUEVO: Procesar licencias NO remuneradas (solo restan días, no se pagan)
+      const licenciaDays = novedad.dias || 0;
+      totalLicenciaNoRemuneradaDays += licenciaDays;
+      
+      console.log('🚫 LICENCIA NO REMUNERADA detectada (Art. 51 CST):', {
+        dias: licenciaDays,
+        valor: 0,
+        acumuladoDias: totalLicenciaNoRemuneradaDays,
+        constitutiva: false,
+        nota: 'Suspende prestaciones sociales y salario'
+      });
+      
+      // ✅ NO agregar nada a extraPay
+      // ✅ NO es constitutiva de salario
+      
     } else if (DEDUCTION_TYPES.includes(novedad.tipo_novedad)) {
       // ✅ DEDUCCIONES EXPLÍCITAS: Restar del salario
       const valorDeduccion = Math.max(0, Number(novedad.valor || 0));
@@ -491,12 +508,13 @@ async function calculatePayroll(supabase: any, data: any) {
     workedDays,
     totalIncapacityDays,
     totalLicenciaRemuneradaDays,
+    totalLicenciaNoRemuneradaDays,
     'novedades.length': novedades.length
   });
   
-  // ✅ CÁLCULO NORMATIVO: Días efectivamente trabajados (sin incapacidades ni licencias remuneradas)
+  // ✅ CÁLCULO NORMATIVO: Días efectivamente trabajados (sin incapacidades, licencias remuneradas y licencias NO remuneradas)
   const effectiveWorkedDays = Math.max(0, Math.min(
-    workedDays - totalIncapacityDays - totalLicenciaRemuneradaDays, 
+    workedDays - totalIncapacityDays - totalLicenciaRemuneradaDays - totalLicenciaNoRemuneradaDays, 
     30
   ));
   
@@ -506,13 +524,14 @@ async function calculatePayroll(supabase: any, data: any) {
   console.log('📊 CÁLCULO FINAL - Días trabajados:', { 
     workedDays, 
     totalIncapacityDays,
-    totalLicenciaRemuneradaDays,  // ✅ NUEVO
+    totalLicenciaRemuneradaDays,
+    totalLicenciaNoRemuneradaDays,  // ✅ NUEVO
     effectiveWorkedDays,
     baseSalary,
     dailySalary: Math.round(dailySalary),
     regularPay,
     absences,
-    note: 'Licencias remuneradas restan días del salario base (Art. 57 CST)'
+    note: 'Licencias (remuneradas y NO remuneradas) restan días del salario base (Art. 51 y 57 CST)'
   });
 
   // ✅ Agregar valores calculados DESPUÉS del loop (una sola vez)
