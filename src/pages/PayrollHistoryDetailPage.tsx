@@ -80,6 +80,7 @@ function PayrollHistoryDetailPageContent() {
   const [isLoadingEmployees, setIsLoadingEmployees] = useState(false);
   const [isRecalculatingAll, setIsRecalculatingAll] = useState(false);
   const [isLoadingPeriod, setIsLoadingPeriod] = useState(false);
+  const [hasMissingTotals, setHasMissingTotals] = useState(false);
   
   // States for pending adjustments logic - replaced with hook
   const {
@@ -294,6 +295,18 @@ function PayrollHistoryDetailPageContent() {
       }));
       
       setEmployees(expandedEmployees);
+      
+      // Detect if any employee has missing totals in BD
+      const missingTotals = expandedEmployees.some(emp => 
+        !emp.total_devengado || !emp.total_deducciones || !emp.neto_pagado
+      );
+
+      if (missingTotals) {
+        console.warn('⚠️ Algunos empleados tienen totales faltantes en BD');
+        setHasMissingTotals(true);
+      } else {
+        setHasMissingTotals(false);
+      }
       
       // Load pending adjustments from database and sync with session storage
       console.log('🔄 Loading and syncing pending adjustments...');
@@ -883,6 +896,26 @@ function PayrollHistoryDetailPageContent() {
           periodStatus={periodData?.estado || ''}
         />
       </div>
+
+      {/* Missing Totals Alert */}
+      {hasMissingTotals && (
+        <div className="px-6">
+          <Alert variant="destructive" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Totales pendientes de cálculo</AlertTitle>
+            <AlertDescription className="flex items-center justify-between">
+              <span>Algunos empleados no tienen totales calculados en la base de datos.</span>
+              <Button 
+                onClick={recalculateAllEmployees}
+                disabled={isRecalculatingAll}
+                size="sm"
+              >
+                {isRecalculatingAll ? 'Calculando...' : 'Calcular ahora'}
+              </Button>
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
 
       {/* Summary Cards */}
         <PeriodSummaryCards

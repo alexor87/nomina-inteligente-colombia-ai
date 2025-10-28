@@ -394,87 +394,55 @@ export const ExpandedEmployeesTable = ({
                       </span>
                     </TableCell>
                     
-                    <TableCell className="bg-green-100 text-right">
-                      {preview.hasPending ? (
-                        <div className="space-y-1">
-                          <div className="text-muted-foreground line-through text-sm">
-                            {formatCurrency(preview.originalDevengado)}
-                          </div>
-                          <div className="font-semibold text-green-600">
-                            {formatCurrency(preview.newDevengado)}
-                            <span className="text-xs ml-1">
-                              (+{formatCurrency(preview.newDevengado - preview.originalDevengado)})
-                            </span>
-                          </div>
+                  <TableCell className="bg-green-100 text-right">
+                    {preview.hasPending ? (
+                      <div className="space-y-1">
+                        <div className="text-muted-foreground line-through text-sm">
+                          {formatCurrency(preview.originalDevengado)}
                         </div>
-                      ) : (
-                        (() => {
-                          // Fallback: calcular devengado desde componentes si no coincide
-                          const grossCalc = (employee.salario_base / 30) * employee.dias_trabajados
-                            + (employee.auxilio_transporte || 0)
-                            + (employee.horas_extra || 0)
-                            + (employee.bonificaciones || 0)
-                            + (employee.comisiones || 0)
-                            + (employee.cesantias || 0)
-                            + (employee.prima || 0)
-                            + (employee.vacaciones || 0)
-                            + (employee.incapacidades || 0)
-                            + (employee.otros_devengos || 0);
-                          
-                          const displayedGross = Math.abs(grossCalc - employee.total_devengado) > 1 
-                            ? grossCalc 
-                            : employee.total_devengado;
-                          
-                          if (Math.abs(grossCalc - employee.total_devengado) > 1) {
-                            console.warn(`⚠️ Devengado mismatch for ${employee.nombre}: DB=${employee.total_devengado}, Calc=${grossCalc}`);
-                          }
-                          
-                          return (
-                            <span className="font-semibold text-green-600">
-                              {formatCurrency(displayedGross)}
-                            </span>
-                          );
-                        })()
-                      )}
-                    </TableCell>
+                        <div className="font-semibold text-green-600">
+                          {formatCurrency(preview.newDevengado)}
+                          <span className="text-xs ml-1">
+                            (+{formatCurrency(preview.newDevengado - preview.originalDevengado)})
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-end gap-2">
+                        <span className={`font-semibold ${employee.total_devengado ? 'text-green-600' : 'text-gray-400'}`}>
+                          {formatCurrency(employee.total_devengado || 0)}
+                        </span>
+                        {!employee.total_devengado && (
+                          <Badge variant="outline" className="text-xs">Sin calcular</Badge>
+                        )}
+                      </div>
+                    )}
+                  </TableCell>
                     
-                    <TableCell className="bg-red-100 text-right">
-                      {preview.hasPending ? (
-                        <div className="space-y-1">
-                          <div className="text-muted-foreground line-through text-sm">
-                            {formatCurrency(preview.originalDeducciones)}
-                          </div>
-                          <div className="font-semibold text-red-600">
-                            {formatCurrency(preview.newDeducciones)}
-                            <span className="text-xs ml-1">
-                              (+{formatCurrency(preview.newDeducciones - preview.originalDeducciones)})
-                            </span>
-                          </div>
+                  <TableCell className="bg-red-100 text-right">
+                    {preview.hasPending ? (
+                      <div className="space-y-1">
+                        <div className="text-muted-foreground line-through text-sm">
+                          {formatCurrency(preview.originalDeducciones)}
                         </div>
-                      ) : (
-                        (() => {
-                          // UI Fallback: sumar todas las deducciones individuales si no coincide con total
-                          const calculatedDeductions = (employee.salud_empleado || 0) 
-                            + (employee.pension_empleado || 0)
-                            + (employee.descuentos_varios || 0)
-                            + (employee.retencion_fuente || 0);
-                          
-                          const displayedDeductions = Math.abs(calculatedDeductions - employee.total_deducciones) > 1 
-                            ? calculatedDeductions 
-                            : employee.total_deducciones;
-                          
-                          if (calculatedDeductions !== employee.total_deducciones && Math.abs(calculatedDeductions - employee.total_deducciones) > 1) {
-                            console.warn(`⚠️ Deduction mismatch for ${employee.nombre}: total=${employee.total_deducciones}, calculated=${calculatedDeductions}`);
-                          }
-                          
-                          return (
-                            <span className="font-semibold text-red-600">
-                              {formatCurrency(displayedDeductions)}
-                            </span>
-                          );
-                        })()
-                      )}
-                    </TableCell>
+                        <div className="font-semibold text-red-600">
+                          {formatCurrency(preview.newDeducciones)}
+                          <span className="text-xs ml-1">
+                            (+{formatCurrency(preview.newDeducciones - preview.originalDeducciones)})
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-end gap-2">
+                        <span className={`font-semibold ${employee.total_deducciones ? 'text-red-600' : 'text-gray-400'}`}>
+                          {formatCurrency(employee.total_deducciones || 0)}
+                        </span>
+                        {!employee.total_deducciones && (
+                          <Badge variant="outline" className="text-xs">Sin calcular</Badge>
+                        )}
+                      </div>
+                    )}
+                  </TableCell>
                     
                      <TableCell className="text-center font-medium">
                        <div className="flex items-center justify-center gap-2">
