@@ -723,7 +723,8 @@ export const usePayrollUnified = (companyId: string) => {
       deductions?: number; 
       healthDeduction?: number; 
       pensionDeduction?: number; 
-      transportAllowance?: number; 
+      transportAllowance?: number;
+      effectiveWorkedDays?: number;
     }>
   ) => {
     if (!currentPeriod?.id || Object.keys(employeeCalculations).length === 0) return;
@@ -734,6 +735,8 @@ export const usePayrollUnified = (companyId: string) => {
       // Actualizar cada empleado en la tabla payrolls
       for (const [employeeId, calculation] of Object.entries(employeeCalculations)) {
         console.log('💾 Persistiendo valores exactos del backend para empleado:', employeeId, {
+          ibc: calculation.ibc,
+          effectiveWorkedDays: calculation.effectiveWorkedDays,
           healthDeduction: calculation.healthDeduction,
           pensionDeduction: calculation.pensionDeduction,
           totalToPay: calculation.totalToPay,
@@ -745,6 +748,8 @@ export const usePayrollUnified = (companyId: string) => {
         const { error } = await supabase
           .from('payrolls')
           .update({
+            ibc: calculation.ibc,
+            dias_trabajados: calculation.effectiveWorkedDays || null,
             total_devengado: calculation.grossPay || calculation.totalToPay,
             salud_empleado: calculation.healthDeduction || 0, // ✅ Valor exacto del backend
             pension_empleado: calculation.pensionDeduction || 0, // ✅ Valor exacto del backend  
