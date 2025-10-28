@@ -209,14 +209,14 @@ export const VoucherSendDialog: React.FC<VoucherSendDialogProps> = ({
         </CustomModalTitle>
       </CustomModalHeader>
 
-      <div className="space-y-4">
-        <div className="bg-blue-50 p-4 rounded-lg">
-          <div className="text-sm text-blue-600 font-medium">Empleado</div>
-          <div className="font-semibold">{employee.name}</div>
-          <div className="text-sm text-gray-600">{employee.position}</div>
+      <div className="space-y-6 mt-4">
+        <div className="bg-blue-50 p-4 rounded-lg space-y-1.5">
+          <div className="text-sm text-blue-600 font-medium mb-2">Empleado</div>
+          <div className="font-semibold text-base">{employee.name}</div>
+          <div className="text-sm text-gray-600 mt-1">{employee.position}</div>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-3">
           <Label htmlFor="emails">Email(s) del destinatario</Label>
           {isLoadingEmployeeEmail ? (
             <div className="flex items-center justify-center p-4 border border-input rounded-md bg-muted/50">
@@ -233,14 +233,14 @@ export const VoucherSendDialog: React.FC<VoucherSendDialogProps> = ({
               className="w-full"
             />
           )}
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-gray-500 mt-2">
             Puedes agregar múltiples emails. Presiona espacio, enter o tab para agregar cada email.
             Se enviará el comprobante de pago en formato PDF como adjunto.
           </p>
         </div>
       </div>
 
-      <div className="flex justify-end gap-3 pt-4 border-t">
+      <div className="flex justify-end gap-3 pt-6 mt-6 border-t">
         <Button variant="outline" onClick={onClose} disabled={isSending}>
           <X className="h-4 w-4 mr-2" />
           Cancelar
