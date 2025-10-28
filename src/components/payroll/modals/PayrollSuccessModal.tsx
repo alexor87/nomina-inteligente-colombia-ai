@@ -149,11 +149,11 @@ export const PayrollSuccessModal: React.FC<PayrollSuccessModalProps> = ({
     <CustomModal 
       isOpen={isOpen} 
       onClose={onClose}
-      className="max-w-md"
+      className="max-w-lg"
       closeOnEscape={true}
       closeOnBackdrop={true}
     >
-      <div className="text-center space-y-6">
+      <div className="text-center space-y-8 p-2">
         {/* Success Icon */}
         <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-success/10 mb-4">
           <CheckCircle className="h-10 w-10 text-success" />
@@ -167,30 +167,34 @@ export const PayrollSuccessModal: React.FC<PayrollSuccessModalProps> = ({
         </CustomModalHeader>
 
         {/* Period Info */}
-        <div className="space-y-3">
+        <div className="space-y-4 py-2">
           <div className="flex items-center justify-center gap-2 text-muted-foreground">
-            <Calendar className="h-4 w-4" />
-            <span className="text-sm">Período liquidado</span>
+            <Calendar className="h-5 w-5" />
+            <span className="text-sm font-medium">Período liquidado</span>
           </div>
-          <div className="text-lg font-medium text-foreground">
+          <div className="text-lg font-semibold text-foreground px-4">
             {formatDate(periodData.startDate)} - {formatDate(periodData.endDate)}
           </div>
         </div>
 
         {/* Summary */}
-        <div className="space-y-4 py-4 border-t border-b border-border">
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <span className="text-muted-foreground">Empleados procesados</span>
-              <div className="font-medium">
+        <div className="space-y-4 py-6 border-t border-b border-border">
+          <div className="grid grid-cols-2 gap-6 text-sm">
+            <div className="space-y-2">
+              <div className="text-muted-foreground text-xs uppercase tracking-wide">
+                Empleados procesados
+              </div>
+              <div className="font-semibold text-lg">
                 {loadingSummary ? 'Consolidando...' : 
                  dbSummary ? dbSummary.employeesCount : 
                  'Sin datos disponibles'}
               </div>
             </div>
-            <div>
-              <span className="text-muted-foreground">Neto a pagar</span>
-              <div className="font-medium">
+            <div className="space-y-2">
+              <div className="text-muted-foreground text-xs uppercase tracking-wide">
+                Neto a pagar
+              </div>
+              <div className="font-semibold text-lg text-green-600">
                 {loadingSummary ? 'Consolidando...' : 
                  dbSummary ? formatCurrency(dbSummary.totalNet) : 
                  'Sin datos disponibles'}
@@ -201,12 +205,12 @@ export const PayrollSuccessModal: React.FC<PayrollSuccessModalProps> = ({
 
         {/* Action Buttons */}
         {!sendResult && !isSending && (
-          <div className="flex gap-3">
-            <Button variant="outline" onClick={onClose} className="flex-1">
+          <div className="flex gap-3 pt-2">
+            <Button variant="outline" onClick={onClose} className="flex-1 h-11">
               Cerrar
             </Button>
-            <Button onClick={handleSendVouchers} className="flex-1" disabled={isSending}>
-              <Mail className="h-4 w-4 mr-2" />
+            <Button onClick={handleSendVouchers} className="flex-1 h-11" disabled={isSending}>
+              <Mail className="h-5 w-5 mr-2" />
               Enviar comprobantes
             </Button>
           </div>
@@ -214,24 +218,24 @@ export const PayrollSuccessModal: React.FC<PayrollSuccessModalProps> = ({
 
         {/* Estado: enviando */}
         {isSending && (
-          <div className="space-y-3">
+          <div className="space-y-4 p-4 bg-blue-50/50 rounded-lg">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Enviando comprobantes...</span>
-              <span className="font-medium">{sendProgress.current} de {sendProgress.total}</span>
+              <span className="text-muted-foreground font-medium">Enviando comprobantes...</span>
+              <span className="font-semibold text-base">{sendProgress.current} de {sendProgress.total}</span>
             </div>
-            <Progress value={(sendProgress.current / sendProgress.total) * 100} className="h-2" />
-            <p className="text-xs text-center text-muted-foreground">Por favor espere...</p>
+            <Progress value={(sendProgress.current / sendProgress.total) * 100} className="h-3" />
+            <p className="text-sm text-center text-muted-foreground">Por favor espere...</p>
           </div>
         )}
 
         {/* Estado: después de enviar */}
         {sendResult && !isSending && (
-          <div className="space-y-4">
-            <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
-              <div className="flex items-start gap-2">
-                <CheckCircle className="h-4 w-4 text-blue-600 mt-0.5" />
-                <div className="text-sm">
-                  <p className="font-medium text-blue-700">Envío completado</p>
+          <div className="space-y-5 pt-2">
+            <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
+              <div className="flex items-start gap-3">
+                <CheckCircle className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                <div className="text-sm space-y-1">
+                  <p className="font-semibold text-blue-700 text-base">Envío completado</p>
                   <p className="text-blue-600">
                     ✅ {sendResult.successCount} enviados exitosamente
                     {sendResult.errorCount > 0 && ` • ❌ ${sendResult.errorCount} fallidos`}
@@ -241,20 +245,20 @@ export const PayrollSuccessModal: React.FC<PayrollSuccessModalProps> = ({
             </div>
             
             {sendResult.errorCount > 0 && (
-              <div className="bg-orange-50 border border-orange-200 p-3 rounded-lg max-h-32 overflow-y-auto">
-                <p className="font-medium text-orange-700 text-sm mb-2">Errores:</p>
-                <ul className="text-xs text-orange-600 space-y-1">
+              <div className="bg-orange-50 border border-orange-200 p-4 rounded-lg max-h-40 overflow-y-auto">
+                <p className="font-semibold text-orange-700 text-sm mb-3">Errores:</p>
+                <ul className="text-sm text-orange-600 space-y-2">
                   {sendResult.errors.slice(0, 5).map((err, idx) => (
-                    <li key={idx}>• {err.employeeName}: {err.error}</li>
+                    <li key={idx} className="leading-relaxed">• {err.employeeName}: {err.error}</li>
                   ))}
                   {sendResult.errors.length > 5 && (
-                    <li className="font-medium">... y {sendResult.errors.length - 5} más</li>
+                    <li className="font-semibold pt-1">... y {sendResult.errors.length - 5} más</li>
                   )}
                 </ul>
               </div>
             )}
             
-            <Button onClick={onClose} className="w-full">
+            <Button onClick={onClose} className="w-full h-11">
               Cerrar
             </Button>
           </div>
