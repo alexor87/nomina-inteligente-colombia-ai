@@ -66,13 +66,8 @@ export const PeriodEmployeesTable = ({
             return (
               <tr key={employee.id} className="border-b hover:bg-gray-50">
                 <td className="p-4">
-                  <div>
-                    <div className="font-medium text-gray-900">
-                      {employee.nombre} {employee.apellido}
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      ID: {employee.id.slice(0, 8)}...
-                    </div>
+                  <div className="font-medium text-gray-900">
+                    {employee.nombre} {employee.apellido}
                   </div>
                 </td>
                 <td className="p-4 text-right">
