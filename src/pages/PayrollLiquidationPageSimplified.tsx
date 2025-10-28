@@ -294,8 +294,13 @@ const PayrollLiquidationPageSimplified = () => {
 
   const handleSuccessModalClose = () => {
     setShowSuccessModal(false);
+    const periodId = liquidationResult?.periodId;
+    if (periodId) {
+      navigate(`/modules/payroll-history/${periodId}`);
+    } else {
+      navigate('/modules/payroll-history');
+    }
     setLiquidationResult(null);
-    navigate('/app/payroll');
   };
 
   return (
