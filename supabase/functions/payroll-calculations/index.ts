@@ -7,24 +7,34 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// ✅ VALORES OFICIALES CORREGIDOS 2025/2024
-const OFFICIAL_VALUES = {
-  '2025': {
-    salarioMinimo: 1423500,  // ✅ CORREGIDO: Valor oficial 2025
-    auxilioTransporte: 200000, // ✅ CORREGIDO: Valor oficial 2025
-    uvt: 49799 // ✅ CORREGIDO: Valor oficial 2025
-  },
-  '2024': {
-    salarioMinimo: 1300000,
-    auxilioTransporte: 162000,
-    uvt: 47065
+// ✅ Function to get dynamic configuration from database
+async function getOfficialValues(supabase: any, companyId: string, year: string) {
+  const { data, error } = await supabase
+    .from('company_payroll_configurations')
+    .select('salary_min, transport_allowance, uvt')
+    .eq('company_id', companyId)
+    .eq('year', year)
+    .single()
+  
+  if (error || !data) {
+    console.warn(`⚠️ No config for year ${year}, using fallback`)
+    const fallback = year === '2024'
+      ? { salarioMinimo: 1300000, auxilioTransporte: 162000, uvt: 47065 }
+      : { salarioMinimo: 1423500, auxilioTransporte: 200000, uvt: 49799 }
+    return fallback
   }
-};
+  
+  console.log(`✅ Using config for ${year}: SMMLV=${data.salary_min}, AuxTrans=${data.transport_allowance}, UVT=${data.uvt}`)
+  return {
+    salarioMinimo: data.salary_min,
+    auxilioTransporte: data.transport_allowance,
+    uvt: data.uvt
+  }
+}
 
-// ✅ LÍMITE CORRECTO AUXILIO TRANSPORTE 2025: 2 SMMLV
-const getTransportAssistanceLimit = (year: string) => {
-  const values = OFFICIAL_VALUES[year as keyof typeof OFFICIAL_VALUES] || OFFICIAL_VALUES['2025'];
-  return values.salarioMinimo * 2; // 2 SMMLV
+// ✅ LÍMITE CORRECTO AUXILIO TRANSPORTE: 2 SMMLV
+const getTransportAssistanceLimit = (salarioMinimo: number) => {
+  return salarioMinimo * 2; // 2 SMMLV
 };
 
 /**
@@ -384,7 +394,27 @@ async function getCompanyPolicy(supabase: any): Promise<{ incapacity_policy: str
 
 async function calculatePayroll(supabase: any, data: any) {
   const year = data.year || '2025';
-  const config = OFFICIAL_VALUES[year as keyof typeof OFFICIAL_VALUES] || OFFICIAL_VALUES['2025'];
+  
+  // ✅ Get company_id from data or fetch from user profile
+  let companyId = data.companyId;
+  if (!companyId) {
+    // Try to get from supabase context if available
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .single();
+      companyId = profile?.company_id;
+    }
+  }
+  
+  // ✅ Get dynamic configuration
+  const config = companyId 
+    ? await getOfficialValues(supabase, companyId, year)
+    : { salarioMinimo: 1423500, auxilioTransporte: 200000, uvt: 49799 }; // Fallback if no company
+  
   const policy = await getCompanyPolicy(supabase);
   
   console.log('⚙️ Using configuration:', config, 'Policy:', policy);
@@ -546,7 +576,7 @@ async function calculatePayroll(supabase: any, data: any) {
   });
 
   // ✅ AUXILIO DE TRANSPORTE PRORRATEADO: Solo si salario ≤ 2 SMMLV y según días EFECTIVAMENTE TRABAJADOS (sin incapacidades ni licencias)
-  const transportLimit = getTransportAssistanceLimit(year);
+  const transportLimit = getTransportAssistanceLimit(config.salarioMinimo);
   const eligibleForTransport = baseSalary <= transportLimit;
   const transportAllowance = eligibleForTransport ? Math.round((config.auxilioTransporte / 30) * effectiveWorkedDays) : 0;
 
@@ -720,10 +750,14 @@ function normalizeIncapacitySubtype(subtipo?: string): 'general' | 'laboral' {
 }
 
 async function calculateNovedadesTotals(supabase: any, data: any) {
-  const { salarioBase, fechaPeriodo, novedades = [] } = data;
+  const { salarioBase, fechaPeriodo, novedades = [], companyId } = data;
   const policy = await getCompanyPolicy(supabase);
   const year = new Date(fechaPeriodo).getFullYear().toString();
-  const config = OFFICIAL_VALUES[year as keyof typeof OFFICIAL_VALUES] || OFFICIAL_VALUES['2025'];
+  
+  // ✅ Get dynamic configuration
+  const config = companyId
+    ? await getOfficialValues(supabase, companyId, year)
+    : { salarioMinimo: 1423500, auxilioTransporte: 200000, uvt: 49799 }; // Fallback
 
   console.log('📊 BACKEND: Calculando totales de novedades con política:', {
     salarioBase,
@@ -897,11 +931,16 @@ async function calculateSingleNovedad(supabase: any, data: any) {
     salarioBase,
     horas,
     dias,
-    fechaPeriodo
+    fechaPeriodo,
+    companyId
   } = data;
 
   const year = fechaPeriodo ? new Date(fechaPeriodo).getFullYear().toString() : '2025';
-  const config = OFFICIAL_VALUES[year as keyof typeof OFFICIAL_VALUES] || OFFICIAL_VALUES['2025'];
+  
+  // ✅ Get dynamic configuration
+  const config = companyId
+    ? await getOfficialValues(supabase, companyId, year)
+    : { salarioMinimo: 1423500, auxilioTransporte: 200000, uvt: 49799 }; // Fallback
   
   console.log('🧩 calculateSingleNovedad:', {
     tipoNovedad, subtipo, salarioBase, horas, dias, fechaPeriodo, year
@@ -1076,8 +1115,15 @@ async function calculateSingleNovedad(supabase: any, data: any) {
 }
 
 async function explainSurcharge(supabase: any, data: any) {
-  const { type, salary, hours = 1, date } = data;
-  const salarioBase = salary || OFFICIAL_VALUES['2025'].salarioMinimo;
+  const { type, salary, hours = 1, date, companyId } = data;
+  
+  // ✅ Get dynamic configuration if companyId provided
+  const year = date ? new Date(date).getFullYear().toString() : '2025';
+  const config = companyId
+    ? await getOfficialValues(supabase, companyId, year)
+    : { salarioMinimo: 1423500, auxilioTransporte: 200000, uvt: 49799 }; // Fallback
+  
+  const salarioBase = salary || config.salarioMinimo;
   const fecha = date ? new Date(date) : new Date();
   
   console.log('🔧 explainSurcharge called (PURE - sin BD):', { type, salary, hours, date });

@@ -132,6 +132,26 @@ serve(async (req) => {
 
       console.log(`📅 Período: ${periodInfo.fecha_inicio} a ${periodInfo.fecha_fin}, días legales: ${legalDays}`)
 
+      // ✅ Function to get dynamic configuration from database
+      const getConfigurationForYear = async (companyId: string, year: string) => {
+        const { data, error } = await supabaseClient
+          .from('company_payroll_configurations')
+          .select('salary_min, transport_allowance, uvt')
+          .eq('company_id', companyId)
+          .eq('year', year)
+          .single()
+        
+        if (error || !data) {
+          console.warn(`⚠️ No config for year ${year}, using fallback`)
+          return year === '2024' 
+            ? { salary_min: 1300000, transport_allowance: 162000, uvt: 47065 }
+            : { salary_min: 1423500, transport_allowance: 200000, uvt: 49799 }
+        }
+        
+        console.log(`✅ Using config for ${year}: SMMLV=${data.salary_min}, AuxTrans=${data.transport_allowance}, UVT=${data.uvt}`)
+        return data
+      }
+
       // Function to calculate incapacity value with policy
       const calculateIncapacityValue = (
         baseSalary: number,
@@ -170,6 +190,12 @@ serve(async (req) => {
         }
       }
 
+      // ✅ Get dynamic configuration for the period's year
+      const periodYear = new Date(periodInfo.fecha_inicio).getFullYear().toString()
+      const config = await getConfigurationForYear(data.company_id, periodYear)
+      const SMMLV = config.salary_min // ✅ Dynamic value based on period year
+      const AUXILIO_TRANSPORTE = config.transport_allowance
+
       // Process each payroll to calculate and store accurate IBC and dias_trabajados
       for (const payroll of payrollsData || []) {
         try {
@@ -203,7 +229,6 @@ serve(async (req) => {
             .reduce((sum, n) => sum + (n.valor || 0), 0)
 
           // ✅ Calculate incapacity value (part of IBC per Decree 1406/1999)
-          const SMMLV_2025 = 1423500 // ✅ SMMLV oficial 2025
           const incapacidadesNovedades = (novedades || [])
             .filter(n => n.tipo_novedad === 'incapacidad')
 
@@ -213,7 +238,7 @@ serve(async (req) => {
               salarioBase,
               inc.dias || 0,
               inc.subtipo || 'general',
-              SMMLV_2025
+              SMMLV
             )
             totalIncapacityValue += incValue
             console.log(`🏥 Incapacity for employee ${payroll.employee_id}: ${inc.dias} days, subtipo=${inc.subtipo}, value=${incValue}`)
@@ -224,12 +249,12 @@ serve(async (req) => {
           let ibc = ibcBase + novedadesConstitutivas + totalIncapacityValue
           
           // Apply maximum cap only (25 SMMLV) - no minimum to preserve exact calculation
-          ibc = Math.min(ibc, SMMLV_2025 * 25)
+          ibc = Math.min(ibc, SMMLV * 25)
           
           console.log(`🧮 IBC calculation for employee ${payroll.employee_id}: base=${ibcBase}, novedades=${novedadesConstitutivas}, incapacidades=${totalIncapacityValue}, final=${ibc}`)
 
           // Calculate other fields
-          const transportAllowance = salarioBase <= (SMMLV_2025 * 2) ? (200000 / 30) * diasTrabajadosEfectivos : 0
+          const transportAllowance = salarioBase <= (SMMLV * 2) ? (AUXILIO_TRANSPORTE / 30) * diasTrabajadosEfectivos : 0
           const healthDeduction = ibc * 0.04
           const pensionDeduction = ibc * 0.04
 
@@ -374,8 +399,9 @@ serve(async (req) => {
             created_by?: string | null
           }
 
-          const SMMLV_2025 = 1300000
-          const AUXILIO_TRANSPORTE_2025 = 200000
+          // ✅ Use dynamic configuration already loaded
+          const SMMLV_PROVISIONES = SMMLV
+          const AUXILIO_TRANSPORTE_PROVISIONES = AUXILIO_TRANSPORTE
           const items: Row[] = []
 
           for (const p of payrolls || []) {
@@ -389,7 +415,7 @@ serve(async (req) => {
               continue
             }
 
-            const auxilioMensual = salarioMensual <= (2 * SMMLV_2025) ? AUXILIO_TRANSPORTE_2025 : 0
+            const auxilioMensual = salarioMensual <= (2 * SMMLV_PROVISIONES) ? AUXILIO_TRANSPORTE_PROVISIONES : 0
             const basePrestaciones = salarioMensual + auxilioMensual
             const fraction = workedDays / 360
 
@@ -399,7 +425,7 @@ serve(async (req) => {
             const vacacionesAmount = salarioMensual * workedDays / 720
 
             const calculation_basis = {
-              version: "4_legal_2025",
+              version: `4_legal_${periodYear}`,
               salario_mensual: salarioMensual,
               auxilio_mensual: auxilioMensual,
               base_prestaciones: basePrestaciones,
@@ -410,8 +436,8 @@ serve(async (req) => {
               transport_allowance: auxilioMensual,            // Compatibilidad con UI
               worked_days: workedDays,
               method: 'legal_monthly_base_proportional',
-              smmlv_2025: SMMLV_2025,
-              auxilio_transporte_2025: AUXILIO_TRANSPORTE_2025,
+              smmlv: SMMLV_PROVISIONES,
+              auxilio_transporte: AUXILIO_TRANSPORTE_PROVISIONES,
               legal_reference: "Ley 50/1990 Art. 99 - Intereses 12% anual sobre cesantías",
               period: {
                 id: periodData.id,
