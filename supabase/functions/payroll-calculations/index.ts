@@ -627,7 +627,9 @@ async function calculatePayroll(supabase: any, data: any) {
     employerContributions,
     totalPayrollCost: Math.round(netPay + employerContributions),
     // ✅ IBC UNIFICADO
-    ibc: ibcSalud
+    ibc: ibcSalud,
+    // ✅ DÍAS EFECTIVAMENTE TRABAJADOS (para mostrar en UI)
+    effectiveWorkedDays: effectiveWorkedDays
   };
 
   console.log('✅ Calculation (normative IBC) result:', {

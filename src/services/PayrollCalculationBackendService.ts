@@ -36,6 +36,8 @@ export interface PayrollCalculationResult {
   totalPayrollCost: number;
   // ✅ NUEVO CAMPO: IBC calculado incluyendo novedades constitutivas
   ibc: number;
+  // ✅ NUEVO CAMPO: Días efectivamente trabajados (después de restar licencias)
+  effectiveWorkedDays: number;
 }
 
 export interface ValidationResult {

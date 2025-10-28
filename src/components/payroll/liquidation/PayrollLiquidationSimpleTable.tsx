@@ -43,6 +43,7 @@ interface PayrollLiquidationSimpleTableProps {
     healthDeduction?: number; 
     pensionDeduction?: number; 
     transportAllowance?: number; 
+    effectiveWorkedDays?: number; 
   }>) => Promise<void>;
   year: string;
 }
@@ -70,6 +71,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
     healthDeduction: number; 
     pensionDeduction: number; 
     transportAllowance: number; 
+    effectiveWorkedDays: number; 
   }>>({});
   const [optimisticCalculations, setOptimisticCalculations] = useState<Record<string, boolean>>({});
   const [isCalculating, setIsCalculating] = useState(false);
@@ -158,7 +160,8 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
           deductions: calculation.totalDeductions,
           healthDeduction: calculation.healthDeduction,
           pensionDeduction: calculation.pensionDeduction,
-          transportAllowance: proratedTransport
+          transportAllowance: proratedTransport,
+          effectiveWorkedDays: calculation.effectiveWorkedDays
         }
       }));
 
@@ -206,6 +209,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
         healthDeduction: number; 
         pensionDeduction: number; 
         transportAllowance: number; 
+        effectiveWorkedDays: number; 
       }> = {};
 
       try {
@@ -264,7 +268,8 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
             deductions: calculation.totalDeductions,
             healthDeduction: calculation.healthDeduction,
             pensionDeduction: calculation.pensionDeduction,
-            transportAllowance: proratedTransport
+            transportAllowance: proratedTransport,
+            effectiveWorkedDays: calculation.effectiveWorkedDays
           };
         });
 
@@ -512,7 +517,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
                   </TableCell>
                   
                   <TableCell className="text-center font-medium">
-                    {workedDays} días
+                    {calc?.effectiveWorkedDays ?? workedDays} días
                   </TableCell>
                   
                   <TableCell className="text-right bg-green-100 font-semibold">
