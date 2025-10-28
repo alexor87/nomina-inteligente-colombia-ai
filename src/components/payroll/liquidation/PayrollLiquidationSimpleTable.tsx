@@ -148,7 +148,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
       });
 
       const eligible = employee.baseSalary <= (config.salarioMinimo * 2);
-      const proratedTransport = eligible ? Math.round((config.auxilioTransporte / 30) * currentWorkedDays) : 0;
+      const proratedTransport = eligible ? Math.round((config.auxilioTransporte / 30) * (calculation.effectiveWorkedDays ?? currentWorkedDays)) : 0;
 
       // Actualizar solo ese empleado
       setEmployeeCalculations(prev => ({
@@ -259,7 +259,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
         employees.forEach((employee, index) => {
           const calculation = batchResults[index];
           const eligible = employee.baseSalary <= (config.salarioMinimo * 2);
-          const proratedTransport = eligible ? Math.round((config.auxilioTransporte / 30) * currentWorkedDays) : 0;
+          const proratedTransport = eligible ? Math.round((config.auxilioTransporte / 30) * (calculation.effectiveWorkedDays ?? currentWorkedDays)) : 0;
 
           newCalculations[employee.id] = {
             totalToPay: calculation.netPay,
@@ -498,6 +498,11 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
               const ibc = getEmployeeIBC(employee);
               const transportAllowance = getEmployeeTransportAllowance(employee);
               const calc = employeeCalculations[employee.id];
+              
+              // 🔍 Debug: Verificar días efectivos
+              if (calc && calc.effectiveWorkedDays !== workedDays) {
+                console.log(`👤 ${employee.name}: efectivos=${calc.effectiveWorkedDays}, período=${workedDays}`);
+              }
 
               return (
                 <TableRow key={employee.id}>
