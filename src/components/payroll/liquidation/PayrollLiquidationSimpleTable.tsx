@@ -71,6 +71,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
     pensionDeduction: number; 
     transportAllowance: number; 
   }>>({});
+  const [optimisticCalculations, setOptimisticCalculations] = useState<Record<string, boolean>>({});
   const [isCalculating, setIsCalculating] = useState(false);
   const [calculationProgress, setCalculationProgress] = useState({ current: 0, total: 0 });
   const novedadChangedRef = useRef(false);
@@ -270,6 +271,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
         console.log(`✅ Batch completado: ${employees.length} empleados en una llamada`);
 
         setEmployeeCalculations(newCalculations);
+        setOptimisticCalculations({}); // ✅ Limpiar flags optimistic
 
         // Persistir si hay cambios
         const calculationsHash = JSON.stringify(newCalculations);
@@ -360,6 +362,23 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
     }
 
     console.log('💾 Creando novedad:', data);
+    
+    // ✅ OPTIMISTIC UI: Estimación rápida antes de crear novedad
+    if (data.valor > 0 && data.tipo_novedad === 'comision') {
+      const estimate = data.valor * 0.92; // ~8% deducciones
+      const currentTotal = employeeCalculations[selectedEmployee.id]?.totalToPay || 0;
+      
+      setEmployeeCalculations(prev => ({
+        ...prev,
+        [selectedEmployee.id]: {
+          ...prev[selectedEmployee.id],
+          totalToPay: currentTotal + estimate
+        }
+      }));
+      
+      setOptimisticCalculations(prev => ({ ...prev, [selectedEmployee.id]: true }));
+      console.log('⚡ UI Optimista: Mostrando estimación instantánea +', formatCurrency(estimate));
+    }
     
     try {
       const result = await createNovedad({
@@ -527,6 +546,9 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
                   
                   <TableCell className="text-right bg-blue-100 font-semibold text-blue-600">
                     {formatCurrency(totalToPay)}
+                    {optimisticCalculations[employee.id] && (
+                      <span className="ml-2 text-xs text-blue-600">⏳</span>
+                    )}
                   </TableCell>
 
                   <TableCell className="text-center sticky right-0 bg-background z-10">
