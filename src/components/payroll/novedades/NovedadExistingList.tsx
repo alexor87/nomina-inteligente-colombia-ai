@@ -80,6 +80,37 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
     return subtipo && tipo !== 'recargo_nocturno' ? `${base} (${subtipo})` : base;
   };
 
+  const getNovedadDetails = (item: DisplayNovedad): string | null => {
+    const details: string[] = [];
+    
+    // Para bonificaciones y otros ingresos: mostrar constitutividad
+    if (['bonificacion', 'otros_ingresos', 'horas_extra'].includes(item.tipo_novedad)) {
+      if (item.constitutivo_salario !== undefined) {
+        details.push(item.constitutivo_salario 
+          ? '✓ Constitutivo de salario' 
+          : '○ No constitutivo de salario');
+      }
+    }
+    
+    // Para incapacidades: mostrar tipo
+    if (item.tipo_novedad === 'incapacidad' && item.subtipo) {
+      const tipos: Record<string, string> = {
+        'general': 'Incapacidad General',
+        'laboral': 'Incapacidad Laboral',
+        'licencia_maternidad': 'Licencia de Maternidad',
+        'licencia_paternidad': 'Licencia de Paternidad'
+      };
+      details.push(tipos[item.subtipo] || item.subtipo);
+    }
+    
+    // Agregar observación del usuario si existe
+    if (item.observacion) {
+      details.push(item.observacion);
+    }
+    
+    return details.length > 0 ? details.join(' • ') : null;
+  };
+
   const fetchIntegratedData = async () => {
     try {
       setLoading(true);
@@ -738,13 +769,16 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
                       </div>
 
                       <div className="col-span-12 sm:col-span-8 lg:col-span-4">
-                        {item.observacion && (
-                          <div className="text-sm text-gray-600 bg-gray-50 p-2 rounded text-left">
-                            <div className="line-clamp-2">
-                              {item.observacion}
+                        {(() => {
+                          const details = getNovedadDetails(item);
+                          return details && (
+                            <div className="text-sm text-gray-600 bg-gray-50 p-2 rounded text-left">
+                              <div className="line-clamp-2">
+                                {details}
+                              </div>
                             </div>
-                          </div>
-                        )}
+                          );
+                        })()}
                       </div>
 
                       <div className="col-span-12 sm:col-span-4 lg:col-span-1">

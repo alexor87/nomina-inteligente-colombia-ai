@@ -15,6 +15,7 @@ export interface DisplayNovedad {
   observacion?: string;
   fecha_inicio?: string;
   fecha_fin?: string;
+  constitutivo_salario?: boolean;
   
   // Metadatos de origen y estado
   origen: 'novedades' | 'vacaciones';
@@ -221,6 +222,7 @@ export const convertNovedadToDisplay = (novedad: any): DisplayNovedad => {
     observacion: novedad.observacion,
     fecha_inicio: novedad.fecha_inicio,
     fecha_fin: novedad.fecha_fin,
+    constitutivo_salario: novedad.constitutivo_salario,
     
     origen: 'novedades',
     status: 'registrada',
