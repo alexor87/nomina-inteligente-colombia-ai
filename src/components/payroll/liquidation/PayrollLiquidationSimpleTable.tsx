@@ -458,14 +458,18 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
 
   return (
     <>
-      {isCalculating && (
-        <div className="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 px-4 py-3 rounded-lg mb-4 border border-blue-200">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          <span className="font-medium">
-            Calculando nómina... {calculationProgress.current > 0 && `(${calculationProgress.current}/${calculationProgress.total})`}
-          </span>
-        </div>
-      )}
+          <div className="h-12 mb-4 transition-opacity duration-200">
+            {isCalculating ? (
+              <div className="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 px-4 py-3 rounded-lg border border-blue-200 h-full">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="font-medium">
+                  Calculando nómina... {calculationProgress.current > 0 && `(${calculationProgress.current}/${calculationProgress.total})`}
+                </span>
+              </div>
+            ) : (
+              <div className="h-full opacity-0" aria-hidden="true"></div>
+            )}
+          </div>
       <div className="w-full overflow-x-auto">
         <Table className="min-w-max">
           <TableHeader>
