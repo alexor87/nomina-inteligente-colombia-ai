@@ -2000,6 +2000,7 @@ export type Database = {
           horas_extra_diurnas: number | null
           horas_extra_nocturnas: number | null
           ibc: number | null
+          ibc_snapshot: Json | null
           id: string
           incapacidades: number | null
           intereses_cesantias: number | null
@@ -2048,6 +2049,7 @@ export type Database = {
           horas_extra_diurnas?: number | null
           horas_extra_nocturnas?: number | null
           ibc?: number | null
+          ibc_snapshot?: Json | null
           id?: string
           incapacidades?: number | null
           intereses_cesantias?: number | null
@@ -2096,6 +2098,7 @@ export type Database = {
           horas_extra_diurnas?: number | null
           horas_extra_nocturnas?: number | null
           ibc?: number | null
+          ibc_snapshot?: Json | null
           id?: string
           incapacidades?: number | null
           intereses_cesantias?: number | null

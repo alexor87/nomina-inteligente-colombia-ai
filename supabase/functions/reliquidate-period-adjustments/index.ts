@@ -221,17 +221,67 @@ serve(async (req) => {
           continue
         }
 
-        // Calculate worked days based on period type
+        // 📸 SOLUCIÓN PROFESIONAL: Usar snapshot del IBC original para recálculo exacto
+        const ibcSnapshot = employeePayroll.ibc_snapshot
+        let newIBC: number
+
+        if (ibcSnapshot && ibcSnapshot.ibc_base_salario) {
+          console.log('✅ Usando snapshot profesional para recálculo de IBC:', employeeId)
+          
+          // Recalcular IBC desde el snapshot base + TODAS las novedades constitutivas actuales
+          const currentConstitutiveNovedades = employeeNovedades
+            .filter(n => isNovedadConstitutiva(n.tipo_novedad, n.constitutivo_salario))
+            .reduce((sum, n) => sum + (n.valor || 0), 0)
+          
+          newIBC = ibcSnapshot.ibc_base_salario + currentConstitutiveNovedades
+          
+          console.log('📊 IBC recalculado desde snapshot:', {
+            ibc_base: ibcSnapshot.ibc_base_salario,
+            novedades_constitutivas: currentConstitutiveNovedades,
+            ibc_nuevo: newIBC,
+            ibc_anterior: employeePayroll.ibc,
+            diferencia: newIBC - employeePayroll.ibc
+          })
+        } else {
+          console.warn('⚠️ No hay snapshot IBC, recalculando desde cero (puede ser inexacto):', employeeId)
+          
+          // Fallback: calcular desde cero (puede no incluir novedades del período original)
+          const workedDays = calculateWorkedDays(
+            periodData.tipo_periodo,
+            new Date(periodData.fecha_inicio),
+            new Date(periodData.fecha_fin)
+          )
+          
+          const convertedNovedades = convertNovedadesToIBC(employeeNovedades)
+          
+          const calculationInput = {
+            baseSalary: employeeData.salario_base,
+            workedDays: workedDays,
+            extraHours: 0,
+            disabilities: 0,
+            bonuses: 0,
+            absences: 0,
+            periodType: periodData.tipo_periodo,
+            novedades: convertedNovedades,
+            year: new Date(periodData.fecha_inicio).getFullYear().toString()
+          }
+          
+          const calculationResult = await calculatePayroll(supabase, calculationInput)
+          newIBC = calculationResult.ibc
+        }
+
+        // Calcular deducciones con el nuevo IBC
+        const healthDeduction = Math.round(newIBC * 0.04)
+        const pensionDeduction = Math.round(newIBC * 0.04)
+        
+        // Recalcular devengado y neto (sin cambiar el IBC logic)
         const workedDays = calculateWorkedDays(
           periodData.tipo_periodo,
           new Date(periodData.fecha_inicio),
           new Date(periodData.fecha_fin)
         )
-
-        // Convert novedades to proper IBC format
+        
         const convertedNovedades = convertNovedadesToIBC(employeeNovedades)
-
-        // Use proper payroll calculation logic
         const calculationInput = {
           baseSalary: employeeData.salario_base,
           workedDays: workedDays,
@@ -243,13 +293,11 @@ serve(async (req) => {
           novedades: convertedNovedades,
           year: new Date(periodData.fecha_inicio).getFullYear().toString()
         }
-
-        // Calculate using proper backend logic
+        
         const calculationResult = await calculatePayroll(supabase, calculationInput)
-
         const totalDevengado = calculationResult.grossPay
-        const totalDeducciones = calculationResult.totalDeductions
-        const netoCalculado = calculationResult.netPay
+        const totalDeducciones = healthDeduction + pensionDeduction
+        const netoCalculado = totalDevengado - totalDeducciones
 
         // Update payroll record with all calculated fields
         const { error: updateError } = await supabase
@@ -258,9 +306,9 @@ serve(async (req) => {
             total_devengado: totalDevengado,
             total_deducciones: totalDeducciones,
             neto_pagado: netoCalculado,
-            salud_empleado: calculationResult.healthDeduction,
-            pension_empleado: calculationResult.pensionDeduction,
-            ibc: calculationResult.ibc,
+            salud_empleado: healthDeduction,
+            pension_empleado: pensionDeduction,
+            ibc: newIBC, // 📸 IBC recalculado profesionalmente desde snapshot
             is_stale: false,
             updated_at: new Date().toISOString()
           })

@@ -745,6 +745,49 @@ export const usePayrollUnified = (companyId: string) => {
         });
 
         // ✅ CORRECCIÓN CRÍTICA: Persistir valores exactos calculados por el backend
+        
+        // 📸 SNAPSHOT PROFESIONAL: Guardar IBC base y novedades constitutivas para auditoría
+        const employee = employees.find(e => e.id === employeeId);
+        if (!employee) {
+          console.error('❌ Empleado no encontrado para snapshot:', employeeId);
+          continue;
+        }
+        
+        const baseSalary = employee.baseSalary || 0;
+        const workedDays = calculation.effectiveWorkedDays || 15;
+        const ibc_base_salario = Math.round((baseSalary / 30) * workedDays);
+        
+        // Obtener novedades del empleado desde la BD
+        const { data: employeeNovedades } = await supabase
+          .from('payroll_novedades')
+          .select('*')
+          .eq('periodo_id', currentPeriod.id)
+          .eq('empleado_id', employeeId);
+        
+        const ibc_novedades_constitutivas = (employeeNovedades || [])
+          .filter(n => n.constitutivo_salario === true)
+          .map(n => ({
+            novedad_id: n.id,
+            tipo_novedad: n.tipo_novedad,
+            subtipo: n.subtipo,
+            valor: n.valor || 0,
+            dias: n.dias,
+            constitutivo: true
+          }));
+        
+        const ibc_snapshot = {
+          ibc_base_salario,
+          ibc_novedades_constitutivas,
+          ibc_total: calculation.ibc,
+          fecha_calculo: new Date().toISOString()
+        };
+        
+        console.log('📸 Guardando snapshot IBC para empleado:', employeeId, {
+          ibc_base: ibc_base_salario,
+          novedades_count: ibc_novedades_constitutivas.length,
+          ibc_total: calculation.ibc
+        });
+        
         const { error } = await supabase
           .from('payrolls')
           .update({
@@ -756,6 +799,7 @@ export const usePayrollUnified = (companyId: string) => {
             auxilio_transporte: calculation.transportAllowance || 0,
             total_deducciones: calculation.deductions || 0,
             neto_pagado: calculation.totalToPay, // ✅ Neto correcto del backend
+            ibc_snapshot, // 📸 Snapshot profesional para recálculos futuros
             updated_at: new Date().toISOString()
           })
           .eq('company_id', companyId)
