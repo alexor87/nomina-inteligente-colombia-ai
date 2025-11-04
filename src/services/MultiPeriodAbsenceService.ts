@@ -27,6 +27,16 @@ export class MultiPeriodAbsenceService {
   ): Promise<MultiPeriodAbsenceAnalysis> {
     console.log('🔍 Analizando ausencia multi-período:', { startDate, endDate, companyId });
 
+    // Obtener la periodicidad configurada de la empresa
+    const { data: companySettings } = await supabase
+      .from('company_settings')
+      .select('periodicity')
+      .eq('company_id', companyId)
+      .single();
+
+    const configuredPeriodicity = companySettings?.periodicity || 'quincenal';
+    console.log(`⚙️ Periodicidad configurada: ${configuredPeriodicity}`);
+
     // Obtener todos los períodos que intersectan con el rango de fechas
     const { data: periodsRaw, error } = await supabase
       .from('payroll_periods_real')
@@ -40,25 +50,43 @@ export class MultiPeriodAbsenceService {
       throw error;
     }
 
-    // CORRECCIÓN: Filtrar períodos duplicados por fechas exactas
+    // CORRECCIÓN: Filtrar períodos duplicados priorizando configuración de empresa
     const periodsMap = new Map();
+    
     for (const period of periodsRaw || []) {
       const key = `${period.fecha_inicio}-${period.fecha_fin}`;
       const existing = periodsMap.get(key);
       
-      // Si existe duplicado, mantener el más reciente
-      if (!existing || new Date(period.created_at) > new Date(existing.created_at)) {
+      if (!existing) {
         periodsMap.set(key, period);
+      } else {
+        const currentMatchesConfig = period.tipo_periodo === configuredPeriodicity;
+        const existingMatchesConfig = existing.tipo_periodo === configuredPeriodicity;
+        
+        if (currentMatchesConfig && !existingMatchesConfig) {
+          periodsMap.set(key, period);
+        } else if (!currentMatchesConfig && existingMatchesConfig) {
+          continue;
+        } else if (new Date(period.created_at) > new Date(existing.created_at)) {
+          periodsMap.set(key, period);
+        }
       }
     }
     
     const periods = Array.from(periodsMap.values());
-    console.log(`🔧 Períodos filtrados: ${periodsRaw?.length || 0} → ${periods.length} (eliminados ${(periodsRaw?.length || 0) - periods.length} duplicados)`);
+    
+    // Filtrar para mantener SOLO períodos del tipo configurado (si existen)
+    const periodsOfConfiguredType = periods.filter(p => p.tipo_periodo === configuredPeriodicity);
+    const finalPeriods = periodsOfConfiguredType.length > 0 ? periodsOfConfiguredType : periods;
+    
+    console.log(`🔧 Períodos filtrados: ${periodsRaw?.length || 0} → ${finalPeriods.length}`);
+    console.log(`   Tipo configurado: ${configuredPeriodicity}`);
+    console.log(`   Distribución: ${finalPeriods.filter(p => p.tipo_periodo === 'quincenal').length} quincenales, ${finalPeriods.filter(p => p.tipo_periodo === 'mensual').length} mensuales`);
 
     const segments: PeriodSegment[] = [];
     let totalDays = 0;
 
-    for (const period of periods) {
+    for (const period of finalPeriods) {
       // Calcular intersección entre la ausencia y el período
       const segmentStart = startDate > period.fecha_inicio ? startDate : period.fecha_inicio;
       const segmentEnd = endDate < period.fecha_fin ? endDate : period.fecha_fin;
@@ -80,6 +108,16 @@ export class MultiPeriodAbsenceService {
         
         totalDays += segmentDays;
       }
+    }
+
+    // Validar que el total de días sea razonable
+    const expectedDays = this.calculateDaysBetween(startDate, endDate);
+    const daysDifference = Math.abs(totalDays - expectedDays);
+
+    if (daysDifference > 1) {
+      console.warn(`⚠️ ADVERTENCIA: Días calculados (${totalDays}) difieren de lo esperado (${expectedDays})`);
+      console.warn(`   Diferencia: ${daysDifference} días`);
+      console.warn(`   Puede indicar períodos faltantes en el rango ${startDate} - ${endDate}`);
     }
 
     console.log('✅ Análisis completado:', { 
