@@ -214,7 +214,7 @@ export const VacationFormFields = ({
       {/* Información de período(s) detectado(s) */}
       {(formData.start_date && formData.end_date) && (
         <Card className={`${getPeriodStatusColor()}`}>
-          <CardContent className="pt-4">
+          <CardContent className="pt-6 pb-5 px-5">
             <div className="flex items-start space-x-3">
               {getPeriodStatusIcon()}
               <div className="flex-1 space-y-2">
@@ -225,14 +225,17 @@ export const VacationFormFields = ({
                 </div>
                 
                 {periodInfo && (
-                  <div className="space-y-2">
-                    <p className="text-sm text-gray-700">
-                      {periodInfo.message}
-                    </p>
+                  <div className="space-y-3">
+                    {/* Solo mostrar periodInfo.message cuando NO es multi-período */}
+                    {!periodInfo.crossesMultiplePeriods && (
+                      <p className="text-sm text-gray-700">
+                        {periodInfo.message}
+                      </p>
+                    )}
                     
                     {/* Multi-período: Mensaje simplificado */}
                     {periodInfo.crossesMultiplePeriods && (
-                      <div className="text-xs text-purple-600 bg-purple-100/50 rounded px-2 py-1 mt-2">
+                      <div className="text-xs text-purple-600 bg-purple-100/50 rounded px-3 py-2">
                         ℹ️ Esta ausencia afecta múltiples períodos de liquidación
                       </div>
                     )}
