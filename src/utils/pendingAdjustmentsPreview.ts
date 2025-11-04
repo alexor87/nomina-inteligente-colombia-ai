@@ -37,12 +37,50 @@ export const calculateEmployeePreviewImpact = async (
       subtipo: pending.novedadData?.subtipo
     })));
 
-    // ✅ Calculate worked days based on period type (not employee.dias_trabajados which is already adjusted)
-    const periodType = employee.periodo_type === 'quincenal' ? 'quincenal' : 'mensual';
-    const periodDays = periodType === 'quincenal' ? 15 : 30;
+    // ✅ Determine period type with robust fallback logic
+    let periodType: 'semanal' | 'quincenal' | 'mensual' = 'mensual';
+
+    // 1. Try to get tipo_periodo from payroll_periods table
+    if (periodId) {
+      try {
+        const { supabase } = await import('@/integrations/supabase/client');
+        const { data: periodRow } = await supabase
+          .from('payroll_periods_real')
+          .select('tipo_periodo')
+          .eq('id', periodId)
+          .single();
+        
+        if (periodRow?.tipo_periodo) {
+          periodType = periodRow.tipo_periodo as 'semanal' | 'quincenal' | 'mensual';
+        }
+      } catch (error) {
+        console.warn('Could not fetch period type from database:', error);
+      }
+    }
+
+    // 2. Fallback to employee.tipo_periodo or employee.periodo_type
+    if (!periodType || periodType === 'mensual') {
+      const empPeriodType = (employee as any).tipo_periodo || (employee as any).periodo_type;
+      if (empPeriodType) {
+        periodType = empPeriodType === 'semanal' ? 'semanal' 
+                   : empPeriodType === 'quincenal' ? 'quincenal' 
+                   : 'mensual';
+      }
+    }
+
+    // 3. Final fallback: infer from dias_trabajados
+    if (!periodType || periodType === 'mensual') {
+      const diasTrabajados = employee.dias_trabajados || 30;
+      periodType = diasTrabajados <= 7 ? 'semanal' 
+                 : diasTrabajados <= 15 ? 'quincenal' 
+                 : 'mensual';
+    }
+
+    const periodDays = periodType === 'semanal' ? 7 : periodType === 'quincenal' ? 15 : 30;
     
     console.log('📊 Preview calculation input:', {
       employeeId: employee.employee_id || employee.id,
+      periodId,
       salarioBase: employee.salario_base,
       periodType,
       periodDays,
@@ -50,7 +88,8 @@ export const calculateEmployeePreviewImpact = async (
       note: 'Using full period days, backend will adjust for absences/incapacities'
     });
 
-    // Prepare base calculation input
+    // Prepare base calculation input (map 'semanal' to 'quincenal' for backend compatibility)
+    const backendPeriodType = periodType === 'semanal' ? 'quincenal' : periodType as 'quincenal' | 'mensual';
     const baseInput: PayrollCalculationInput = {
       baseSalary: employee.salario_base || 0,
       workedDays: periodDays,  // ✅ Use full period days, backend will calculate effective days
@@ -58,7 +97,7 @@ export const calculateEmployeePreviewImpact = async (
       disabilities: 0,
       bonuses: 0,
       absences: 0,
-      periodType: periodType,
+      periodType: backendPeriodType,
       year: '2025'
     };
 
