@@ -37,15 +37,28 @@ export const calculateEmployeePreviewImpact = async (
       subtipo: pending.novedadData?.subtipo
     })));
 
+    // ✅ Calculate worked days based on period type (not employee.dias_trabajados which is already adjusted)
+    const periodType = employee.periodo_type === 'quincenal' ? 'quincenal' : 'mensual';
+    const periodDays = periodType === 'quincenal' ? 15 : 30;
+    
+    console.log('📊 Preview calculation input:', {
+      employeeId: employee.employee_id || employee.id,
+      salarioBase: employee.salario_base,
+      periodType,
+      periodDays,
+      adjustedDays: employee.dias_trabajados,
+      note: 'Using full period days, backend will adjust for absences/incapacities'
+    });
+
     // Prepare base calculation input
     const baseInput: PayrollCalculationInput = {
       baseSalary: employee.salario_base || 0,
-      workedDays: employee.dias_trabajados || 30,
+      workedDays: periodDays,  // ✅ Use full period days, backend will calculate effective days
       extraHours: 0,
       disabilities: 0,
       bonuses: 0,
       absences: 0,
-      periodType: employee.periodo_type === 'quincenal' ? 'quincenal' : 'mensual',
+      periodType: periodType,
       year: '2025'
     };
 
