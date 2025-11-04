@@ -230,33 +230,10 @@ export const VacationFormFields = ({
                       {periodInfo.message}
                     </p>
                     
-                    {/* Multi-período: Mostrar información detallada */}
-                    {periodInfo.crossesMultiplePeriods && periodInfo.periodSegments && (
-                      <div className="space-y-2">
-                        <p className="text-xs font-medium text-purple-700">
-                          📋 División por períodos:
-                        </p>
-                        <div className="space-y-1">
-                          {periodInfo.periodSegments.map((segment, index) => (
-                            <div key={segment.periodId} className="flex items-center justify-between text-xs bg-white/50 rounded px-2 py-1">
-                              <span className="font-medium">{segment.periodName}</span>
-                              <div className="flex items-center space-x-2">
-                                <span>{segment.startDate} - {segment.endDate}</span>
-                                <Badge variant="secondary" className="text-xs">
-                                  {segment.days} días
-                                </Badge>
-                                {segment.isPartial && (
-                                  <Badge variant="outline" className="text-xs bg-orange-50 border-orange-200 text-orange-700">
-                                    Parcial
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                        <div className="text-xs text-purple-600 bg-purple-100/50 rounded px-2 py-1">
-                          💡 <strong>Al liquidar cada período</strong>, se generarán automáticamente las novedades correspondientes a los días que aplican para ese período específico.
-                        </div>
+                    {/* Multi-período: Mensaje simplificado */}
+                    {periodInfo.crossesMultiplePeriods && (
+                      <div className="text-xs text-purple-600 bg-purple-100/50 rounded px-2 py-1 mt-2">
+                        ℹ️ Esta ausencia afecta múltiples períodos de liquidación
                       </div>
                     )}
                     
