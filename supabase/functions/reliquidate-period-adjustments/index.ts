@@ -226,22 +226,46 @@ serve(async (req) => {
         let newIBC: number
 
         if (ibcSnapshot && ibcSnapshot.ibc_base_salario) {
-          console.log('✅ Usando snapshot profesional para recálculo de IBC:', employeeId)
+          // Detectar si es un snapshot retroactivo
+          const isRetroactive = ibcSnapshot.retroactive === true
           
-          // Recalcular IBC desde el snapshot base + TODAS las novedades constitutivas actuales
-          const currentConstitutiveNovedades = employeeNovedades
-            .filter(n => isNovedadConstitutiva(n.tipo_novedad, n.constitutivo_salario))
-            .reduce((sum, n) => sum + (n.valor || 0), 0)
-          
-          newIBC = ibcSnapshot.ibc_base_salario + currentConstitutiveNovedades
-          
-          console.log('📊 IBC recalculado desde snapshot:', {
-            ibc_base: ibcSnapshot.ibc_base_salario,
-            novedades_constitutivas: currentConstitutiveNovedades,
-            ibc_nuevo: newIBC,
-            ibc_anterior: employeePayroll.ibc,
-            diferencia: newIBC - employeePayroll.ibc
-          })
+          if (isRetroactive) {
+            console.log('🔄 Usando snapshot RETROACTIVO para recálculo de IBC:', employeeId)
+            
+            // Para snapshots retroactivos: usar ibc_total como base confiable
+            // y sumar solo novedades constitutivas NUEVAS (que no estaban en el IBC original)
+            const currentConstitutiveNovedades = employeeNovedades
+              .filter(n => isNovedadConstitutiva(n.tipo_novedad, n.constitutivo_salario))
+              .reduce((sum, n) => sum + (n.valor || 0), 0)
+            
+            newIBC = ibcSnapshot.ibc_total + currentConstitutiveNovedades
+            
+            console.log('📊 IBC recalculado desde snapshot RETROACTIVO:', {
+              ibc_total_original: ibcSnapshot.ibc_total,
+              ibc_delta_unknown: ibcSnapshot.ibc_delta_unknown,
+              novedades_nuevas: currentConstitutiveNovedades,
+              ibc_nuevo: newIBC,
+              ibc_anterior: employeePayroll.ibc,
+              diferencia: newIBC - employeePayroll.ibc
+            })
+          } else {
+            console.log('✅ Usando snapshot ORIGINAL para recálculo de IBC:', employeeId)
+            
+            // Para snapshots originales: recalcular desde base + TODAS las novedades constitutivas actuales
+            const currentConstitutiveNovedades = employeeNovedades
+              .filter(n => isNovedadConstitutiva(n.tipo_novedad, n.constitutivo_salario))
+              .reduce((sum, n) => sum + (n.valor || 0), 0)
+            
+            newIBC = ibcSnapshot.ibc_base_salario + currentConstitutiveNovedades
+            
+            console.log('📊 IBC recalculado desde snapshot ORIGINAL:', {
+              ibc_base: ibcSnapshot.ibc_base_salario,
+              novedades_constitutivas: currentConstitutiveNovedades,
+              ibc_nuevo: newIBC,
+              ibc_anterior: employeePayroll.ibc,
+              diferencia: newIBC - employeePayroll.ibc
+            })
+          }
         } else {
           console.warn('⚠️ No hay snapshot IBC, recalculando desde cero (puede ser inexacto):', employeeId)
           

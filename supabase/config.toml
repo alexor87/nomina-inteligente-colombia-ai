@@ -1,7 +1,9 @@
-
 project_id = "xrmorlkakwujyozgmilf"
 
 [functions.maya-intelligence]
+verify_jwt = true
+
+[functions.migrate-ibc-snapshots]
 verify_jwt = true
 
 [functions.process-embedding-queue]
