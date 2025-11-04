@@ -198,7 +198,7 @@ serve(async (req) => {
       }
     }
 
-    // Process each affected employee with proper calculation logic
+    // ✅ SOLUCIÓN PROFESIONAL: Usar el mismo motor de cálculo que la liquidación original
     for (const employeeId of affectedEmployeeIds) {
       try {
         const employeeNovedades = novedades?.filter(n => n.empleado_id === employeeId) || []
@@ -209,130 +209,87 @@ serve(async (req) => {
           continue
         }
 
-        // Get employee data for proper calculation
-        const { data: employeeData, error: employeeError } = await supabase
-          .from('employees')
-          .select('salario_base, dias_trabajo')
-          .eq('id', employeeId)
-          .single()
-
-        if (employeeError || !employeeData) {
-          errors.push(`Employee data not found for ${employeeId}`)
-          continue
-        }
-
-        // 📸 SOLUCIÓN PROFESIONAL: Usar snapshot del IBC original para recálculo exacto
-        const ibcSnapshot = employeePayroll.ibc_snapshot
-        let newIBC: number
-
-        if (ibcSnapshot && ibcSnapshot.ibc_base_salario) {
-          // Detectar si es un snapshot retroactivo
-          const isRetroactive = ibcSnapshot.retroactive === true
-          
-          if (isRetroactive) {
-            console.log('🔄 Usando snapshot RETROACTIVO para recálculo de IBC:', employeeId)
-            
-            // Para snapshots retroactivos: usar ibc_total como base confiable
-            // y sumar solo novedades constitutivas NUEVAS (que no estaban en el IBC original)
-            const currentConstitutiveNovedades = employeeNovedades
-              .filter(n => isNovedadConstitutiva(n.tipo_novedad, n.constitutivo_salario))
-              .reduce((sum, n) => sum + (n.valor || 0), 0)
-            
-            newIBC = ibcSnapshot.ibc_total + currentConstitutiveNovedades
-            
-            console.log('📊 IBC recalculado desde snapshot RETROACTIVO:', {
-              ibc_total_original: ibcSnapshot.ibc_total,
-              ibc_delta_unknown: ibcSnapshot.ibc_delta_unknown,
-              novedades_nuevas: currentConstitutiveNovedades,
-              ibc_nuevo: newIBC,
-              ibc_anterior: employeePayroll.ibc,
-              diferencia: newIBC - employeePayroll.ibc
-            })
-          } else {
-            console.log('✅ Usando snapshot ORIGINAL para recálculo de IBC:', employeeId)
-            
-            // Para snapshots originales: recalcular desde base + TODAS las novedades constitutivas actuales
-            const currentConstitutiveNovedades = employeeNovedades
-              .filter(n => isNovedadConstitutiva(n.tipo_novedad, n.constitutivo_salario))
-              .reduce((sum, n) => sum + (n.valor || 0), 0)
-            
-            newIBC = ibcSnapshot.ibc_base_salario + currentConstitutiveNovedades
-            
-            console.log('📊 IBC recalculado desde snapshot ORIGINAL:', {
-              ibc_base: ibcSnapshot.ibc_base_salario,
-              novedades_constitutivas: currentConstitutiveNovedades,
-              ibc_nuevo: newIBC,
-              ibc_anterior: employeePayroll.ibc,
-              diferencia: newIBC - employeePayroll.ibc
-            })
-          }
-        } else {
-          console.warn('⚠️ No hay snapshot IBC, recalculando desde cero (puede ser inexacto):', employeeId)
-          
-          // Fallback: calcular desde cero (puede no incluir novedades del período original)
-          const workedDays = calculateWorkedDays(
-            periodData.tipo_periodo,
-            new Date(periodData.fecha_inicio),
-            new Date(periodData.fecha_fin)
-          )
-          
-          const convertedNovedades = convertNovedadesToIBC(employeeNovedades)
-          
-          const calculationInput = {
-            baseSalary: employeeData.salario_base,
-            workedDays: workedDays,
-            extraHours: 0,
-            disabilities: 0,
-            bonuses: 0,
-            absences: 0,
-            periodType: periodData.tipo_periodo,
-            novedades: convertedNovedades,
-            year: new Date(periodData.fecha_inicio).getFullYear().toString()
-          }
-          
-          const calculationResult = await calculatePayroll(supabase, calculationInput)
-          newIBC = calculationResult.ibc
-        }
-
-        // Calcular deducciones con el nuevo IBC
-        const healthDeduction = Math.round(newIBC * 0.04)
-        const pensionDeduction = Math.round(newIBC * 0.04)
+        console.log('🔄 Recalculando empleado con motor unificado:', employeeId)
         
-        // Recalcular devengado y neto (sin cambiar el IBC logic)
+        // ✅ Preparar input para el motor (usa datos ORIGINALES del período + novedades ACTUALES)
         const workedDays = calculateWorkedDays(
           periodData.tipo_periodo,
           new Date(periodData.fecha_inicio),
           new Date(periodData.fecha_fin)
         )
         
+        // Convertir novedades al formato esperado por el backend
         const convertedNovedades = convertNovedadesToIBC(employeeNovedades)
+        
         const calculationInput = {
-          baseSalary: employeeData.salario_base,
-          workedDays: workedDays,
+          baseSalary: employeePayroll.salario_base,  // ✅ Dato original del período
+          workedDays: employeePayroll.dias_trabajados || workedDays,  // ✅ Dato original
           extraHours: 0,
           disabilities: 0,
           bonuses: 0,
           absences: 0,
           periodType: periodData.tipo_periodo,
-          novedades: convertedNovedades,
-          year: new Date(periodData.fecha_inicio).getFullYear().toString()
+          novedades: convertedNovedades,  // ✅ TODAS las novedades actuales
+          year: new Date(periodData.fecha_inicio).getFullYear().toString(),
+          companyId: periodData.company_id
         }
         
-        const calculationResult = await calculatePayroll(supabase, calculationInput)
-        const totalDevengado = calculationResult.grossPay
-        const totalDeducciones = healthDeduction + pensionDeduction
-        const netoCalculado = totalDevengado - totalDeducciones
+        console.log('📊 Input para cálculo:', {
+          employeeId,
+          baseSalary: calculationInput.baseSalary,
+          workedDays: calculationInput.workedDays,
+          novedadesCount: convertedNovedades.length
+        })
+        
+        // ✅ LLAMAR AL MOTOR UNA SOLA VEZ (mismo que usa liquidación original)
+        const { data: calcResponse, error: calcError } = await supabase.functions.invoke(
+          'payroll-calculations',
+          {
+            body: {
+              action: 'calculate',
+              data: calculationInput
+            }
+          }
+        )
+        
+        if (calcError || !calcResponse?.success) {
+          throw new Error(calcResponse?.error || calcError?.message || 'Error en cálculo de nómina')
+        }
+        
+        const calculationResult = calcResponse.data
+        
+        console.log('✅ Resultado del cálculo unificado:', {
+          employeeId,
+          ibc: calculationResult.ibc,
+          healthDeduction: calculationResult.healthDeduction,
+          pensionDeduction: calculationResult.pensionDeduction,
+          grossPay: calculationResult.grossPay,
+          netPay: calculationResult.netPay,
+          effectiveWorkedDays: calculationResult.effectiveWorkedDays
+        })
 
-        // Update payroll record with all calculated fields
+        // ✅ ACTUALIZAR CON TODO EL RESULTADO
         const { error: updateError } = await supabase
           .from('payrolls')
           .update({
-            total_devengado: totalDevengado,
-            total_deducciones: totalDeducciones,
-            neto_pagado: netoCalculado,
-            salud_empleado: healthDeduction,
-            pension_empleado: pensionDeduction,
-            ibc: newIBC, // 📸 IBC recalculado profesionalmente desde snapshot
+            // Devengados
+            total_devengado: Math.round(calculationResult.grossPay),
+            
+            // Deducciones (calculadas por el backend)
+            salud_empleado: calculationResult.healthDeduction,
+            pension_empleado: calculationResult.pensionDeduction,
+            total_deducciones: calculationResult.totalDeductions,
+            
+            // IBC (calculado por el backend con TODAS las novedades)
+            ibc: calculationResult.ibc,
+            
+            // Neto
+            neto_pagado: Math.round(calculationResult.netPay),
+            
+            // Días efectivos (después de restar ausencias)
+            dias_trabajados: calculationResult.effectiveWorkedDays,
+            
+            // Metadatos
             is_stale: false,
             updated_at: new Date().toISOString()
           })
@@ -351,8 +308,8 @@ serve(async (req) => {
             period_id: periodId,
             employee_id: employeeId,
             previous_value: employeePayroll.neto_pagado,
-            new_value: netoCalculado,
-            value_difference: netoCalculado - (employeePayroll.neto_pagado || 0),
+            new_value: Math.round(calculationResult.netPay),
+            value_difference: Math.round(calculationResult.netPay) - (employeePayroll.neto_pagado || 0),
             correction_type: 'reliquidation',
             concept: 'Reliquidación por aplicación de ajustes pendientes',
             justification: justification,
