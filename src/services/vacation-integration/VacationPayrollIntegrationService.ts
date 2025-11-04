@@ -145,7 +145,7 @@ export class VacationPayrollIntegrationService {
     return Math.max(0, diffDays);
   }
 
-  // ✅ NUEVA FUNCIÓN: Verificar si una ausencia ha sido completamente procesada
+  // ✅ CORRECCIÓN: Verificar si una ausencia ha sido completamente procesada considerando períodos esperados
   private static async checkIfVacationFullyProcessed(
     vacationId: string,
     vacationStart: string,
@@ -153,54 +153,139 @@ export class VacationPayrollIntegrationService {
     currentPeriodId: string
   ): Promise<boolean> {
     try {
-      // Obtener todos los períodos que intersectan con esta ausencia
-      const { data: intersectingPeriods, error } = await supabase
+      // 1. Obtener la periodicidad configurada de la empresa
+      const { data: vacation } = await supabase
+        .from('employee_vacation_periods')
+        .select('company_id')
+        .eq('id', vacationId)
+        .single();
+
+      if (!vacation) {
+        console.error('Vacation not found:', vacationId);
+        return false;
+      }
+
+      const { data: companySettings } = await supabase
+        .from('company_settings')
+        .select('periodicity')
+        .eq('company_id', vacation.company_id)
+        .single();
+
+      const periodicity = (companySettings?.periodicity || 'quincenal') as 'mensual' | 'quincenal' | 'semanal';
+
+      // 2. Generar TODOS los períodos esperados (no solo los que existen en BD)
+      const expectedPeriods = this.generateExpectedPeriods(
+        vacationStart,
+        vacationEnd,
+        periodicity
+      );
+
+      console.log(`📊 Expected ${expectedPeriods.length} periods for vacation ${vacationId} (${periodicity})`);
+
+      // 3. Buscar períodos reales que intersectan
+      const { data: realPeriods } = await supabase
         .from('payroll_periods_real')
         .select('id, fecha_inicio, fecha_fin')
         .lte('fecha_inicio', vacationEnd)
         .gte('fecha_fin', vacationStart);
 
-      if (error || !intersectingPeriods) {
-        console.error('Error checking intersecting periods:', error);
-        return true; // En caso de error, procesar la ausencia
-      }
+      // 4. Verificar cobertura: contar cuántos períodos esperados YA fueron procesados
+      let processedExpectedPeriods = 0;
 
-      // Verificar si todos los períodos intersectantes han procesado esta ausencia
-      let totalProcessedDays = 0;
-      const vacationTotalDays = this.calculateTotalVacationDays(vacationStart, vacationEnd);
-
-      for (const period of intersectingPeriods) {
-        const periodDays = this.calculatePeriodIntersectionDays(
-          vacationStart,
-          vacationEnd,
-          period.fecha_inicio,
-          period.fecha_fin
+      for (const expectedPeriod of expectedPeriods) {
+        // Buscar si hay un período real que cubra este período esperado
+        const matchingReal = realPeriods?.find(real =>
+          real.fecha_inicio === expectedPeriod.startDate &&
+          real.fecha_fin === expectedPeriod.endDate
         );
 
-        if (period.id === currentPeriodId) {
-          // Este es el período actual, contar sus días
-          totalProcessedDays += periodDays;
-        } else {
-          // Verificar si este período ya procesó esta ausencia
-          const isProcessed = await this.isPeriodProcessedForVacation(vacationId, period.id);
-          if (isProcessed) {
-            totalProcessedDays += periodDays;
+        if (matchingReal) {
+          // Si este es el período actual, ya está siendo procesado ahora
+          if (matchingReal.id === currentPeriodId) {
+            processedExpectedPeriods++;
+          } else {
+            // Verificar si ya fue procesado anteriormente
+            const isProcessed = await this.isPeriodProcessedForVacation(vacationId, matchingReal.id);
+            if (isProcessed) {
+              processedExpectedPeriods++;
+            }
           }
         }
+        // Si no hay matchingReal, este período esperado NO ha sido procesado
       }
 
-      const fullyProcessed = totalProcessedDays >= vacationTotalDays;
-      console.log(`📊 Vacation ${vacationId} processing status:`, {
-        totalDays: vacationTotalDays,
-        processedDays: totalProcessedDays,
-        fullyProcessed
+      // Solo está completamente procesada si TODOS los períodos esperados han sido procesados
+      const fullyProcessed = processedExpectedPeriods >= expectedPeriods.length;
+
+      console.log(`📊 Vacation ${vacationId} coverage:`, {
+        periodicity,
+        expectedPeriods: expectedPeriods.length,
+        processedPeriods: processedExpectedPeriods,
+        fullyProcessed,
+        details: expectedPeriods.map(ep => ({
+          period: `${ep.startDate} - ${ep.endDate}`,
+          hasReal: realPeriods?.some(rp => rp.fecha_inicio === ep.startDate && rp.fecha_fin === ep.endDate)
+        }))
       });
 
       return fullyProcessed;
     } catch (error) {
       console.error('Error checking vacation processing status:', error);
-      return true; // En caso de error, procesar la ausencia
+      // En caso de error, NO marcar como procesada (mantener 'pendiente')
+      return false;
     }
+  }
+
+  // ✅ NUEVO: Genera los períodos teóricos que DEBERÍAN cubrir una ausencia
+  private static generateExpectedPeriods(
+    startDate: string,
+    endDate: string,
+    periodicity: 'mensual' | 'quincenal' | 'semanal'
+  ): Array<{ startDate: string; endDate: string }> {
+    const periods: Array<{ startDate: string; endDate: string }> = [];
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    let currentYear = start.getFullYear();
+    let currentMonth = start.getMonth();
+
+    while (currentYear < end.getFullYear() || 
+           (currentYear === end.getFullYear() && currentMonth <= end.getMonth())) {
+      
+      if (periodicity === 'quincenal') {
+        // Primera quincena: 1-15
+        const q1Start = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`;
+        const q1End = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-15`;
+        periods.push({ startDate: q1Start, endDate: q1End });
+
+        // Segunda quincena: 16-fin de mes
+        const lastDay = new Date(currentYear, currentMonth + 1, 0).getDate();
+        const q2Start = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-16`;
+        const q2End = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+        periods.push({ startDate: q2Start, endDate: q2End });
+      } else if (periodicity === 'mensual') {
+        // Período mensual: 1-fin de mes
+        const lastDay = new Date(currentYear, currentMonth + 1, 0).getDate();
+        const mStart = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`;
+        const mEnd = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+        periods.push({ startDate: mStart, endDate: mEnd });
+      }
+
+      currentMonth++;
+      if (currentMonth === 12) {
+        currentMonth = 0;
+        currentYear++;
+      }
+    }
+
+    // Filtrar solo los que intersectan con el rango de la ausencia
+    const filtered = periods.filter(period => {
+      const pStart = new Date(period.startDate);
+      const pEnd = new Date(period.endDate);
+      return pStart <= end && pEnd >= start;
+    });
+
+    return filtered;
   }
 
   // ✅ FUNCIÓN AUXILIAR: Calcular días totales de una ausencia
