@@ -5,7 +5,9 @@ import { PendingNovedad, EmployeeNovedadPreview } from '@/types/pending-adjustme
 import { formatPreviewCurrency } from '@/utils/pendingAdjustmentsPreview';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, FileText, Mail, RefreshCw } from 'lucide-react';
+import { Plus, FileText, Mail, RefreshCw, Info } from 'lucide-react';
+import { PendingChangeDisplay } from './PendingChangeDisplay';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatCurrency } from '@/lib/utils';
 import { PayrollNovedad } from '@/types/novedades';
 import { VoucherPreviewModal } from '@/components/payroll/modals/VoucherPreviewModal';
@@ -321,16 +323,16 @@ export const ExpandedEmployeesTable = ({
                 <TableHead className="min-w-[140px] text-right">Salario Base</TableHead>
                 <TableHead className="min-w-[140px] text-right">IBC</TableHead>
                 <TableHead className="min-w-[100px] text-center">Días Trabajados</TableHead>
-                <TableHead className="min-w-[140px] bg-green-100 text-right font-semibold">
+                <TableHead className="min-w-[140px] bg-success/10 text-right font-semibold">
                   Total Devengado
                 </TableHead>
-                <TableHead className="min-w-[140px] bg-red-100 text-right font-semibold">
+                <TableHead className="min-w-[140px] bg-warning/10 text-right font-semibold">
                   Total Deducciones
                 </TableHead>
                 <TableHead className="min-w-[100px] text-center">
                   Novedades
                 </TableHead>
-                <TableHead className="min-w-[140px] bg-blue-100 text-right font-semibold">
+                <TableHead className="min-w-[140px] bg-primary/10 text-right font-semibold">
                   Neto Pagado
                 </TableHead>
                 <TableHead className="min-w-[140px] sticky right-0 bg-background z-10 text-center">
@@ -348,18 +350,37 @@ export const ExpandedEmployeesTable = ({
                 return (
                   <TableRow key={employee.id} className="hover:bg-muted/30">
               <TableCell className="sticky left-0 bg-background z-10 min-w-[200px] font-medium">
-                <div className="flex items-center">
+                <div className="flex items-center gap-2">
                   <div>
                     <div className="font-medium">
                       {employee.nombre} {employee.apellido}
                     </div>
                   </div>
+                  {preview.hasPending && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Badge variant="secondary" className="text-xs bg-primary/10 text-primary border-primary/20">
+                            <Info className="h-3 w-3 mr-1" />
+                            {preview.pendingCount} ajuste{preview.pendingCount > 1 ? 's' : ''}
+                          </Badge>
+                        </TooltipTrigger>
+                        <TooltipContent side="right" className="max-w-[300px]">
+                          <div className="space-y-1 text-sm">
+                            <p className="font-semibold">Cambios pendientes de aplicar:</p>
+                            <ul className="list-disc list-inside space-y-0.5">
+                              {preview.newIBC !== preview.originalIBC && (
+                                <li>IBC: {formatCurrency(preview.originalIBC)} → {formatCurrency(preview.newIBC)}</li>
+                              )}
+                              <li>Devengado: +{formatCurrency(preview.newDevengado - preview.originalDevengado)}</li>
+                              <li>Neto: +{formatCurrency(preview.newNeto - preview.originalNeto)}</li>
+                            </ul>
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
                 </div>
-                {preview.hasPending && (
-                  <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800 mt-1 animate-pulse">
-                    Ajustes pendientes
-                  </Badge>
-                )}
               </TableCell>
                     
                     <TableCell className="text-right">
@@ -370,17 +391,13 @@ export const ExpandedEmployeesTable = ({
                     
                     <TableCell className="text-right">
                       {preview.hasPending && preview.newIBC !== preview.originalIBC ? (
-                        <div className="space-y-1">
-                          <div className="text-muted-foreground line-through text-sm">
-                            {formatCurrency(preview.originalIBC)}
-                          </div>
-                          <div className="font-semibold text-purple-600">
-                            {formatCurrency(preview.newIBC)}
-                            <span className="text-xs ml-1">
-                              ({preview.newIBC > preview.originalIBC ? '+' : ''}{formatCurrency(preview.newIBC - preview.originalIBC)})
-                            </span>
-                          </div>
-                        </div>
+                        <PendingChangeDisplay
+                          label="IBC"
+                          currentValue={preview.originalIBC}
+                          newValue={preview.newIBC}
+                          changeType="info"
+                          tooltip="El IBC cambiará debido a las novedades agregadas (horas extra, bonificaciones, etc.)"
+                        />
                       ) : (
                         <span className="font-medium text-foreground">
                           {formatCurrency(employee.ibc)}
@@ -394,22 +411,18 @@ export const ExpandedEmployeesTable = ({
                       </span>
                     </TableCell>
                     
-                  <TableCell className="bg-green-100 text-right">
+                  <TableCell className="bg-success/5 text-right">
                     {preview.hasPending ? (
-                      <div className="space-y-1">
-                        <div className="text-muted-foreground line-through text-sm">
-                          {formatCurrency(preview.originalDevengado)}
-                        </div>
-                        <div className="font-semibold text-green-600">
-                          {formatCurrency(preview.newDevengado)}
-                          <span className="text-xs ml-1">
-                            (+{formatCurrency(preview.newDevengado - preview.originalDevengado)})
-                          </span>
-                        </div>
-                      </div>
+                      <PendingChangeDisplay
+                        label="Total Devengado"
+                        currentValue={preview.originalDevengado}
+                        newValue={preview.newDevengado}
+                        changeType="positive"
+                        tooltip="El total devengado incluye el incremento de las novedades agregadas"
+                      />
                     ) : (
                       <div className="flex items-center justify-end gap-2">
-                        <span className={`font-semibold ${employee.total_devengado ? 'text-green-600' : 'text-gray-400'}`}>
+                        <span className={`font-semibold ${employee.total_devengado ? 'text-success' : 'text-muted-foreground'}`}>
                           {formatCurrency(employee.total_devengado || 0)}
                         </span>
                         {!employee.total_devengado && (
@@ -419,22 +432,18 @@ export const ExpandedEmployeesTable = ({
                     )}
                   </TableCell>
                     
-                  <TableCell className="bg-red-100 text-right">
+                  <TableCell className="bg-warning/5 text-right">
                     {preview.hasPending ? (
-                      <div className="space-y-1">
-                        <div className="text-muted-foreground line-through text-sm">
-                          {formatCurrency(preview.originalDeducciones)}
-                        </div>
-                        <div className="font-semibold text-red-600">
-                          {formatCurrency(preview.newDeducciones)}
-                          <span className="text-xs ml-1">
-                            (+{formatCurrency(preview.newDeducciones - preview.originalDeducciones)})
-                          </span>
-                        </div>
-                      </div>
+                      <PendingChangeDisplay
+                        label="Total Deducciones"
+                        currentValue={preview.originalDeducciones}
+                        newValue={preview.newDeducciones}
+                        changeType="neutral"
+                        tooltip="Las deducciones aumentan porque el IBC es mayor con las nuevas novedades"
+                      />
                     ) : (
                       <div className="flex items-center justify-end gap-2">
-                        <span className={`font-semibold ${employee.total_deducciones ? 'text-red-600' : 'text-gray-400'}`}>
+                        <span className={`font-semibold ${employee.total_deducciones ? 'text-destructive' : 'text-muted-foreground'}`}>
                           {formatCurrency(employee.total_deducciones || 0)}
                         </span>
                         {!employee.total_deducciones && (
@@ -447,37 +456,37 @@ export const ExpandedEmployeesTable = ({
                      <TableCell className="text-center font-medium">
                        <div className="flex items-center justify-center gap-2">
                          {canEdit && (
-                           <Button
-                             size="sm"
-                             variant="outline"
-                             className="h-8 w-8 p-0 rounded-full border-dashed border-2 border-blue-300 text-blue-600 hover:border-blue-500 hover:text-blue-700 hover:bg-blue-50"
-                             onClick={() => onAddNovedad(employee.id)}
-                           >
-                             <Plus className="h-4 w-4" />
-                           </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 w-8 p-0 rounded-full border-dashed border-2 border-primary/30 text-primary hover:border-primary hover:text-primary hover:bg-primary/10"
+                              onClick={() => onAddNovedad(employee.id)}
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
                          )}
                          {(novedadesCount > 0 || preview.pendingCount > 0) ? (
                            <div className="flex gap-2">
                              {novedadesCount > 0 && (
-                               <Badge 
-                                 variant="secondary" 
-                                 className="bg-blue-100 text-blue-800 cursor-pointer hover:bg-blue-200"
-                                 onClick={() => onAddNovedad(employee.id)}
-                                 title="Ver novedades"
-                               >
-                                 {novedadesCount}
-                               </Badge>
+                                <Badge 
+                                  variant="secondary" 
+                                  className="bg-primary/10 text-primary border-primary/20 cursor-pointer hover:bg-primary/20"
+                                  onClick={() => onAddNovedad(employee.id)}
+                                  title="Ver novedades"
+                                >
+                                  {novedadesCount}
+                                </Badge>
                              )}
-                             {preview.pendingCount > 0 && (
-                               <Badge 
-                                 variant="secondary" 
-                                 className="bg-orange-100 text-orange-800 animate-pulse text-xs cursor-pointer hover:bg-orange-200"
-                                 onClick={() => onAddNovedad(employee.id)}
-                                 title="Ver ajustes pendientes"
-                               >
-                                 +{preview.pendingCount}
-                               </Badge>
-                             )}
+                              {preview.pendingCount > 0 && (
+                                <Badge 
+                                  variant="secondary" 
+                                  className="bg-primary/10 text-primary border-primary/20 text-xs cursor-pointer hover:bg-primary/20"
+                                  onClick={() => onAddNovedad(employee.id)}
+                                  title="Ver ajustes pendientes"
+                                >
+                                  +{preview.pendingCount}
+                                </Badge>
+                              )}
                            </div>
                          ) : (
                            <Button
@@ -493,25 +502,21 @@ export const ExpandedEmployeesTable = ({
                        </div>
                      </TableCell>
                     
-                    <TableCell className="bg-blue-100 text-right">
-                      {preview.hasPending ? (
-                        <div className="space-y-1">
-                          <div className="text-muted-foreground line-through text-sm">
-                            {formatCurrency(preview.originalNeto)}
-                          </div>
-                          <div className="font-semibold text-blue-600">
-                            {formatCurrency(preview.newNeto)}
-                            <span className="text-xs ml-1">
-                              ({preview.newNeto > preview.originalNeto ? '+' : ''}{formatCurrency(preview.newNeto - preview.originalNeto)})
-                            </span>
-                          </div>
-                        </div>
-                      ) : (
-                        <span className="font-semibold text-blue-600">
-                          {formatCurrency(employee.neto_pagado)}
-                        </span>
-                      )}
-                    </TableCell>
+                     <TableCell className="bg-primary/5 text-right">
+                       {preview.hasPending ? (
+                         <PendingChangeDisplay
+                           label="Neto a Pagar"
+                           currentValue={preview.originalNeto}
+                           newValue={preview.newNeto}
+                           changeType="positive"
+                           tooltip={`El empleado recibirá ${formatCurrency(preview.newNeto - preview.originalNeto)} adicionales`}
+                         />
+                       ) : (
+                         <span className="font-semibold text-primary">
+                           {formatCurrency(employee.neto_pagado)}
+                         </span>
+                       )}
+                     </TableCell>
                     
                     <TableCell className="sticky right-0 bg-background z-10 text-center font-medium">
                       <div className="flex items-center gap-2">
