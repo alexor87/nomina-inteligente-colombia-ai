@@ -37,7 +37,37 @@ export class MultiPeriodAbsenceService {
     const configuredPeriodicity = companySettings?.periodicity || 'quincenal';
     console.log(`⚙️ Periodicidad configurada: ${configuredPeriodicity}`);
 
-    // Obtener todos los períodos que intersectan con el rango de fechas
+    // 🎯 PASO 1: Calcular LÓGICAMENTE si cruza múltiples períodos
+    const totalDaysSpan = this.calculateDaysBetween(startDate, endDate);
+    const startDateObj = new Date(startDate);
+    const endDateObj = new Date(endDate);
+    
+    let logicallyCrossesMultiple = false;
+    
+    if (configuredPeriodicity === 'quincenal') {
+      // Quincenal: cruza si abarca 1-15 y 16-fin de mes, o múltiples meses
+      const startDay = startDateObj.getDate();
+      const endDay = endDateObj.getDate();
+      const sameMonth = startDateObj.getMonth() === endDateObj.getMonth() && 
+                       startDateObj.getFullYear() === endDateObj.getFullYear();
+      
+      if (!sameMonth) {
+        logicallyCrossesMultiple = true; // Cruza meses = múltiples quincenas
+      } else if (startDay <= 15 && endDay >= 16) {
+        logicallyCrossesMultiple = true; // Cruza ambas quincenas del mismo mes
+      } else if (totalDaysSpan > 15) {
+        logicallyCrossesMultiple = true; // Más de 15 días = múltiples períodos
+      }
+    } else if (configuredPeriodicity === 'semanal') {
+      logicallyCrossesMultiple = totalDaysSpan > 7;
+    } else { // mensual
+      logicallyCrossesMultiple = startDateObj.getMonth() !== endDateObj.getMonth() ||
+                                 startDateObj.getFullYear() !== endDateObj.getFullYear();
+    }
+
+    console.log(`📐 Análisis lógico: ${logicallyCrossesMultiple ? 'SÍ' : 'NO'} cruza múltiples períodos (${totalDaysSpan} días)`);
+
+    // 🎯 PASO 2: Obtener períodos existentes en DB (pueden no existir)
     const { data: periodsRaw, error } = await supabase
       .from('payroll_periods_real')
       .select('id, periodo, fecha_inicio, fecha_fin, tipo_periodo, created_at')
@@ -50,7 +80,7 @@ export class MultiPeriodAbsenceService {
       throw error;
     }
 
-    // CORRECCIÓN: Filtrar períodos duplicados priorizando configuración de empresa
+    // Filtrar períodos duplicados priorizando configuración de empresa
     const periodsMap = new Map();
     
     for (const period of periodsRaw || []) {
@@ -74,63 +104,167 @@ export class MultiPeriodAbsenceService {
     }
     
     const periods = Array.from(periodsMap.values());
-    
-    // Filtrar para mantener SOLO períodos del tipo configurado (si existen)
     const periodsOfConfiguredType = periods.filter(p => p.tipo_periodo === configuredPeriodicity);
     const finalPeriods = periodsOfConfiguredType.length > 0 ? periodsOfConfiguredType : periods;
     
-    console.log(`🔧 Períodos filtrados: ${periodsRaw?.length || 0} → ${finalPeriods.length}`);
-    console.log(`   Tipo configurado: ${configuredPeriodicity}`);
-    console.log(`   Distribución: ${finalPeriods.filter(p => p.tipo_periodo === 'quincenal').length} quincenales, ${finalPeriods.filter(p => p.tipo_periodo === 'mensual').length} mensuales`);
+    console.log(`🔧 Períodos en DB: ${finalPeriods.length}`);
 
     const segments: PeriodSegment[] = [];
     let totalDays = 0;
 
-    for (const period of finalPeriods) {
-      // Calcular intersección entre la ausencia y el período
-      const segmentStart = startDate > period.fecha_inicio ? startDate : period.fecha_inicio;
-      const segmentEnd = endDate < period.fecha_fin ? endDate : period.fecha_fin;
+    // 🎯 PASO 3: Si lógicamente es multi-período PERO no hay períodos en DB
+    if (logicallyCrossesMultiple && finalPeriods.length === 0) {
+      console.log('⚠️ Multi-período sin períodos en DB - generando segmentos teóricos');
       
-      // Calcular días del segmento
-      const segmentDays = this.calculateDaysBetween(segmentStart, segmentEnd);
-      
-      if (segmentDays > 0) {
-        const isPartial = startDate < period.fecha_inicio || endDate > period.fecha_fin;
+      // Generar segmentos teóricos basados en periodicidad
+      if (configuredPeriodicity === 'quincenal') {
+        let currentDate = new Date(startDate);
+        const finalDate = new Date(endDate);
         
-        segments.push({
-          periodId: period.id,
-          periodName: period.periodo,
-          startDate: segmentStart,
-          endDate: segmentEnd,
-          days: segmentDays,
-          isPartial
-        });
+        while (currentDate <= finalDate) {
+          const year = currentDate.getFullYear();
+          const month = currentDate.getMonth();
+          const day = currentDate.getDate();
+          
+          let segmentStart: Date;
+          let segmentEnd: Date;
+          
+          if (day <= 15) {
+            segmentStart = new Date(year, month, 1);
+            segmentEnd = new Date(year, month, 15);
+          } else {
+            segmentStart = new Date(year, month, 16);
+            segmentEnd = new Date(year, month + 1, 0); // último día del mes
+          }
+          
+          // Ajustar a los límites de la ausencia
+          const actualStart = segmentStart < new Date(startDate) ? startDate : segmentStart.toISOString().split('T')[0];
+          const actualEnd = segmentEnd > new Date(endDate) ? endDate : segmentEnd.toISOString().split('T')[0];
+          
+          const segmentDays = this.calculateDaysBetween(actualStart, actualEnd);
+          
+          segments.push({
+            periodId: 'pending-creation', // 🎯 Marca que requiere creación
+            periodName: `Quincena ${day <= 15 ? '1-15' : '16-fin'} ${this.getMonthName(month)} ${year}`,
+            startDate: actualStart,
+            endDate: actualEnd,
+            days: segmentDays,
+            isPartial: true
+          });
+          
+          totalDays += segmentDays;
+          
+          // Avanzar a la siguiente quincena
+          if (day <= 15) {
+            currentDate = new Date(year, month, 16);
+          } else {
+            currentDate = new Date(year, month + 1, 1);
+          }
+        }
+      } else if (configuredPeriodicity === 'semanal') {
+        // Generar semanas teóricas
+        let currentDate = new Date(startDate);
+        const finalDate = new Date(endDate);
+        let weekNumber = 1;
         
-        totalDays += segmentDays;
+        while (currentDate <= finalDate) {
+          const segmentStart = new Date(currentDate);
+          const segmentEnd = new Date(currentDate);
+          segmentEnd.setDate(segmentEnd.getDate() + 6);
+          
+          const actualStart = segmentStart < new Date(startDate) ? startDate : segmentStart.toISOString().split('T')[0];
+          const actualEnd = segmentEnd > new Date(endDate) ? endDate : segmentEnd.toISOString().split('T')[0];
+          
+          const segmentDays = this.calculateDaysBetween(actualStart, actualEnd);
+          
+          segments.push({
+            periodId: 'pending-creation',
+            periodName: `Semana ${weekNumber} ${this.getMonthName(segmentStart.getMonth())} ${segmentStart.getFullYear()}`,
+            startDate: actualStart,
+            endDate: actualEnd,
+            days: segmentDays,
+            isPartial: true
+          });
+          
+          totalDays += segmentDays;
+          currentDate.setDate(currentDate.getDate() + 7);
+          weekNumber++;
+        }
+      } else { // mensual
+        // Generar meses teóricos
+        let currentDate = new Date(startDate);
+        const finalDate = new Date(endDate);
+        
+        while (currentDate <= finalDate) {
+          const year = currentDate.getFullYear();
+          const month = currentDate.getMonth();
+          
+          const segmentStart = new Date(year, month, 1);
+          const segmentEnd = new Date(year, month + 1, 0);
+          
+          const actualStart = segmentStart < new Date(startDate) ? startDate : segmentStart.toISOString().split('T')[0];
+          const actualEnd = segmentEnd > new Date(endDate) ? endDate : segmentEnd.toISOString().split('T')[0];
+          
+          const segmentDays = this.calculateDaysBetween(actualStart, actualEnd);
+          
+          segments.push({
+            periodId: 'pending-creation',
+            periodName: `${this.getMonthName(month)} ${year}`,
+            startDate: actualStart,
+            endDate: actualEnd,
+            days: segmentDays,
+            isPartial: true
+          });
+          
+          totalDays += segmentDays;
+          currentDate = new Date(year, month + 1, 1);
+        }
       }
-    }
-
-    // Validar que el total de días sea razonable
-    const expectedDays = this.calculateDaysBetween(startDate, endDate);
-    const daysDifference = Math.abs(totalDays - expectedDays);
-
-    if (daysDifference > 1) {
-      console.warn(`⚠️ ADVERTENCIA: Días calculados (${totalDays}) difieren de lo esperado (${expectedDays})`);
-      console.warn(`   Diferencia: ${daysDifference} días`);
-      console.warn(`   Puede indicar períodos faltantes en el rango ${startDate} - ${endDate}`);
+      
+    } else {
+      // 🎯 PASO 4: Usar períodos existentes
+      for (const period of finalPeriods) {
+        const segmentStart = startDate > period.fecha_inicio ? startDate : period.fecha_inicio;
+        const segmentEnd = endDate < period.fecha_fin ? endDate : period.fecha_fin;
+        const segmentDays = this.calculateDaysBetween(segmentStart, segmentEnd);
+        
+        if (segmentDays > 0) {
+          const isPartial = startDate < period.fecha_inicio || endDate > period.fecha_fin;
+          
+          segments.push({
+            periodId: period.id,
+            periodName: period.periodo,
+            startDate: segmentStart,
+            endDate: segmentEnd,
+            days: segmentDays,
+            isPartial
+          });
+          
+          totalDays += segmentDays;
+        }
+      }
     }
 
     console.log('✅ Análisis completado:', { 
       totalDays, 
       segments: segments.length,
-      crossesMultiple: segments.length > 1 
+      crossesMultiple: logicallyCrossesMultiple // 🎯 Usar cálculo lógico
     });
 
     return {
       totalDays,
       segments,
-      crossesMultiplePeriods: segments.length > 1
+      crossesMultiplePeriods: logicallyCrossesMultiple // 🎯 CAMBIO CLAVE
     };
+  }
+
+  /**
+   * Obtiene el nombre del mes en español
+   */
+  private static getMonthName(month: number): string {
+    const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+                    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    return months[month];
   }
 
   /**

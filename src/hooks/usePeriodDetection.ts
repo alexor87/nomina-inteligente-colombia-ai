@@ -55,20 +55,36 @@ export const usePeriodDetection = () => {
 
       console.log('🔍 Análisis multi-período prioritario:', multiPeriodAnalysis);
 
-      // 🎯 CORRECCIÓN: Si cruza múltiples períodos, manejar inmediatamente
+      // 🎯 Si cruza múltiples períodos, manejar inmediatamente
       if (multiPeriodAnalysis.crossesMultiplePeriods) {
-        const primarySegment = multiPeriodAnalysis.segments[0];
-        const totalPeriods = multiPeriodAnalysis.segments.length;
-        
-        return {
-          periodId: primarySegment.periodId,
-          periodName: primarySegment.periodName,
-          isExact: false,
-          isAutoCreated: false,
-          crossesMultiplePeriods: true,
-          periodSegments: multiPeriodAnalysis.segments,
-          message: `⚡ Ausencia multi-período: ${totalPeriods} períodos afectados (${multiPeriodAnalysis.totalDays} días total)`
-        };
+        // Verificar si hay períodos existentes o son teóricos
+        if (multiPeriodAnalysis.segments.length > 0 && 
+            multiPeriodAnalysis.segments[0].periodId !== 'pending-creation') {
+          // ✅ Multi-período con períodos existentes en DB
+          const primarySegment = multiPeriodAnalysis.segments[0];
+          const totalPeriods = multiPeriodAnalysis.segments.length;
+          
+          return {
+            periodId: primarySegment.periodId,
+            periodName: primarySegment.periodName,
+            isExact: false,
+            isAutoCreated: false,
+            crossesMultiplePeriods: true,
+            periodSegments: multiPeriodAnalysis.segments,
+            message: `⚡ Ausencia multi-período: ${totalPeriods} períodos (${multiPeriodAnalysis.totalDays} días)`
+          };
+        } else {
+          // ⚠️ Multi-período sin períodos creados (segmentos teóricos)
+          return {
+            periodId: null,
+            periodName: null,
+            isExact: false,
+            isAutoCreated: false,
+            crossesMultiplePeriods: true,
+            periodSegments: multiPeriodAnalysis.segments,
+            message: `⚠️ Esta ausencia requiere crear ${multiPeriodAnalysis.segments.length} períodos de liquidación`
+          };
+        }
       }
 
       // Solo si NO es multi-período, buscar período único exacto
