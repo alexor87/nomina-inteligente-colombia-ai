@@ -52,7 +52,7 @@ interface ExpandedEmployeesTableProps {
   canEdit: boolean;
   pendingNovedades?: PendingNovedad[];
   getPendingCount?: (employeeId: string) => number;
-  calculateEmployeePreview?: (employee: any) => Promise<EmployeeNovedadPreview>;
+  calculateEmployeePreview?: (employee: any, employeePendingNovedades?: PendingNovedad[], employeePeriodId?: string) => Promise<EmployeeNovedadPreview>;
   isRecalculatingBackend?: boolean; // New prop to show backend loading state
   // New props for voucher preview functionality
   periodData?: {
@@ -114,7 +114,7 @@ export const ExpandedEmployeesTable = ({
       await Promise.all(
         employees.map(async (employee) => {
           try {
-            previews[employee.id] = await calculateEmployeePreview(employee);
+            previews[employee.id] = await calculateEmployeePreview(employee, undefined, periodData?.id);
           } catch (error) {
             console.error(`Error calculating preview for employee ${employee.id}:`, error);
             // Fallback to default preview using backend values only

@@ -168,7 +168,8 @@ export const usePendingAdjustments = ({ periodId, companyId }: UsePendingAdjustm
   // Calculate preview for an employee using backend calculation service
   const calculateEmployeePreview = useCallback(async (
     employee: any,
-    employeePendingNovedades?: PendingNovedad[]
+    employeePendingNovedades?: PendingNovedad[],
+    employeePeriodId?: string
   ): Promise<EmployeeNovedadPreview> => {
     const pending = employeePendingNovedades || getPendingForEmployee(employee.id);
     
@@ -209,8 +210,33 @@ export const usePendingAdjustments = ({ periodId, companyId }: UsePendingAdjustm
         year: '2025'
       };
 
-      // Calculate original values (without pending novedades, only existing ones)
-      const existingNovedades = employee.novedades || [];
+      // Calculate original values (without pending novedades, only existing ones from DB)
+      const usePeriodId = employeePeriodId || periodId;
+      let existingNovedades: any[] = [];
+      
+      if (usePeriodId) {
+        // ✅ Import supabase at the top of the file
+        const { supabase } = await import('@/integrations/supabase/client');
+        
+        // ✅ Fetch existing novedades from database
+        const { data: existingNovedadesDB } = await supabase
+          .from('payroll_novedades')
+          .select('tipo_novedad, subtipo, valor, dias, horas, constitutivo_salario')
+          .eq('periodo_id', usePeriodId)
+          .eq('empleado_id', employee.id);
+        
+        existingNovedades = convertNovedadesToIBC(existingNovedadesDB || []);
+        
+        console.log('📊 Existing novedades from DB for preview:', {
+          employeeId: employee.id,
+          periodId: usePeriodId,
+          count: existingNovedades.length,
+          novedades: existingNovedades
+        });
+      } else {
+        existingNovedades = employee.novedades || [];
+      }
+      
       const originalInput = {
         ...baseInput,
         novedades: existingNovedades
