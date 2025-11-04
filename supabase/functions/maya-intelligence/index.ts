@@ -852,6 +852,53 @@ serve(async (req) => {
     
 
     // ============================================================================
+    // SPECIAL MESSAGE HANDLING - Before conversation validation
+    // ============================================================================
+    // Handle special messages that don't require a full conversation array
+    if (body?.message || body?.simulationRequest || body?.scanRequest) {
+      const specialMessage = body.message;
+      
+      // Handle expand_periods_response
+      if (specialMessage === 'expand_periods_response' && body?.data) {
+        console.log('📊 [SPECIAL_MESSAGE] Expand periods response detected');
+        return new Response(JSON.stringify({
+          message: `Aquí están los detalles de **${body.data.employeeName}**:`,
+          emotionalState: 'professional',
+          sessionId: body.sessionId || sessionId,
+          timestamp: new Date().toISOString()
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      
+      // Handle what_if_simulation
+      if (specialMessage?.startsWith('what_if_simulation:') && body?.simulationRequest) {
+        console.log('📊 [SPECIAL_MESSAGE] What-if simulation detected');
+        return new Response(JSON.stringify({
+          message: 'Simulación procesada correctamente',
+          emotionalState: 'professional',
+          sessionId: body.sessionId || sessionId,
+          timestamp: new Date().toISOString()
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      
+      // Handle proactive_scan
+      if (specialMessage === 'proactive_scan' && body?.scanRequest) {
+        console.log('📊 [SPECIAL_MESSAGE] Proactive scan detected');
+        return new Response(JSON.stringify({
+          message: 'Escaneo proactivo completado',
+          emotionalState: 'professional',
+          sessionId: body.sessionId || sessionId,
+          timestamp: new Date().toISOString()
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
+    // ============================================================================
     // CONVERSATION VALIDATION - For normal chat flows
     // ============================================================================
     if (!conversation || !Array.isArray(conversation)) {
