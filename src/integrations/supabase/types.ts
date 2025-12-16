@@ -2904,11 +2904,11 @@ export type Database = {
         Returns: Json
       }
       diagnose_maya_auth:
+        | { Args: { p_company_id?: string }; Returns: Json }
         | {
             Args: { p_requesting_user_id: string; p_target_company_id: string }
             Returns: Json
           }
-        | { Args: { p_company_id?: string }; Returns: Json }
       ensure_admin_role_for_company_users: { Args: never; Returns: undefined }
       execute_maya_safe_query: {
         Args: {
@@ -3096,19 +3096,19 @@ export type Database = {
       maya_query_router:
         | {
             Args: {
+              company_id: string
               params: Json
               query_type: string
-              requesting_user_id: string
-              target_company_id: string
+              user_id: string
             }
             Returns: Json
           }
         | {
             Args: {
-              company_id: string
               params: Json
               query_type: string
-              user_id: string
+              requesting_user_id: string
+              target_company_id: string
             }
             Returns: Json
           }

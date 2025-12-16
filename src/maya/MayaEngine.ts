@@ -1,4 +1,3 @@
-import { supabase } from "@/integrations/supabase/client";
 import type { MayaMessage, MayaContext, PayrollPhase, EmotionalState } from "./types";
 
 export class MayaEngine {
@@ -16,66 +15,11 @@ export class MayaEngine {
   async generateContextualMessage(context: MayaContext): Promise<MayaMessage> {
     this.currentContext = context;
     
-    try {
-      const { data, error } = await supabase.functions.invoke('maya-intelligence', {
-        body: {
-          context: this.buildContextString(context),
-          phase: context.phase,
-          data: {
-            employeeCount: context.employeeCount,
-            periodName: context.periodName,
-            hasErrors: context.hasErrors,
-            isProcessing: context.isProcessing,
-            completionPercentage: context.completionPercentage,
-            validationResults: context.validationResults
-          }
-        }
-      });
-
-      if (error) throw error;
-
-      const message: MayaMessage = {
-        id: `maya-${Date.now()}`,
-        message: data.message,
-        emotionalState: data.emotionalState,
-        contextualActions: data.contextualActions,
-        timestamp: data.timestamp,
-        isVisible: true
-      };
-
-      this.messageHistory.push(message);
-      return message;
-
-    } catch (error) {
-      console.error('Maya Engine Error:', error);
-      return this.getFallbackMessage(context);
-    }
-  }
-
-  private buildContextString(context: MayaContext): string {
-    const parts = [];
-    
-    if (context.periodName) {
-      parts.push(`Período: ${context.periodName}`);
-    }
-    
-    if (context.employeeCount) {
-      parts.push(`${context.employeeCount} empleados`);
-    }
-    
-    if (context.hasErrors) {
-      parts.push('errores detectados');
-    }
-    
-    if (context.isProcessing) {
-      parts.push('procesando liquidación');
-    }
-    
-    if (context.completionPercentage) {
-      parts.push(`${context.completionPercentage}% completado`);
-    }
-
-    return `${context.phase}: ${parts.join(', ')}`;
+    // Use fallback messages directly - they're appropriate for phase-based contextual messages
+    // and don't require the chat-based edge function
+    const message = this.getFallbackMessage(context);
+    this.messageHistory.push(message);
+    return message;
   }
 
   private getFallbackMessage(context: MayaContext): MayaMessage {
