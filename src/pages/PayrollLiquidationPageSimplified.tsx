@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calculator, Users, Settings, RotateCcw, Upload } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Calculator, Users, Settings, RotateCcw, Upload, Gift } from 'lucide-react';
+import { SocialBenefitsLiquidation } from '@/components/social-benefits/SocialBenefitsLiquidation';
 import { PayrollLiquidationTable } from '@/components/payroll/liquidation/PayrollLiquidationTable';
 import { SimplePeriodSelector } from '@/components/payroll/SimplePeriodSelector';
 import { AutoSaveIndicator } from '@/components/payroll/AutoSaveIndicator';
@@ -324,17 +326,22 @@ const PayrollLiquidationPageSimplified = () => {
           <Calculator className="h-6 w-6 text-blue-600" />
           <h1 className="text-2xl font-bold">Liquidación de Nómina</h1>
         </div>
-        
-        <div className="flex items-center space-x-4">
-          {employees.length > 0 && (
-            <AutoSaveIndicator 
-              isSaving={isAutoSaving}
-              lastSaveTime={lastAutoSaveTime}
-            />
-          )}
-          
-        </div>
       </div>
+
+      {/* Tabs para Liquidación y Prestaciones */}
+      <Tabs defaultValue="liquidacion" className="w-full">
+        <TabsList className="grid w-full grid-cols-2 mb-4">
+          <TabsTrigger value="liquidacion" className="flex items-center gap-2">
+            <Calculator className="h-4 w-4" />
+            Liquidación
+          </TabsTrigger>
+          <TabsTrigger value="prestaciones" className="flex items-center gap-2">
+            <Gift className="h-4 w-4" />
+            Prestaciones
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="liquidacion" className="space-y-6">
 
       {/* World-Class Control Panel - OCULTO: Validación automática activa
       {periodSelected && selectedPeriod && (
@@ -565,6 +572,13 @@ const PayrollLiquidationPageSimplified = () => {
           onYearCreated={handleYearCreated}
         />
       )}
+
+        </TabsContent>
+
+        <TabsContent value="prestaciones">
+          <SocialBenefitsLiquidation />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
