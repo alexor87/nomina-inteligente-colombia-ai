@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calculator, Users, RotateCcw, Upload } from 'lucide-react';
 import { PayrollLiquidationTable } from '@/components/payroll/liquidation/PayrollLiquidationTable';
-import { PayrollDashboardCards } from '@/components/payroll/PayrollDashboardCards';
+import { SocialBenefitsDropdown } from '@/components/payroll/SocialBenefitsDropdown';
 import { SimplePeriodSelector } from '@/components/payroll/SimplePeriodSelector';
 import { AutoSaveIndicator } from '@/components/payroll/AutoSaveIndicator';
 import { usePayrollLiquidationSimplified } from '@/hooks/usePayrollLiquidationSimplified';
@@ -327,16 +327,6 @@ const PayrollLiquidationPageSimplified = () => {
         </div>
       </div>
 
-      {/* Dashboard de Cards - Estilo Aleluya */}
-      {selectedPeriod && periodSelected && (
-        <PayrollDashboardCards
-          companyId={companyId || ''}
-          selectedPeriod={selectedPeriod}
-          employees={employees}
-          onPayrollClick={() => {/* Scroll to table or focus */}}
-          isPayrollLiquidated={periodAlreadyLiquidated}
-        />
-      )}
 
       {/* World-Class Control Panel - OCULTO: Validación automática activa
       {periodSelected && selectedPeriod && (
@@ -419,14 +409,21 @@ const PayrollLiquidationPageSimplified = () => {
                 <h3 className="font-medium text-green-800">Período Activo</h3>
                 <p className="text-green-700">{selectedPeriod.label}</p>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleReset}
-                className="text-green-700 border-green-200 hover:bg-green-100"
-              >
-                Cambiar Período
-              </Button>
+              <div className="flex items-center gap-2">
+                <SocialBenefitsDropdown
+                  companyId={companyId || ''}
+                  employees={employees}
+                  disabled={isLoading || isLiquidating}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleReset}
+                  className="text-green-700 border-green-200 hover:bg-green-100"
+                >
+                  Cambiar Período
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
