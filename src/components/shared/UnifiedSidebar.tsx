@@ -1,142 +1,18 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { useMaya } from '@/maya/MayaProvider';
-import { useAuth } from '@/contexts/AuthContext';
-import { useCurrentCompany } from '@/hooks/useCurrentCompany';
-import { MayaConversationManager } from '@/maya/services/MayaConversationManager';
-import { ConversationSummary } from '@/maya/types';
-import { toast } from 'sonner';
-import { NewConversationButton } from '@/components/maya-page/sidebar/NewConversationButton';
-import { ConversationSearch } from '@/components/maya-page/sidebar/ConversationSearch';
-import { ConversationList } from '@/components/maya-page/sidebar/ConversationList';
-import { ArchiveToggle } from '@/components/maya-page/sidebar/ArchiveToggle';
 import { SidebarHeader } from './sidebar/SidebarHeader';
-import { SidebarDivider } from './sidebar/SidebarDivider';
 import { ModuleNavigation } from './sidebar/ModuleNavigation';
 import { ToggleButton } from './sidebar/ToggleButton';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { forceUIReset } from '@/utils/ui/overlayRecovery';
 
 const STORAGE_KEY = 'unified_sidebar_collapsed';
 
 export const UnifiedSidebar: React.FC = () => {
-  const { user } = useAuth();
-  const { companyId } = useCurrentCompany();
-  
-  // Protected Maya context access
-  const mayaContext = (() => {
-    try {
-      return useMaya();
-    } catch (error) {
-      console.warn('⚠️ Maya context not available during cleanup');
-      return null;
-    }
-  })();
-
-  const clearConversation = mayaContext?.clearConversation || (async () => {});
-  const currentConversationId = mayaContext?.currentConversationId || null;
-  const loadConversation = mayaContext?.loadConversation || (async () => {});
-  const navigate = useNavigate();
-  const location = useLocation();
   const isMobile = useIsMobile();
   const [collapsed, setCollapsed] = useState(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
     return stored === 'true';
   });
-  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
-  const [archivedConversations, setArchivedConversations] = useState<ConversationSummary[]>([]);
-  const [viewMode, setViewMode] = useState<'active' | 'archived'>('active');
-  const [isLoading, setIsLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isDeleting, setIsDeleting] = useState(false);
-  const prevDeletingRef = useRef(isDeleting);
-  const isDeletingRef = useRef(false);
-  const justDeletedRef = useRef(false);
-
-  // Diagnostics: log overlay mount/unmount
-  useEffect(() => {
-    if (isMobile && !collapsed) {
-      console.log('📱 UnifiedSidebar overlay-mounted', { isMobile, collapsed });
-      return () => console.log('📱 UnifiedSidebar overlay-unmounted');
-    }
-  }, [isMobile, collapsed]);
-
-  // Failsafe: after deletion finishes on mobile, force collapse
-  useEffect(() => {
-    const prev = prevDeletingRef.current;
-    if (prev && !isDeleting && isMobile) {
-      console.log('📱 UnifiedSidebar: deletion finished, collapsing');
-      setCollapsed(true);
-      localStorage.setItem(STORAGE_KEY, 'true');
-    }
-    prevDeletingRef.current = isDeleting;
-  }, [isDeleting, isMobile]);
-
-  const conversationManager = MayaConversationManager.getInstance();
-
-  // ✅ Cargar conversaciones cuando user y companyId estén disponibles
-  useEffect(() => {
-    if (user?.id && companyId) {
-      console.log('🔄 UnifiedSidebar: user y company listos, cargando conversaciones...', {
-        userId: user.id,
-        companyId
-      });
-      loadConversations();
-      loadArchivedConversations();
-    }
-  }, [user?.id, companyId]);
-
-  // ⚡ Recargar conversaciones cuando cambia currentConversationId (pero no durante eliminación)
-  useEffect(() => {
-    if (!isDeleting && currentConversationId && user?.id && companyId) {
-      // Skip reload si acabamos de eliminar (ya se hizo manual)
-      if (justDeletedRef.current) {
-        justDeletedRef.current = false;
-        return;
-      }
-      loadConversations();
-      loadArchivedConversations();
-    }
-  }, [currentConversationId, user?.id, companyId, isDeleting]);
-
-  const loadConversations = async () => {
-    console.log('📋 UnifiedSidebar: loadConversations llamado', {
-      hasUser: !!user?.id,
-      hasCompanyId: !!companyId,
-      userId: user?.id,
-      companyId
-    });
-    
-    if (!user?.id || !companyId) {
-      console.warn('⚠️ UnifiedSidebar: No se puede cargar, falta user o companyId');
-      return;
-    }
-    
-    setIsLoading(true);
-    try {
-      const convs = await conversationManager.getConversations(user.id, companyId);
-      console.log('✅ UnifiedSidebar: Conversaciones cargadas:', convs.length);
-      setConversations(convs);
-    } catch (error) {
-      console.error('❌ UnifiedSidebar: Error loading conversations:', error);
-      toast.error('Error al cargar conversaciones');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const loadArchivedConversations = async () => {
-    if (!user?.id || !companyId) return;
-    
-    try {
-      const archived = await conversationManager.getArchivedConversations(user.id, companyId);
-      console.log('📦 UnifiedSidebar: Conversaciones archivadas cargadas:', archived.length);
-      setArchivedConversations(archived);
-    } catch (error) {
-      console.error('❌ UnifiedSidebar: Error loading archived conversations:', error);
-    }
-  };
 
   const handleToggleCollapse = () => {
     const newValue = !collapsed;
@@ -144,219 +20,28 @@ export const UnifiedSidebar: React.FC = () => {
     localStorage.setItem(STORAGE_KEY, String(newValue));
   };
 
-  const handleNewConversation = async () => {
-    await clearConversation();
-    await loadConversations();
-    // Navigate to Maya if not already there
-    if (location.pathname !== '/maya') {
-      navigate('/maya');
-    }
-  };
-
-  const handleSelectConversation = async (id: string) => {
-    try {
-      conversationManager.setCurrentConversationId(id);
-      
-      // Navegar a MAYA si no estamos ahí
-      if (location.pathname !== '/maya') {
-        navigate('/maya');
-      }
-      
-      // Cargar la conversación en el provider
-      await loadConversation(id);
-      
-      toast.success('Conversación cargada');
-    } catch (error) {
-      console.error('Error loading conversation:', error);
-      toast.error('Error al cargar la conversación');
-    }
-  };
-
-  const handleRenameConversation = async (id: string, newTitle: string) => {
-    try {
-      await conversationManager.updateConversationTitle(id, newTitle);
-      await loadConversations();
-      toast.success('Conversación renombrada');
-    } catch (error) {
-      console.error('Error renaming conversation:', error);
-      toast.error('Error al renombrar');
-    }
-  };
-
-  const handleArchiveConversation = async (id: string) => {
-    try {
-      await conversationManager.archiveConversation(id);
-      await loadConversations();
-      await loadArchivedConversations();
-      
-      toast.success('Conversación archivada', {
-        action: {
-          label: 'Deshacer',
-          onClick: async () => {
-            await handleUnarchiveConversation(id);
-          }
-        },
-        duration: 5000
-      });
-    } catch (error) {
-      console.error('Error archiving conversation:', error);
-      toast.error('Error al archivar');
-    }
-  };
-
-  const handleUnarchiveConversation = async (id: string) => {
-    try {
-      await conversationManager.unarchiveConversation(id);
-      await loadConversations();
-      await loadArchivedConversations();
-      toast.success('Conversación restaurada');
-    } catch (error) {
-      console.error('Error unarchiving conversation:', error);
-      toast.error('Error al restaurar');
-    }
-  };
-
-  const handleDeleteConversation = async (id: string) => {
-    // Prevenir ejecuciones múltiples
-    if (isDeletingRef.current) {
-      console.log('⚠️ Deletion already in progress');
-      return;
-    }
-    isDeletingRef.current = true;
-    
-    try {
-      setIsDeleting(true);
-      
-      await conversationManager.deleteConversation(id);
-      
-      // Si es la conversación actual, limpiar el ID y el estado SIN generar mensaje
-      if (id === currentConversationId) {
-        conversationManager.clearCurrentConversationId();
-        await clearConversation(true);
-      }
-      
-      // Marcar que acabamos de eliminar para evitar recarga duplicada
-      justDeletedRef.current = true;
-      
-      // Cargar conversaciones UNA SOLA VEZ
-      await loadConversations();
-      await loadArchivedConversations();
-      
-      toast.success('Conversación eliminada');
-    } catch (error) {
-      console.error('Error deleting conversation:', error);
-      toast.error('Error al eliminar');
-    } finally {
-      setIsDeleting(false);
-      isDeletingRef.current = false;
-      
-      // Force UI reset to clear any orphaned overlays
-      // Double RAF ensures Radix animations complete first
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          forceUIReset();
-        });
-      });
-      
-      if (isMobile) {
-        setCollapsed(true);
-        localStorage.setItem(STORAGE_KEY, 'true');
-      }
-    }
-  };
-
-  const currentConversations = viewMode === 'active' ? conversations : archivedConversations;
-
   return (
     <>
-      {/* Desktop Unified Sidebar */}
+      {/* Desktop Sidebar - Clean module navigation */}
       <motion.aside
-        animate={{ width: collapsed ? 64 : 288 }}
+        animate={{ width: collapsed ? 64 : 256 }}
         transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
         className="hidden md:flex flex-col bg-background border-r border-border relative z-20"
       >
         <div className="flex flex-col h-full">
-          {/* SECCIÓN SUPERIOR: MAYA */}
-          <div className="flex-none flex flex-col border-b border-border" style={{ maxHeight: '45vh' }}>
-            <SidebarHeader collapsed={collapsed} />
-            
-            <div className="px-3 pt-4 pb-3">
-              <NewConversationButton 
-                onClick={handleNewConversation} 
-                collapsed={collapsed}
-              />
-            </div>
+          <SidebarHeader collapsed={collapsed} />
+          
+          {/* Module Navigation */}
+          <nav className="flex-1 px-3 py-4 overflow-y-auto">
+            <ModuleNavigation collapsed={collapsed} />
+          </nav>
 
-            {!collapsed && (
-              <div className="px-3 pt-2 pb-3">
-                <ArchiveToggle
-                  mode={viewMode}
-                  onModeChange={setViewMode}
-                  activeCount={conversations.length}
-                  archivedCount={archivedConversations.length}
-                />
-              </div>
-            )}
-
-            {!collapsed && (
-              <div className="px-3 pt-1 pb-3">
-                <ConversationSearch 
-                  onSearch={setSearchQuery} 
-                  collapsed={collapsed}
-                />
-              </div>
-            )}
-
-            <div className="flex-1 overflow-y-auto min-h-0">
-              {!collapsed ? (
-                <ConversationList
-                  conversations={currentConversations}
-                  currentConversationId={currentConversationId}
-                  onSelectConversation={handleSelectConversation}
-                  onRenameConversation={handleRenameConversation}
-                  onArchiveConversation={handleArchiveConversation}
-                  onDeleteConversation={handleDeleteConversation}
-                  onUnarchiveConversation={handleUnarchiveConversation}
-                  isLoading={isLoading}
-                  searchQuery={searchQuery}
-                  mode={viewMode}
-                />
-              ) : (
-                <div className="flex flex-col gap-2 items-center py-4">
-                  <ArchiveToggle
-                    mode={viewMode}
-                    onModeChange={setViewMode}
-                    activeCount={conversations.length}
-                    archivedCount={archivedConversations.length}
-                    collapsed
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* SEPARADOR ELEGANTE */}
-          <SidebarDivider />
-
-          {/* SECCIÓN INFERIOR: MÓDULOS */}
-          <div className="flex-1 flex flex-col min-h-0">
-            {!collapsed && (
-              <div className="px-3 pt-3 pb-2">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Módulos
-                </p>
-              </div>
-            )}
-            <nav className="flex-1 px-3 pb-3 overflow-y-auto">
-              <ModuleNavigation collapsed={collapsed} />
-            </nav>
-
-            <div className="p-2 border-t border-border flex-shrink-0 flex">
-              <ToggleButton 
-                collapsed={collapsed} 
-                onToggle={handleToggleCollapse} 
-              />
-            </div>
+          {/* Toggle Button */}
+          <div className="p-2 border-t border-border flex-shrink-0 flex">
+            <ToggleButton 
+              collapsed={collapsed} 
+              onToggle={handleToggleCollapse} 
+            />
           </div>
         </div>
       </motion.aside>
@@ -373,59 +58,21 @@ export const UnifiedSidebar: React.FC = () => {
               onClick={handleToggleCollapse}
             />
             <motion.aside
-              initial={{ x: -288 }}
+              initial={{ x: -256 }}
               animate={{ x: 0 }}
-              exit={{ x: -288 }}
+              exit={{ x: -256 }}
               transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-              className="md:hidden fixed left-0 top-0 bottom-0 w-72 bg-background border-r border-border z-50 flex flex-col"
+              className="md:hidden fixed left-0 top-0 bottom-0 w-64 bg-background border-r border-border z-50 flex flex-col"
             >
               <div className="flex flex-col h-full">
                 <SidebarHeader collapsed={false} />
                 
-                <div className="px-3 pt-4 pb-3 border-b border-border">
-                  <NewConversationButton onClick={handleNewConversation} />
-                </div>
-
-                <div className="px-3 pt-2 pb-3">
-                  <ArchiveToggle
-                    mode={viewMode}
-                    onModeChange={setViewMode}
-                    activeCount={conversations.length}
-                    archivedCount={archivedConversations.length}
-                  />
-                </div>
-
-                <div className="px-3 pt-1 pb-3">
-                  <ConversationSearch onSearch={setSearchQuery} />
-                </div>
-
-                <div className="flex-1 overflow-y-auto border-b border-border" style={{ maxHeight: '40vh' }}>
-                  <ConversationList
-                    conversations={currentConversations}
-                    currentConversationId={currentConversationId}
-                    onSelectConversation={handleSelectConversation}
-                    onRenameConversation={handleRenameConversation}
-                    onArchiveConversation={handleArchiveConversation}
-                    onDeleteConversation={handleDeleteConversation}
-                    onUnarchiveConversation={handleUnarchiveConversation}
-                    isLoading={isLoading}
-                    searchQuery={searchQuery}
-                    mode={viewMode}
-                  />
-                </div>
-
-                <SidebarDivider />
-
-                <div className="px-3 pt-3 pb-2">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    Módulos
-                  </p>
-                </div>
-
-                <nav className="flex-1 px-3 pb-3 overflow-y-auto">
+                {/* Module Navigation */}
+                <nav className="flex-1 px-3 py-4 overflow-y-auto">
                   <ModuleNavigation collapsed={false} />
                 </nav>
 
+                {/* Toggle Button */}
                 <div className="p-2 border-t border-border flex">
                   <ToggleButton 
                     collapsed={false} 

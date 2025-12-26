@@ -60,8 +60,8 @@ function AppContent() {
         <Route path="/logout" element={<LogoutPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         
-        {/* Legacy landing (redirect to Maya) */}
-        <Route path="/app" element={<Navigate to="/maya" replace />} />
+        {/* Main app entry - Dashboard is home */}
+        <Route path="/app" element={<Navigate to="/modules/dashboard" replace />} />
         
         {/* UNIFIED EXPERIENCE - All routes use MayaFullScreenLayout with UnifiedSidebar */}
         <Route element={<MayaFullScreenLayout />}>
