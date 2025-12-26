@@ -9,9 +9,9 @@ export const RootRedirect = () => {
     return <LoadingWithTimeout message="Cargando..." timeout={7} redirectTo="/home" />;
   }
   
-  // Usuario autenticado → MAYA
+  // Usuario autenticado → Dashboard
   if (user) {
-    return <Navigate to="/maya" replace />;
+    return <Navigate to="/modules/dashboard" replace />;
   }
   
   // Usuario NO autenticado → Landing page
