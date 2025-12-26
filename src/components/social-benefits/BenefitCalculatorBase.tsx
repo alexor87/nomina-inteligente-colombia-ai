@@ -23,19 +23,36 @@ interface BenefitCalculatorBaseProps {
   };
 }
 
+type QuickPeriodType = 'sem1' | 'sem2' | 'custom';
+
 export const BenefitCalculatorBase = ({
   benefitType,
   title,
   description,
   defaultPeriod
 }: BenefitCalculatorBaseProps) => {
+  const currentYear = new Date().getFullYear();
+  
   const [selectedEmployee, setSelectedEmployee] = useState('');
   const [periodStart, setPeriodStart] = useState(defaultPeriod?.start || '');
   const [periodEnd, setPeriodEnd] = useState(defaultPeriod?.end || '');
   const [notes, setNotes] = useState('');
+  const [quickPeriod, setQuickPeriod] = useState<QuickPeriodType>('custom');
 
   const { data: employees = [], isLoading: employeesLoading } = useSecureEmployees();
   const { isCalculating, previewResult, calculatePreview, calculateAndSave, clearPreview } = useSocialBenefits();
+
+  const handleQuickPeriodSelect = (type: QuickPeriodType) => {
+    setQuickPeriod(type);
+    if (type === 'sem1') {
+      setPeriodStart(`${currentYear}-01-01`);
+      setPeriodEnd(`${currentYear}-06-30`);
+    } else if (type === 'sem2') {
+      setPeriodStart(`${currentYear}-07-01`);
+      setPeriodEnd(`${currentYear}-12-31`);
+    }
+    // 'custom' keeps current values
+  };
 
   // Auto-calculate preview when inputs change
   useEffect(() => {
@@ -126,6 +143,41 @@ export const BenefitCalculatorBase = ({
           </div>
         )}
       </div>
+
+      {/* Selector rápido de período - solo para prima */}
+      {benefitType === 'prima' && (
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Período de Liquidación
+          </label>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant={quickPeriod === 'sem1' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => handleQuickPeriodSelect('sem1')}
+            >
+              1er Semestre (Ene-Jun)
+            </Button>
+            <Button
+              type="button"
+              variant={quickPeriod === 'sem2' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => handleQuickPeriodSelect('sem2')}
+            >
+              2do Semestre (Jul-Dic)
+            </Button>
+            <Button
+              type="button"
+              variant={quickPeriod === 'custom' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => handleQuickPeriodSelect('custom')}
+            >
+              Personalizado
+            </Button>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-4">

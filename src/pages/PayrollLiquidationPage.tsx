@@ -1,18 +1,17 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calculator, Users, Loader2, Settings, Bug } from 'lucide-react';
+import { Calculator, Users, Loader2, Settings, Bug, Gift } from 'lucide-react';
 import { PayrollLiquidationTable } from '@/components/payroll/liquidation/PayrollLiquidationTable';
 import { SimplePeriodSelector } from '@/components/payroll/SimplePeriodSelector';
 import { AutoSaveIndicator } from '@/components/payroll/AutoSaveIndicator';
 import { PayrollDiagnosticPanel } from '@/components/payroll/diagnostic/PayrollDiagnosticPanel';
+import { SocialBenefitsLiquidation } from '@/components/social-benefits/SocialBenefitsLiquidation';
 import { usePayrollLiquidation } from '@/hooks/usePayrollLiquidation';
 import { useSimplePeriodSelection } from '@/hooks/useSimplePeriodSelection';
 import { EmployeeAddModal } from '@/components/payroll/modals/EmployeeAddModal';
 import { useCurrentCompany } from '@/hooks/useCurrentCompany';
-
 import { PeriodCleanupDialog } from '@/components/payroll/PeriodCleanupDialog';
 import { PayrollSuccessModal } from '@/components/payroll/modals/PayrollSuccessModal';
 import { SelectablePeriod } from '@/services/payroll/SimplePeriodService';
@@ -131,10 +130,14 @@ const PayrollLiquidationPage = () => {
       </div>
 
       <Tabs defaultValue="liquidation" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="liquidation" className="flex items-center gap-2">
             <Calculator className="h-4 w-4" />
             Liquidación
+          </TabsTrigger>
+          <TabsTrigger value="prestaciones" className="flex items-center gap-2">
+            <Gift className="h-4 w-4" />
+            Prestaciones
           </TabsTrigger>
           <TabsTrigger value="diagnostic" className="flex items-center gap-2">
             <Bug className="h-4 w-4" />
@@ -220,6 +223,10 @@ const PayrollLiquidationPage = () => {
           )}
         </TabsContent>
         
+        <TabsContent value="prestaciones" className="space-y-6">
+          <SocialBenefitsLiquidation />
+        </TabsContent>
+
         <TabsContent value="diagnostic">
           <PayrollDiagnosticPanel />
         </TabsContent>
