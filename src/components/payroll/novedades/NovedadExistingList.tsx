@@ -652,148 +652,104 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
           </Card>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              <Card className="border-green-200 bg-green-50">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium text-green-800 flex items-center gap-2">
-                    ✅ Valores Confirmados
-                    <Badge variant="outline" className="text-xs">
-                      {separatedTotals.confirmed.count}
-                    </Badge>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-green-700">Devengos:</span>
-                    <span className="font-semibold text-green-800">
-                      {formatCurrency(separatedTotals.confirmed.devengos)}
-                    </span>
+            {/* Summary bar - compact horizontal design */}
+            <div className="flex flex-wrap items-center justify-between gap-4 p-4 bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl border border-emerald-200 mb-6">
+              <div className="flex items-center gap-6">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                  <div>
+                    <span className="text-xs text-emerald-600 font-medium">Devengos</span>
+                    <p className="text-sm font-bold text-emerald-800">{formatCurrency(separatedTotals.confirmed.devengos)}</p>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-green-700">Deducciones:</span>
-                    <span className="font-semibold text-red-600">
-                      {formatCurrency(separatedTotals.confirmed.deducciones)}
-                    </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                  <div>
+                    <span className="text-xs text-red-600 font-medium">Deducciones</span>
+                    <p className="text-sm font-bold text-red-600">{formatCurrency(separatedTotals.confirmed.deducciones)}</p>
                   </div>
-                  <div className="flex justify-between items-center pt-2 border-t border-green-200">
-                    <span className="text-sm font-medium text-green-800">Neto:</span>
-                    <span className="font-bold text-green-900">
-                      {formatCurrency(separatedTotals.confirmed.neto)}
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-yellow-200 bg-yellow-50">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium text-yellow-800 flex items-center gap-2">
-                    ⏳ Valores Estimados
-                    <Badge variant="outline" className="text-xs">
-                      {separatedTotals.estimated.count}
-                    </Badge>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-yellow-700">Devengos:</span>
-                    <span className="font-semibold text-yellow-800">
-                      {formatCurrency(separatedTotals.estimated.devengos)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-yellow-700">Deducciones:</span>
-                    <span className="font-semibold text-red-600">
-                      {formatCurrency(separatedTotals.estimated.deducciones)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center pt-2 border-t border-yellow-200">
-                    <span className="text-sm font-medium text-yellow-800">Neto:</span>
-                    <span className="font-bold text-yellow-900">
-                      {formatCurrency(separatedTotals.estimated.neto)}
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
+                </div>
+                <div className="h-8 w-px bg-emerald-200"></div>
+                <div>
+                  <span className="text-xs text-emerald-600 font-medium">Neto Total</span>
+                  <p className="text-lg font-bold text-emerald-900">{formatCurrency(separatedTotals.confirmed.neto)}</p>
+                </div>
+              </div>
+              <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 border-emerald-300">
+                {separatedTotals.confirmed.count} novedad{separatedTotals.confirmed.count !== 1 ? 'es' : ''}
+              </Badge>
             </div>
 
-            <div className="space-y-3">
-              {/* Regular novedades */}
+            {/* Pending adjustments alert */}
+            {pendingAdjustments.length > 0 && (
+              <div className="flex items-center gap-3 p-3 bg-amber-50 rounded-lg border border-amber-200 mb-4">
+                <Clock className="h-4 w-4 text-amber-600" />
+                <span className="text-sm text-amber-800">
+                  <strong>{pendingAdjustments.length}</strong> ajuste{pendingAdjustments.length !== 1 ? 's' : ''} pendiente{pendingAdjustments.length !== 1 ? 's' : ''} de aplicar
+                </span>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              {/* Regular novedades - simplified cards */}
               {integratedData.map((item) => (
-                <Card key={`${item.origen}-${item.id}`} className={`hover:shadow-md transition-shadow ${!item.isConfirmed ? 'border-yellow-200 bg-yellow-50' : ''}`}>
-                  <CardContent className="pt-4">
-                    <div className="grid grid-cols-12 gap-4 items-center">
-                      <div className="col-span-12 sm:col-span-4 lg:col-span-3">
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2">
-                            <Badge className={item.badgeColor}>
-                              {item.badgeIcon} {item.badgeLabel}
+                <Card 
+                  key={`${item.origen}-${item.id}`} 
+                  className={`hover:shadow-md transition-all duration-200 border-l-4 ${
+                    !item.isConfirmed 
+                      ? 'border-l-amber-400 bg-amber-50/50' 
+                      : item.valor >= 0 
+                        ? 'border-l-emerald-400' 
+                        : 'border-l-red-400'
+                  }`}
+                >
+                  <CardContent className="py-3 px-4">
+                    <div className="flex items-center justify-between gap-4">
+                      {/* Left: Type and badges */}
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge className={`${item.badgeColor} text-xs`}>
+                              {item.badgeIcon}
                             </Badge>
-                            <Badge variant="outline" className={item.statusColor}>
+                            <span className="font-medium text-sm text-foreground">
+                              {formatTipoNovedad(item.tipo_novedad, item.subtipo)}
+                            </span>
+                            <Badge variant="outline" className={`${item.statusColor} text-xs`}>
                               {item.status === 'procesada' ? 'Procesada' : 
                                item.status === 'pendiente' ? 'Pendiente' :
                                item.status === 'registrada' ? 'Registrada' : 
                                item.status}
                             </Badge>
                             {!item.isConfirmed && (
-                              <Badge variant="outline" className="text-xs bg-yellow-100 text-yellow-800">
+                              <Badge variant="outline" className="text-xs bg-amber-100 text-amber-700 border-amber-300">
                                 Estimado
                               </Badge>
                             )}
                           </div>
-                          <div className="text-sm font-medium text-gray-900">
-                            {formatTipoNovedad(item.tipo_novedad, item.subtipo)}
+                          {/* Details row */}
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                            {item.horas && <span>{item.horas} hrs</span>}
+                            {item.dias && <span>{item.dias} días</span>}
+                            {item.fecha_inicio && item.fecha_fin && (
+                              <span>{item.fecha_inicio} → {item.fecha_fin}</span>
+                            )}
+                            {(() => {
+                              const details = getNovedadDetails(item);
+                              return details && <span className="truncate max-w-[200px]" title={details}>{details}</span>;
+                            })()}
                           </div>
                         </div>
                       </div>
 
-                      <div className="col-span-6 sm:col-span-3 lg:col-span-2">
-                        <div className="text-right sm:text-left">
-                          <div className={`text-lg font-bold ${item.valor >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {formatCurrency(Math.abs(item.valor))}
+                      {/* Right: Value and actions */}
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <div className={`text-base font-bold ${item.valor >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                            {item.valor < 0 && '-'}{formatCurrency(Math.abs(item.valor))}
                           </div>
-                          {item.valor < 0 && (
-                            <div className="text-xs text-red-500">Deducción</div>
-                          )}
                         </div>
-                      </div>
-
-                      <div className="col-span-6 sm:col-span-2 lg:col-span-2">
-                        <div className="text-sm text-gray-600 space-y-1">
-                          {item.horas && (
-                            <div className="flex items-center">
-                              <span className="font-medium">{item.horas}</span>
-                              <span className="ml-1">hrs</span>
-                            </div>
-                          )}
-                          {item.dias && (
-                            <div className="flex items-center">
-                              <span className="font-medium">{item.dias}</span>
-                              <span className="ml-1">días</span>
-                            </div>
-                          )}
-                          {item.fecha_inicio && item.fecha_fin && (
-                            <div className="text-xs text-gray-500">
-                              {item.fecha_inicio} / {item.fecha_fin}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="col-span-12 sm:col-span-8 lg:col-span-4">
-                        {(() => {
-                          const details = getNovedadDetails(item);
-                          return details && (
-                            <div className="text-sm text-gray-600 bg-gray-50 p-2 rounded text-left">
-                              <div className="line-clamp-2">
-                                {details}
-                              </div>
-                            </div>
-                          );
-                        })()}
-                      </div>
-
-                      <div className="col-span-12 sm:col-span-4 lg:col-span-1">
-                        <div className="flex justify-end sm:justify-center">
+                        <div className="flex items-center">
                           {getActionButtons(item)}
                         </div>
                       </div>
@@ -802,51 +758,49 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
                 </Card>
               ))}
               
-              {/* Pending adjustments */}
+              {/* Pending adjustments - distinctive styling */}
               {convertPendingToDisplay(pendingAdjustments).map((item) => (
-                <Card key={`pending-${item.id}`} data-pending-id={item.id} className="border-orange-200 bg-orange-50 hover:shadow-md transition-all duration-200 hover:border-orange-300">
-                  <CardContent className="pt-4">
-                    <div className="grid grid-cols-12 gap-4 items-center">
-                      <div className="col-span-12 sm:col-span-4 lg:col-span-3">
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2">
-                            <Badge className="bg-orange-100 text-orange-800 border-orange-200">
+                <Card 
+                  key={`pending-${item.id}`} 
+                  data-pending-id={item.id} 
+                  className="border-l-4 border-l-amber-500 bg-amber-50/70 hover:shadow-md transition-all duration-200"
+                >
+                  <CardContent className="py-3 px-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge className="bg-amber-100 text-amber-800 border-amber-300 text-xs">
                               <Clock className="h-3 w-3 mr-1" />
-                              {item.badgeLabel}
-                            </Badge>
-                            <Badge variant="outline" className="border-orange-200 text-orange-700">
                               Pendiente
                             </Badge>
+                            <span className="font-medium text-sm text-foreground">
+                              {item.badgeLabel}
+                            </span>
                           </div>
-                          {item.fecha_inicio && item.fecha_fin && (
-                            <p className="text-xs text-orange-600">
-                              {new Date(item.fecha_inicio).toLocaleDateString('es-CO')} - {new Date(item.fecha_fin).toLocaleDateString('es-CO')}
-                            </p>
-                          )}
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                            {item.dias && <span>{item.dias} día{item.dias !== 1 ? 's' : ''}</span>}
+                            {item.fecha_inicio && item.fecha_fin && (
+                              <span>
+                                {new Date(item.fecha_inicio).toLocaleDateString('es-CO')} → {new Date(item.fecha_fin).toLocaleDateString('es-CO')}
+                              </span>
+                            )}
+                            {item.observacion && (
+                              <span className="truncate max-w-[200px]" title={item.observacion}>{item.observacion}</span>
+                            )}
+                          </div>
                         </div>
                       </div>
-                      
-                      <div className="col-span-12 sm:col-span-2 lg:col-span-2 text-center">
-                        <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800">
-                          {item.dias} día{item.dias !== 1 ? 's' : ''}
-                        </Badge>
-                      </div>
-                      
-                      <div className="col-span-12 sm:col-span-3 lg:col-span-4">
+
+                      <div className="flex items-center gap-4">
                         <div className="text-right">
-                          <div className={`text-lg font-bold ${item.valor >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {formatCurrency(item.valor)}
+                          <div className={`text-base font-bold ${item.valor >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                            {item.valor < 0 && '-'}{formatCurrency(Math.abs(item.valor))}
                           </div>
-                          {item.observacion && (
-                            <p className="text-xs text-orange-600 mt-1 truncate" title={item.observacion}>
-                              {item.observacion}
-                            </p>
-                          )}
                         </div>
-                      </div>
-                      
-                      <div className="col-span-12 sm:col-span-3 lg:col-span-3 text-right">
-                        {getActionButtons(item)}
+                        <div className="flex items-center">
+                          {getActionButtons(item)}
+                        </div>
                       </div>
                     </div>
                   </CardContent>
