@@ -16,13 +16,13 @@ const CompanyRegistrationPage = () => {
     
     // Redirigir al dashboard después de completar el registro
     setTimeout(() => {
-      navigate('/maya');
+      navigate('/modules/dashboard');
     }, 2000);
   };
 
   const handleCancel = () => {
     // Redirigir al dashboard si cancela (el usuario ya está registrado)
-    navigate('/maya');
+    navigate('/modules/dashboard');
   };
 
   return (
