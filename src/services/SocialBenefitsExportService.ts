@@ -37,10 +37,10 @@ export class SocialBenefitsExportService {
     const employees = payment.payment_details?.employees || [];
     
     // Preparar datos
-    const data = employees.map((emp: any, index: number) => ({
+    const data: Array<Record<string, string | number>> = employees.map((emp: any, index: number) => ({
       'No.': index + 1,
       'Empleado': emp.name,
-      'Quincenas': emp.periodsCount || '-',
+      'Quincenas': emp.periodsCount?.toString() || '-',
       'Monto': emp.amount,
     }));
 
@@ -197,10 +197,10 @@ export class SocialBenefitsExportService {
   ): void {
     const benefitLabel = BENEFIT_LABELS[benefitType] || benefitType;
     
-    const data = employees.map((emp, index) => ({
+    const data: Array<Record<string, string | number>> = employees.map((emp, index) => ({
       'No.': index + 1,
       'Empleado': emp.name,
-      'Quincenas': emp.periodsCount || '-',
+      'Quincenas': emp.periodsCount?.toString() || '-',
       'Monto': emp.amount,
     }));
 

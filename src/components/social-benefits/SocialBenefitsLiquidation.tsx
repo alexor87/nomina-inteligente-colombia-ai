@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Gift, Package, Percent, Info, ArrowLeft, X } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Gift, Package, Percent, Info, ArrowLeft, X, Calculator, History } from 'lucide-react';
 import { BenefitCalculatorBase } from './BenefitCalculatorBase';
+import { LiquidationHistoryPanel } from './LiquidationHistoryPanel';
 
 type BenefitOption = 'prima' | 'cesantias' | 'intereses' | null;
 
@@ -42,8 +44,7 @@ const benefitCards = [
 
 export const SocialBenefitsLiquidation = () => {
   const [selectedBenefit, setSelectedBenefit] = useState<BenefitOption>(null);
-
-  const currentYear = new Date().getFullYear();
+  const [activeTab, setActiveTab] = useState<'liquidar' | 'historial'>('liquidar');
 
   const getBenefitConfig = (benefit: BenefitOption) => {
     switch (benefit) {
@@ -70,6 +71,7 @@ export const SocialBenefitsLiquidation = () => {
     }
   };
 
+  // Vista del calculador de beneficio seleccionado
   if (selectedBenefit) {
     const config = getBenefitConfig(selectedBenefit);
     if (!config) return null;
@@ -109,50 +111,71 @@ export const SocialBenefitsLiquidation = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold text-foreground">Liquidación de Prestaciones Sociales</h2>
-        <p className="text-muted-foreground text-sm mt-1">
-          Seleccione la prestación que desea liquidar
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-semibold text-foreground">Prestaciones Sociales</h2>
+          <p className="text-muted-foreground text-sm mt-1">
+            Liquide y consulte el historial de prestaciones sociales
+          </p>
+        </div>
       </div>
 
-      <Alert className="border-blue-200 bg-blue-50">
-        <Info className="h-4 w-4 text-blue-600" />
-        <AlertDescription className="text-blue-800">
-          <strong>Flexibilidad legal:</strong> Puede liquidar prestaciones en cualquier momento del año, 
-          no solo en las fechas límite legales. El sistema calculará el valor proporcional al período seleccionado.
-        </AlertDescription>
-      </Alert>
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'liquidar' | 'historial')}>
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="liquidar" className="flex items-center gap-2">
+            <Calculator className="h-4 w-4" />
+            Liquidar
+          </TabsTrigger>
+          <TabsTrigger value="historial" className="flex items-center gap-2">
+            <History className="h-4 w-4" />
+            Historial
+          </TabsTrigger>
+        </TabsList>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {benefitCards.map((card) => (
-          <Card
-            key={card.id}
-            className={`cursor-pointer transition-all duration-200 ${card.bgColor} ${card.borderColor} border-2`}
-            onClick={() => setSelectedBenefit(card.id)}
-          >
-            <CardHeader className="pb-3">
-              <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-lg bg-white ${card.color}`}>
-                  <card.icon className="h-5 w-5" />
-                </div>
-                <CardTitle className="text-lg">{card.title}</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <CardDescription className="text-gray-600">
-                {card.description}
-              </CardDescription>
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-500">{card.legalDate}</span>
-                <Button variant="ghost" size="sm" className={card.color}>
-                  Liquidar →
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+        <TabsContent value="liquidar" className="mt-6 space-y-6">
+          <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
+            <Info className="h-4 w-4 text-blue-600" />
+            <AlertDescription className="text-blue-800 dark:text-blue-200">
+              <strong>Flexibilidad legal:</strong> Puede liquidar prestaciones en cualquier momento del año, 
+              no solo en las fechas límite legales. El sistema calculará el valor proporcional al período seleccionado.
+            </AlertDescription>
+          </Alert>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {benefitCards.map((card) => (
+              <Card
+                key={card.id}
+                className={`cursor-pointer transition-all duration-200 ${card.bgColor} ${card.borderColor} border-2`}
+                onClick={() => setSelectedBenefit(card.id)}
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg bg-white ${card.color}`}>
+                      <card.icon className="h-5 w-5" />
+                    </div>
+                    <CardTitle className="text-lg">{card.title}</CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <CardDescription className="text-gray-600 dark:text-gray-300">
+                    {card.description}
+                  </CardDescription>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-500">{card.legalDate}</span>
+                    <Button variant="ghost" size="sm" className={card.color}>
+                      Liquidar →
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="historial" className="mt-6">
+          <LiquidationHistoryPanel />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

@@ -1,13 +1,5 @@
-
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
-
-// Extend jsPDF interface to include autoTable
-declare module 'jspdf' {
-  interface jsPDF {
-    autoTable: (options: any) => void;
-  }
-}
+import autoTable from 'jspdf-autotable';
 
 export class PDFExportService {
   static exportToPDF(data: any[], filename: string, title: string, columns: any[]): void {
@@ -23,7 +15,7 @@ export class PDFExportService {
       doc.text(`Generado el: ${new Date().toLocaleDateString('es-ES')}`, 14, 30);
 
       // Add table
-      doc.autoTable({
+      autoTable(doc, {
         head: [columns.map(col => col.header)],
         body: data.map(item => columns.map(col => col.dataKey ? item[col.dataKey] : '')),
         startY: 35,

@@ -236,6 +236,7 @@ export const SocialBenefitsDropdown: React.FC<SocialBenefitsDropdownProps> = ({
         preview={previewData}
         benefitLabel={selectedBenefit?.label || ''}
         benefitIcon={selectedBenefit?.icon || ''}
+        benefitType={selectedBenefit?.key}
         isProcessing={isProcessing}
       />
     </>
