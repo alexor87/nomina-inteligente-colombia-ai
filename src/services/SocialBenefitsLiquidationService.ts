@@ -43,6 +43,48 @@ export interface LiquidationResult {
   periodLabel: string;
 }
 
+export interface AlreadyLiquidatedError {
+  success: false;
+  error: 'already_liquidated';
+  message: string;
+  existingPayment: {
+    id: string;
+    periodLabel: string;
+    amount: number;
+    employeesCount: number;
+    date: string;
+  };
+}
+
+export interface AnulacionResult {
+  success: true;
+  message: string;
+  paymentId: string;
+  benefitType: string;
+  periodLabel: string;
+  totalAmount: number;
+  provisionsReverted: number;
+  anulado_at: string;
+}
+
+export interface PaymentHistoryItem {
+  id: string;
+  company_id: string;
+  benefit_type: string;
+  period_label: string;
+  period_start: string;
+  period_end: string;
+  employees_count: number;
+  total_amount: number;
+  payment_details: any;
+  created_by: string | null;
+  created_at: string;
+  anulado: boolean;
+  anulado_por: string | null;
+  anulado_at: string | null;
+  anulacion_motivo: string | null;
+}
+
 export interface LiquidationError {
   success: false;
   error: string;
@@ -147,7 +189,7 @@ export class SocialBenefitsLiquidationService {
   static async getPaymentHistory(
     companyId: string,
     benefitType?: BenefitType
-  ): Promise<{ success: boolean; payments?: any[]; error?: string }> {
+  ): Promise<{ success: boolean; payments?: PaymentHistoryItem[]; error?: string }> {
     try {
       let query = supabase
         .from('social_benefit_payments')
@@ -165,8 +207,50 @@ export class SocialBenefitsLiquidationService {
         return { success: false, error: error.message };
       }
 
-      return { success: true, payments: data };
+      return { success: true, payments: data as PaymentHistoryItem[] };
     } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Error desconocido'
+      };
+    }
+  }
+
+  /**
+   * Anula una liquidación y revierte las provisiones a estado 'calculado'
+   */
+  static async anularLiquidacion(
+    paymentId: string,
+    motivo: string
+  ): Promise<{ success: boolean; data?: AnulacionResult; error?: string }> {
+    try {
+      console.log(`🔄 Anulando liquidación: ${paymentId}`);
+
+      const { data, error } = await supabase.functions.invoke('anular-social-benefit', {
+        body: {
+          paymentId,
+          motivo
+        }
+      });
+
+      if (error) {
+        console.error('❌ Error en anulación:', error);
+        return {
+          success: false,
+          error: error.message || 'Error anulando liquidación'
+        };
+      }
+
+      if (!data.success) {
+        return {
+          success: false,
+          error: data.error || 'Error desconocido'
+        };
+      }
+
+      return { success: true, data: data as AnulacionResult };
+    } catch (error) {
+      console.error('❌ Error en anularLiquidacion:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Error desconocido'

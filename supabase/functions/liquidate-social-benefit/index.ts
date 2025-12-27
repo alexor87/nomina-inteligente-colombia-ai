@@ -58,6 +58,40 @@ serve(async (req) => {
     console.log(`📦 Liquidación ${benefitType} - Empresa: ${companyId}, Período: ${periodLabel}`);
     console.log(`   Rango: ${periodStart} a ${periodEnd}, Modo: ${save ? 'GUARDAR' : 'PREVIEW'}`);
 
+    // 0. VALIDACIÓN DE RE-LIQUIDACIÓN: Verificar si ya existe una liquidación activa para este período
+    const { data: existingPayment, error: existingPaymentError } = await supabase
+      .from('social_benefit_payments')
+      .select('id, period_label, total_amount, employees_count, created_at')
+      .eq('company_id', companyId)
+      .eq('benefit_type', benefitType)
+      .eq('period_start', periodStart)
+      .eq('period_end', periodEnd)
+      .eq('anulado', false)
+      .maybeSingle();
+
+    if (existingPaymentError) {
+      console.error('❌ Error verificando liquidación existente:', existingPaymentError);
+    }
+
+    if (existingPayment) {
+      console.log(`⚠️ Ya existe liquidación activa para ${benefitType} - ${periodLabel}`);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'already_liquidated',
+          message: 'Esta prestación ya fue liquidada para el período seleccionado',
+          existingPayment: {
+            id: existingPayment.id,
+            periodLabel: existingPayment.period_label,
+            amount: existingPayment.total_amount,
+            employeesCount: existingPayment.employees_count,
+            date: existingPayment.created_at
+          }
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // 1. Detectar períodos abiertos en el rango
     const { data: openPeriods, error: openPeriodsError } = await supabase
       .from('payroll_periods_real')

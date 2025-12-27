@@ -2578,6 +2578,10 @@ export type Database = {
       }
       social_benefit_payments: {
         Row: {
+          anulacion_motivo: string | null
+          anulado: boolean | null
+          anulado_at: string | null
+          anulado_por: string | null
           benefit_type: string
           company_id: string
           created_at: string
@@ -2593,6 +2597,10 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          anulacion_motivo?: string | null
+          anulado?: boolean | null
+          anulado_at?: string | null
+          anulado_por?: string | null
           benefit_type: string
           company_id: string
           created_at?: string
@@ -2608,6 +2616,10 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          anulacion_motivo?: string | null
+          anulado?: boolean | null
+          anulado_at?: string | null
+          anulado_por?: string | null
           benefit_type?: string
           company_id?: string
           created_at?: string
