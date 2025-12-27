@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 import { Gift, Loader2, AlertTriangle, Clock, CheckCircle2, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -12,7 +15,6 @@ import { useToast } from '@/hooks/use-toast';
 import { SocialBenefitsLiquidationService, type LiquidationPreview, type PendingPeriod, type PendingPeriodStatus } from '@/services/SocialBenefitsLiquidationService';
 import { LiquidationPreviewModal } from './LiquidationPreviewModal';
 import { usePendingPeriods } from '@/hooks/usePendingPeriods';
-import type { BenefitType } from '@/types/social-benefits';
 
 interface SocialBenefitsDropdownProps {
   companyId: string;
@@ -41,31 +43,31 @@ const getStatusBadge = (status: PendingPeriodStatus) => {
   switch (status) {
     case 'overdue':
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-destructive/10 text-destructive">
+        <Badge variant="destructive" className="gap-1">
           <AlertTriangle className="h-3 w-3" />
           Vencido
-        </span>
+        </Badge>
       );
     case 'urgent':
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-500/10 text-yellow-600">
+        <Badge variant="warning" className="gap-1">
           <Clock className="h-3 w-3" />
           Urgente
-        </span>
+        </Badge>
       );
     case 'current':
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/10 text-blue-600">
+        <Badge variant="info" className="gap-1">
           <Calendar className="h-3 w-3" />
           En período
-        </span>
+        </Badge>
       );
     default:
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">
+        <Badge variant="secondary" className="gap-1">
           <CheckCircle2 className="h-3 w-3" />
           Pendiente
-        </span>
+        </Badge>
       );
   }
 };
@@ -193,7 +195,7 @@ export const SocialBenefitsDropdown: React.FC<SocialBenefitsDropdownProps> = ({
     const config = BENEFIT_CONFIG[type];
     
     return (
-      <div key={type} className="space-y-2">
+      <div key={type} className="space-y-3">
         <h4 className="text-sm font-medium text-foreground flex items-center gap-2">
           <span>{config.icon}</span>
           {config.label}
@@ -204,46 +206,44 @@ export const SocialBenefitsDropdown: React.FC<SocialBenefitsDropdownProps> = ({
             const isThisPeriodLoading = isLoadingPreview && selectedPeriod && getPeriodKey(selectedPeriod) === periodKey;
             
             return (
-              <div
-                key={periodKey}
-                className="p-3 rounded-lg border border-border bg-card hover:bg-accent/50 transition-colors"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium text-sm">{period.periodLabel}</span>
-                      {getStatusBadge(period.status)}
+              <Card key={periodKey} className="hover:bg-accent/50 transition-colors">
+                <CardContent className="p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-sm">{period.periodLabel}</span>
+                        {getStatusBadge(period.status)}
+                      </div>
+                      <div className="mt-2 text-xs text-muted-foreground space-y-1">
+                        <div>{period.employeesCount} empleados</div>
+                        <div className="font-semibold text-foreground">{formatCurrency(period.totalAmount)}</div>
+                        {period.daysUntilDeadline !== undefined && (
+                          <div className={period.daysUntilDeadline < 0 ? 'text-destructive font-medium' : period.daysUntilDeadline <= 15 ? 'text-yellow-700 dark:text-yellow-400' : 'text-muted-foreground'}>
+                            {period.daysUntilDeadline < 0 
+                              ? `Venció hace ${Math.abs(period.daysUntilDeadline)} días`
+                              : period.daysUntilDeadline === 0
+                              ? 'Vence hoy'
+                              : `Vence en ${period.daysUntilDeadline} días`
+                            }
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div className="mt-1 text-xs text-muted-foreground space-y-0.5">
-                      <div>{period.employeesCount} empleados</div>
-                      <div className="font-medium text-foreground">{formatCurrency(period.totalAmount)}</div>
-                      {period.daysUntilDeadline !== undefined && (
-                        <div className={period.daysUntilDeadline < 0 ? 'text-destructive' : period.daysUntilDeadline <= 15 ? 'text-yellow-600' : ''}>
-                          {period.daysUntilDeadline < 0 
-                            ? `Venció hace ${Math.abs(period.daysUntilDeadline)} días`
-                            : period.daysUntilDeadline === 0
-                            ? 'Vence hoy'
-                            : `Vence en ${period.daysUntilDeadline} días`
-                          }
-                        </div>
+                    <Button
+                      size="sm"
+                      onClick={() => handleSelectPeriod(period)}
+                      disabled={isLoadingPreview}
+                      className="shrink-0"
+                    >
+                      {isThisPeriodLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        'Liquidar'
                       )}
-                    </div>
+                    </Button>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="default"
-                    onClick={() => handleSelectPeriod(period)}
-                    disabled={isLoadingPreview}
-                    className="shrink-0"
-                  >
-                    {isThisPeriodLoading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      'Liquidar'
-                    )}
-                  </Button>
-                </div>
-              </div>
+                </CardContent>
+              </Card>
             );
           })}
         </div>
@@ -259,14 +259,14 @@ export const SocialBenefitsDropdown: React.FC<SocialBenefitsDropdownProps> = ({
             variant="outline"
             size="sm"
             disabled={disabled}
-            className="text-green-700 border-green-300 hover:bg-green-100"
+            className="border-green-600/30 text-green-700 dark:text-green-400 hover:bg-green-500/10"
           >
             <Gift className="h-4 w-4 mr-2" />
             Prestaciones Sociales
             {stats.totalPending > 0 && (
-              <span className="ml-2 px-1.5 py-0.5 text-xs rounded-full bg-green-600 text-white">
+              <Badge variant="success" className="ml-2">
                 {stats.totalPending}
-              </span>
+              </Badge>
             )}
           </Button>
         </DialogTrigger>
@@ -276,9 +276,12 @@ export const SocialBenefitsDropdown: React.FC<SocialBenefitsDropdownProps> = ({
               <Gift className="h-5 w-5 text-green-600" />
               Prestaciones Sociales Pendientes
             </DialogTitle>
+            <DialogDescription>
+              Gestiona y liquida las prestaciones sociales de tus empleados
+            </DialogDescription>
           </DialogHeader>
 
-          <div className="flex-1 overflow-y-auto pr-1">
+          <div className="flex-1 overflow-y-auto pr-1 space-y-4">
             {isLoading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -299,19 +302,19 @@ export const SocialBenefitsDropdown: React.FC<SocialBenefitsDropdownProps> = ({
                 </p>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-5">
                 {/* Stats summary */}
                 {(stats.overdueCount > 0 || stats.urgentCount > 0) && (
                   <div className="flex gap-2 flex-wrap">
                     {stats.overdueCount > 0 && (
-                      <div className="px-3 py-1.5 rounded-lg bg-destructive/10 text-destructive text-xs font-medium">
+                      <Badge variant="destructive">
                         {stats.overdueCount} vencido{stats.overdueCount > 1 ? 's' : ''}
-                      </div>
+                      </Badge>
                     )}
                     {stats.urgentCount > 0 && (
-                      <div className="px-3 py-1.5 rounded-lg bg-yellow-500/10 text-yellow-600 text-xs font-medium">
+                      <Badge variant="warning">
                         {stats.urgentCount} urgente{stats.urgentCount > 1 ? 's' : ''}
-                      </div>
+                      </Badge>
                     )}
                   </div>
                 )}
