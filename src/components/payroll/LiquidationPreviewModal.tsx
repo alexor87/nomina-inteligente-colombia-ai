@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { AlertTriangle, CheckCircle, Users, DollarSign, Calendar, Loader2 } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { AlertTriangle, CheckCircle, Users, DollarSign, Calendar, Loader2, Clock } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -33,6 +33,7 @@ interface LiquidationPreviewModalProps {
   preview: LiquidationPreview | null;
   benefitLabel: string;
   benefitIcon: string;
+  benefitType?: string;
   isProcessing: boolean;
 }
 
@@ -45,6 +46,54 @@ const formatCurrency = (value: number): string => {
   }).format(value);
 };
 
+// Función para calcular alertas de fechas de corte legal
+const getLegalDeadlineAlert = (benefitType?: string): { message: string; urgency: 'info' | 'warning' | 'urgent' } | null => {
+  if (!benefitType) return null;
+  
+  const now = new Date();
+  const month = now.getMonth(); // 0-11
+  const day = now.getDate();
+
+  if (benefitType === 'prima') {
+    // Prima 1er semestre: límite 30 junio
+    if (month === 5) { // Junio
+      if (day >= 25) return { message: 'La prima de primer semestre vence el 30 de junio', urgency: 'urgent' };
+      if (day >= 15) return { message: 'Quedan pocos días para el límite del 30 de junio', urgency: 'warning' };
+    }
+    // Prima 2do semestre: límite 20 diciembre
+    if (month === 11) { // Diciembre
+      if (day >= 15) return { message: 'La prima de segundo semestre vence el 20 de diciembre', urgency: 'urgent' };
+      if (day >= 5) return { message: 'El límite para prima de segundo semestre es el 20 de diciembre', urgency: 'warning' };
+    }
+  }
+
+  if (benefitType === 'cesantias') {
+    // Cesantías: consignar antes del 14 de febrero
+    if (month === 0) { // Enero
+      if (day >= 25) return { message: 'Las cesantías deben consignarse antes del 14 de febrero', urgency: 'urgent' };
+      return { message: 'Recuerde: el límite de consignación de cesantías es el 14 de febrero', urgency: 'info' };
+    }
+    if (month === 1 && day <= 14) { // Febrero
+      if (day >= 10) return { message: '¡Última semana! Las cesantías deben consignarse antes del 14 de febrero', urgency: 'urgent' };
+      return { message: 'Las cesantías deben consignarse antes del 14 de febrero', urgency: 'warning' };
+    }
+  }
+
+  if (benefitType === 'intereses_cesantias') {
+    // Intereses de cesantías: pago antes del 31 de enero
+    if (month === 0) { // Enero
+      if (day >= 25) return { message: '¡Última semana! Los intereses de cesantías vencen el 31 de enero', urgency: 'urgent' };
+      if (day >= 15) return { message: 'El pago de intereses de cesantías vence el 31 de enero', urgency: 'warning' };
+      return { message: 'Recuerde: el límite para pago de intereses es el 31 de enero', urgency: 'info' };
+    }
+    if (month === 11 && day >= 15) { // Diciembre
+      return { message: 'Próximamente vence el plazo para intereses de cesantías (31 de enero)', urgency: 'info' };
+    }
+  }
+
+  return null;
+};
+
 export const LiquidationPreviewModal: React.FC<LiquidationPreviewModalProps> = ({
   isOpen,
   onClose,
@@ -52,9 +101,13 @@ export const LiquidationPreviewModal: React.FC<LiquidationPreviewModalProps> = (
   preview,
   benefitLabel,
   benefitIcon,
+  benefitType,
   isProcessing,
 }) => {
   const [skipOpenPeriods, setSkipOpenPeriods] = useState(false);
+
+  // Calcular alerta de fecha legal
+  const legalAlert = useMemo(() => getLegalDeadlineAlert(benefitType), [benefitType]);
 
   if (!preview) return null;
 
@@ -79,6 +132,45 @@ export const LiquidationPreviewModal: React.FC<LiquidationPreviewModalProps> = (
         </DialogHeader>
 
         <div className="flex-1 overflow-hidden space-y-4">
+          {/* Alerta de fecha de corte legal */}
+          {legalAlert && (
+            <Alert 
+              variant={legalAlert.urgency === 'urgent' ? 'destructive' : 'default'}
+              className={
+                legalAlert.urgency === 'urgent' 
+                  ? 'border-red-500 bg-red-50 dark:bg-red-950' 
+                  : legalAlert.urgency === 'warning'
+                  ? 'border-amber-500 bg-amber-50 dark:bg-amber-950'
+                  : 'border-blue-500 bg-blue-50 dark:bg-blue-950'
+              }
+            >
+              <Clock className={`h-4 w-4 ${
+                legalAlert.urgency === 'urgent' 
+                  ? 'text-red-600' 
+                  : legalAlert.urgency === 'warning'
+                  ? 'text-amber-600'
+                  : 'text-blue-600'
+              }`} />
+              <AlertTitle className={
+                legalAlert.urgency === 'urgent' 
+                  ? 'text-red-800 dark:text-red-200' 
+                  : legalAlert.urgency === 'warning'
+                  ? 'text-amber-800 dark:text-amber-200'
+                  : 'text-blue-800 dark:text-blue-200'
+              }>
+                {legalAlert.urgency === 'urgent' ? '⚠️ Fecha límite próxima' : 'Recordatorio de fecha legal'}
+              </AlertTitle>
+              <AlertDescription className={
+                legalAlert.urgency === 'urgent' 
+                  ? 'text-red-700 dark:text-red-300' 
+                  : legalAlert.urgency === 'warning'
+                  ? 'text-amber-700 dark:text-amber-300'
+                  : 'text-blue-700 dark:text-blue-300'
+              }>
+                {legalAlert.message}
+              </AlertDescription>
+            </Alert>
+          )}
           {/* Alerta de períodos abiertos */}
           {hasOpenPeriods && (
             <Alert variant="destructive" className="border-amber-500 bg-amber-50 text-amber-900">
