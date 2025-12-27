@@ -94,7 +94,165 @@ export interface LiquidationError {
 
 export type LiquidationResponse = LiquidationPreview | LiquidationResult | LiquidationError;
 
+export type PendingPeriodStatus = 'overdue' | 'urgent' | 'current' | 'future';
+
+export interface PendingPeriod {
+  benefitType: 'prima' | 'cesantias' | 'intereses_cesantias';
+  periodLabel: string;
+  periodStart: string;
+  periodEnd: string;
+  employeesCount: number;
+  totalAmount: number;
+  status: PendingPeriodStatus;
+  legalDeadline: string;
+  daysUntilDeadline: number;
+}
+
 export class SocialBenefitsLiquidationService {
+  /**
+   * Obtiene todos los períodos pendientes de liquidar agrupados por tipo de beneficio
+   */
+  static async getPendingPeriods(companyId: string): Promise<{ success: boolean; periods?: PendingPeriod[]; error?: string }> {
+    try {
+      // Consultar provisiones pendientes (calculado y sin payment_id)
+      const { data, error } = await supabase
+        .from('social_benefit_calculations')
+        .select('benefit_type, period_start, period_end, employee_id, calculated_amount')
+        .eq('company_id', companyId)
+        .eq('estado', 'calculado')
+        .is('payment_id', null);
+
+      if (error) {
+        console.error('❌ Error consultando períodos pendientes:', error);
+        return { success: false, error: error.message };
+      }
+
+      if (!data || data.length === 0) {
+        return { success: true, periods: [] };
+      }
+
+      // Agrupar por tipo de beneficio y período
+      const groupedPeriods = new Map<string, {
+        benefitType: 'prima' | 'cesantias' | 'intereses_cesantias';
+        periodStart: string;
+        periodEnd: string;
+        employees: Set<string>;
+        totalAmount: number;
+      }>();
+
+      data.forEach((calc: any) => {
+        const benefitType = calc.benefit_type as 'prima' | 'cesantias' | 'intereses_cesantias';
+        const periodStart = calc.period_start;
+        const periodEnd = calc.period_end;
+        
+        // Crear key único basado en tipo y período
+        let periodKey: string;
+        const startDate = new Date(periodStart);
+        const year = startDate.getFullYear();
+        
+        if (benefitType === 'prima') {
+          // Para prima, agrupar por semestre
+          const semester = startDate.getMonth() < 6 ? 1 : 2;
+          periodKey = `${benefitType}-${year}-S${semester}`;
+        } else {
+          // Para cesantías e intereses, agrupar por año
+          periodKey = `${benefitType}-${year}`;
+        }
+
+        if (!groupedPeriods.has(periodKey)) {
+          groupedPeriods.set(periodKey, {
+            benefitType,
+            periodStart,
+            periodEnd,
+            employees: new Set(),
+            totalAmount: 0
+          });
+        }
+
+        const group = groupedPeriods.get(periodKey)!;
+        group.employees.add(calc.employee_id);
+        group.totalAmount += Number(calc.calculated_amount) || 0;
+        // Actualizar fechas para tener el rango más amplio
+        if (new Date(periodStart) < new Date(group.periodStart)) {
+          group.periodStart = periodStart;
+        }
+        if (new Date(periodEnd) > new Date(group.periodEnd)) {
+          group.periodEnd = periodEnd;
+        }
+      });
+
+      // Convertir a array de PendingPeriod con cálculo de status
+      const now = new Date();
+      const periods: PendingPeriod[] = [];
+
+      groupedPeriods.forEach((group, key) => {
+        const startDate = new Date(group.periodStart);
+        const year = startDate.getFullYear();
+        
+        let periodLabel: string;
+        let legalDeadline: Date;
+
+        if (group.benefitType === 'prima') {
+          const semester = startDate.getMonth() < 6 ? 1 : 2;
+          periodLabel = semester === 1 ? `1er Semestre ${year}` : `2do Semestre ${year}`;
+          // Fecha legal: 30 Jun para S1, 20 Dic para S2
+          legalDeadline = semester === 1 
+            ? new Date(year, 5, 30) // 30 de junio
+            : new Date(year, 11, 20); // 20 de diciembre
+        } else if (group.benefitType === 'cesantias') {
+          periodLabel = `Año ${year}`;
+          // Fecha legal: 14 de febrero del año siguiente
+          legalDeadline = new Date(year + 1, 1, 14);
+        } else {
+          periodLabel = `Año ${year}`;
+          // Fecha legal: 31 de enero del año siguiente
+          legalDeadline = new Date(year + 1, 0, 31);
+        }
+
+        const daysUntilDeadline = Math.ceil((legalDeadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        
+        let status: PendingPeriodStatus;
+        if (daysUntilDeadline < 0) {
+          status = 'overdue';
+        } else if (daysUntilDeadline <= 30) {
+          status = 'urgent';
+        } else if (daysUntilDeadline <= 90) {
+          status = 'current';
+        } else {
+          status = 'future';
+        }
+
+        periods.push({
+          benefitType: group.benefitType,
+          periodLabel,
+          periodStart: group.periodStart,
+          periodEnd: group.periodEnd,
+          employeesCount: group.employees.size,
+          totalAmount: group.totalAmount,
+          status,
+          legalDeadline: legalDeadline.toISOString().split('T')[0],
+          daysUntilDeadline
+        });
+      });
+
+      // Ordenar por urgencia (vencidos primero, luego por fecha)
+      periods.sort((a, b) => {
+        const statusOrder = { overdue: 0, urgent: 1, current: 2, future: 3 };
+        if (statusOrder[a.status] !== statusOrder[b.status]) {
+          return statusOrder[a.status] - statusOrder[b.status];
+        }
+        return new Date(a.periodStart).getTime() - new Date(b.periodStart).getTime();
+      });
+
+      return { success: true, periods };
+    } catch (error) {
+      console.error('❌ Error en getPendingPeriods:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Error desconocido'
+      };
+    }
+  }
   /**
    * Obtiene un preview de la liquidación consultando provisiones acumuladas
    */
