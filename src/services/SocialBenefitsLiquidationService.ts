@@ -117,7 +117,7 @@ export class SocialBenefitsLiquidationService {
       // Consultar provisiones pendientes (calculado y sin payment_id)
       const { data, error } = await supabase
         .from('social_benefit_calculations')
-        .select('benefit_type, period_start, period_end, employee_id, calculated_amount')
+        .select('benefit_type, period_start, period_end, employee_id, amount')
         .eq('company_id', companyId)
         .eq('estado', 'calculado')
         .is('payment_id', null);
@@ -171,7 +171,7 @@ export class SocialBenefitsLiquidationService {
 
         const group = groupedPeriods.get(periodKey)!;
         group.employees.add(calc.employee_id);
-        group.totalAmount += Number(calc.calculated_amount) || 0;
+        group.totalAmount += Number(calc.amount) || 0;
         // Actualizar fechas para tener el rango más amplio
         if (new Date(periodStart) < new Date(group.periodStart)) {
           group.periodStart = periodStart;
