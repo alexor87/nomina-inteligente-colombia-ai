@@ -196,7 +196,7 @@ export const SocialBenefitsDropdown: React.FC<SocialBenefitsDropdownProps> = ({
     
     return (
       <div key={type} className="space-y-3">
-        <h4 className="text-sm font-medium text-foreground flex items-center gap-2">
+        <h4 className="text-base font-semibold text-foreground flex items-center gap-2">
           <span>{config.icon}</span>
           {config.label}
         </h4>
@@ -207,16 +207,16 @@ export const SocialBenefitsDropdown: React.FC<SocialBenefitsDropdownProps> = ({
             
             return (
               <Card key={periodKey} className="hover:bg-accent/50 transition-colors">
-                <CardContent className="p-3">
+                <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-sm">{period.periodLabel}</span>
+                        <span className="font-semibold text-base">{period.periodLabel}</span>
                         {getStatusBadge(period.status)}
                       </div>
-                      <div className="mt-2 text-xs text-muted-foreground space-y-1">
+                      <div className="mt-2 text-sm text-muted-foreground space-y-1">
                         <div>{period.employeesCount} empleados</div>
-                        <div className="font-semibold text-foreground">{formatCurrency(period.totalAmount)}</div>
+                        <div className="font-bold text-base text-foreground">{formatCurrency(period.totalAmount)}</div>
                         {period.daysUntilDeadline !== undefined && (
                           <div className={period.daysUntilDeadline < 0 ? 'text-destructive font-medium' : period.daysUntilDeadline <= 15 ? 'text-yellow-700 dark:text-yellow-400' : 'text-muted-foreground'}>
                             {period.daysUntilDeadline < 0 
@@ -272,7 +272,7 @@ export const SocialBenefitsDropdown: React.FC<SocialBenefitsDropdownProps> = ({
         </DialogTrigger>
         <DialogContent className="max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
+            <DialogTitle className="flex items-center gap-2 text-xl">
               <Gift className="h-5 w-5 text-green-600" />
               Prestaciones Sociales Pendientes
             </DialogTitle>
