@@ -44,3 +44,6 @@ verify_jwt = false
 
 [functions.populate-knowledge-embeddings]
 verify_jwt = false
+
+[functions.liquidate-social-benefit]
+verify_jwt = true

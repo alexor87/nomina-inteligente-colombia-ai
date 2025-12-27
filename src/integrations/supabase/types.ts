@@ -2513,6 +2513,7 @@ export type Database = {
           estado: string
           id: string
           notes: string | null
+          payment_id: string | null
           period_end: string
           period_start: string
           updated_at: string
@@ -2529,6 +2530,7 @@ export type Database = {
           estado?: string
           id?: string
           notes?: string | null
+          payment_id?: string | null
           period_end: string
           period_start: string
           updated_at?: string
@@ -2545,6 +2547,7 @@ export type Database = {
           estado?: string
           id?: string
           notes?: string | null
+          payment_id?: string | null
           period_end?: string
           period_start?: string
           updated_at?: string
@@ -2562,6 +2565,69 @@ export type Database = {
             columns: ["employee_id"]
             isOneToOne: false
             referencedRelation: "employees_limited"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "social_benefit_calculations_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "social_benefit_payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      social_benefit_payments: {
+        Row: {
+          benefit_type: string
+          company_id: string
+          created_at: string
+          created_by: string | null
+          employees_count: number
+          estado: string
+          id: string
+          payment_details: Json | null
+          period_end: string
+          period_label: string
+          period_start: string
+          total_amount: number
+          updated_at: string
+        }
+        Insert: {
+          benefit_type: string
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          employees_count?: number
+          estado?: string
+          id?: string
+          payment_details?: Json | null
+          period_end: string
+          period_label: string
+          period_start: string
+          total_amount?: number
+          updated_at?: string
+        }
+        Update: {
+          benefit_type?: string
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          employees_count?: number
+          estado?: string
+          id?: string
+          payment_details?: Json | null
+          period_end?: string
+          period_label?: string
+          period_start?: string
+          total_amount?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_benefit_payments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
