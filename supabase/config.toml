@@ -47,3 +47,6 @@ verify_jwt = false
 
 [functions.liquidate-social-benefit]
 verify_jwt = true
+
+[functions.anular-social-benefit]
+verify_jwt = true
