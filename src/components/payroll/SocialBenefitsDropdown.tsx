@@ -7,18 +7,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { SocialBenefitsService } from '@/services/SocialBenefitsService';
+import { SocialBenefitsLiquidationService, type LiquidationPreview } from '@/services/SocialBenefitsLiquidationService';
+import { LiquidationPreviewModal } from './LiquidationPreviewModal';
 import type { BenefitType } from '@/types/social-benefits';
 
 interface Employee {
@@ -90,72 +81,106 @@ export const SocialBenefitsDropdown: React.FC<SocialBenefitsDropdownProps> = ({
 }) => {
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
-  const [confirmDialog, setConfirmDialog] = useState<{
-    open: boolean;
-    benefit: BenefitOption | null;
-  }>({ open: false, benefit: null });
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [progress, setProgress] = useState({ current: 0, total: 0 });
+  const [selectedBenefit, setSelectedBenefit] = useState<BenefitOption | null>(null);
+  const [previewData, setPreviewData] = useState<LiquidationPreview | null>(null);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
 
   const benefitOptions = getBenefitOptions();
 
-  const handleSelectBenefit = (benefit: BenefitOption) => {
+  const handleSelectBenefit = async (benefit: BenefitOption) => {
     setIsOpen(false);
-    setConfirmDialog({ open: true, benefit });
-  };
+    setSelectedBenefit(benefit);
+    setIsLoadingPreview(true);
 
-  const handleConfirmLiquidation = async () => {
-    if (!confirmDialog.benefit || employees.length === 0) return;
-
-    const benefit = confirmDialog.benefit;
     const dates = benefit.getPeriodDates();
-    
-    setConfirmDialog({ open: false, benefit: null });
-    setIsProcessing(true);
-    setProgress({ current: 0, total: employees.length });
 
-    let successCount = 0;
-    let errorCount = 0;
+    try {
+      const result = await SocialBenefitsLiquidationService.getPreview(
+        companyId,
+        benefit.key,
+        dates.start,
+        dates.end,
+        benefit.getPeriodLabel()
+      );
 
-    for (let i = 0; i < employees.length; i++) {
-      const employee = employees[i];
-      setProgress({ current: i + 1, total: employees.length });
-
-      try {
-        const result = await SocialBenefitsService.calculateAndSave({
-          employeeId: employee.id,
-          benefitType: benefit.key,
-          periodStart: dates.start,
-          periodEnd: dates.end,
-          notes: `Liquidación masiva - ${benefit.label} ${benefit.getPeriodLabel()}`,
+      if (!result.success) {
+        toast({
+          title: 'Error obteniendo preview',
+          description: 'error' in result ? result.error : 'Error desconocido',
+          variant: 'destructive',
         });
-
-        if (result.success) {
-          successCount++;
-        } else {
-          errorCount++;
-          console.error(`Error liquidando ${benefit.label} para ${employee.nombre}:`, result);
-        }
-      } catch (error) {
-        errorCount++;
-        console.error(`Error liquidando ${benefit.label} para ${employee.nombre}:`, error);
+        return;
       }
-    }
 
-    setIsProcessing(false);
-    setProgress({ current: 0, total: 0 });
-
-    if (errorCount === 0) {
+      if (result.mode === 'preview') {
+        setPreviewData(result);
+        setShowPreviewModal(true);
+      }
+    } catch (error) {
+      console.error('Error en preview:', error);
       toast({
-        title: '✅ Liquidación completada',
-        description: `${benefit.label} liquidada para ${successCount} empleados`,
-      });
-    } else {
-      toast({
-        title: '⚠️ Liquidación parcial',
-        description: `${successCount} exitosos, ${errorCount} con errores`,
+        title: 'Error',
+        description: 'No se pudo obtener la información de liquidación',
         variant: 'destructive',
       });
+    } finally {
+      setIsLoadingPreview(false);
+    }
+  };
+
+  const handleConfirmLiquidation = async (skipOpenPeriods: boolean) => {
+    if (!selectedBenefit) return;
+
+    setIsProcessing(true);
+    const dates = selectedBenefit.getPeriodDates();
+
+    try {
+      const result = await SocialBenefitsLiquidationService.liquidate(
+        companyId,
+        selectedBenefit.key,
+        dates.start,
+        dates.end,
+        selectedBenefit.getPeriodLabel(),
+        skipOpenPeriods
+      );
+
+      if (!result.success) {
+        toast({
+          title: 'Error en liquidación',
+          description: 'error' in result ? result.error : 'Error desconocido',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      if (result.mode === 'saved') {
+        toast({
+          title: '✅ Liquidación completada',
+          description: `${selectedBenefit.label} liquidada para ${result.employeesCount} empleados - Total: $${result.totalAmount.toLocaleString()}`,
+        });
+        setShowPreviewModal(false);
+        setPreviewData(null);
+        setSelectedBenefit(null);
+      }
+    } catch (error) {
+      console.error('Error en liquidación:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo completar la liquidación',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleCloseModal = () => {
+    if (!isProcessing) {
+      setShowPreviewModal(false);
+      setPreviewData(null);
+      setSelectedBenefit(null);
     }
   };
 
@@ -168,13 +193,13 @@ export const SocialBenefitsDropdown: React.FC<SocialBenefitsDropdownProps> = ({
           <Button
             variant="outline"
             size="sm"
-            disabled={disabled || isProcessing}
+            disabled={disabled || isLoadingPreview}
             className="text-green-700 border-green-300 hover:bg-green-100"
           >
-            {isProcessing ? (
+            {isLoadingPreview ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                {progress.current}/{progress.total}
+                Cargando...
               </>
             ) : (
               <>
@@ -204,32 +229,15 @@ export const SocialBenefitsDropdown: React.FC<SocialBenefitsDropdownProps> = ({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <AlertDialog
-        open={confirmDialog.open}
-        onOpenChange={(open) => !open && setConfirmDialog({ open: false, benefit: null })}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {confirmDialog.benefit?.icon} Liquidar {confirmDialog.benefit?.label}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              ¿Desea liquidar <strong>{confirmDialog.benefit?.label}</strong> del{' '}
-              <strong>{confirmDialog.benefit?.getPeriodLabel()}</strong> para{' '}
-              <strong>{employees.length} empleados</strong>?
-              <br />
-              <br />
-              Esta acción calculará y guardará la prestación para todos los empleados activos.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmLiquidation}>
-              Liquidar {employees.length} empleados
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <LiquidationPreviewModal
+        isOpen={showPreviewModal}
+        onClose={handleCloseModal}
+        onConfirm={handleConfirmLiquidation}
+        preview={previewData}
+        benefitLabel={selectedBenefit?.label || ''}
+        benefitIcon={selectedBenefit?.icon || ''}
+        isProcessing={isProcessing}
+      />
     </>
   );
 };

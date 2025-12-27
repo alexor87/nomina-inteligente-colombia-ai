@@ -1,5 +1,6 @@
-
 export type BenefitType = 'cesantias' | 'intereses_cesantias' | 'prima' | 'vacaciones';
+
+export type BenefitEstado = 'calculado' | 'liquidado' | 'anulado';
 
 export interface CalculateBenefitPayload {
   employeeId: string;
@@ -32,3 +33,19 @@ export type BenefitCalculationResponse =
   | BenefitCalculationPreview
   | BenefitCalculationSaved
   | { success: false; error: string; details?: any; message?: string };
+
+// Tipos para liquidación
+export interface SocialBenefitPayment {
+  id: string;
+  company_id: string;
+  benefit_type: BenefitType;
+  period_label: string;
+  period_start: string;
+  period_end: string;
+  employees_count: number;
+  total_amount: number;
+  payment_details: any;
+  estado: 'pagado' | 'anulado';
+  created_by: string | null;
+  created_at: string;
+}
