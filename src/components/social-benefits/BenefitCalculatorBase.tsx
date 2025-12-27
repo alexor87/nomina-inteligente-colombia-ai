@@ -21,6 +21,10 @@ interface BenefitCalculatorBaseProps {
     start: string;
     end: string;
   };
+  // Props para período pre-seleccionado desde el dashboard
+  initialPeriodStart?: string;
+  initialPeriodEnd?: string;
+  initialPeriodLabel?: string;
 }
 
 type QuickPeriodType = 'sem1' | 'sem2' | 'custom';
@@ -29,15 +33,28 @@ export const BenefitCalculatorBase = ({
   benefitType,
   title,
   description,
-  defaultPeriod
+  defaultPeriod,
+  initialPeriodStart,
+  initialPeriodEnd,
+  initialPeriodLabel
 }: BenefitCalculatorBaseProps) => {
   const currentYear = new Date().getFullYear();
   
   const [selectedEmployee, setSelectedEmployee] = useState('');
-  const [periodStart, setPeriodStart] = useState(defaultPeriod?.start || '');
-  const [periodEnd, setPeriodEnd] = useState(defaultPeriod?.end || '');
+  const [periodStart, setPeriodStart] = useState(initialPeriodStart || defaultPeriod?.start || '');
+  const [periodEnd, setPeriodEnd] = useState(initialPeriodEnd || defaultPeriod?.end || '');
   const [notes, setNotes] = useState('');
-  const [quickPeriod, setQuickPeriod] = useState<QuickPeriodType>('custom');
+  
+  // Determinar quickPeriod inicial basado en período pre-seleccionado
+  const getInitialQuickPeriod = (): QuickPeriodType => {
+    if (initialPeriodStart && initialPeriodEnd) {
+      const startMonth = new Date(initialPeriodStart).getMonth();
+      if (startMonth < 6) return 'sem1';
+      return 'sem2';
+    }
+    return 'custom';
+  };
+  const [quickPeriod, setQuickPeriod] = useState<QuickPeriodType>(getInitialQuickPeriod());
 
   const { data: employees = [], isLoading: employeesLoading } = useSecureEmployees();
   const { isCalculating, previewResult, calculatePreview, calculateAndSave, clearPreview } = useSocialBenefits();
