@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Download, CheckCircle, Loader2 } from 'lucide-react';
+import { Search, Download, CheckCircle, Loader2, HelpCircle, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -7,7 +7,19 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { ConfirmLiquidationModal } from './ConfirmLiquidationModal';
+
+type BenefitType = 'prima' | 'cesantias' | 'intereses_cesantias';
 
 interface LiquidationActionBarProps {
   searchTerm: string;
@@ -19,7 +31,41 @@ interface LiquidationActionBarProps {
   benefitLabel: string;
   employeesCount: number;
   totalAmount: number;
+  benefitType?: BenefitType;
 }
+
+const FAQ_ITEMS: Record<BenefitType, { question: string; answer: string }[]> = {
+  prima: [
+    {
+      question: '¿Cómo se calcula la prima?',
+      answer: 'La prima equivale a un mes de salario por año trabajado. Se calcula sobre el salario promedio del semestre, incluyendo el auxilio de transporte.',
+    },
+    {
+      question: '¿Cuándo debo pagar la prima?',
+      answer: 'La prima del primer semestre se paga a más tardar el 30 de junio. La del segundo semestre, máximo el 20 de diciembre.',
+    },
+  ],
+  cesantias: [
+    {
+      question: '¿Cómo se calculan las cesantías?',
+      answer: 'Las cesantías equivalen a un mes de salario por año trabajado. Se calculan sobre el último salario devengado.',
+    },
+    {
+      question: '¿Cuándo debo consignar las cesantías?',
+      answer: 'Las cesantías deben consignarse al fondo antes del 14 de febrero del año siguiente.',
+    },
+  ],
+  intereses_cesantias: [
+    {
+      question: '¿Cómo se calculan los intereses?',
+      answer: 'Los intereses corresponden al 12% anual sobre el saldo de cesantías acumuladas durante el año.',
+    },
+    {
+      question: '¿Cuándo debo pagar los intereses?',
+      answer: 'Los intereses se pagan directamente al trabajador antes del 31 de enero de cada año.',
+    },
+  ],
+};
 
 const formatCurrency = (amount: number): string => {
   return new Intl.NumberFormat('es-CO', {
@@ -40,8 +86,10 @@ export const LiquidationActionBar: React.FC<LiquidationActionBarProps> = ({
   benefitLabel,
   employeesCount,
   totalAmount,
+  benefitType = 'prima',
 }) => {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const faqs = FAQ_ITEMS[benefitType] || FAQ_ITEMS.prima;
 
   const handleConfirmLiquidation = async () => {
     await onLiquidate();
@@ -64,6 +112,34 @@ export const LiquidationActionBar: React.FC<LiquidationActionBarProps> = ({
 
         {/* Right side - Actions */}
         <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+          {/* Help button with FAQs */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="sm" className="gap-2">
+                <HelpCircle className="h-4 w-4" />
+                <span className="hidden sm:inline">Ayuda</span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80" align="end">
+              <div className="space-y-3">
+                <h4 className="font-medium text-sm">Preguntas Frecuentes</h4>
+                <div className="space-y-2">
+                  {faqs.map((faq, index) => (
+                    <Collapsible key={index}>
+                      <CollapsibleTrigger className="flex items-start gap-2 text-sm text-left hover:text-primary transition-colors w-full py-1.5">
+                        <ExternalLink className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                        <span>{faq.question}</span>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="pl-5 pb-2">
+                        <p className="text-xs text-muted-foreground">{faq.answer}</p>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  ))}
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+
           <Tooltip>
             <TooltipTrigger asChild>
               <Button variant="outline" size="sm" onClick={onDownload}>

@@ -3,7 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { LiquidationHero } from '@/components/social-benefits/liquidation/LiquidationHero';
-import { LiquidationSidebar } from '@/components/social-benefits/liquidation/LiquidationSidebar';
 import { EmployeeLiquidationTable } from '@/components/social-benefits/liquidation/EmployeeLiquidationTable';
 import { LiquidationActionBar } from '@/components/social-benefits/liquidation/LiquidationActionBar';
 import { useSocialBenefitLiquidation } from '@/hooks/useSocialBenefitLiquidation';
@@ -71,55 +70,44 @@ export default function SocialBenefitLiquidationPage() {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Main content area */}
-          <div className="lg:col-span-3 space-y-6">
-            {/* Hero section */}
-            <LiquidationHero
-              benefitType={validBenefitType}
-              benefitLabel={benefitLabel}
-              periodLabel={periodInfo?.periodLabel || decodedPeriodKey}
-              description={benefitDescription}
-            />
+      <div className="container mx-auto px-4 py-6 space-y-6">
+        {/* Hero section with integrated period info */}
+        <LiquidationHero
+          benefitType={validBenefitType}
+          benefitLabel={benefitLabel}
+          periodLabel={periodInfo?.periodLabel || decodedPeriodKey}
+          description={benefitDescription}
+          periodStart={periodInfo?.periodStart}
+          periodEnd={periodInfo?.periodEnd}
+          legalDeadline={periodInfo?.legalDeadline}
+        />
 
-            {/* Action bar */}
-            <LiquidationActionBar
-              searchTerm={searchTerm}
-              onSearchChange={setSearchTerm}
-              onDownload={handleDownloadSummary}
-              onLiquidate={handleLiquidate}
-              isLiquidating={isLiquidating}
-              isLiquidated={isLiquidated}
-              benefitLabel={benefitLabel}
-              employeesCount={employees.length}
-              totalAmount={summary?.totalAmount || 0}
-            />
+        {/* Action bar with help button */}
+        <LiquidationActionBar
+          searchTerm={searchTerm}
+          onSearchChange={setSearchTerm}
+          onDownload={handleDownloadSummary}
+          onLiquidate={handleLiquidate}
+          isLiquidating={isLiquidating}
+          isLiquidated={isLiquidated}
+          benefitLabel={benefitLabel}
+          employeesCount={employees.length}
+          totalAmount={summary?.totalAmount || 0}
+          benefitType={validBenefitType}
+        />
 
-            {/* Employees table */}
-            <EmployeeLiquidationTable
-              employees={employees}
-              benefitType={validBenefitType}
-              isLoading={isLoading}
-              error={error}
-              onRetry={refetch}
-              onUpdateEmployee={handleUpdateEmployee}
-              onDeleteEmployee={handleDeleteEmployee}
-              editingRowId={editingRowId}
-              onEditRow={setEditingRowId}
-            />
-          </div>
-
-          {/* Sidebar */}
-          <div className="lg:col-span-1">
-            <LiquidationSidebar
-              benefitType={validBenefitType}
-              periodStart={periodInfo?.periodStart}
-              periodEnd={periodInfo?.periodEnd}
-              legalDeadline={periodInfo?.legalDeadline}
-            />
-          </div>
-        </div>
+        {/* Employees table - now full width */}
+        <EmployeeLiquidationTable
+          employees={employees}
+          benefitType={validBenefitType}
+          isLoading={isLoading}
+          error={error}
+          onRetry={refetch}
+          onUpdateEmployee={handleUpdateEmployee}
+          onDeleteEmployee={handleDeleteEmployee}
+          editingRowId={editingRowId}
+          onEditRow={setEditingRowId}
+        />
       </div>
     </div>
   );
