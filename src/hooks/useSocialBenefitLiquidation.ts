@@ -98,13 +98,20 @@ export function useSocialBenefitLiquidation(
           employeeId: emp.id || `emp-${index}`,
           name: emp.name || 'Sin nombre',
           cedula: emp.cedula || '',
-          baseSalary: emp.baseSalary || emp.accumulatedAmount || 0,
-          daysWorked: emp.periodsCount || 0,
+          baseSalary: emp.baseSalary || 0,
+          daysWorked: emp.totalDaysWorked || 0, // Días reales trabajados desde el backend
           calculatedAmount: emp.accumulatedAmount || 0,
           previousBalance: 0,
           amountToPay: emp.accumulatedAmount || 0,
           retefuente: 0,
         }));
+
+        console.log('📊 Empleados mapeados para liquidación:', mappedEmployees.map(e => ({
+          nombre: e.name,
+          dias: e.daysWorked,
+          salarioBase: e.baseSalary,
+          montoCalculado: e.calculatedAmount
+        })));
 
         setEmployees(mappedEmployees);
       }
