@@ -30,6 +30,7 @@ import PayrollHistoryDetailPage from "./pages/PayrollHistoryDetailPage";
 import CompanyRegistrationPage from "./pages/CompanyRegistrationPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import SocialBenefitsPage from "./pages/SocialBenefitsPage";
+import SocialBenefitLiquidationPage from "./pages/SocialBenefitLiquidationPage";
 import MayaPage from "./pages/MayaPage";
 import { RootRedirect } from "@/components/routing/RootRedirect";
 
@@ -77,6 +78,7 @@ function AppContent() {
           <Route path="/modules/payroll-history" element={<PayrollHistoryPage />} />
           <Route path="/modules/payroll-history/:periodId" element={<PayrollHistoryDetailPage />} />
           <Route path="/modules/prestaciones-sociales" element={<SocialBenefitsPage />} />
+          <Route path="/modules/prestaciones-sociales/liquidar/:benefitType/:periodKey" element={<SocialBenefitLiquidationPage />} />
           <Route path="/modules/vacations-absences" element={<VacationsAbsencesPage />} />
           <Route path="/modules/reports" element={<ReportsPage />} />
           <Route path="/modules/settings" element={<SettingsPage />} />
