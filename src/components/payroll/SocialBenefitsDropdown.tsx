@@ -117,11 +117,6 @@ export const SocialBenefitsDropdown: React.FC<SocialBenefitsDropdownProps> = ({
         >
           <Gift className="h-4 w-4 mr-2" />
           Prestaciones Sociales
-          {filteredTotalPending > 0 && (
-            <Badge variant="success" className="ml-2">
-              {filteredTotalPending}
-            </Badge>
-          )}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-80 bg-popover">
