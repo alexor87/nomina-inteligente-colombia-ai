@@ -155,13 +155,6 @@ export const SocialBenefitsDropdown: React.FC<SocialBenefitsDropdownProps> = ({
           </>
         )}
 
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          onClick={() => navigate('/modules/prestaciones-sociales')}
-          className="justify-center text-primary"
-        >
-          Ver historial completo
-        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
