@@ -414,6 +414,7 @@ const PayrollLiquidationPageSimplified = () => {
                   companyId={companyId || ''}
                   employees={employees}
                   disabled={isLoading || isLiquidating}
+                  activeYear={selectedPeriod ? new Date(selectedPeriod.startDate).getFullYear() : undefined}
                 />
                 <Button
                   variant="outline"
