@@ -17,6 +17,7 @@ interface SocialBenefitsDropdownProps {
   companyId: string;
   employees: { id: string }[];
   disabled?: boolean;
+  activeYear?: number;
 }
 
 type SocialBenefitType = 'prima' | 'cesantias' | 'intereses_cesantias';
@@ -40,11 +41,32 @@ export const SocialBenefitsDropdown: React.FC<SocialBenefitsDropdownProps> = ({
   companyId,
   employees,
   disabled = false,
+  activeYear,
 }) => {
   const navigate = useNavigate();
   const { periods, isLoading, periodsByType, stats } = usePendingPeriods();
 
   if (employees.length === 0) return null;
+
+  // Filter periods by active year if provided
+  const filterByYear = (items: typeof periods) => {
+    if (!activeYear) return items;
+    return items.filter(p => {
+      const year = new Date(p.periodStart).getFullYear();
+      return year === activeYear;
+    });
+  };
+
+  const filteredPeriodsByType = {
+    prima: filterByYear(periodsByType.prima),
+    cesantias: filterByYear(periodsByType.cesantias),
+    intereses_cesantias: filterByYear(periodsByType.intereses_cesantias),
+  };
+
+  const filteredTotalPending = 
+    filteredPeriodsByType.prima.length + 
+    filteredPeriodsByType.cesantias.length + 
+    filteredPeriodsByType.intereses_cesantias.length;
 
   const handleNavigateToLiquidation = (benefitType: SocialBenefitType, periodLabel: string) => {
     // Encode the period label for URL
@@ -53,7 +75,7 @@ export const SocialBenefitsDropdown: React.FC<SocialBenefitsDropdownProps> = ({
   };
 
   const renderBenefitItems = (type: SocialBenefitType) => {
-    const items = periodsByType[type];
+    const items = filteredPeriodsByType[type];
     const config = BENEFIT_CONFIG[type];
 
     if (items.length === 0) return null;
@@ -82,7 +104,7 @@ export const SocialBenefitsDropdown: React.FC<SocialBenefitsDropdownProps> = ({
     ));
   };
 
-  const hasPendingPeriods = stats.totalPending > 0;
+  const hasPendingPeriods = filteredTotalPending > 0;
 
   return (
     <DropdownMenu>
@@ -95,9 +117,9 @@ export const SocialBenefitsDropdown: React.FC<SocialBenefitsDropdownProps> = ({
         >
           <Gift className="h-4 w-4 mr-2" />
           Prestaciones Sociales
-          {stats.totalPending > 0 && (
+          {filteredTotalPending > 0 && (
             <Badge variant="success" className="ml-2">
-              {stats.totalPending}
+              {filteredTotalPending}
             </Badge>
           )}
         </Button>
@@ -106,6 +128,11 @@ export const SocialBenefitsDropdown: React.FC<SocialBenefitsDropdownProps> = ({
         <DropdownMenuLabel className="flex items-center gap-2">
           <Calendar className="h-4 w-4" />
           Prestaciones Pendientes
+          {activeYear && (
+            <Badge variant="outline" className="ml-1 text-xs">
+              {activeYear}
+            </Badge>
+          )}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         
@@ -122,11 +149,11 @@ export const SocialBenefitsDropdown: React.FC<SocialBenefitsDropdownProps> = ({
         ) : (
           <>
             {renderBenefitItems('prima')}
-            {periodsByType.prima.length > 0 && (periodsByType.cesantias.length > 0 || periodsByType.intereses_cesantias.length > 0) && (
+            {filteredPeriodsByType.prima.length > 0 && (filteredPeriodsByType.cesantias.length > 0 || filteredPeriodsByType.intereses_cesantias.length > 0) && (
               <DropdownMenuSeparator />
             )}
             {renderBenefitItems('cesantias')}
-            {periodsByType.cesantias.length > 0 && periodsByType.intereses_cesantias.length > 0 && (
+            {filteredPeriodsByType.cesantias.length > 0 && filteredPeriodsByType.intereses_cesantias.length > 0 && (
               <DropdownMenuSeparator />
             )}
             {renderBenefitItems('intereses_cesantias')}
