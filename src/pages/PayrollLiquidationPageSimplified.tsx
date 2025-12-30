@@ -305,7 +305,7 @@ const PayrollLiquidationPageSimplified = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="px-6 py-6 space-y-6">
       {/* Integración con MAYA para tracking inteligente */}
       <MayaIntegratedComponent
         employees={employees}
@@ -319,13 +319,6 @@ const PayrollLiquidationPageSimplified = () => {
         liquidationErrors={liquidationErrors}
         companyId={companyId}
       />
-      
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <Calculator className="h-6 w-6 text-blue-600" />
-          <h1 className="text-2xl font-bold">Liquidación de Nómina</h1>
-        </div>
-      </div>
 
 
       {/* World-Class Control Panel - OCULTO: Validación automática activa
