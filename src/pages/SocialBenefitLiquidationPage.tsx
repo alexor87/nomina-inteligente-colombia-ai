@@ -42,6 +42,10 @@ export default function SocialBenefitLiquidationPage() {
     isLiquidated,
     handleDownloadSummary,
     refetch,
+    editingRowId,
+    setEditingRowId,
+    handleUpdateEmployee,
+    handleDeleteEmployee,
   } = useSocialBenefitLiquidation(validBenefitType, decodedPeriodKey);
 
   const handleGoBack = () => {
@@ -99,6 +103,10 @@ export default function SocialBenefitLiquidationPage() {
               isLoading={isLoading}
               error={error}
               onRetry={refetch}
+              onUpdateEmployee={handleUpdateEmployee}
+              onDeleteEmployee={handleDeleteEmployee}
+              editingRowId={editingRowId}
+              onEditRow={setEditingRowId}
             />
           </div>
 
