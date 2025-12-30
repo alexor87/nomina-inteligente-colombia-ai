@@ -32,6 +32,9 @@ export function useSocialBenefitLiquidation(
   const [isLiquidating, setIsLiquidating] = useState(false);
   const [isLiquidated, setIsLiquidated] = useState(false);
   const [periodInfo, setPeriodInfo] = useState<PeriodInfo | null>(null);
+  
+  // Estados para edición inline
+  const [editingRowId, setEditingRowId] = useState<string | null>(null);
 
   const companyId = profile?.company_id;
 
@@ -134,6 +137,29 @@ export function useSocialBenefitLiquidation(
     totalAmount: employees.reduce((sum, e) => sum + e.amountToPay, 0),
   }), [employees]);
 
+  // Actualizar empleado (edición inline)
+  const handleUpdateEmployee = useCallback((employeeId: string, updates: Partial<EmployeeLiquidationData>) => {
+    setEmployees(prev => prev.map(emp => 
+      emp.id === employeeId 
+        ? { ...emp, ...updates }
+        : emp
+    ));
+    toast({
+      title: 'Valores actualizados',
+      description: 'Los cambios se aplicarán al liquidar',
+    });
+  }, [toast]);
+
+  // Eliminar/excluir empleado de la liquidación
+  const handleDeleteEmployee = useCallback((employeeId: string) => {
+    const employee = employees.find(e => e.id === employeeId);
+    setEmployees(prev => prev.filter(emp => emp.id !== employeeId));
+    toast({
+      title: 'Empleado excluido',
+      description: employee ? `${employee.name} no será incluido en esta liquidación` : 'Empleado excluido de la liquidación',
+    });
+  }, [employees, toast]);
+
   // Manejar liquidación
   const handleLiquidate = useCallback(async () => {
     if (!companyId || !periodInfo) return;
@@ -200,5 +226,10 @@ export function useSocialBenefitLiquidation(
     isLiquidated,
     handleDownloadSummary,
     refetch: fetchData,
+    // Nuevas funciones para edición inline
+    editingRowId,
+    setEditingRowId,
+    handleUpdateEmployee,
+    handleDeleteEmployee,
   };
 }
