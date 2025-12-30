@@ -127,11 +127,11 @@ Deno.serve(async (req) => {
 
     console.log('📋 Found payrolls for provisioning:', payrolls.length);
 
-    // Get employee data for full monthly salary
+    // Get employee data for full monthly salary + fecha_ingreso para validación
     const employeeIds = [...new Set(payrolls?.map(p => p.employee_id) || [])];
     const { data: employees, error: employeesErr } = await supabase
       .from('employees')
-      .select('id, salario_base')
+      .select('id, salario_base, fecha_ingreso')
       .in('id', employeeIds);
 
     if (employeesErr) {
@@ -148,6 +148,7 @@ Deno.serve(async (req) => {
     });
 
     const items: CalculationRow[] = [];
+    let skippedDueToHireDate = 0;
 
     for (const p of payrolls || []) {
       const employeeId = p.employee_id as string;
@@ -156,6 +157,22 @@ Deno.serve(async (req) => {
       // ✅ CORREGIDO: Usar salario mensual completo del empleado
       const employee = employeesMap.get(employeeId);
       const salarioMensual = Number(employee?.salario_base) || 0;
+      const fechaIngreso = employee?.fecha_ingreso;
+      
+      // ✅ VALIDACIÓN: Verificar que el período no sea anterior a la fecha de ingreso
+      if (fechaIngreso) {
+        const hireDate = new Date(fechaIngreso);
+        const periodEnd = new Date(period.fecha_fin);
+        if (periodEnd < hireDate) {
+          console.log('⚠️ Skipping employee - period ends before hire date:', {
+            employeeId,
+            fechaIngreso,
+            periodEnd: period.fecha_fin
+          });
+          skippedDueToHireDate++;
+          continue;
+        }
+      }
       
       // ✅ CORREGIDO: Auxilio de transporte 2025 = $200,000 fijo
       const SMMLV_2025 = 1300000;
@@ -252,11 +269,18 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log('🧾 Calculated provision items:', { count: items.length, employees: employeeIds.length });
+    console.log('🧾 Calculated provision items:', { 
+      count: items.length, 
+      employees: employeeIds.length,
+      skippedDueToHireDate 
+    });
 
     if (items.length === 0) {
+      const message = skippedDueToHireDate > 0 
+        ? `No hay datos válidos para calcular provisiones. ${skippedDueToHireDate} empleados omitidos por fecha de ingreso posterior al período.`
+        : 'No hay datos válidos para calcular provisiones';
       return new Response(
-        JSON.stringify({ success: true, message: 'no_items_to_provision', count: 0, details: 'No hay datos válidos para calcular provisiones' }),
+        JSON.stringify({ success: true, message: 'no_items_to_provision', count: 0, skippedDueToHireDate, details: message }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
