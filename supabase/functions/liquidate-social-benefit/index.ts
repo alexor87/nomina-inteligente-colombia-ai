@@ -140,7 +140,8 @@ serve(async (req) => {
         amount,
         period_start,
         period_end,
-        employees!inner(nombre, apellido)
+        calculated_values,
+        employees!inner(nombre, apellido, cedula, salario_base, fecha_ingreso)
       `)
       .eq('company_id', companyId)
       .eq('benefit_type', benefitType)
@@ -185,19 +186,32 @@ serve(async (req) => {
       );
     }
 
-    // 3. Agrupar por empleado
-    const employeeMap = new Map<string, EmployeeProvision>();
+    // 3. Agrupar por empleado con datos adicionales
+    interface EmployeeProvisionExtended extends EmployeeProvision {
+      cedula: string;
+      base_salary: number;
+      fecha_ingreso: string;
+      total_days_worked: number;
+    }
+    
+    const employeeMap = new Map<string, EmployeeProvisionExtended>();
     
     for (const p of provisions) {
       const emp = p.employees as any;
       const empName = `${emp.nombre || ''} ${emp.apellido || ''}`.trim() || 'Sin nombre';
+      const calcValues = p.calculated_values as any;
+      const daysInPeriod = calcValues?.days_count || calcValues?.dias_trabajados || 15; // Default 15 días por quincena
       
       if (!employeeMap.has(p.employee_id)) {
         employeeMap.set(p.employee_id, {
           employee_id: p.employee_id,
           employee_name: empName,
+          cedula: emp.cedula || '',
+          base_salary: emp.salario_base || 0,
+          fecha_ingreso: emp.fecha_ingreso || '',
           periods_count: 0,
           total_amount: 0,
+          total_days_worked: 0,
           provision_ids: []
         });
       }
@@ -205,6 +219,7 @@ serve(async (req) => {
       const entry = employeeMap.get(p.employee_id)!;
       entry.periods_count++;
       entry.total_amount += Number(p.amount) || 0;
+      entry.total_days_worked += daysInPeriod;
       entry.provision_ids.push(p.id);
     }
 
@@ -232,8 +247,12 @@ serve(async (req) => {
           employees: employeeList.map(e => ({
             id: e.employee_id,
             name: e.employee_name,
+            cedula: e.cedula,
             periodsCount: e.periods_count,
-            accumulatedAmount: e.total_amount
+            accumulatedAmount: e.total_amount,
+            totalDaysWorked: e.total_days_worked,
+            baseSalary: e.base_salary,
+            fechaIngreso: e.fecha_ingreso
           })),
           summary: {
             totalEmployees,
