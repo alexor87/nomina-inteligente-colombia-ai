@@ -117,33 +117,59 @@ export const EmployeeLiquidationTable: React.FC<EmployeeLiquidationTableProps> =
 }) => {
   const config = COLUMN_CONFIG[benefitType] || COLUMN_CONFIG.prima;
   
-  // Estado local para valores editados
+  // Estado local para valores editados (incluyendo calculados originales)
   const [editValues, setEditValues] = useState<Partial<EmployeeLiquidationData>>({});
+  const [hasChanges, setHasChanges] = useState(false);
   
   const handleStartEdit = (employee: EmployeeLiquidationData) => {
+    // Guardar TODOS los valores originales, incluyendo los calculados del backend
     setEditValues({
       baseSalary: employee.baseSalary,
       daysWorked: employee.daysWorked,
       previousBalance: employee.previousBalance,
+      calculatedAmount: employee.calculatedAmount,
+      amountToPay: employee.amountToPay,
     });
+    setHasChanges(false);
     onEditRow?.(employee.id);
   };
   
   const handleCancelEdit = () => {
     setEditValues({});
+    setHasChanges(false);
     onEditRow?.(null);
   };
   
   const handleSaveEdit = (employee: EmployeeLiquidationData) => {
-    const recalculated = recalculateAmounts(employee, editValues, benefitType);
-    onUpdateEmployee?.(employee.id, recalculated);
+    // Solo recalcular si hubo cambios en campos editables
+    const updatesToSave = hasChanges 
+      ? recalculateAmounts(employee, editValues, benefitType)
+      : {
+          baseSalary: editValues.baseSalary,
+          daysWorked: editValues.daysWorked,
+          previousBalance: editValues.previousBalance,
+          calculatedAmount: editValues.calculatedAmount,
+          amountToPay: editValues.amountToPay,
+        };
+    onUpdateEmployee?.(employee.id, updatesToSave);
     setEditValues({});
+    setHasChanges(false);
     onEditRow?.(null);
   };
   
-  const handleInputChange = (field: keyof EmployeeLiquidationData, value: string) => {
+  const handleInputChange = (field: keyof EmployeeLiquidationData, value: string, employee: EmployeeLiquidationData) => {
     const numValue = field === 'daysWorked' ? parseInt(value) || 0 : parseCurrency(value);
-    setEditValues(prev => ({ ...prev, [field]: numValue }));
+    
+    // Marcar que hubo cambios y recalcular
+    setHasChanges(true);
+    const newEditValues = { ...editValues, [field]: numValue };
+    const recalculated = recalculateAmounts(employee, newEditValues, benefitType);
+    
+    setEditValues({
+      ...newEditValues,
+      calculatedAmount: recalculated.calculatedAmount,
+      amountToPay: recalculated.amountToPay,
+    });
   };
 
   if (isLoading) {
@@ -200,7 +226,7 @@ export const EmployeeLiquidationTable: React.FC<EmployeeLiquidationTableProps> =
         <Input
           type="number"
           value={value}
-          onChange={(e) => handleInputChange(field, e.target.value)}
+          onChange={(e) => handleInputChange(field, e.target.value, employee)}
           className="h-8 w-24 text-right"
           min={0}
         />
@@ -230,9 +256,9 @@ export const EmployeeLiquidationTable: React.FC<EmployeeLiquidationTableProps> =
                 {employees.map((employee) => {
                   const isEditing = editingRowId === employee.id;
                   
-                  // Calcular valores en tiempo real durante edición
+                  // Mostrar valores editados (ya recalculados en handleInputChange) o valores originales
                   const displayEmployee = isEditing 
-                    ? { ...employee, ...recalculateAmounts(employee, editValues, benefitType) }
+                    ? { ...employee, ...editValues }
                     : employee;
                   
                   return (
