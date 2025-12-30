@@ -160,10 +160,29 @@ export class SocialBenefitsLiquidationService {
         }
 
         if (!groupedPeriods.has(periodKey)) {
+          // Calcular fechas correctas del semestre/año según el tipo de prestación
+          let correctPeriodStart: string;
+          let correctPeriodEnd: string;
+          
+          if (benefitType === 'prima') {
+            const semester = startDate.getMonth() < 6 ? 1 : 2;
+            if (semester === 1) {
+              correctPeriodStart = `${year}-01-01`;
+              correctPeriodEnd = `${year}-06-30`;
+            } else {
+              correctPeriodStart = `${year}-07-01`;
+              correctPeriodEnd = `${year}-12-31`;
+            }
+          } else {
+            // Para cesantías e intereses, usar el año completo
+            correctPeriodStart = `${year}-01-01`;
+            correctPeriodEnd = `${year}-12-31`;
+          }
+          
           groupedPeriods.set(periodKey, {
             benefitType,
-            periodStart,
-            periodEnd,
+            periodStart: correctPeriodStart,
+            periodEnd: correctPeriodEnd,
             employees: new Set(),
             totalAmount: 0
           });
@@ -172,13 +191,6 @@ export class SocialBenefitsLiquidationService {
         const group = groupedPeriods.get(periodKey)!;
         group.employees.add(calc.employee_id);
         group.totalAmount += Number(calc.amount) || 0;
-        // Actualizar fechas para tener el rango más amplio
-        if (new Date(periodStart) < new Date(group.periodStart)) {
-          group.periodStart = periodStart;
-        }
-        if (new Date(periodEnd) > new Date(group.periodEnd)) {
-          group.periodEnd = periodEnd;
-        }
       });
 
       // Convertir a array de PendingPeriod con cálculo de status
