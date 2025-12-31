@@ -140,19 +140,25 @@ export class SocialBenefitsLiquidationService {
         totalAmount: number;
       }>();
 
+      console.log('📊 [SocialBenefits] Provisiones pendientes encontradas:', data.length);
+
       data.forEach((calc: any) => {
         const benefitType = calc.benefit_type as 'prima' | 'cesantias' | 'intereses_cesantias';
         const periodStart = calc.period_start;
         const periodEnd = calc.period_end;
         
         // Crear key único basado en tipo y período
+        // IMPORTANTE: Usar period_end para determinar el semestre de prima
+        // ya que las provisiones de julio pertenecen al 2do semestre
         let periodKey: string;
-        const startDate = new Date(periodStart);
-        const year = startDate.getFullYear();
+        const endDate = new Date(periodEnd);
+        const year = endDate.getFullYear();
         
         if (benefitType === 'prima') {
-          // Para prima, agrupar por semestre
-          const semester = startDate.getMonth() < 6 ? 1 : 2;
+          // Para prima, agrupar por semestre basándose en period_end
+          // Mes 0-5 (ene-jun) = 1er semestre, Mes 6-11 (jul-dic) = 2do semestre
+          const endMonth = endDate.getMonth();
+          const semester = endMonth <= 5 ? 1 : 2;
           periodKey = `${benefitType}-${year}-S${semester}`;
         } else {
           // Para cesantías e intereses, agrupar por año
@@ -165,7 +171,8 @@ export class SocialBenefitsLiquidationService {
           let correctPeriodEnd: string;
           
           if (benefitType === 'prima') {
-            const semester = startDate.getMonth() < 6 ? 1 : 2;
+            const endMonth = endDate.getMonth();
+            const semester = endMonth <= 5 ? 1 : 2;
             if (semester === 1) {
               correctPeriodStart = `${year}-01-01`;
               correctPeriodEnd = `${year}-06-30`;
@@ -192,6 +199,8 @@ export class SocialBenefitsLiquidationService {
         group.employees.add(calc.employee_id);
         group.totalAmount += Number(calc.amount) || 0;
       });
+
+      console.log('📊 [SocialBenefits] Períodos agrupados:', Array.from(groupedPeriods.keys()));
 
       // Convertir a array de PendingPeriod con cálculo de status
       const now = new Date();
