@@ -115,12 +115,14 @@ export class SocialBenefitsLiquidationService {
   static async getPendingPeriods(companyId: string): Promise<{ success: boolean; periods?: PendingPeriod[]; error?: string }> {
     try {
       // Consultar provisiones pendientes (calculado y sin payment_id)
+      // Filtrar solo los tipos de beneficio que se liquidan en este módulo
       const { data, error } = await supabase
         .from('social_benefit_calculations')
         .select('benefit_type, period_start, period_end, employee_id, amount')
         .eq('company_id', companyId)
         .eq('estado', 'calculado')
-        .is('payment_id', null);
+        .is('payment_id', null)
+        .in('benefit_type', ['prima', 'cesantias', 'intereses_cesantias']);
 
       if (error) {
         console.error('❌ Error consultando períodos pendientes:', error);
@@ -128,6 +130,7 @@ export class SocialBenefitsLiquidationService {
       }
 
       if (!data || data.length === 0) {
+        console.log('📊 [SocialBenefits] No hay provisiones pendientes');
         return { success: true, periods: [] };
       }
 
@@ -143,7 +146,13 @@ export class SocialBenefitsLiquidationService {
       console.log('📊 [SocialBenefits] Provisiones pendientes encontradas:', data.length);
 
       data.forEach((calc: any) => {
-        const benefitType = calc.benefit_type as 'prima' | 'cesantias' | 'intereses_cesantias';
+        const benefitType = calc.benefit_type;
+        
+        // Validación adicional: saltar tipos no soportados (por seguridad)
+        if (!['prima', 'cesantias', 'intereses_cesantias'].includes(benefitType)) {
+          console.warn('⚠️ [SocialBenefits] Tipo de beneficio no soportado:', benefitType);
+          return;
+        }
         const periodStart = calc.period_start;
         const periodEnd = calc.period_end;
         
