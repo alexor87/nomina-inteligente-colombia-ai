@@ -217,13 +217,16 @@ export class SocialBenefitsLiquidationService {
 
       groupedPeriods.forEach((group, key) => {
         const startDate = new Date(group.periodStart);
-        const year = startDate.getFullYear();
+        const endDate = new Date(group.periodEnd);
+        const year = endDate.getFullYear();
         
         let periodLabel: string;
         let legalDeadline: Date;
 
         if (group.benefitType === 'prima') {
-          const semester = startDate.getMonth() < 6 ? 1 : 2;
+          // Usar periodEnd para determinar el semestre correctamente
+          const endMonth = endDate.getMonth();
+          const semester = endMonth <= 5 ? 1 : 2;
           periodLabel = semester === 1 ? `1er Semestre ${year}` : `2do Semestre ${year}`;
           // Fecha legal: 30 Jun para S1, 20 Dic para S2
           legalDeadline = semester === 1 
@@ -251,6 +254,15 @@ export class SocialBenefitsLiquidationService {
         } else {
           status = 'future';
         }
+
+        console.log(`📊 [SocialBenefits] Período creado: ${key}`, {
+          benefitType: group.benefitType,
+          periodLabel,
+          periodStart: group.periodStart,
+          periodEnd: group.periodEnd,
+          employees: group.employees.size,
+          totalAmount: group.totalAmount
+        });
 
         periods.push({
           benefitType: group.benefitType,

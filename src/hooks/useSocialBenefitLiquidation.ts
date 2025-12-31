@@ -56,18 +56,33 @@ export function useSocialBenefitLiquidation(
         return;
       }
 
-      // Buscar el período que coincida con el periodKey y benefitType
+      // Buscar el período con coincidencia EXACTA del periodLabel
+      const decodedPeriodKey = decodeURIComponent(periodKey);
+      console.log('🔍 [useSocialBenefitLiquidation] Buscando período:', {
+        benefitType,
+        periodKey: decodedPeriodKey,
+        availablePeriods: periodsResult.periods.map(p => ({
+          type: p.benefitType,
+          label: p.periodLabel,
+          start: p.periodStart,
+          end: p.periodEnd
+        }))
+      });
+
       const matchingPeriod = periodsResult.periods.find(p => 
         p.benefitType === benefitType && 
-        (p.periodLabel.includes(periodKey) || periodKey.includes(p.periodLabel))
+        p.periodLabel === decodedPeriodKey
       );
 
       if (!matchingPeriod) {
+        console.warn('⚠️ [useSocialBenefitLiquidation] No se encontró período coincidente');
         // Si no hay período pendiente, puede que ya esté liquidado
         setIsLiquidated(true);
         setEmployees([]);
         return;
       }
+      
+      console.log('✅ [useSocialBenefitLiquidation] Período encontrado:', matchingPeriod);
 
       // Guardar info del período
       setPeriodInfo({
