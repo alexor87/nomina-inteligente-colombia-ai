@@ -30,20 +30,31 @@ export function usePendingPeriods(): UsePendingPeriodsReturn {
 
   const fetchPeriods = useCallback(async () => {
     if (!companyId) {
+      console.log('📊 [usePendingPeriods] No hay companyId, saltando fetch');
       setPeriods([]);
       setIsLoading(false);
       return;
     }
 
+    console.log('📊 [usePendingPeriods] Iniciando fetch para companyId:', companyId);
     setIsLoading(true);
     setError(null);
 
-    const result = await SocialBenefitsLiquidationService.getPendingPeriods(companyId);
+    try {
+      const result = await SocialBenefitsLiquidationService.getPendingPeriods(companyId);
+      console.log('📊 [usePendingPeriods] Resultado:', result);
 
-    if (result.success && result.periods) {
-      setPeriods(result.periods);
-    } else {
-      setError(result.error || 'Error cargando períodos');
+      if (result.success && result.periods) {
+        console.log('📊 [usePendingPeriods] Períodos encontrados:', result.periods.length);
+        setPeriods(result.periods);
+      } else {
+        console.warn('📊 [usePendingPeriods] Error o sin períodos:', result.error);
+        setError(result.error || 'Error cargando períodos');
+        setPeriods([]);
+      }
+    } catch (err) {
+      console.error('📊 [usePendingPeriods] Error inesperado:', err);
+      setError('Error inesperado cargando períodos');
       setPeriods([]);
     }
 
