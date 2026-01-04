@@ -300,4 +300,61 @@ export class SocialBenefitsExportService {
     const filename = `Liquidacion_${benefitLabel.replace(/\s+/g, '_')}_${result.periodLabel.replace(/\s+/g, '_')}.pdf`;
     doc.save(filename);
   }
+
+  /**
+   * Exporta el preview de liquidación (antes de liquidar) a Excel
+   */
+  static exportPreviewToExcel(
+    result: { totalAmount: number; employeesCount: number; periodLabel: string },
+    employees: Array<{ 
+      name: string; 
+      cedula: string;
+      baseSalary: number;
+      daysWorked: number;
+      amount: number;
+    }>,
+    benefitType: string
+  ): void {
+    const benefitLabel = BENEFIT_LABELS[benefitType] || benefitType;
+    
+    // Datos con todas las columnas de la tabla
+    const data: Array<Record<string, string | number>> = employees.map((emp, index) => ({
+      'No.': index + 1,
+      'Cédula': emp.cedula,
+      'Empleado': emp.name,
+      'Salario Base': emp.baseSalary,
+      'Días Trabajados': emp.daysWorked,
+      'Valor a Pagar': emp.amount,
+    }));
+
+    // Fila de totales
+    data.push({
+      'No.': '',
+      'Cédula': '',
+      'Empleado': 'TOTAL',
+      'Salario Base': '',
+      'Días Trabajados': '',
+      'Valor a Pagar': result.totalAmount,
+    });
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    
+    // Ajustar anchos de columna
+    ws['!cols'] = [
+      { wch: 5 },   // No.
+      { wch: 15 },  // Cédula
+      { wch: 35 },  // Empleado
+      { wch: 15 },  // Salario Base
+      { wch: 15 },  // Días Trabajados
+      { wch: 18 },  // Valor a Pagar
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Resumen Liquidación');
+
+    const dateStr = format(new Date(), 'yyyy-MM-dd');
+    const filename = `Resumen_${benefitLabel.replace(/\s+/g, '_')}_${result.periodLabel.replace(/\s+/g, '_')}_${dateStr}.xlsx`;
+
+    XLSX.writeFile(wb, filename);
+  }
 }

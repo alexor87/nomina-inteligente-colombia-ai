@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { SocialBenefitsLiquidationService, type PendingPeriod } from '@/services/SocialBenefitsLiquidationService';
+import { SocialBenefitsExportService } from '@/services/SocialBenefitsExportService';
 import type { EmployeeLiquidationData } from '@/components/social-benefits/liquidation/EmployeeLiquidationTable';
 
 interface PeriodInfo {
@@ -228,12 +229,49 @@ export function useSocialBenefitLiquidation(
 
   // Manejar descarga de resumen
   const handleDownloadSummary = useCallback(() => {
-    toast({
-      title: 'Descargando...',
-      description: 'El resumen se descargará en breve',
-    });
-    // TODO: Implementar descarga de Excel
-  }, [toast]);
+    if (!periodInfo || employees.length === 0) {
+      toast({
+        title: 'No hay datos',
+        description: 'No hay empleados para exportar',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      // Mapear empleados al formato esperado por el servicio
+      const employeesForExport = employees.map(emp => ({
+        name: emp.name,
+        cedula: emp.cedula,
+        baseSalary: emp.baseSalary,
+        daysWorked: emp.daysWorked,
+        amount: emp.amountToPay,
+      }));
+
+      // Llamar al servicio de exportación
+      SocialBenefitsExportService.exportPreviewToExcel(
+        {
+          totalAmount: summary.totalAmount,
+          employeesCount: summary.totalEmployees,
+          periodLabel: periodInfo.periodLabel,
+        },
+        employeesForExport,
+        benefitType
+      );
+
+      toast({
+        title: 'Descarga completada',
+        description: 'El resumen se ha descargado correctamente',
+      });
+    } catch (error) {
+      console.error('Error al exportar:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo descargar el resumen',
+        variant: 'destructive',
+      });
+    }
+  }, [employees, summary, periodInfo, benefitType, toast]);
 
   return {
     employees: filteredEmployees,
