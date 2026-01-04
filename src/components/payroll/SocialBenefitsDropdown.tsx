@@ -49,10 +49,12 @@ export const SocialBenefitsDropdown: React.FC<SocialBenefitsDropdownProps> = ({
   if (employees.length === 0) return null;
 
   // Filter periods by active year if provided
+  // Usar slice para evitar problemas de timezone con Date parsing
   const filterByYear = (items: typeof periods) => {
     if (!activeYear) return items;
     return items.filter(p => {
-      const year = new Date(p.periodStart).getFullYear();
+      // Extraer año directamente del string YYYY-MM-DD para evitar timezone issues
+      const year = Number(p.periodStart.slice(0, 4));
       return year === activeYear;
     });
   };
