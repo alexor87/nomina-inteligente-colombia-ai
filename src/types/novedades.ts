@@ -57,6 +57,7 @@ export type NovedadType =
   // Devengados
   | 'horas_extra'
   | 'recargo_nocturno'
+  | 'recargo_dominical'
   | 'vacaciones'
   | 'licencia_remunerada'
   | 'licencia_no_remunerada'

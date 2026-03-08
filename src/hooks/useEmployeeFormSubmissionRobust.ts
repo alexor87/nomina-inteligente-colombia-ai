@@ -1,4 +1,13 @@
 /**
  * @deprecated Re-export stub - use useEmployeeFormSubmission directly
  */
-export { useEmployeeFormSubmission as useEmployeeFormSubmissionRobust } from './useEmployeeFormSubmission';
+import { useEmployeeFormSubmission } from './useEmployeeFormSubmission';
+
+export const useEmployeeFormSubmissionRobust = () => {
+  const { submitEmployeeForm, isSubmitting } = useEmployeeFormSubmission();
+  return {
+    submitEmployee: submitEmployeeForm,
+    submitEmployeeForm,
+    isSubmitting,
+  };
+};
