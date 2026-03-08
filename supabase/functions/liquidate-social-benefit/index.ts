@@ -325,6 +325,79 @@ serve(async (req) => {
 
     console.log(`   ✅ ${allProvisionIds.length} provisiones marcadas como liquidadas`);
 
+    // 6. ACTUALIZAR PAYROLLS CON LOS MONTOS DE PRESTACIONES
+    console.log('📝 Actualizando registros de nómina con montos de prestaciones...');
+
+    const fieldMap: Record<string, string> = {
+      'prima': 'prima',
+      'cesantias': 'cesantias',
+      'intereses_cesantias': 'intereses_cesantias',
+      'vacaciones': 'vacaciones'
+    };
+
+    const updateField = fieldMap[benefitType];
+    let payrollsUpdated = 0;
+
+    if (updateField) {
+      // Buscar el último período de nómina cerrado dentro del rango de liquidación
+      const { data: targetPeriod, error: targetPeriodError } = await supabase
+        .from('payroll_periods_real')
+        .select('id, periodo, fecha_fin')
+        .eq('company_id', companyId)
+        .eq('estado', 'cerrado')
+        .lte('fecha_fin', periodEnd)
+        .gte('fecha_inicio', periodStart)
+        .order('fecha_fin', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (targetPeriodError) {
+        console.warn('⚠️ Error buscando período objetivo:', targetPeriodError);
+      }
+
+      if (targetPeriod) {
+        console.log(`   Período objetivo para actualizar payrolls: ${targetPeriod.periodo} (${targetPeriod.id})`);
+
+        for (const emp of employeeList) {
+          // Obtener payroll actual para recalcular totales
+          const { data: currentPayroll } = await supabase
+            .from('payrolls')
+            .select('id, total_devengado, neto_pagado')
+            .eq('employee_id', emp.employee_id)
+            .eq('period_id', targetPeriod.id)
+            .maybeSingle();
+
+          if (currentPayroll) {
+            const newTotalDevengado = (Number(currentPayroll.total_devengado) || 0) + emp.total_amount;
+            const newNetoPagado = (Number(currentPayroll.neto_pagado) || 0) + emp.total_amount;
+
+            const { error: updatePayrollError } = await supabase
+              .from('payrolls')
+              .update({
+                [updateField]: emp.total_amount,
+                total_devengado: newTotalDevengado,
+                neto_pagado: newNetoPagado,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', currentPayroll.id);
+
+            if (updatePayrollError) {
+              console.warn(`⚠️ No se pudo actualizar payroll para ${emp.employee_name}:`, updatePayrollError);
+            } else {
+              payrollsUpdated++;
+              console.log(`   ✅ Payroll actualizado: ${emp.employee_name} → ${updateField}=$${emp.total_amount.toLocaleString()}, devengado=$${newTotalDevengado.toLocaleString()}, neto=$${newNetoPagado.toLocaleString()}`);
+            }
+          } else {
+            console.warn(`⚠️ No se encontró payroll para ${emp.employee_name} en período ${targetPeriod.periodo}`);
+          }
+        }
+
+        console.log(`✅ ${payrollsUpdated}/${employeeList.length} payrolls actualizados con ${benefitType}`);
+      } else {
+        console.warn(`⚠️ No se encontró período de nómina cerrado en el rango ${periodStart} - ${periodEnd}. Los payrolls no fueron actualizados.`);
+      }
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -333,6 +406,7 @@ serve(async (req) => {
         totalAmount,
         employeesCount: totalEmployees,
         provisionsUpdated: allProvisionIds.length,
+        payrollsUpdated,
         periodLabel
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
