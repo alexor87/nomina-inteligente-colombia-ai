@@ -6,7 +6,7 @@ import { useEmployeeFormSubmission } from './useEmployeeFormSubmission';
 export const useEmployeeFormSubmissionRobust = () => {
   const { submitEmployeeForm, isSubmitting } = useEmployeeFormSubmission();
   return {
-    submitEmployee: submitEmployeeForm,
+    submitEmployee: (formData: any) => submitEmployeeForm(formData, formData.company_id || formData.empresaId),
     submitEmployeeForm,
     isSubmitting,
   };
