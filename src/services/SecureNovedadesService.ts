@@ -1,9 +1,9 @@
 import { SecureBaseService } from './SecureBaseService';
 import { PayrollNovedad, CreateNovedadData } from '@/types/novedades';
+import { logger } from '@/lib/logger';
 
 /**
  * 🔒 SECURE VERSION: NovedadesService with built-in company isolation
- * Replaces the original NovedadesService with automatic security filtering
  */
 export class SecureNovedadesService extends SecureBaseService {
   
@@ -12,31 +12,19 @@ export class SecureNovedadesService extends SecureBaseService {
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) throw new Error('🔒 [SECURITY] No company context');
 
-      console.log('🔒 [SECURITY] Creating novedad with secure validation for company:', companyId);
-
       // Validate period belongs to user's company
       const { data: periodExists, error: periodError } = await this.secureQuery(
-        'payroll_periods_real',
-        companyId,
-        'id',
-        { id: novedadData.periodo_id }
+        'payroll_periods_real', companyId, 'id', { id: novedadData.periodo_id }
       );
-
       if (periodError || !periodExists?.length) {
-        console.error('🔒 [SECURITY] Period validation failed:', periodError);
         throw new Error(`Invalid period ID: ${novedadData.periodo_id}`);
       }
 
       // Validate employee belongs to user's company
       const { data: employeeExists, error: employeeError } = await this.secureQuery(
-        'employees',
-        companyId,
-        'id',
-        { id: novedadData.empleado_id }
+        'employees', companyId, 'id', { id: novedadData.empleado_id }
       );
-
       if (employeeError || !employeeExists?.length) {
-        console.error('🔒 [SECURITY] Employee validation failed:', employeeError);
         throw new Error(`Invalid employee ID: ${novedadData.empleado_id}`);
       }
 
@@ -55,18 +43,10 @@ export class SecureNovedadesService extends SecureBaseService {
 
       const { data, error } = await this.secureInsert('payroll_novedades', insertData);
 
-      if (error) {
-        console.error('🔒 [SECURITY] Error inserting novedad:', error);
-        throw error;
-      }
-
-      if (!data?.[0]) {
-        throw new Error('No data returned from insert');
-      }
+      if (error) throw error;
+      if (!data?.[0]) throw new Error('No data returned from insert');
 
       const novedad = data[0];
-      console.log('✅ [SECURITY] Novedad created successfully:', novedad.id);
-      
       return {
         id: novedad.id,
         company_id: novedad.company_id,
@@ -84,8 +64,8 @@ export class SecureNovedadesService extends SecureBaseService {
         updated_at: novedad.updated_at
       };
     } catch (error) {
-      console.error('🔒 [SECURITY] Error creating novedad:', error);
-      await this.logSecurityViolation('payroll_novedades', 'create', 'create_attempt_failed', { error: error.message });
+      logger.error('❌ Error creating novedad:', error);
+      await this.logSecurityViolation('payroll_novedades', 'create', 'create_attempt_failed', { error: (error as Error).message });
       throw error;
     }
   }
@@ -98,39 +78,13 @@ export class SecureNovedadesService extends SecureBaseService {
         return [];
       }
 
-      console.log('🔒 [SECURITY] Loading novedades for employee:', empleadoId, 'period:', periodId, 'company:', companyId);
-
       const { data, error } = await this.secureQuery(
-        'payroll_novedades',
-        companyId,
-        `
-          id,
-          company_id,
-          empleado_id,
-          periodo_id,
-          tipo_novedad,
-          valor,
-          horas,
-          dias,
-          observacion,
-          fecha_inicio,
-          fecha_fin,
-          base_calculo,
-          created_at,
-          updated_at
-        `,
-        {
-          empleado_id: empleadoId,
-          periodo_id: periodId
-        }
+        'payroll_novedades', companyId,
+        'id,company_id,empleado_id,periodo_id,tipo_novedad,valor,horas,dias,observacion,fecha_inicio,fecha_fin,base_calculo,created_at,updated_at',
+        { empleado_id: empleadoId, periodo_id: periodId }
       );
 
-      if (error) {
-        console.error('🔒 [SECURITY] Error loading novedades:', error);
-        throw error;
-      }
-
-      console.log('✅ [SECURITY] Loaded novedades:', data?.length || 0);
+      if (error) throw error;
 
       return (data || []).map(novedad => ({
         id: novedad.id,
@@ -149,8 +103,8 @@ export class SecureNovedadesService extends SecureBaseService {
         updated_at: novedad.updated_at
       }));
     } catch (error) {
-      console.error('🔒 [SECURITY] Error loading novedades:', error);
-      await this.logSecurityViolation('payroll_novedades', 'read', 'read_attempt_failed', { empleadoId, periodId, error: error.message });
+      logger.error('❌ Error loading novedades:', error);
+      await this.logSecurityViolation('payroll_novedades', 'read', 'read_attempt_failed', { empleadoId, periodId, error: (error as Error).message });
       throw error;
     }
   }
@@ -160,32 +114,17 @@ export class SecureNovedadesService extends SecureBaseService {
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) throw new Error('🔒 [SECURITY] No company context');
 
-      console.log('🔒 [SECURITY] Updating novedad:', id, 'for company:', companyId);
-
-      // Transform updates to match database schema
       const dbUpdates: any = { ...updates };
       if (updates.base_calculo) {
         dbUpdates.base_calculo = JSON.stringify(updates.base_calculo);
       }
 
-      const { data, error } = await this.secureUpdate(
-        'payroll_novedades',
-        dbUpdates,
-        { id }
-      );
+      const { data, error } = await this.secureUpdate('payroll_novedades', dbUpdates, { id });
 
-      if (error) {
-        console.error('🔒 [SECURITY] Error updating novedad:', error);
-        throw error;
-      }
-
-      if (!data?.[0]) {
-        throw new Error('Novedad not found or access denied');
-      }
+      if (error) throw error;
+      if (!data?.[0]) throw new Error('Novedad not found or access denied');
 
       const novedad = data[0];
-      console.log('✅ [SECURITY] Novedad updated successfully:', novedad.id);
-
       return {
         id: novedad.id,
         company_id: novedad.company_id,
@@ -203,8 +142,8 @@ export class SecureNovedadesService extends SecureBaseService {
         updated_at: novedad.updated_at
       };
     } catch (error) {
-      console.error('🔒 [SECURITY] Error updating novedad:', error);
-      await this.logSecurityViolation('payroll_novedades', 'update', 'update_attempt_failed', { id, error: error.message });
+      logger.error('❌ Error updating novedad:', error);
+      await this.logSecurityViolation('payroll_novedades', 'update', 'update_attempt_failed', { id, error: (error as Error).message });
       throw error;
     }
   }
@@ -214,19 +153,11 @@ export class SecureNovedadesService extends SecureBaseService {
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) throw new Error('🔒 [SECURITY] No company context');
 
-      console.log('🔒 [SECURITY] Deleting novedad:', id, 'for company:', companyId);
-
       const { error } = await this.secureDelete('payroll_novedades', { id });
-
-      if (error) {
-        console.error('🔒 [SECURITY] Error deleting novedad:', error);
-        throw error;
-      }
-
-      console.log('✅ [SECURITY] Novedad deleted successfully');
+      if (error) throw error;
     } catch (error) {
-      console.error('🔒 [SECURITY] Error deleting novedad:', error);
-      await this.logSecurityViolation('payroll_novedades', 'delete', 'delete_attempt_failed', { id, error: error.message });
+      logger.error('❌ Error deleting novedad:', error);
+      await this.logSecurityViolation('payroll_novedades', 'delete', 'delete_attempt_failed', { id, error: (error as Error).message });
       throw error;
     }
   }

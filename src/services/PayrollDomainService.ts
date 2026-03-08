@@ -1,12 +1,11 @@
 /**
  * ✅ SERVICIO DOMINIO DE NÓMINA - ARQUITECTURA CRÍTICA REPARADA
- * Servicio único que maneja toda la lógica de negocio de nómina
- * Reemplaza: PayrollUnifiedService, PayrollLiquidationService, PayrollHistoryService
  */
 
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollStateManager } from './PayrollStateManager';
 import { PayrollCalculationEngine } from './PayrollCalculationEngine';
+import { logger } from '@/lib/logger';
 
 export interface PayrollPeriod {
   id: string;
@@ -51,9 +50,6 @@ export interface PeriodDetectionResult {
 export class PayrollDomainService {
   private static calculator = new PayrollCalculationEngine();
 
-  /**
-   * Detectar situación actual del período de nómina
-   */
   static async detectCurrentPeriodSituation(): Promise<PeriodDetectionResult> {
     try {
       const companyId = await this.getCurrentUserCompanyId();
@@ -61,8 +57,6 @@ export class PayrollDomainService {
         throw new Error('No se pudo determinar la empresa del usuario');
       }
 
-      // Buscar período activo usando query directa optimizada
-      console.log('🔍 Buscando períodos activos para company:', companyId);
       const { data: periods, error } = await supabase
         .from('payroll_periods_real')
         .select('*')
@@ -72,18 +66,11 @@ export class PayrollDomainService {
         .limit(1);
 
       if (error) {
-        console.error('❌ Error detecting period:', error);
+        logger.error('❌ Error detecting period:', error);
         throw error;
       }
 
-      console.log('🔍 Períodos encontrados:', periods?.length || 0);
-      if (periods && periods.length > 0) {
-        console.log('📅 Período actual:', periods[0]);
-      }
-
-      // Si no hay período activo, necesita crear uno
       if (!periods || periods.length === 0) {
-        console.log('⚠️ No se encontró período activo');
         return {
           currentPeriod: null,
           needsCreation: true,
@@ -118,7 +105,7 @@ export class PayrollDomainService {
       };
 
     } catch (error) {
-      console.error('❌ Error en detectCurrentPeriodSituation:', error);
+      logger.error('❌ Error en detectCurrentPeriodSituation:', error);
       return {
         currentPeriod: null,
         needsCreation: true,
@@ -130,27 +117,16 @@ export class PayrollDomainService {
     }
   }
 
-  /**
-   * Crear nuevo período de nómina
-   */
-  static async createNextPeriod(): Promise<{
-    success: boolean;
-    period?: PayrollPeriod;
-    message: string;
-  }> {
+  static async createNextPeriod(): Promise<{ success: boolean; period?: PayrollPeriod; message: string }> {
     try {
       const companyId = await this.getCurrentUserCompanyId();
-      if (!companyId) {
-        throw new Error('No se pudo determinar la empresa del usuario');
-      }
+      if (!companyId) throw new Error('No se pudo determinar la empresa del usuario');
 
-      // Generar fechas para el nuevo período
       const currentDate = new Date();
       const startDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
       const endDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
       const periodName = this.generatePeriodName(startDate);
 
-      // Crear período en la base de datos
       const { data: newPeriod, error } = await supabase
         .from('payroll_periods_real')
         .insert({
@@ -164,49 +140,35 @@ export class PayrollDomainService {
         .select()
         .single();
 
-      if (error) {
-        throw error;
-      }
-
-      const period: PayrollPeriod = {
-        id: newPeriod.id,
-        periodo: newPeriod.periodo,
-        fecha_inicio: newPeriod.fecha_inicio,
-        fecha_fin: newPeriod.fecha_fin,
-        estado: newPeriod.estado as 'draft',
-        tipo_periodo: newPeriod.tipo_periodo as 'mensual',
-        empleados_count: 0,
-        total_devengado: 0,
-        total_deducciones: 0,
-        total_neto: 0
-      };
+      if (error) throw error;
 
       return {
         success: true,
-        period,
+        period: {
+          id: newPeriod.id,
+          periodo: newPeriod.periodo,
+          fecha_inicio: newPeriod.fecha_inicio,
+          fecha_fin: newPeriod.fecha_fin,
+          estado: newPeriod.estado as 'draft',
+          tipo_periodo: newPeriod.tipo_periodo as 'mensual',
+          empleados_count: 0,
+          total_devengado: 0,
+          total_deducciones: 0,
+          total_neto: 0
+        },
         message: `Período ${periodName} creado exitosamente`
       };
-
     } catch (error) {
-      console.error('❌ Error creating period:', error);
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : 'Error creando período'
-      };
+      logger.error('❌ Error creating period:', error);
+      return { success: false, message: error instanceof Error ? error.message : 'Error creando período' };
     }
   }
 
-  /**
-   * Cargar empleados para liquidación
-   */
   static async loadEmployeesForLiquidation(periodId: string): Promise<PayrollEmployee[]> {
     try {
       const companyId = await this.getCurrentUserCompanyId();
-      if (!companyId) {
-        return [];
-      }
+      if (!companyId) return [];
 
-      // Cargar empleados activos
       const { data: employees, error } = await supabase
         .from('employees')
         .select('*')
@@ -214,12 +176,11 @@ export class PayrollDomainService {
         .eq('estado', 'activo');
 
       if (error) {
-        console.error('❌ Error loading employees:', error);
+        logger.error('❌ Error loading employees:', error);
         return [];
       }
 
-      // Procesar empleados con cálculos
-      const processedEmployees = await Promise.all(
+      return await Promise.all(
         (employees || []).map(async (emp) => {
           const calculation = await this.calculator.calculateEmployeePayroll({
             baseSalary: Number(emp.salario_base) || 0,
@@ -242,24 +203,16 @@ export class PayrollDomainService {
           };
         })
       );
-
-      return processedEmployees;
-
     } catch (error) {
-      console.error('❌ Error loading employees for liquidation:', error);
+      logger.error('❌ Error loading employees for liquidation:', error);
       return [];
     }
   }
 
-  /**
-   * Obtener historial de períodos
-   */
   static async getPayrollHistory(): Promise<PayrollPeriod[]> {
     try {
       const companyId = await this.getCurrentUserCompanyId();
-      if (!companyId) {
-        return [];
-      }
+      if (!companyId) return [];
 
       const { data: periods, error } = await supabase
         .from('payroll_periods_real')
@@ -268,7 +221,7 @@ export class PayrollDomainService {
         .order('fecha_inicio', { ascending: false });
 
       if (error) {
-        console.error('❌ Error loading payroll history:', error);
+        logger.error('❌ Error loading payroll history:', error);
         return [];
       }
 
@@ -284,54 +237,33 @@ export class PayrollDomainService {
         total_deducciones: Number(period.total_deducciones) || 0,
         total_neto: Number(period.total_neto) || 0
       }));
-
     } catch (error) {
-      console.error('❌ Error loading payroll history:', error);
+      logger.error('❌ Error loading payroll history:', error);
       return [];
     }
   }
 
-  /**
-   * Cerrar período de nómina
-   */
-  static async closePeriod(periodId: string): Promise<{
-    success: boolean;
-    message: string;
-  }> {
+  static async closePeriod(periodId: string): Promise<{ success: boolean; message: string }> {
     try {
       const { error } = await supabase
         .from('payroll_periods_real')
-        .update({ 
-          estado: 'cerrado',
-          updated_at: new Date().toISOString()
-        })
+        .update({ estado: 'cerrado', updated_at: new Date().toISOString() })
         .eq('id', periodId);
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
-      // También actualizar payrolls relacionados
       await supabase
         .from('payrolls')
         .update({ estado: 'procesada' })
         .eq('period_id', periodId);
 
-      return {
-        success: true,
-        message: 'Período cerrado exitosamente'
-      };
-
+      return { success: true, message: 'Período cerrado exitosamente' };
     } catch (error) {
-      console.error('❌ Error closing period:', error);
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : 'Error cerrando período'
-      };
+      logger.error('❌ Error closing period:', error);
+      return { success: false, message: error instanceof Error ? error.message : 'Error cerrando período' };
     }
   }
 
-  // Métodos de utilidad privados
   private static async getCurrentUserCompanyId(): Promise<string | null> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -345,7 +277,7 @@ export class PayrollDomainService {
 
       return profile?.company_id || null;
     } catch (error) {
-      console.error('Error getting company ID:', error);
+      logger.error('Error getting company ID:', error);
       return null;
     }
   }
@@ -355,7 +287,6 @@ export class PayrollDomainService {
       'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
       'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
     ];
-    
     return `${months[date.getMonth()]} ${date.getFullYear()}`;
   }
 }
