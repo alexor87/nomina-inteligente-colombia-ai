@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/lib/logger';
 
 export interface Company {
   id: string;
@@ -15,7 +16,6 @@ export interface Company {
 }
 
 export class CompanyManagementService {
-  // Verificar si el usuario tiene rol de soporte (no hay más superadmin)
   static async isSaasAdmin(): Promise<boolean> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -29,18 +29,17 @@ export class CompanyManagementService {
         .limit(1);
 
       if (error) {
-        console.error('Error checking support role:', error);
+        logger.error('Error checking support role:', error);
         return false;
       }
 
       return data && data.length > 0;
     } catch (error) {
-      console.error('Error checking admin status:', error);
+      logger.error('Error checking admin status:', error);
       return false;
     }
   }
 
-  // Listar todas las empresas (solo para usuarios con rol de soporte)
   static async getAllCompanies(): Promise<Company[]> {
     try {
       const { data, error } = await supabase
@@ -64,12 +63,11 @@ export class CompanyManagementService {
         updated_at: company.updated_at
       }));
     } catch (error) {
-      console.error('Error loading companies:', error);
+      logger.error('Error loading companies:', error);
       return [];
     }
   }
 
-  // Obtener empresa actual del usuario
   static async getCurrentCompany(): Promise<Company | null> {
     try {
       const { data: profile, error: profileError } = await supabase
@@ -88,7 +86,6 @@ export class CompanyManagementService {
 
       if (error) throw error;
 
-      // Cast the data to our Company interface
       return {
         id: data.id,
         nit: data.nit,
@@ -103,53 +100,23 @@ export class CompanyManagementService {
         updated_at: data.updated_at
       };
     } catch (error) {
-      console.error('Error loading current company:', error);
+      logger.error('Error loading current company:', error);
       return null;
     }
   }
 
-  // Actualizar empresa
   static async updateCompany(companyId: string, updates: Partial<Company>): Promise<void> {
-    try {
-      const { error } = await supabase
-        .from('companies')
-        .update(updates)
-        .eq('id', companyId);
-
-      if (error) throw error;
-    } catch (error) {
-      console.error('Error updating company:', error);
-      throw new Error('Error al actualizar la empresa');
-    }
+    const { error } = await supabase.from('companies').update(updates).eq('id', companyId);
+    if (error) throw new Error('Error al actualizar la empresa');
   }
 
-  // Suspender empresa (solo usuarios con rol de soporte)
   static async suspendCompany(companyId: string): Promise<void> {
-    try {
-      const { error } = await supabase
-        .from('companies')
-        .update({ estado: 'suspendida' })
-        .eq('id', companyId);
-
-      if (error) throw error;
-    } catch (error) {
-      console.error('Error suspending company:', error);
-      throw new Error('Error al suspender la empresa');
-    }
+    const { error } = await supabase.from('companies').update({ estado: 'suspendida' }).eq('id', companyId);
+    if (error) throw new Error('Error al suspender la empresa');
   }
 
-  // Activar empresa (solo usuarios con rol de soporte)
   static async activateCompany(companyId: string): Promise<void> {
-    try {
-      const { error } = await supabase
-        .from('companies')
-        .update({ estado: 'activa' })
-        .eq('id', companyId);
-
-      if (error) throw error;
-    } catch (error) {
-      console.error('Error activating company:', error);
-      throw new Error('Error al activar la empresa');
-    }
+    const { error } = await supabase.from('companies').update({ estado: 'activa' }).eq('id', companyId);
+    if (error) throw new Error('Error al activar la empresa');
   }
 }
