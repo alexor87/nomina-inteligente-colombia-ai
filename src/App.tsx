@@ -1,4 +1,5 @@
 
+import { lazy, Suspense } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,83 +9,75 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
 import { YearProvider } from "@/contexts/YearContext";
 import { useSystemInitialization } from "@/hooks/useSystemInitialization";
-import { Layout } from "@/components/layout/Layout";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { MayaFullScreenLayout } from "@/components/maya-page/layouts/MayaFullScreenLayout";
-
-// Components and pages
-import Index from "./pages/Index";
-import LoginPage from "./pages/LoginPage";
-import RegisterPage from "./pages/RegisterPage";
-import LogoutPage from "./pages/LogoutPage";
-import DashboardPage from "./pages/DashboardPage";
-import EmployeesPage from "./pages/EmployeesPage";
-import CreateEmployeeModernPage from "./pages/CreateEmployeeModernPage";
-import EditEmployeePage from "./pages/EditEmployeePage";
-import ReportsPage from "./pages/ReportsPage";
-import SettingsPage from "./pages/SettingsPage";
-import ProfilePage from "./pages/ProfilePage";
-import PayrollLiquidationPageSimplified from "./pages/PayrollLiquidationPageSimplified";
-import VacationsAbsencesPage from "./pages/VacationsAbsencesPage";
-import { PayrollHistoryPage } from "./pages/PayrollHistoryPage";
-import PayrollHistoryDetailPage from "./pages/PayrollHistoryDetailPage";
-import CompanyRegistrationPage from "./pages/CompanyRegistrationPage";
-import ResetPasswordPage from "./pages/ResetPasswordPage";
-import SocialBenefitsPage from "./pages/SocialBenefitsPage";
-import SocialBenefitLiquidationPage from "./pages/SocialBenefitLiquidationPage";
-import MayaPage from "./pages/MayaPage";
 import { RootRedirect } from "@/components/routing/RootRedirect";
+
+// Lazy-loaded pages for reduced initial bundle
+const Index = lazy(() => import("./pages/Index"));
+const LoginPage = lazy(() => import("./pages/LoginPage"));
+const RegisterPage = lazy(() => import("./pages/RegisterPage"));
+const LogoutPage = lazy(() => import("./pages/LogoutPage"));
+const DashboardPage = lazy(() => import("./pages/DashboardPage"));
+const EmployeesPage = lazy(() => import("./pages/EmployeesPage"));
+const CreateEmployeeModernPage = lazy(() => import("./pages/CreateEmployeeModernPage"));
+const EditEmployeePage = lazy(() => import("./pages/EditEmployeePage"));
+const ReportsPage = lazy(() => import("./pages/ReportsPage"));
+const SettingsPage = lazy(() => import("./pages/SettingsPage"));
+const ProfilePage = lazy(() => import("./pages/ProfilePage"));
+const PayrollLiquidationPageSimplified = lazy(() => import("./pages/PayrollLiquidationPageSimplified"));
+const VacationsAbsencesPage = lazy(() => import("./pages/VacationsAbsencesPage"));
+const PayrollHistoryPage = lazy(() => import("./pages/PayrollHistoryPage").then(m => ({ default: m.PayrollHistoryPage })));
+const PayrollHistoryDetailPage = lazy(() => import("./pages/PayrollHistoryDetailPage"));
+const CompanyRegistrationPage = lazy(() => import("./pages/CompanyRegistrationPage"));
+const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
+const SocialBenefitsPage = lazy(() => import("./pages/SocialBenefitsPage"));
+const SocialBenefitLiquidationPage = lazy(() => import("./pages/SocialBenefitLiquidationPage"));
+const MayaPage = lazy(() => import("./pages/MayaPage"));
 
 const queryClient = new QueryClient();
 
-/**
- * ✅ APLICACIÓN PRINCIPAL DE NÓMINA
- * Sistema simplificado de gestión de nómina
- */
+const PageLoader = () => (
+  <div className="min-h-screen flex items-center justify-center">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+  </div>
+);
+
 function AppContent() {
-  // Inicialización automática del sistema
   const { isInitializing, systemStatus } = useSystemInitialization();
 
   return (
     <div className="min-h-screen bg-background">
-      <Routes>
-        {/* Root - Smart redirect based on auth */}
-        <Route path="/" element={<RootRedirect />} />
-        
-        {/* Public landing page */}
-        <Route path="/home" element={<Index />} />
-        
-        {/* Public routes */}
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/register/company" element={<CompanyRegistrationPage />} />
-        <Route path="/auth" element={<Navigate to="/login" replace />} />
-        <Route path="/logout" element={<LogoutPage />} />
-        <Route path="/reset-password" element={<ResetPasswordPage />} />
-        
-        {/* Main app entry - Dashboard is home */}
-        <Route path="/app" element={<Navigate to="/modules/dashboard" replace />} />
-        
-        {/* UNIFIED EXPERIENCE - All routes use MayaFullScreenLayout with UnifiedSidebar */}
-        <Route element={<MayaFullScreenLayout />}>
-          {/* MAYA Chat */}
-          <Route path="/maya" element={<MayaPage />} />
-          
-          {/* Modules - Now share the same layout with UnifiedSidebar */}
-          <Route path="/modules/dashboard" element={<DashboardPage />} />
-          <Route path="/modules/employees" element={<EmployeesPage />} />
-          <Route path="/modules/employees/create" element={<CreateEmployeeModernPage />} />
-          <Route path="/modules/employees/:employeeId/edit" element={<EditEmployeePage />} />
-          <Route path="/modules/payroll" element={<PayrollLiquidationPageSimplified />} />
-          <Route path="/modules/payroll-history" element={<PayrollHistoryPage />} />
-          <Route path="/modules/payroll-history/:periodId" element={<PayrollHistoryDetailPage />} />
-          <Route path="/modules/prestaciones-sociales" element={<SocialBenefitsPage />} />
-          <Route path="/modules/prestaciones-sociales/liquidar/:benefitType/:periodKey" element={<SocialBenefitLiquidationPage />} />
-          <Route path="/modules/vacations-absences" element={<VacationsAbsencesPage />} />
-          <Route path="/modules/reports" element={<ReportsPage />} />
-          <Route path="/modules/settings" element={<SettingsPage />} />
-          <Route path="/modules/profile" element={<ProfilePage />} />
-        </Route>
-      </Routes>
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/" element={<RootRedirect />} />
+          <Route path="/home" element={<Index />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/register/company" element={<CompanyRegistrationPage />} />
+          <Route path="/auth" element={<Navigate to="/login" replace />} />
+          <Route path="/logout" element={<LogoutPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/app" element={<Navigate to="/modules/dashboard" replace />} />
+
+          <Route element={<MayaFullScreenLayout />}>
+            <Route path="/maya" element={<MayaPage />} />
+            <Route path="/modules/dashboard" element={<DashboardPage />} />
+            <Route path="/modules/employees" element={<EmployeesPage />} />
+            <Route path="/modules/employees/create" element={<CreateEmployeeModernPage />} />
+            <Route path="/modules/employees/:employeeId/edit" element={<EditEmployeePage />} />
+            <Route path="/modules/payroll" element={<PayrollLiquidationPageSimplified />} />
+            <Route path="/modules/payroll-history" element={<PayrollHistoryPage />} />
+            <Route path="/modules/payroll-history/:periodId" element={<PayrollHistoryDetailPage />} />
+            <Route path="/modules/prestaciones-sociales" element={<SocialBenefitsPage />} />
+            <Route path="/modules/prestaciones-sociales/liquidar/:benefitType/:periodKey" element={<SocialBenefitLiquidationPage />} />
+            <Route path="/modules/vacations-absences" element={<VacationsAbsencesPage />} />
+            <Route path="/modules/reports" element={<ReportsPage />} />
+            <Route path="/modules/settings" element={<SettingsPage />} />
+            <Route path="/modules/profile" element={<ProfilePage />} />
+          </Route>
+        </Routes>
+      </Suspense>
     </div>
   );
 }
@@ -96,10 +89,12 @@ function App() {
         <AuthProvider>
           <SubscriptionProvider>
             <YearProvider>
-            <BrowserRouter>
-              <AppContent />
-              <Toaster />
-              <Sonner />
+              <BrowserRouter>
+                <ErrorBoundary>
+                  <AppContent />
+                </ErrorBoundary>
+                <Toaster />
+                <Sonner />
               </BrowserRouter>
             </YearProvider>
           </SubscriptionProvider>

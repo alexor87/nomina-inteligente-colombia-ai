@@ -136,8 +136,8 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
         if (result.success) {
           console.log('✅ Create submission completed successfully');
           onSuccess();
-          if (result.employeeId && memoizedDataRefresh) {
-            const updatedEmployee: EmployeeUnified = { ...formDataWithCompany, id: result.employeeId } as EmployeeUnified;
+          if (result.data?.id && memoizedDataRefresh) {
+            const updatedEmployee: EmployeeUnified = { ...formDataWithCompany, id: result.data.id } as EmployeeUnified;
             memoizedDataRefresh(updatedEmployee);
           }
         } else {
