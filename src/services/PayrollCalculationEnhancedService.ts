@@ -4,7 +4,7 @@
 import { PayrollCalculationService } from './PayrollCalculationService';
 
 export class PayrollCalculationEnhancedService extends PayrollCalculationService {
-  static getUserConfiguredPeriodicity(): string {
+  static getUserConfiguredPeriodicity(): 'mensual' | 'quincenal' | 'semanal' {
     console.warn('⚠️ PayrollCalculationEnhancedService.getUserConfiguredPeriodicity is deprecated.');
     return 'mensual';
   }

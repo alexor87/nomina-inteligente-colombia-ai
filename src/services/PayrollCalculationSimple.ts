@@ -45,11 +45,11 @@ export class PayrollCalculationSimple {
     };
   }
 
-  static shouldReceiveTransportAllowance(salary: number): boolean {
+  static shouldReceiveTransportAllowance(salary: number, _year?: string): boolean {
     return salary <= 2 * this.SMMLV_2025;
   }
 
-  static getConfigurationInfo() {
+  static getConfigurationInfo(_year?: string) {
     return {
       smmlv: this.SMMLV_2025,
       transportAllowance: this.TRANSPORT_2025,

@@ -6,7 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { SecureNovedadesService } from './SecureNovedadesService';
 import { PayrollNovedad, CreateNovedadData } from '@/types/novedades-enhanced';
 
-export { PayrollNovedad, CreateNovedadData } from '@/types/novedades-enhanced';
+export type { PayrollNovedad, CreateNovedadData } from '@/types/novedades-enhanced';
 
 export class NovedadesEnhancedService {
   static async createNovedad(data: CreateNovedadData): Promise<PayrollNovedad | null> {
