@@ -406,6 +406,7 @@ serve(async (req) => {
         totalAmount,
         employeesCount: totalEmployees,
         provisionsUpdated: allProvisionIds.length,
+        payrollsUpdated,
         periodLabel
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
