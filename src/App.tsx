@@ -71,6 +71,7 @@ function AppContent() {
             <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
             <Route path="/admin/companies" element={<AdminCompaniesPage />} />
             <Route path="/admin/companies/:companyId" element={<AdminCompanyDetailPage />} />
+            <Route path="/admin/plans" element={<AdminPlansPage />} />
             <Route path="/admin/subscriptions" element={<AdminSubscriptionsPage />} />
           </Route>
 
