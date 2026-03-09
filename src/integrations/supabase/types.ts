@@ -2849,6 +2849,48 @@ export type Database = {
           },
         ]
       }
+      subscription_plans: {
+        Row: {
+          caracteristicas: Json
+          created_at: string
+          id: string
+          is_active: boolean
+          max_employees: number
+          max_payrolls_per_month: number
+          nombre: string
+          plan_id: string
+          precio: number
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          caracteristicas?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          max_employees?: number
+          max_payrolls_per_month?: number
+          nombre: string
+          plan_id: string
+          precio?: number
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          caracteristicas?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          max_employees?: number
+          max_payrolls_per_month?: number
+          nombre?: string
+          plan_id?: string
+          precio?: number
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       subtipos_cotizante: {
         Row: {
           activo: boolean
