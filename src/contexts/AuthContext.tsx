@@ -3,7 +3,7 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useRoleManagement } from '@/hooks/useRoleManagement';
 
-type AppRole = 'administrador' | 'rrhh' | 'contador' | 'visualizador' | 'soporte';
+type AppRole = 'administrador' | 'rrhh' | 'contador' | 'visualizador' | 'soporte' | 'superadmin';
 
 interface UserRole {
   role: AppRole;
