@@ -30,6 +30,10 @@ export interface UnifiedExecutionResult {
   totalDeducciones: number;
   totalNeto: number;
   vouchersGenerated?: number;
+  accountingSyncResult?: {
+    synced: boolean;
+    error?: string;
+  };
   error?: string;
   details?: any;
 }
