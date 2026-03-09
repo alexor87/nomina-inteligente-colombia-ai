@@ -40,6 +40,7 @@ const AdminCompaniesPage = lazy(() => import("./pages/admin/AdminCompaniesPage")
 const AdminCompanyDetailPage = lazy(() => import("./pages/admin/AdminCompanyDetailPage"));
 const AdminSubscriptionsPage = lazy(() => import("./pages/admin/AdminSubscriptionsPage"));
 const AdminPlansPage = lazy(() => import("./pages/admin/AdminPlansPage"));
+const AdminUsersPage = lazy(() => import("./pages/admin/AdminUsersPage"));
 
 const queryClient = new QueryClient();
 
