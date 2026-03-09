@@ -286,6 +286,41 @@ export const SuperAdminService = {
     return data || [];
   },
 
+  async updateCompanyLimits(
+    companyId: string,
+    maxEmployees: number,
+    maxPayrolls: number,
+    reason: string,
+    changedBy: string
+  ): Promise<void> {
+    const { data: currentSub } = await supabase
+      .from('company_subscriptions')
+      .select('plan_type, status, max_employees, max_payrolls_per_month')
+      .eq('company_id', companyId)
+      .maybeSingle();
+
+    const { error: updateError } = await supabase
+      .from('company_subscriptions')
+      .update({
+        max_employees: maxEmployees,
+        max_payrolls_per_month: maxPayrolls,
+        updated_at: new Date().toISOString()
+      })
+      .eq('company_id', companyId);
+
+    if (updateError) throw updateError;
+
+    await supabase.from('subscription_events').insert({
+      company_id: companyId,
+      previous_plan: currentSub?.plan_type || 'basico',
+      new_plan: currentSub?.plan_type || 'basico',
+      previous_status: currentSub?.status || 'activa',
+      new_status: currentSub?.status || 'activa',
+      changed_by: changedBy,
+      reason: `Límites ajustados: empleados ${currentSub?.max_employees ?? '?'} → ${maxEmployees}, nóminas ${currentSub?.max_payrolls_per_month ?? '?'} → ${maxPayrolls}. Razón: ${reason}`
+    });
+  },
+
   async getCompanyDetail(companyId: string) {
     const [companyRes, subRes, employeesRes, usersRes, eventsRes] = await Promise.all([
       supabase.from('companies').select('*').eq('id', companyId).single(),

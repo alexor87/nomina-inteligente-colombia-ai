@@ -8,11 +8,12 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Progress } from '@/components/ui/progress';
 import { toast } from '@/hooks/use-toast';
-import { Search, Eye, ArrowUpDown, Pause, Play, ChevronUp, ChevronDown } from 'lucide-react';
+import { Search, Eye, ArrowUpDown, Pause, Play, ChevronUp, ChevronDown, SlidersHorizontal } from 'lucide-react';
 import { PLANES_SAAS } from '@/constants';
 
 type SortField = 'razon_social' | 'created_at' | 'employee_count' | 'trial_ends_at';
@@ -32,6 +33,12 @@ const AdminCompaniesPage: React.FC = () => {
   const [newPlan, setNewPlan] = useState('');
   const [changeReason, setChangeReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Limits dialog state
+  const [limitsDialog, setLimitsDialog] = useState<{ open: boolean; company: CompanyWithSubscription | null }>({ open: false, company: null });
+  const [limitsMaxEmployees, setLimitsMaxEmployees] = useState<number>(10);
+  const [limitsMaxPayrolls, setLimitsMaxPayrolls] = useState<number>(1);
+  const [limitsReason, setLimitsReason] = useState('');
 
   const { data: companies, isLoading } = useQuery({
     queryKey: ['admin-companies'],
@@ -143,6 +150,47 @@ const AdminCompaniesPage: React.FC = () => {
     }
   };
 
+  const openLimitsDialog = (company: CompanyWithSubscription) => {
+    setLimitsDialog({ open: true, company });
+    setLimitsMaxEmployees(company.subscription?.max_employees ?? 10);
+    setLimitsMaxPayrolls(company.subscription?.max_payrolls_per_month ?? 1);
+    setLimitsReason('');
+  };
+
+  const handleUpdateLimits = async () => {
+    if (!limitsDialog.company || !limitsReason.trim() || !user) return;
+    setIsSubmitting(true);
+    try {
+      await SuperAdminService.updateCompanyLimits(
+        limitsDialog.company.id,
+        limitsMaxEmployees,
+        limitsMaxPayrolls,
+        limitsReason,
+        user.id
+      );
+      toast({ title: 'Límites actualizados', description: `${limitsDialog.company.razon_social}: ${limitsMaxEmployees} empleados, ${limitsMaxPayrolls} nóminas/mes` });
+      queryClient.invalidateQueries({ queryKey: ['admin-companies'] });
+      setLimitsDialog({ open: false, company: null });
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const getLimitsCell = (company: CompanyWithSubscription) => {
+    const max = company.subscription?.max_employees ?? null;
+    const current = company.employee_count || 0;
+    if (max === null) return <span className="text-muted-foreground text-xs">—</span>;
+    const pct = Math.min((current / max) * 100, 100);
+    return (
+      <div className="min-w-[80px]">
+        <span className="text-xs font-medium text-foreground">{current}/{max}</span>
+        <Progress value={pct} className={`h-1.5 mt-1 ${pct >= 90 ? '[&>div]:bg-destructive' : pct >= 70 ? '[&>div]:bg-yellow-500' : ''}`} />
+      </div>
+    );
+  };
+
   return (
     <div className="p-8 space-y-6">
       <div>
@@ -190,8 +238,8 @@ const AdminCompaniesPage: React.FC = () => {
                     <th className="text-left p-3 font-medium text-muted-foreground">NIT</th>
                     <th className="text-left p-3 font-medium text-muted-foreground">Plan</th>
                     <th className="text-left p-3 font-medium text-muted-foreground">Estado</th>
-                    <th className="text-right p-3 font-medium text-muted-foreground cursor-pointer select-none" onClick={() => toggleSort('employee_count')}>
-                      <span className="flex items-center justify-end">Empleados<SortIcon field="employee_count" /></span>
+                    <th className="text-left p-3 font-medium text-muted-foreground cursor-pointer select-none" onClick={() => toggleSort('employee_count')}>
+                      <span className="flex items-center">Límites<SortIcon field="employee_count" /></span>
                     </th>
                     <th className="text-left p-3 font-medium text-muted-foreground cursor-pointer select-none" onClick={() => toggleSort('trial_ends_at')}>
                       <span className="flex items-center">Trial expira<SortIcon field="trial_ends_at" /></span>
@@ -214,7 +262,7 @@ const AdminCompaniesPage: React.FC = () => {
                           <Badge variant="outline" className="capitalize text-xs">{effectivePlan || 'N/A'}</Badge>
                         </td>
                         <td className="p-3">{getStatusBadge(effectiveStatus)}</td>
-                        <td className="p-3 text-right text-foreground">{company.employee_count}</td>
+                        <td className="p-3">{getLimitsCell(company)}</td>
                         <td className="p-3">{getTrialBadge(company.subscription?.trial_ends_at ?? null)}</td>
                         <td className="p-3 text-muted-foreground text-xs">
                           {new Date(company.created_at).toLocaleDateString('es-CO')}
@@ -223,6 +271,9 @@ const AdminCompaniesPage: React.FC = () => {
                           <div className="flex items-center justify-end gap-1">
                             <Button size="sm" variant="ghost" onClick={() => navigate(`/admin/companies/${company.id}`)}>
                               <Eye className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => openLimitsDialog(company)} title="Editar límites">
+                              <SlidersHorizontal className="h-3.5 w-3.5" />
                             </Button>
                             <Button size="sm" variant="ghost" onClick={() => { setPlanDialog({ open: true, company }); setNewPlan(effectivePlan || 'basico'); }}>
                               <ArrowUpDown className="h-3.5 w-3.5" />
@@ -274,6 +325,37 @@ const AdminCompaniesPage: React.FC = () => {
             <Button variant="outline" onClick={() => setPlanDialog({ open: false, company: null })}>Cancelar</Button>
             <Button onClick={handleChangePlan} disabled={!changeReason.trim() || isSubmitting}>
               {isSubmitting ? 'Guardando...' : 'Confirmar Cambio'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Limits Edit Dialog */}
+      <Dialog open={limitsDialog.open} onOpenChange={open => !open && setLimitsDialog({ open: false, company: null })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Límites — {limitsDialog.company?.razon_social}</DialogTitle>
+            <DialogDescription>Ajusta los límites de empleados y nóminas para esta empresa sin cambiar su plan.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label>Máximo de empleados</Label>
+              <Input type="number" min={1} value={limitsMaxEmployees} onChange={e => setLimitsMaxEmployees(Number(e.target.value))} />
+              <p className="text-xs text-muted-foreground mt-1">Actualmente: {limitsDialog.company?.employee_count ?? 0} empleados</p>
+            </div>
+            <div>
+              <Label>Máximo de nóminas por mes</Label>
+              <Input type="number" min={1} value={limitsMaxPayrolls} onChange={e => setLimitsMaxPayrolls(Number(e.target.value))} />
+            </div>
+            <div>
+              <Label>Razón del ajuste *</Label>
+              <Textarea value={limitsReason} onChange={e => setLimitsReason(e.target.value)} placeholder="Describe por qué se ajustan los límites..." />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLimitsDialog({ open: false, company: null })}>Cancelar</Button>
+            <Button onClick={handleUpdateLimits} disabled={!limitsReason.trim() || isSubmitting}>
+              {isSubmitting ? 'Guardando...' : 'Guardar Límites'}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -1,21 +1,59 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { SuperAdminService } from '@/services/SuperAdminService';
+import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Building2, Users, Receipt, History } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Progress } from '@/components/ui/progress';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { toast } from '@/hooks/use-toast';
+import { ArrowLeft, Building2, Users, Receipt, History, SlidersHorizontal } from 'lucide-react';
 
 const AdminCompanyDetailPage: React.FC = () => {
   const { companyId } = useParams<{ companyId: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin-company-detail', companyId],
     queryFn: () => SuperAdminService.getCompanyDetail(companyId!),
     enabled: !!companyId
   });
+
+  // Limits dialog state
+  const [limitsOpen, setLimitsOpen] = useState(false);
+  const [maxEmployees, setMaxEmployees] = useState(10);
+  const [maxPayrolls, setMaxPayrolls] = useState(1);
+  const [limitsReason, setLimitsReason] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const openLimitsDialog = () => {
+    setMaxEmployees(data?.subscription?.max_employees ?? 10);
+    setMaxPayrolls(data?.subscription?.max_payrolls_per_month ?? 1);
+    setLimitsReason('');
+    setLimitsOpen(true);
+  };
+
+  const handleUpdateLimits = async () => {
+    if (!companyId || !limitsReason.trim() || !user) return;
+    setIsSubmitting(true);
+    try {
+      await SuperAdminService.updateCompanyLimits(companyId, maxEmployees, maxPayrolls, limitsReason, user.id);
+      toast({ title: 'Límites actualizados' });
+      queryClient.invalidateQueries({ queryKey: ['admin-company-detail', companyId] });
+      setLimitsOpen(false);
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   if (isLoading) {
     return <div className="p-8"><div className="animate-pulse h-64 bg-muted rounded-lg" /></div>;
@@ -25,7 +63,10 @@ const AdminCompanyDetailPage: React.FC = () => {
     return <div className="p-8 text-muted-foreground">Empresa no encontrada</div>;
   }
 
-  const { company, subscription, employees, users, events } = data;
+  const { company, subscription, employees, users: companyUsers, events } = data;
+  const empCount = employees.length;
+  const maxEmp = subscription?.max_employees ?? null;
+  const empPct = maxEmp ? Math.min((empCount / maxEmp) * 100, 100) : 0;
 
   return (
     <div className="p-8 space-y-6">
@@ -57,14 +98,27 @@ const AdminCompanyDetailPage: React.FC = () => {
         {/* Subscription */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm flex items-center gap-2"><Receipt className="h-4 w-4" /> Suscripción</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm flex items-center gap-2"><Receipt className="h-4 w-4" /> Suscripción</CardTitle>
+              {subscription && (
+                <Button variant="ghost" size="sm" onClick={openLimitsDialog} title="Editar límites">
+                  <SlidersHorizontal className="h-3.5 w-3.5 mr-1" /> Límites
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
             {subscription ? (
               <>
                 <div className="flex justify-between"><span className="text-muted-foreground">Plan</span><span className="capitalize font-medium">{subscription.plan_type}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Estado</span><Badge variant="outline" className="capitalize">{subscription.status}</Badge></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Máx. empleados</span><span>{subscription.max_employees}</span></div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Empleados</span>
+                  <div className="text-right">
+                    <span className="font-medium">{empCount}/{subscription.max_employees}</span>
+                    <Progress value={empPct} className={`h-1.5 w-20 mt-1 ${empPct >= 90 ? '[&>div]:bg-destructive' : empPct >= 70 ? '[&>div]:bg-yellow-500' : ''}`} />
+                  </div>
+                </div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Máx. nóminas/mes</span><span>{subscription.max_payrolls_per_month}</span></div>
                 {subscription.trial_ends_at && (
                   <div className="flex justify-between"><span className="text-muted-foreground">Trial hasta</span><span>{new Date(subscription.trial_ends_at).toLocaleDateString('es-CO')}</span></div>
@@ -79,10 +133,10 @@ const AdminCompanyDetailPage: React.FC = () => {
         {/* Users */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm flex items-center gap-2"><Users className="h-4 w-4" /> Usuarios ({users.length})</CardTitle>
+            <CardTitle className="text-sm flex items-center gap-2"><Users className="h-4 w-4" /> Usuarios ({companyUsers.length})</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
-            {users.length > 0 ? users.map((u: any) => (
+            {companyUsers.length > 0 ? companyUsers.map((u: any) => (
               <div key={u.id} className="flex justify-between items-center py-1">
                 <span>{u.first_name} {u.last_name}</span>
                 <div className="flex gap-1">
@@ -154,6 +208,37 @@ const AdminCompanyDetailPage: React.FC = () => {
           ) : <p className="text-muted-foreground text-sm">Sin eventos registrados</p>}
         </CardContent>
       </Card>
+
+      {/* Limits Edit Dialog */}
+      <Dialog open={limitsOpen} onOpenChange={setLimitsOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Límites — {company.razon_social}</DialogTitle>
+            <DialogDescription>Ajusta los límites sin cambiar el plan de la empresa.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label>Máximo de empleados</Label>
+              <Input type="number" min={1} value={maxEmployees} onChange={e => setMaxEmployees(Number(e.target.value))} />
+              <p className="text-xs text-muted-foreground mt-1">Actualmente: {empCount} empleados</p>
+            </div>
+            <div>
+              <Label>Máximo de nóminas por mes</Label>
+              <Input type="number" min={1} value={maxPayrolls} onChange={e => setMaxPayrolls(Number(e.target.value))} />
+            </div>
+            <div>
+              <Label>Razón del ajuste *</Label>
+              <Textarea value={limitsReason} onChange={e => setLimitsReason(e.target.value)} placeholder="Describe por qué se ajustan los límites..." />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLimitsOpen(false)}>Cancelar</Button>
+            <Button onClick={handleUpdateLimits} disabled={!limitsReason.trim() || isSubmitting}>
+              {isSubmitting ? 'Guardando...' : 'Guardar Límites'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
