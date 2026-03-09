@@ -14,6 +14,7 @@ import { TrialExpiredBanner } from '@/components/subscription/TrialExpiredBanner
 export const Layout = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const { user, loading } = useAuth();
+  const { isTrialExpired } = useSubscription();
 
   console.log('🏗️ Layout rendered with sidebar collapsed:', sidebarCollapsed, 'user:', user?.email);
 
@@ -36,7 +37,7 @@ export const Layout = () => {
 
   return (
     <MayaProvider autoShow={false}>
-      <div className="flex min-h-screen bg-gray-50">
+      <div className="flex min-h-screen bg-background">
         <Sidebar 
           collapsed={sidebarCollapsed}
           onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
@@ -48,7 +49,8 @@ export const Layout = () => {
           }`}
         >
           <Header />
-          <div className="min-h-screen bg-gray-50">
+          {isTrialExpired && <TrialExpiredBanner />}
+          <div className="min-h-screen bg-background">
             <Outlet />
           </div>
         </main>
