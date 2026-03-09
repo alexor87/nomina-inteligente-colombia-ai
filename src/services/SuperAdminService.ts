@@ -213,8 +213,9 @@ export const SuperAdminService = {
       .eq('company_id', companyId)
       .maybeSingle();
 
-    const planConfig = PLANES_SAAS.find(p => p.id === newPlan);
-    const maxEmployees = planConfig?.empleados === -1 ? 9999 : (planConfig?.empleados || 10);
+    const plans = await fetchPlans();
+    const planConfig = plans.find(p => p.plan_id === newPlan);
+    const maxEmployees = planConfig?.max_employees === -1 ? 9999 : (planConfig?.max_employees || 10);
 
     // Update subscription
     const { error: updateError } = await supabase
