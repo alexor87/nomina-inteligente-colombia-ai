@@ -267,6 +267,48 @@ const AdminCompanyDetailPage: React.FC = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Trial Extension Dialog */}
+      <Dialog open={trialOpen} onOpenChange={setTrialOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Extender Trial — {company.razon_social}</DialogTitle>
+            <DialogDescription>Establece una nueva fecha de finalización del periodo de prueba.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label>Nueva fecha de fin de trial</Label>
+              <Input type="date" value={trialDate} onChange={e => setTrialDate(e.target.value)} min={new Date().toISOString().split('T')[0]} />
+            </div>
+            <div>
+              <Label>Razón *</Label>
+              <Textarea value={trialReason} onChange={e => setTrialReason(e.target.value)} placeholder="Razón de la extensión del trial..." />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTrialOpen(false)}>Cancelar</Button>
+            <Button
+              onClick={async () => {
+                if (!companyId || !trialDate || !trialReason.trim() || !user) return;
+                setIsSubmitting(true);
+                try {
+                  await SuperAdminService.extendTrial(companyId, new Date(trialDate).toISOString(), trialReason, user.id);
+                  toast({ title: 'Trial extendido', description: `Nuevo vencimiento: ${new Date(trialDate).toLocaleDateString('es-CO')}` });
+                  queryClient.invalidateQueries({ queryKey: ['admin-company-detail', companyId] });
+                  setTrialOpen(false);
+                } catch (err: any) {
+                  toast({ title: 'Error', description: err.message, variant: 'destructive' });
+                } finally {
+                  setIsSubmitting(false);
+                }
+              }}
+              disabled={!trialDate || !trialReason.trim() || isSubmitting}
+            >
+              {isSubmitting ? 'Guardando...' : 'Extender Trial'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
