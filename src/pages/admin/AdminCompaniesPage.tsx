@@ -313,8 +313,8 @@ const AdminCompaniesPage: React.FC = () => {
               <Select value={newPlan} onValueChange={setNewPlan}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {PLANES_SAAS.map(p => (
-                    <SelectItem key={p.id} value={p.id}>
+                  {plans.map(p => (
+                    <SelectItem key={p.plan_id} value={p.plan_id}>
                       {p.nombre} — {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(p.precio)}/mes
                     </SelectItem>
                   ))}

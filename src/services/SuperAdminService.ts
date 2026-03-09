@@ -384,5 +384,95 @@ export const SuperAdminService = {
       })),
       events: eventsRes.data || []
     };
+  },
+
+  async extendTrial(
+    companyId: string,
+    newTrialEnd: string,
+    reason: string,
+    changedBy: string
+  ): Promise<void> {
+    const { data: currentSub } = await supabase
+      .from('company_subscriptions')
+      .select('plan_type, status, trial_ends_at')
+      .eq('company_id', companyId)
+      .maybeSingle();
+
+    const { error } = await supabase
+      .from('company_subscriptions')
+      .update({
+        trial_ends_at: newTrialEnd,
+        status: 'trial',
+        updated_at: new Date().toISOString()
+      })
+      .eq('company_id', companyId);
+
+    if (error) throw error;
+
+    await supabase.from('subscription_events').insert({
+      company_id: companyId,
+      previous_plan: currentSub?.plan_type || 'basico',
+      new_plan: currentSub?.plan_type || 'basico',
+      previous_status: currentSub?.status || 'trial',
+      new_status: 'trial',
+      changed_by: changedBy,
+      reason: `Trial extendido hasta ${new Date(newTrialEnd).toLocaleDateString('es-CO')}. Razón: ${reason}`
+    });
+  },
+
+  async getAllPlatformUsers() {
+    const { data: profiles, error: profError } = await supabase
+      .from('profiles')
+      .select('id, user_id, first_name, last_name, company_id')
+      .order('first_name');
+
+    if (profError) throw profError;
+
+    const userIds = profiles?.map(p => p.user_id) || [];
+    let userRoles: any[] = [];
+    if (userIds.length > 0) {
+      const { data } = await supabase
+        .from('user_roles')
+        .select('user_id, role, company_id')
+        .in('user_id', userIds);
+      userRoles = data || [];
+    }
+
+    // Get company names
+    const companyIds = [...new Set(profiles?.map(p => p.company_id).filter(Boolean) || [])];
+    let companyMap = new Map<string, string>();
+    if (companyIds.length > 0) {
+      const { data: companies } = await supabase
+        .from('companies')
+        .select('id, razon_social')
+        .in('id', companyIds as string[]);
+      companyMap = new Map(companies?.map(c => [c.id, c.razon_social]) || []);
+    }
+
+    return (profiles || []).map(p => ({
+      ...p,
+      roles: userRoles.filter(r => r.user_id === p.user_id),
+      company_name: p.company_id ? companyMap.get(p.company_id) || 'Desconocida' : null
+    }));
+  },
+
+  async assignRole(userId: string, role: string, companyId?: string): Promise<void> {
+    const { error } = await supabase
+      .from('user_roles')
+      .insert({
+        user_id: userId,
+        role: role as any,
+        ...(companyId ? { company_id: companyId } : {})
+      });
+    if (error) throw error;
+  },
+
+  async revokeRole(userId: string, role: string): Promise<void> {
+    const { error } = await supabase
+      .from('user_roles')
+      .delete()
+      .eq('user_id', userId)
+      .eq('role', role as any);
+    if (error) throw error;
   }
 };
