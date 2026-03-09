@@ -1,14 +1,9 @@
-import { useState } from 'react';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PUCMappingEditor } from './PUCMappingEditor';
+import { AccountingSoftwareWizard } from './AccountingSoftwareWizard';
 import { Plug, Calculator } from 'lucide-react';
 
 export const IntegracionesSettings = () => {
-  const { toast } = useToast();
-
   return (
     <div className="space-y-6">
       <div>
@@ -33,17 +28,7 @@ export const IntegracionesSettings = () => {
         </TabsContent>
 
         <TabsContent value="software" className="mt-6">
-          <Card className="p-6">
-            <h3 className="text-lg font-medium mb-4">Integraciones con Software Contable</h3>
-            <p className="text-muted-foreground mb-4">
-              Conecta tu sistema de nómina directamente con Siigo, Alegra u otro software contable para sincronizar automáticamente los asientos de nómina.
-            </p>
-            <div className="bg-muted/50 rounded-lg p-4 text-center">
-              <p className="text-sm text-muted-foreground">
-                🚧 Esta funcionalidad estará disponible próximamente
-              </p>
-            </div>
-          </Card>
+          <AccountingSoftwareWizard />
         </TabsContent>
       </Tabs>
     </div>
