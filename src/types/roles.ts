@@ -56,6 +56,7 @@ export const ROLE_PERMISSIONS: Record<AppRole, RolePermissions> = {
 
 // Descripción de roles para la UI
 export const ROLE_DESCRIPTIONS: Record<AppRole, string> = {
+  superadmin: 'Acceso total al panel de administración SaaS y todas las empresas',
   administrador: 'Acceso completo a todas las funcionalidades de la empresa',
   rrhh: 'Gestión de personal sin acceso financiero o de configuración',
   contador: 'Consulta contable sin acceso a empleados o configuración',
