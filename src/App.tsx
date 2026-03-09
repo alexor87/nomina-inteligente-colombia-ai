@@ -40,6 +40,7 @@ const AdminCompaniesPage = lazy(() => import("./pages/admin/AdminCompaniesPage")
 const AdminCompanyDetailPage = lazy(() => import("./pages/admin/AdminCompanyDetailPage"));
 const AdminSubscriptionsPage = lazy(() => import("./pages/admin/AdminSubscriptionsPage"));
 const AdminPlansPage = lazy(() => import("./pages/admin/AdminPlansPage"));
+const AdminUsersPage = lazy(() => import("./pages/admin/AdminUsersPage"));
 
 const queryClient = new QueryClient();
 
@@ -72,6 +73,7 @@ function AppContent() {
             <Route path="/admin/companies" element={<AdminCompaniesPage />} />
             <Route path="/admin/companies/:companyId" element={<AdminCompanyDetailPage />} />
             <Route path="/admin/plans" element={<AdminPlansPage />} />
+            <Route path="/admin/users" element={<AdminUsersPage />} />
             <Route path="/admin/subscriptions" element={<AdminSubscriptionsPage />} />
           </Route>
 

@@ -1,5 +1,4 @@
 import { supabase } from '@/integrations/supabase/client';
-import { PLANES_SAAS } from '@/constants';
 
 export interface CompanyWithSubscription {
   id: string;
@@ -45,12 +44,39 @@ export interface SubscriptionEvent {
   company_name?: string;
 }
 
-const getPlanPrice = (planType: string | null): number => {
-  const plan = PLANES_SAAS.find(p => p.id === planType);
+// Cache for dynamic plans from DB
+let plansCache: { plan_id: string; nombre: string; precio: number; max_employees: number; max_payrolls_per_month: number }[] | null = null;
+let plansCacheTime = 0;
+const PLANS_CACHE_TTL = 60000; // 1 minute
+
+const fetchPlans = async () => {
+  if (plansCache && Date.now() - plansCacheTime < PLANS_CACHE_TTL) return plansCache;
+  const { data } = await supabase
+    .from('subscription_plans')
+    .select('plan_id, nombre, precio, max_employees, max_payrolls_per_month')
+    .eq('is_active', true)
+    .order('sort_order');
+  plansCache = (data as any[]) || [];
+  plansCacheTime = Date.now();
+  return plansCache;
+};
+
+const getPlanPrice = async (planType: string | null): Promise<number> => {
+  const plans = await fetchPlans();
+  const plan = plans.find(p => p.plan_id === planType);
   return plan?.precio || 0;
 };
 
 export const SuperAdminService = {
+  invalidatePlansCache() {
+    plansCache = null;
+    plansCacheTime = 0;
+  },
+
+  async getActivePlans() {
+    return fetchPlans();
+  },
+
   async getDashboardMetrics(): Promise<SaaSMetrics> {
     // Fetch companies with subscriptions
     const { data: companies, error: compError } = await supabase
@@ -84,9 +110,9 @@ export const SuperAdminService = {
     let activeCompanies = 0;
     let trialCompanies = 0;
     let suspendedCompanies = 0;
-    let mrr = 0;
     let expiringTrials = 0;
     const planCounts: Record<string, number> = {};
+    const activePlanTypes: string[] = [];
 
     companies?.forEach(company => {
       const sub = subMap.get(company.id);
@@ -95,7 +121,7 @@ export const SuperAdminService = {
 
       if (status === 'activa') {
         activeCompanies++;
-        mrr += getPlanPrice(planType);
+        if (planType) activePlanTypes.push(planType);
       }
       if (status === 'trial') {
         trialCompanies++;
@@ -111,6 +137,12 @@ export const SuperAdminService = {
       const planName = planType || 'sin_plan';
       planCounts[planName] = (planCounts[planName] || 0) + 1;
     });
+
+    // Calculate MRR from dynamic plans
+    const plans = await fetchPlans();
+    const planPriceMap = new Map(plans.map(p => [p.plan_id, p.precio]));
+    let mrr = 0;
+    activePlanTypes.forEach(pt => { mrr += planPriceMap.get(pt) || 0; });
 
     // Growth data (last 6 months)
     const growthData: { month: string; companies: number }[] = [];
@@ -181,8 +213,9 @@ export const SuperAdminService = {
       .eq('company_id', companyId)
       .maybeSingle();
 
-    const planConfig = PLANES_SAAS.find(p => p.id === newPlan);
-    const maxEmployees = planConfig?.empleados === -1 ? 9999 : (planConfig?.empleados || 10);
+    const plans = await fetchPlans();
+    const planConfig = plans.find(p => p.plan_id === newPlan);
+    const maxEmployees = planConfig?.max_employees === -1 ? 9999 : (planConfig?.max_employees || 10);
 
     // Update subscription
     const { error: updateError } = await supabase
@@ -351,5 +384,95 @@ export const SuperAdminService = {
       })),
       events: eventsRes.data || []
     };
+  },
+
+  async extendTrial(
+    companyId: string,
+    newTrialEnd: string,
+    reason: string,
+    changedBy: string
+  ): Promise<void> {
+    const { data: currentSub } = await supabase
+      .from('company_subscriptions')
+      .select('plan_type, status, trial_ends_at')
+      .eq('company_id', companyId)
+      .maybeSingle();
+
+    const { error } = await supabase
+      .from('company_subscriptions')
+      .update({
+        trial_ends_at: newTrialEnd,
+        status: 'trial',
+        updated_at: new Date().toISOString()
+      })
+      .eq('company_id', companyId);
+
+    if (error) throw error;
+
+    await supabase.from('subscription_events').insert({
+      company_id: companyId,
+      previous_plan: currentSub?.plan_type || 'basico',
+      new_plan: currentSub?.plan_type || 'basico',
+      previous_status: currentSub?.status || 'trial',
+      new_status: 'trial',
+      changed_by: changedBy,
+      reason: `Trial extendido hasta ${new Date(newTrialEnd).toLocaleDateString('es-CO')}. Razón: ${reason}`
+    });
+  },
+
+  async getAllPlatformUsers() {
+    const { data: profiles, error: profError } = await supabase
+      .from('profiles')
+      .select('id, user_id, first_name, last_name, company_id')
+      .order('first_name');
+
+    if (profError) throw profError;
+
+    const userIds = profiles?.map(p => p.user_id) || [];
+    let userRoles: any[] = [];
+    if (userIds.length > 0) {
+      const { data } = await supabase
+        .from('user_roles')
+        .select('user_id, role, company_id')
+        .in('user_id', userIds);
+      userRoles = data || [];
+    }
+
+    // Get company names
+    const companyIds = [...new Set(profiles?.map(p => p.company_id).filter(Boolean) || [])];
+    let companyMap = new Map<string, string>();
+    if (companyIds.length > 0) {
+      const { data: companies } = await supabase
+        .from('companies')
+        .select('id, razon_social')
+        .in('id', companyIds as string[]);
+      companyMap = new Map(companies?.map(c => [c.id, c.razon_social]) || []);
+    }
+
+    return (profiles || []).map(p => ({
+      ...p,
+      roles: userRoles.filter(r => r.user_id === p.user_id),
+      company_name: p.company_id ? companyMap.get(p.company_id) || 'Desconocida' : null
+    }));
+  },
+
+  async assignRole(userId: string, role: string, companyId?: string): Promise<void> {
+    const { error } = await supabase
+      .from('user_roles')
+      .insert({
+        user_id: userId,
+        role: role as any,
+        ...(companyId ? { company_id: companyId } : {})
+      });
+    if (error) throw error;
+  },
+
+  async revokeRole(userId: string, role: string): Promise<void> {
+    const { error } = await supabase
+      .from('user_roles')
+      .delete()
+      .eq('user_id', userId)
+      .eq('role', role as any);
+    if (error) throw error;
   }
 };

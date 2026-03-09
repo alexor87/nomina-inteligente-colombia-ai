@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
-import { ArrowLeft, Building2, Users, Receipt, History, SlidersHorizontal } from 'lucide-react';
+import { ArrowLeft, Building2, Users, Receipt, History, SlidersHorizontal, CalendarPlus } from 'lucide-react';
 
 const AdminCompanyDetailPage: React.FC = () => {
   const { companyId } = useParams<{ companyId: string }>();
@@ -32,6 +32,11 @@ const AdminCompanyDetailPage: React.FC = () => {
   const [maxPayrolls, setMaxPayrolls] = useState(1);
   const [limitsReason, setLimitsReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Trial extension state
+  const [trialOpen, setTrialOpen] = useState(false);
+  const [trialDate, setTrialDate] = useState('');
+  const [trialReason, setTrialReason] = useState('');
 
   const openLimitsDialog = () => {
     setMaxEmployees(data?.subscription?.max_employees ?? 10);
@@ -121,8 +126,31 @@ const AdminCompanyDetailPage: React.FC = () => {
                 </div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Máx. nóminas/mes</span><span>{subscription.max_payrolls_per_month}</span></div>
                 {subscription.trial_ends_at && (
-                  <div className="flex justify-between"><span className="text-muted-foreground">Trial hasta</span><span>{new Date(subscription.trial_ends_at).toLocaleDateString('es-CO')}</span></div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Trial hasta</span>
+                    <div className="flex items-center gap-2">
+                      <span>{new Date(subscription.trial_ends_at).toLocaleDateString('es-CO')}</span>
+                      {(() => {
+                        const daysLeft = Math.ceil((new Date(subscription.trial_ends_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                        if (daysLeft < 0) return <Badge variant="destructive" className="text-xs">Expirado</Badge>;
+                        if (daysLeft <= 7) return <Badge variant="warning" className="text-xs">{daysLeft}d</Badge>;
+                        return null;
+                      })()}
+                    </div>
+                  </div>
                 )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full mt-2"
+                  onClick={() => {
+                    setTrialDate(subscription.trial_ends_at ? new Date(new Date(subscription.trial_ends_at).getTime() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : '');
+                    setTrialReason('');
+                    setTrialOpen(true);
+                  }}
+                >
+                  <CalendarPlus className="h-3.5 w-3.5 mr-1" /> Extender Trial
+                </Button>
               </>
             ) : (
               <p className="text-muted-foreground">Sin suscripción configurada</p>
@@ -235,6 +263,48 @@ const AdminCompanyDetailPage: React.FC = () => {
             <Button variant="outline" onClick={() => setLimitsOpen(false)}>Cancelar</Button>
             <Button onClick={handleUpdateLimits} disabled={!limitsReason.trim() || isSubmitting}>
               {isSubmitting ? 'Guardando...' : 'Guardar Límites'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Trial Extension Dialog */}
+      <Dialog open={trialOpen} onOpenChange={setTrialOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Extender Trial — {company.razon_social}</DialogTitle>
+            <DialogDescription>Establece una nueva fecha de finalización del periodo de prueba.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label>Nueva fecha de fin de trial</Label>
+              <Input type="date" value={trialDate} onChange={e => setTrialDate(e.target.value)} min={new Date().toISOString().split('T')[0]} />
+            </div>
+            <div>
+              <Label>Razón *</Label>
+              <Textarea value={trialReason} onChange={e => setTrialReason(e.target.value)} placeholder="Razón de la extensión del trial..." />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTrialOpen(false)}>Cancelar</Button>
+            <Button
+              onClick={async () => {
+                if (!companyId || !trialDate || !trialReason.trim() || !user) return;
+                setIsSubmitting(true);
+                try {
+                  await SuperAdminService.extendTrial(companyId, new Date(trialDate).toISOString(), trialReason, user.id);
+                  toast({ title: 'Trial extendido', description: `Nuevo vencimiento: ${new Date(trialDate).toLocaleDateString('es-CO')}` });
+                  queryClient.invalidateQueries({ queryKey: ['admin-company-detail', companyId] });
+                  setTrialOpen(false);
+                } catch (err: any) {
+                  toast({ title: 'Error', description: err.message, variant: 'destructive' });
+                } finally {
+                  setIsSubmitting(false);
+                }
+              }}
+              disabled={!trialDate || !trialReason.trim() || isSubmitting}
+            >
+              {isSubmitting ? 'Guardando...' : 'Extender Trial'}
             </Button>
           </DialogFooter>
         </DialogContent>

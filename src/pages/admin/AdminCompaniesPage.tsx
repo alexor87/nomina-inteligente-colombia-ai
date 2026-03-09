@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { SuperAdminService, CompanyWithSubscription } from '@/services/SuperAdminService';
+import { PlanService } from '@/services/PlanService';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -14,7 +15,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { toast } from '@/hooks/use-toast';
 import { Search, Eye, ArrowUpDown, Pause, Play, ChevronUp, ChevronDown, SlidersHorizontal } from 'lucide-react';
-import { PLANES_SAAS } from '@/constants';
 
 type SortField = 'razon_social' | 'created_at' | 'employee_count' | 'trial_ends_at';
 type SortDir = 'asc' | 'desc';
@@ -43,6 +43,11 @@ const AdminCompaniesPage: React.FC = () => {
   const { data: companies, isLoading } = useQuery({
     queryKey: ['admin-companies'],
     queryFn: () => SuperAdminService.getAllCompaniesWithSubscriptions()
+  });
+
+  const { data: plans = [] } = useQuery({
+    queryKey: ['admin-active-plans'],
+    queryFn: () => PlanService.getPlans(true)
   });
 
   const toggleSort = (field: SortField) => {
@@ -208,7 +213,7 @@ const AdminCompaniesPage: React.FC = () => {
           <SelectTrigger className="w-[160px]"><SelectValue placeholder="Plan" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos los planes</SelectItem>
-            {PLANES_SAAS.map(p => <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>)}
+            {plans.map(p => <SelectItem key={p.plan_id} value={p.plan_id}>{p.nombre}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={filterStatus} onValueChange={setFilterStatus}>
@@ -308,8 +313,8 @@ const AdminCompaniesPage: React.FC = () => {
               <Select value={newPlan} onValueChange={setNewPlan}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {PLANES_SAAS.map(p => (
-                    <SelectItem key={p.id} value={p.id}>
+                  {plans.map(p => (
+                    <SelectItem key={p.plan_id} value={p.plan_id}>
                       {p.nombre} — {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(p.precio)}/mes
                     </SelectItem>
                   ))}
