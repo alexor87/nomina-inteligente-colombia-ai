@@ -126,8 +126,31 @@ const AdminCompanyDetailPage: React.FC = () => {
                 </div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Máx. nóminas/mes</span><span>{subscription.max_payrolls_per_month}</span></div>
                 {subscription.trial_ends_at && (
-                  <div className="flex justify-between"><span className="text-muted-foreground">Trial hasta</span><span>{new Date(subscription.trial_ends_at).toLocaleDateString('es-CO')}</span></div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Trial hasta</span>
+                    <div className="flex items-center gap-2">
+                      <span>{new Date(subscription.trial_ends_at).toLocaleDateString('es-CO')}</span>
+                      {(() => {
+                        const daysLeft = Math.ceil((new Date(subscription.trial_ends_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+                        if (daysLeft < 0) return <Badge variant="destructive" className="text-xs">Expirado</Badge>;
+                        if (daysLeft <= 7) return <Badge variant="warning" className="text-xs">{daysLeft}d</Badge>;
+                        return null;
+                      })()}
+                    </div>
+                  </div>
                 )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full mt-2"
+                  onClick={() => {
+                    setTrialDate(subscription.trial_ends_at ? new Date(new Date(subscription.trial_ends_at).getTime() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : '');
+                    setTrialReason('');
+                    setTrialOpen(true);
+                  }}
+                >
+                  <CalendarPlus className="h-3.5 w-3.5 mr-1" /> Extender Trial
+                </Button>
               </>
             ) : (
               <p className="text-muted-foreground">Sin suscripción configurada</p>
