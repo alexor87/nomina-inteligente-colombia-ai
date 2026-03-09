@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 const NAV_ITEMS = [
   { path: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/admin/companies', label: 'Empresas', icon: Building2 },
+  { path: '/admin/plans', label: 'Planes', icon: Package },
   { path: '/admin/subscriptions', label: 'Suscripciones', icon: Receipt },
 ];
 
