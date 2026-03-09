@@ -421,4 +421,66 @@ export class PayrollUnifiedAtomicService {
     
     return period;
   }
+
+  /**
+   * ✅ AUTO-SYNC: Intentar sincronizar con software contable si está habilitado
+   */
+  private static async tryAccountingSync(
+    periodId: string,
+    companyId: string
+  ): Promise<{ synced: boolean; error?: string }> {
+    try {
+      console.log('📊 [UNIFIED] Verificando auto-sync contable...');
+      
+      // Verificar si auto-sync está habilitado
+      const isEnabled = await AccountingIntegrationService.isAutoSyncEnabled(companyId);
+      
+      if (!isEnabled) {
+        console.log('📊 [UNIFIED] Auto-sync no está habilitado');
+        return { synced: false };
+      }
+      
+      console.log('📊 [UNIFIED] Auto-sync habilitado, sincronizando...');
+      
+      // Ejecutar sincronización
+      const result = await AccountingIntegrationService.syncPeriod(companyId, periodId);
+      
+      if (result.success) {
+        console.log('✅ [UNIFIED] Sincronización contable exitosa:', result);
+        return { synced: true };
+      } else {
+        console.warn('⚠️ [UNIFIED] Error en sincronización contable:', result.error);
+        return { synced: false, error: result.error };
+      }
+      
+    } catch (error: any) {
+      console.warn('⚠️ [UNIFIED] Error en auto-sync contable:', error);
+      return { synced: false, error: error.message };
+    }
+  }
+
+  /**
+   * Obtener estado de sincronización contable para incluir en resultado
+   */
+  private static async getAccountingSyncStatus(
+    companyId: string
+  ): Promise<{ synced: boolean; error?: string } | undefined> {
+    try {
+      const isEnabled = await AccountingIntegrationService.isAutoSyncEnabled(companyId);
+      if (!isEnabled) {
+        return undefined;
+      }
+      
+      const integration = await AccountingIntegrationService.getIntegration(companyId);
+      if (integration?.last_sync_status === 'success') {
+        return { synced: true };
+      } else if (integration?.last_sync_status === 'error') {
+        return { synced: false, error: 'Error en última sincronización' };
+      }
+      
+      return undefined;
+    } catch {
+      return undefined;
+    }
+  }
 }
