@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { SuperAdminService, CompanyWithSubscription } from '@/services/SuperAdminService';
 import { useAuth } from '@/contexts/AuthContext';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,8 +12,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toast';
-import { Search, Eye, ArrowUpDown, Pause, Play } from 'lucide-react';
+import { Search, Eye, ArrowUpDown, Pause, Play, ChevronUp, ChevronDown } from 'lucide-react';
 import { PLANES_SAAS } from '@/constants';
+
+type SortField = 'razon_social' | 'created_at' | 'employee_count' | 'trial_ends_at';
+type SortDir = 'asc' | 'desc';
 
 const AdminCompaniesPage: React.FC = () => {
   const { user } = useAuth();
@@ -22,8 +25,9 @@ const AdminCompaniesPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [filterPlan, setFilterPlan] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [sortField, setSortField] = useState<SortField>('created_at');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
 
-  // Plan change dialog state
   const [planDialog, setPlanDialog] = useState<{ open: boolean; company: CompanyWithSubscription | null }>({ open: false, company: null });
   const [newPlan, setNewPlan] = useState('');
   const [changeReason, setChangeReason] = useState('');
@@ -34,24 +38,75 @@ const AdminCompaniesPage: React.FC = () => {
     queryFn: () => SuperAdminService.getAllCompaniesWithSubscriptions()
   });
 
-  const filtered = companies?.filter(c => {
-    const matchSearch = !search || 
-      c.razon_social.toLowerCase().includes(search.toLowerCase()) ||
-      c.nit.includes(search);
-    const effectivePlan = c.subscription?.plan_type || c.plan;
-    const effectiveStatus = c.subscription?.status || c.estado;
-    const matchPlan = filterPlan === 'all' || effectivePlan === filterPlan;
-    const matchStatus = filterStatus === 'all' || effectiveStatus === filterStatus;
-    return matchSearch && matchPlan && matchStatus;
-  }) || [];
+  const toggleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDir('asc');
+    }
+  };
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return <ArrowUpDown className="h-3 w-3 ml-1 opacity-40" />;
+    return sortDir === 'asc'
+      ? <ChevronUp className="h-3 w-3 ml-1" />
+      : <ChevronDown className="h-3 w-3 ml-1" />;
+  };
+
+  const filtered = useMemo(() => {
+    let result = companies?.filter(c => {
+      const matchSearch = !search ||
+        c.razon_social.toLowerCase().includes(search.toLowerCase()) ||
+        c.nit.includes(search);
+      const effectivePlan = c.subscription?.plan_type || c.plan;
+      const effectiveStatus = c.subscription?.status || c.estado;
+      const matchPlan = filterPlan === 'all' || effectivePlan === filterPlan;
+      const matchStatus = filterStatus === 'all' || effectiveStatus === filterStatus;
+      return matchSearch && matchPlan && matchStatus;
+    }) || [];
+
+    result.sort((a, b) => {
+      let cmp = 0;
+      switch (sortField) {
+        case 'razon_social':
+          cmp = a.razon_social.localeCompare(b.razon_social);
+          break;
+        case 'created_at':
+          cmp = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+          break;
+        case 'employee_count':
+          cmp = (a.employee_count || 0) - (b.employee_count || 0);
+          break;
+        case 'trial_ends_at': {
+          const aDate = a.subscription?.trial_ends_at ? new Date(a.subscription.trial_ends_at).getTime() : 0;
+          const bDate = b.subscription?.trial_ends_at ? new Date(b.subscription.trial_ends_at).getTime() : 0;
+          cmp = aDate - bDate;
+          break;
+        }
+      }
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+
+    return result;
+  }, [companies, search, filterPlan, filterStatus, sortField, sortDir]);
 
   const getStatusBadge = (status: string | null) => {
     switch (status) {
-      case 'activa': return <Badge className="bg-green-100 text-green-800 text-xs">Activa</Badge>;
-      case 'trial': return <Badge className="bg-blue-100 text-blue-800 text-xs">Trial</Badge>;
-      case 'suspendida': return <Badge className="bg-red-100 text-red-800 text-xs">Suspendida</Badge>;
+      case 'activa': return <Badge variant="success" className="text-xs">Activa</Badge>;
+      case 'trial': return <Badge variant="info" className="text-xs">Trial</Badge>;
+      case 'suspendida': return <Badge variant="destructive" className="text-xs">Suspendida</Badge>;
       default: return <Badge variant="outline" className="text-xs">{status || 'N/A'}</Badge>;
     }
+  };
+
+  const getTrialBadge = (trialEndsAt: string | null) => {
+    if (!trialEndsAt) return <span className="text-muted-foreground text-xs">—</span>;
+    const daysLeft = Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    const dateStr = new Date(trialEndsAt).toLocaleDateString('es-CO');
+    if (daysLeft < 0) return <Badge variant="destructive" className="text-xs">Expirado</Badge>;
+    if (daysLeft <= 7) return <Badge variant="warning" className="text-xs">{dateStr} ({daysLeft}d)</Badge>;
+    return <span className="text-xs text-muted-foreground">{dateStr}</span>;
   };
 
   const handleChangePlan = async () => {
@@ -129,12 +184,21 @@ const AdminCompaniesPage: React.FC = () => {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border bg-muted/50">
-                    <th className="text-left p-3 font-medium text-muted-foreground">Empresa</th>
+                    <th className="text-left p-3 font-medium text-muted-foreground cursor-pointer select-none" onClick={() => toggleSort('razon_social')}>
+                      <span className="flex items-center">Empresa<SortIcon field="razon_social" /></span>
+                    </th>
                     <th className="text-left p-3 font-medium text-muted-foreground">NIT</th>
                     <th className="text-left p-3 font-medium text-muted-foreground">Plan</th>
                     <th className="text-left p-3 font-medium text-muted-foreground">Estado</th>
-                    <th className="text-right p-3 font-medium text-muted-foreground">Empleados</th>
-                    <th className="text-left p-3 font-medium text-muted-foreground">Registro</th>
+                    <th className="text-right p-3 font-medium text-muted-foreground cursor-pointer select-none" onClick={() => toggleSort('employee_count')}>
+                      <span className="flex items-center justify-end">Empleados<SortIcon field="employee_count" /></span>
+                    </th>
+                    <th className="text-left p-3 font-medium text-muted-foreground cursor-pointer select-none" onClick={() => toggleSort('trial_ends_at')}>
+                      <span className="flex items-center">Trial expira<SortIcon field="trial_ends_at" /></span>
+                    </th>
+                    <th className="text-left p-3 font-medium text-muted-foreground cursor-pointer select-none" onClick={() => toggleSort('created_at')}>
+                      <span className="flex items-center">Registro<SortIcon field="created_at" /></span>
+                    </th>
                     <th className="text-right p-3 font-medium text-muted-foreground">Acciones</th>
                   </tr>
                 </thead>
@@ -151,6 +215,7 @@ const AdminCompaniesPage: React.FC = () => {
                         </td>
                         <td className="p-3">{getStatusBadge(effectiveStatus)}</td>
                         <td className="p-3 text-right text-foreground">{company.employee_count}</td>
+                        <td className="p-3">{getTrialBadge(company.subscription?.trial_ends_at ?? null)}</td>
                         <td className="p-3 text-muted-foreground text-xs">
                           {new Date(company.created_at).toLocaleDateString('es-CO')}
                         </td>
@@ -171,7 +236,7 @@ const AdminCompaniesPage: React.FC = () => {
                     );
                   })}
                   {filtered.length === 0 && (
-                    <tr><td colSpan={7} className="p-8 text-center text-muted-foreground">No se encontraron empresas</td></tr>
+                    <tr><td colSpan={8} className="p-8 text-center text-muted-foreground">No se encontraron empresas</td></tr>
                   )}
                 </tbody>
               </table>
