@@ -82,7 +82,10 @@ export class PayrollUnifiedAtomicService {
           await this.generateVouchers(periodId, companyId, options.sendEmails || false);
         }
         
-        // 4.3: Registrar auditoría de liquidación completa
+        // 4.3: Sincronizar con software contable si auto-sync está habilitado
+        const accountingSyncResult = await this.tryAccountingSync(periodId, companyId);
+        
+        // 4.4: Registrar auditoría de liquidación completa
         await this.createAuditLog(periodId, companyId, options.userId, 'full_liquidation');
       } else {
         // Solo cálculo - registrar auditoría simple
