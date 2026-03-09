@@ -213,7 +213,7 @@ const AdminCompaniesPage: React.FC = () => {
           <SelectTrigger className="w-[160px]"><SelectValue placeholder="Plan" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos los planes</SelectItem>
-            {PLANES_SAAS.map(p => <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>)}
+            {plans.map(p => <SelectItem key={p.plan_id} value={p.plan_id}>{p.nombre}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={filterStatus} onValueChange={setFilterStatus}>
