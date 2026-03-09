@@ -2802,6 +2802,53 @@ export type Database = {
           },
         ]
       }
+      subscription_events: {
+        Row: {
+          changed_by: string | null
+          company_id: string
+          created_at: string | null
+          id: string
+          metadata: Json | null
+          new_plan: string
+          new_status: string
+          previous_plan: string | null
+          previous_status: string | null
+          reason: string
+        }
+        Insert: {
+          changed_by?: string | null
+          company_id: string
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          new_plan: string
+          new_status: string
+          previous_plan?: string | null
+          previous_status?: string | null
+          reason: string
+        }
+        Update: {
+          changed_by?: string | null
+          company_id?: string
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          new_plan?: string
+          new_status?: string
+          previous_plan?: string | null
+          previous_status?: string | null
+          reason?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subtipos_cotizante: {
         Row: {
           activo: boolean
@@ -3322,6 +3369,7 @@ export type Database = {
         Args: { p_company_id: string }
         Returns: undefined
       }
+      is_superadmin: { Args: never; Returns: boolean }
       is_support_user: { Args: { _user_id?: string }; Returns: boolean }
       log_security_violation: {
         Args: {
