@@ -102,11 +102,12 @@ export class PayrollUnifiedAtomicService {
         mode: options.mode,
         periodId,
         employeesProcessed: calculationResult.employees_processed,
-        employeesCreated, // ✅ FIX: Reportar cuántos empleados se crearon
+        employeesCreated,
         totalDevengado: updatedPeriod.total_devengado,
         totalDeducciones: updatedPeriod.total_deducciones,
         totalNeto: updatedPeriod.total_neto,
         vouchersGenerated: options.generateVouchers ? calculationResult.employees_processed : undefined,
+        accountingSyncResult: options.mode === 'liquidation' ? await this.getAccountingSyncStatus(companyId) : undefined,
         details: {
           periodName: updatedPeriod.periodo,
           periodState: updatedPeriod.estado,
