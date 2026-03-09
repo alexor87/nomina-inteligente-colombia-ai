@@ -68,6 +68,15 @@ const getPlanPrice = async (planType: string | null): Promise<number> => {
 };
 
 export const SuperAdminService = {
+  invalidatePlansCache() {
+    plansCache = null;
+    plansCacheTime = 0;
+  },
+
+  async getActivePlans() {
+    return fetchPlans();
+  },
+
   async getDashboardMetrics(): Promise<SaaSMetrics> {
     // Fetch companies with subscriptions
     const { data: companies, error: compError } = await supabase
