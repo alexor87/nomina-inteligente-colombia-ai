@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { AccountingIntegrationService } from './AccountingIntegrationService';
 
 // ============================================================================
 // PayrollUnifiedAtomicService - Arquitectura Unificada para Maya + Manual
