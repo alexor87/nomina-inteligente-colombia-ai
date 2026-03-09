@@ -133,7 +133,7 @@ describe('AccountingSoftwareWizard', () => {
           integration_id: 'int-123',
           period_id: 'period-1',
           provider: 'siigo',
-          status: 'success',
+          status: 'success' as const,
           entries_sent: 25,
           response_data: {},
           error_message: null,
