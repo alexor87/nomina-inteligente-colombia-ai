@@ -1,6 +1,6 @@
 
 // Tipos para el sistema de roles
-export type AppRole = 'administrador' | 'rrhh' | 'contador' | 'visualizador' | 'soporte';
+export type AppRole = 'administrador' | 'rrhh' | 'contador' | 'visualizador' | 'soporte' | 'superadmin';
 
 export interface UserRole {
   role: AppRole;
