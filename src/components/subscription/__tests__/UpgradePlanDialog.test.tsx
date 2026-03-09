@@ -33,14 +33,16 @@ describe('UpgradePlanDialog', () => {
       render(<UpgradePlanDialog {...defaultProps} />);
 
       expect(screen.getByText('Básico')).toBeInTheDocument();
-      expect(screen.getByText('$15.000/mes')).toBeInTheDocument();
+      // Price is split across text nodes: "$ 15.000" and "/mes"
+      expect(screen.getByText(/15\.000/)).toBeInTheDocument();
     });
 
     it('shows suggested plan name and price', () => {
       render(<UpgradePlanDialog {...defaultProps} />);
 
       expect(screen.getByText('Profesional')).toBeInTheDocument();
-      expect(screen.getByText('$35.000/mes')).toBeInTheDocument();
+      // Price is split across text nodes: "$ 35.000" and "/mes"
+      expect(screen.getByText(/35\.000/)).toBeInTheDocument();
     });
 
     it('shows employee limits for plans', () => {

@@ -57,8 +57,10 @@ describe('TrialExpiredBanner', () => {
     it('has destructive styling classes', () => {
       render(<TrialExpiredBanner />);
 
-      const banner = screen.getByText(/Tu período de prueba/).closest('div')?.parentElement;
-      expect(banner?.className).toContain('bg-destructive');
+      // Walk up to the outermost banner div that has bg-destructive/10
+      const innerDiv = screen.getByText(/Tu período de prueba/).closest('div');
+      const outerDiv = innerDiv?.parentElement?.parentElement;
+      expect(outerDiv?.className).toContain('bg-destructive');
     });
 
     it('has proper text styling', () => {
