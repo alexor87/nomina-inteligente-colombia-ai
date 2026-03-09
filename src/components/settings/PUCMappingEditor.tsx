@@ -219,7 +219,7 @@ export const PUCMappingEditor = () => {
           {/* Créditos - Pasivos */}
           <div>
             <h3 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-green-500" />
+              <span className="w-2 h-2 rounded-full bg-secondary" />
               Deducciones y Provisiones (Crédito)
             </h3>
             <MappingTable 
