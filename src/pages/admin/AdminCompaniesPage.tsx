@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { SuperAdminService, CompanyWithSubscription } from '@/services/SuperAdminService';
+import { PlanService } from '@/services/PlanService';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -14,7 +15,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { toast } from '@/hooks/use-toast';
 import { Search, Eye, ArrowUpDown, Pause, Play, ChevronUp, ChevronDown, SlidersHorizontal } from 'lucide-react';
-import { PLANES_SAAS } from '@/constants';
 
 type SortField = 'razon_social' | 'created_at' | 'employee_count' | 'trial_ends_at';
 type SortDir = 'asc' | 'desc';
