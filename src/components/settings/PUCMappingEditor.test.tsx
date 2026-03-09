@@ -156,18 +156,16 @@ describe('PUCMappingEditor', () => {
     });
   });
 
-  it('should show delete button only for custom mappings', async () => {
+  it('should show Personalizado badge for custom mappings only', async () => {
     render(<PUCMappingEditor />);
     
     await waitFor(() => {
       expect(screen.getByText('📊 Configuración de Cuentas PUC')).toBeInTheDocument();
     });
 
-    // There should be exactly 1 delete button (for the custom mapping)
-    const deleteButtons = screen.getAllByRole('button').filter(
-      btn => btn.querySelector('svg.lucide-trash-2')
-    );
-    expect(deleteButtons.length).toBe(1);
+    // Custom mapping should have "Personalizado" badge
+    const badges = screen.getAllByText('Personalizado');
+    expect(badges.length).toBe(1);
   });
 
   it('should enable save button when mappings are edited', async () => {
