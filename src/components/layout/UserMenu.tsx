@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { LogOut, User, Settings, Crown } from 'lucide-react';
+import { LogOut, User, Settings, Crown, Shield } from 'lucide-react';
 
 export const UserMenu = () => {
   const { user, profile, roles, isSuperAdmin, hasOptimisticRole } = useAuth();
@@ -88,6 +88,15 @@ export const UserMenu = () => {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        {isSuperAdmin && (
+          <>
+            <DropdownMenuItem onClick={() => navigate('/admin/dashboard')}>
+              <Shield className="mr-2 h-4 w-4 text-yellow-600" />
+              <span>Panel Admin</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
         <DropdownMenuItem onClick={handleProfileClick}>
           <User className="mr-2 h-4 w-4" />
           <span>Perfil</span>

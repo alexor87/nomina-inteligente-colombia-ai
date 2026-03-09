@@ -3,7 +3,7 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useRoleManagement } from '@/hooks/useRoleManagement';
 
-type AppRole = 'administrador' | 'rrhh' | 'contador' | 'visualizador' | 'soporte';
+type AppRole = 'administrador' | 'rrhh' | 'contador' | 'visualizador' | 'soporte' | 'superadmin';
 
 interface UserRole {
   role: AppRole;
@@ -49,6 +49,7 @@ export const useAuth = () => {
 
 // Enhanced role permissions matrix - SINCRONIZADO CON src/types/roles.ts
 const ROLE_PERMISSIONS: Record<AppRole, string[]> = {
+  superadmin: ['dashboard', 'employees', 'payroll', 'payroll-history', 'prestaciones-sociales', 'vouchers', 'payments', 'reports', 'settings', 'vacations-absences', 'admin'],
   administrador: ['dashboard', 'employees', 'payroll', 'payroll-history', 'prestaciones-sociales', 'vouchers', 'payments', 'reports', 'settings', 'vacations-absences'],
   rrhh: ['dashboard', 'employees', 'payroll-history', 'prestaciones-sociales', 'vouchers', 'reports', 'vacations-absences'],
   contador: ['dashboard', 'payroll-history', 'prestaciones-sociales', 'vouchers', 'reports', 'vacations-absences'],
@@ -68,6 +69,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Use the optimized role management hook
   const { roles, isLoadingRoles, hasOptimisticRole, refetchRoles } = useRoleManagement(user, profile);
+
+  // Detect superadmin from roles
+  useEffect(() => {
+    const hasSuperAdminRole = roles.some(r => r.role === 'superadmin');
+    setIsSuperAdmin(hasSuperAdminRole);
+  }, [roles]);
 
   const hasRole = useCallback((role: AppRole, companyId?: string): boolean => {
     if (roles.length === 0) {

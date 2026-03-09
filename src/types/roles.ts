@@ -1,6 +1,6 @@
 
 // Tipos para el sistema de roles
-export type AppRole = 'administrador' | 'rrhh' | 'contador' | 'visualizador' | 'soporte';
+export type AppRole = 'administrador' | 'rrhh' | 'contador' | 'visualizador' | 'soporte' | 'superadmin';
 
 export interface UserRole {
   role: AppRole;
@@ -16,6 +16,12 @@ export interface RolePermissions {
 
 // Matriz de permisos por rol - CON PRESTACIONES SOCIALES
 export const ROLE_PERMISSIONS: Record<AppRole, RolePermissions> = {
+  superadmin: {
+    modules: ['dashboard', 'employees', 'payroll', 'prestaciones-sociales', 'vouchers', 'payments', 'reports', 'settings', 'admin'],
+    canEdit: true,
+    canDelete: true,
+    canExport: true
+  },
   administrador: {
     modules: ['dashboard', 'employees', 'payroll', 'prestaciones-sociales', 'vouchers', 'payments', 'reports', 'settings'],
     canEdit: true,
@@ -50,6 +56,7 @@ export const ROLE_PERMISSIONS: Record<AppRole, RolePermissions> = {
 
 // Descripción de roles para la UI
 export const ROLE_DESCRIPTIONS: Record<AppRole, string> = {
+  superadmin: 'Acceso total al panel de administración SaaS y todas las empresas',
   administrador: 'Acceso completo a todas las funcionalidades de la empresa',
   rrhh: 'Gestión de personal sin acceso financiero o de configuración',
   contador: 'Consulta contable sin acceso a empleados o configuración',

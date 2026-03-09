@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
 import { LoadingWithTimeout } from '@/components/ui/LoadingWithTimeout';
 
-type AppRole = 'administrador' | 'rrhh' | 'contador' | 'visualizador' | 'soporte';
+type AppRole = 'administrador' | 'rrhh' | 'contador' | 'visualizador' | 'soporte' | 'superadmin';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;

@@ -12,6 +12,7 @@ import { useSystemInitialization } from "@/hooks/useSystemInitialization";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { MayaFullScreenLayout } from "@/components/maya-page/layouts/MayaFullScreenLayout";
 import { RootRedirect } from "@/components/routing/RootRedirect";
+import { AdminLayout } from "@/components/admin/AdminLayout";
 
 // Lazy-loaded pages for reduced initial bundle
 const Index = lazy(() => import("./pages/Index"));
@@ -34,6 +35,10 @@ const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
 const SocialBenefitsPage = lazy(() => import("./pages/SocialBenefitsPage"));
 const SocialBenefitLiquidationPage = lazy(() => import("./pages/SocialBenefitLiquidationPage"));
 const MayaPage = lazy(() => import("./pages/MayaPage"));
+const AdminDashboardPage = lazy(() => import("./pages/admin/AdminDashboardPage"));
+const AdminCompaniesPage = lazy(() => import("./pages/admin/AdminCompaniesPage"));
+const AdminCompanyDetailPage = lazy(() => import("./pages/admin/AdminCompanyDetailPage"));
+const AdminSubscriptionsPage = lazy(() => import("./pages/admin/AdminSubscriptionsPage"));
 
 const queryClient = new QueryClient();
 
@@ -59,6 +64,14 @@ function AppContent() {
           <Route path="/logout" element={<LogoutPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/app" element={<Navigate to="/modules/dashboard" replace />} />
+
+          {/* SuperAdmin Routes */}
+          <Route element={<AdminLayout />}>
+            <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
+            <Route path="/admin/companies" element={<AdminCompaniesPage />} />
+            <Route path="/admin/companies/:companyId" element={<AdminCompanyDetailPage />} />
+            <Route path="/admin/subscriptions" element={<AdminSubscriptionsPage />} />
+          </Route>
 
           <Route element={<MayaFullScreenLayout />}>
             <Route path="/maya" element={<MayaPage />} />

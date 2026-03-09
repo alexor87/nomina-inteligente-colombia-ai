@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User } from '@supabase/supabase-js';
 
-type AppRole = 'administrador' | 'rrhh' | 'contador' | 'visualizador' | 'soporte';
+type AppRole = 'administrador' | 'rrhh' | 'contador' | 'visualizador' | 'soporte' | 'superadmin';
 
 interface UserRole {
   role: AppRole;
