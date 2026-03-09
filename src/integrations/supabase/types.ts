@@ -3407,6 +3407,7 @@ export type Database = {
         | "contador"
         | "visualizador"
         | "soporte"
+        | "superadmin"
       novedad_type:
         | "horas_extra"
         | "recargo_nocturno"
@@ -3565,6 +3566,7 @@ export const Constants = {
         "contador",
         "visualizador",
         "soporte",
+        "superadmin",
       ],
       novedad_type: [
         "horas_extra",
