@@ -58,6 +58,120 @@ export type Database = {
           },
         ]
       }
+      accounting_integrations: {
+        Row: {
+          auto_sync: boolean | null
+          company_id: string
+          created_at: string | null
+          credentials_ref: string | null
+          id: string
+          is_active: boolean | null
+          last_sync_at: string | null
+          last_sync_status: string | null
+          provider: string
+          updated_at: string | null
+        }
+        Insert: {
+          auto_sync?: boolean | null
+          company_id: string
+          created_at?: string | null
+          credentials_ref?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_sync_at?: string | null
+          last_sync_status?: string | null
+          provider: string
+          updated_at?: string | null
+        }
+        Update: {
+          auto_sync?: boolean | null
+          company_id?: string
+          created_at?: string | null
+          credentials_ref?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_sync_at?: string | null
+          last_sync_status?: string | null
+          provider?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accounting_integrations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      accounting_sync_logs: {
+        Row: {
+          company_id: string
+          completed_at: string | null
+          created_at: string | null
+          entries_sent: number | null
+          error_message: string | null
+          external_reference: string | null
+          id: string
+          integration_id: string
+          period_id: string | null
+          provider: string
+          response_data: Json | null
+          status: string
+        }
+        Insert: {
+          company_id: string
+          completed_at?: string | null
+          created_at?: string | null
+          entries_sent?: number | null
+          error_message?: string | null
+          external_reference?: string | null
+          id?: string
+          integration_id: string
+          period_id?: string | null
+          provider: string
+          response_data?: Json | null
+          status?: string
+        }
+        Update: {
+          company_id?: string
+          completed_at?: string | null
+          created_at?: string | null
+          entries_sent?: number | null
+          error_message?: string | null
+          external_reference?: string | null
+          id?: string
+          integration_id?: string
+          period_id?: string | null
+          provider?: string
+          response_data?: Json | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accounting_sync_logs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "accounting_sync_logs_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "accounting_integrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "accounting_sync_logs_period_id_fkey"
+            columns: ["period_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_periods_real"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       afp_entities: {
         Row: {
           code: string

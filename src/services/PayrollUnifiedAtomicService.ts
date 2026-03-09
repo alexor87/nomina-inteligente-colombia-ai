@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { AccountingIntegrationService } from './AccountingIntegrationService';
 
 // ============================================================================
 // PayrollUnifiedAtomicService - Arquitectura Unificada para Maya + Manual
@@ -29,6 +30,10 @@ export interface UnifiedExecutionResult {
   totalDeducciones: number;
   totalNeto: number;
   vouchersGenerated?: number;
+  accountingSyncResult?: {
+    synced: boolean;
+    error?: string;
+  };
   error?: string;
   details?: any;
 }
@@ -77,7 +82,10 @@ export class PayrollUnifiedAtomicService {
           await this.generateVouchers(periodId, companyId, options.sendEmails || false);
         }
         
-        // 4.3: Registrar auditoría de liquidación completa
+        // 4.3: Sincronizar con software contable si auto-sync está habilitado
+        const accountingSyncResult = await this.tryAccountingSync(periodId, companyId);
+        
+        // 4.4: Registrar auditoría de liquidación completa
         await this.createAuditLog(periodId, companyId, options.userId, 'full_liquidation');
       } else {
         // Solo cálculo - registrar auditoría simple
@@ -94,11 +102,12 @@ export class PayrollUnifiedAtomicService {
         mode: options.mode,
         periodId,
         employeesProcessed: calculationResult.employees_processed,
-        employeesCreated, // ✅ FIX: Reportar cuántos empleados se crearon
+        employeesCreated,
         totalDevengado: updatedPeriod.total_devengado,
         totalDeducciones: updatedPeriod.total_deducciones,
         totalNeto: updatedPeriod.total_neto,
         vouchersGenerated: options.generateVouchers ? calculationResult.employees_processed : undefined,
+        accountingSyncResult: options.mode === 'liquidation' ? await this.getAccountingSyncStatus(companyId) : undefined,
         details: {
           periodName: updatedPeriod.periodo,
           periodState: updatedPeriod.estado,
@@ -411,5 +420,67 @@ export class PayrollUnifiedAtomicService {
     }
     
     return period;
+  }
+
+  /**
+   * ✅ AUTO-SYNC: Intentar sincronizar con software contable si está habilitado
+   */
+  private static async tryAccountingSync(
+    periodId: string,
+    companyId: string
+  ): Promise<{ synced: boolean; error?: string }> {
+    try {
+      console.log('📊 [UNIFIED] Verificando auto-sync contable...');
+      
+      // Verificar si auto-sync está habilitado
+      const isEnabled = await AccountingIntegrationService.isAutoSyncEnabled(companyId);
+      
+      if (!isEnabled) {
+        console.log('📊 [UNIFIED] Auto-sync no está habilitado');
+        return { synced: false };
+      }
+      
+      console.log('📊 [UNIFIED] Auto-sync habilitado, sincronizando...');
+      
+      // Ejecutar sincronización
+      const result = await AccountingIntegrationService.syncPeriod(companyId, periodId);
+      
+      if (result.success) {
+        console.log('✅ [UNIFIED] Sincronización contable exitosa:', result);
+        return { synced: true };
+      } else {
+        console.warn('⚠️ [UNIFIED] Error en sincronización contable:', result.error);
+        return { synced: false, error: result.error };
+      }
+      
+    } catch (error: any) {
+      console.warn('⚠️ [UNIFIED] Error en auto-sync contable:', error);
+      return { synced: false, error: error.message };
+    }
+  }
+
+  /**
+   * Obtener estado de sincronización contable para incluir en resultado
+   */
+  private static async getAccountingSyncStatus(
+    companyId: string
+  ): Promise<{ synced: boolean; error?: string } | undefined> {
+    try {
+      const isEnabled = await AccountingIntegrationService.isAutoSyncEnabled(companyId);
+      if (!isEnabled) {
+        return undefined;
+      }
+      
+      const integration = await AccountingIntegrationService.getIntegration(companyId);
+      if (integration?.last_sync_status === 'success') {
+        return { synced: true };
+      } else if (integration?.last_sync_status === 'error') {
+        return { synced: false, error: 'Error en última sincronización' };
+      }
+      
+      return undefined;
+    } catch {
+      return undefined;
+    }
   }
 }
