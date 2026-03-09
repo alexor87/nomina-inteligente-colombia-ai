@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { LogOut, User, Settings, Crown } from 'lucide-react';
+import { LogOut, User, Settings, Crown, Shield } from 'lucide-react';
 
 export const UserMenu = () => {
   const { user, profile, roles, isSuperAdmin, hasOptimisticRole } = useAuth();
