@@ -1,5 +1,4 @@
 import { supabase } from '@/integrations/supabase/client';
-import { PLANES_SAAS } from '@/constants';
 
 export interface CompanyWithSubscription {
   id: string;
@@ -45,8 +44,26 @@ export interface SubscriptionEvent {
   company_name?: string;
 }
 
-const getPlanPrice = (planType: string | null): number => {
-  const plan = PLANES_SAAS.find(p => p.id === planType);
+// Cache for dynamic plans from DB
+let plansCache: { plan_id: string; nombre: string; precio: number; max_employees: number; max_payrolls_per_month: number }[] | null = null;
+let plansCacheTime = 0;
+const PLANS_CACHE_TTL = 60000; // 1 minute
+
+const fetchPlans = async () => {
+  if (plansCache && Date.now() - plansCacheTime < PLANS_CACHE_TTL) return plansCache;
+  const { data } = await supabase
+    .from('subscription_plans')
+    .select('plan_id, nombre, precio, max_employees, max_payrolls_per_month')
+    .eq('is_active', true)
+    .order('sort_order');
+  plansCache = (data as any[]) || [];
+  plansCacheTime = Date.now();
+  return plansCache;
+};
+
+const getPlanPrice = async (planType: string | null): Promise<number> => {
+  const plans = await fetchPlans();
+  const plan = plans.find(p => p.plan_id === planType);
   return plan?.precio || 0;
 };
 
