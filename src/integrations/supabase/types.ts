@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      accounting_account_mappings: {
+        Row: {
+          company_id: string
+          concept: string
+          created_at: string | null
+          entry_type: string
+          id: string
+          is_active: boolean | null
+          puc_account: string
+          puc_description: string
+          updated_at: string | null
+        }
+        Insert: {
+          company_id: string
+          concept: string
+          created_at?: string | null
+          entry_type: string
+          id?: string
+          is_active?: boolean | null
+          puc_account: string
+          puc_description: string
+          updated_at?: string | null
+        }
+        Update: {
+          company_id?: string
+          concept?: string
+          created_at?: string | null
+          entry_type?: string
+          id?: string
+          is_active?: boolean | null
+          puc_account?: string
+          puc_description?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accounting_account_mappings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       afp_entities: {
         Row: {
           code: string
@@ -3159,6 +3203,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      initialize_puc_mappings: {
+        Args: { p_company_id: string }
+        Returns: undefined
       }
       is_support_user: { Args: { _user_id?: string }; Returns: boolean }
       log_security_violation: {
