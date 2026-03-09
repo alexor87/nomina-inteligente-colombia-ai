@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { SuperAdminService } from '@/services/SuperAdminService';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { AdminExportService } from '@/services/AdminExportService';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Search, Receipt } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Search, Receipt, Download } from 'lucide-react';
 
 const AdminSubscriptionsPage: React.FC = () => {
   const [search, setSearch] = useState('');
@@ -20,9 +22,14 @@ const AdminSubscriptionsPage: React.FC = () => {
 
   return (
     <div className="p-8 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Historial de Suscripciones</h1>
-        <p className="text-muted-foreground text-sm">Timeline de cambios de plan y estado</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Historial de Suscripciones</h1>
+          <p className="text-muted-foreground text-sm">Timeline de cambios de plan y estado</p>
+        </div>
+        <Button variant="outline" size="sm" disabled={filtered.length === 0} onClick={() => AdminExportService.exportSubscriptionEventsToExcel(filtered)}>
+          <Download className="h-4 w-4 mr-2" /> Exportar
+        </Button>
       </div>
 
       <div className="relative max-w-sm">

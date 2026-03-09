@@ -14,7 +14,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { toast } from '@/hooks/use-toast';
-import { Search, Eye, ArrowUpDown, Pause, Play, ChevronUp, ChevronDown, SlidersHorizontal } from 'lucide-react';
+import { Search, Eye, ArrowUpDown, Pause, Play, ChevronUp, ChevronDown, SlidersHorizontal, Download } from 'lucide-react';
+import { AdminExportService } from '@/services/AdminExportService';
 
 type SortField = 'razon_social' | 'created_at' | 'employee_count' | 'trial_ends_at';
 type SortDir = 'asc' | 'desc';
@@ -198,9 +199,14 @@ const AdminCompaniesPage: React.FC = () => {
 
   return (
     <div className="p-8 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Gestión de Empresas</h1>
-        <p className="text-muted-foreground text-sm">{filtered.length} empresas</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Gestión de Empresas</h1>
+          <p className="text-muted-foreground text-sm">{filtered.length} empresas</p>
+        </div>
+        <Button variant="outline" size="sm" disabled={filtered.length === 0} onClick={() => AdminExportService.exportCompaniesToExcel(filtered)}>
+          <Download className="h-4 w-4 mr-2" /> Exportar
+        </Button>
       </div>
 
       {/* Filters */}

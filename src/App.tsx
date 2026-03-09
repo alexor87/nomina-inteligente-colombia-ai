@@ -41,6 +41,7 @@ const AdminCompanyDetailPage = lazy(() => import("./pages/admin/AdminCompanyDeta
 const AdminSubscriptionsPage = lazy(() => import("./pages/admin/AdminSubscriptionsPage"));
 const AdminPlansPage = lazy(() => import("./pages/admin/AdminPlansPage"));
 const AdminUsersPage = lazy(() => import("./pages/admin/AdminUsersPage"));
+const AdminSettingsPage = lazy(() => import("./pages/admin/AdminSettingsPage"));
 
 const queryClient = new QueryClient();
 
@@ -75,6 +76,7 @@ function AppContent() {
             <Route path="/admin/plans" element={<AdminPlansPage />} />
             <Route path="/admin/users" element={<AdminUsersPage />} />
             <Route path="/admin/subscriptions" element={<AdminSubscriptionsPage />} />
+            <Route path="/admin/settings" element={<AdminSettingsPage />} />
           </Route>
 
           <Route element={<MayaFullScreenLayout />}>

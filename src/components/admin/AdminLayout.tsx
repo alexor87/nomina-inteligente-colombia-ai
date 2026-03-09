@@ -3,7 +3,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
 import { 
-  LayoutDashboard, Building2, Receipt, ArrowLeft, Shield, Package, Users
+  LayoutDashboard, Building2, Receipt, ArrowLeft, Shield, Package, Users, Settings
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { path: '/admin/users', label: 'Usuarios', icon: Users },
   { path: '/admin/plans', label: 'Planes', icon: Package },
   { path: '/admin/subscriptions', label: 'Suscripciones', icon: Receipt },
+  { path: '/admin/settings', label: 'Configuración', icon: Settings },
 ];
 
 export const AdminLayout: React.FC = () => {
