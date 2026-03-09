@@ -199,9 +199,14 @@ const AdminCompaniesPage: React.FC = () => {
 
   return (
     <div className="p-8 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Gestión de Empresas</h1>
-        <p className="text-muted-foreground text-sm">{filtered.length} empresas</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Gestión de Empresas</h1>
+          <p className="text-muted-foreground text-sm">{filtered.length} empresas</p>
+        </div>
+        <Button variant="outline" size="sm" disabled={filtered.length === 0} onClick={() => AdminExportService.exportCompaniesToExcel(filtered)}>
+          <Download className="h-4 w-4 mr-2" /> Exportar
+        </Button>
       </div>
 
       {/* Filters */}
