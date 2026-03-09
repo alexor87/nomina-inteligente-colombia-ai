@@ -12,6 +12,7 @@ import { useSystemInitialization } from "@/hooks/useSystemInitialization";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { MayaFullScreenLayout } from "@/components/maya-page/layouts/MayaFullScreenLayout";
 import { RootRedirect } from "@/components/routing/RootRedirect";
+import { AdminLayout } from "@/components/admin/AdminLayout";
 
 // Lazy-loaded pages for reduced initial bundle
 const Index = lazy(() => import("./pages/Index"));
