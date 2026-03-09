@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { path: '/admin/users', label: 'Usuarios', icon: Users },
   { path: '/admin/plans', label: 'Planes', icon: Package },
   { path: '/admin/subscriptions', label: 'Suscripciones', icon: Receipt },
+  { path: '/admin/settings', label: 'Configuración', icon: Settings },
 ];
 
 export const AdminLayout: React.FC = () => {

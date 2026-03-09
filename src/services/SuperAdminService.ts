@@ -146,7 +146,26 @@ export const SuperAdminService = {
     const plans = await fetchPlans();
     const planPriceMap = new Map(plans.map(p => [p.plan_id, p.precio]));
     let mrr = 0;
-    activePlanTypes.forEach(pt => { mrr += planPriceMap.get(pt) || 0; });
+    const revenueByPlan: Record<string, number> = {};
+    activePlanTypes.forEach(pt => {
+      const price = planPriceMap.get(pt) || 0;
+      mrr += price;
+      revenueByPlan[pt] = (revenueByPlan[pt] || 0) + price;
+    });
+
+    // Advanced metrics
+    const churnRate = activeCompanies > 0
+      ? (suspendedCompanies / (activeCompanies + suspendedCompanies)) * 100
+      : 0;
+    const arpu = activeCompanies > 0 ? mrr / activeCompanies : 0;
+
+    // Trial conversion: active / (active + trial + suspended that were ever trial)
+    const totalEverTrial = trialCompanies + activeCompanies; // approximation
+    const trialConversion = totalEverTrial > 0
+      ? (activeCompanies / totalEverTrial) * 100
+      : 0;
+
+    const revenuePerPlan = Object.entries(revenueByPlan).map(([name, revenue]) => ({ name, revenue }));
 
     // Growth data (last 6 months)
     const growthData: { month: string; companies: number }[] = [];
@@ -166,6 +185,10 @@ export const SuperAdminService = {
       totalEmployees: employees?.length || 0,
       mrr,
       expiringTrials,
+      churnRate,
+      arpu,
+      trialConversion,
+      revenuePerPlan,
       planDistribution: Object.entries(planCounts).map(([name, value]) => ({ name, value })),
       growthData
     };
