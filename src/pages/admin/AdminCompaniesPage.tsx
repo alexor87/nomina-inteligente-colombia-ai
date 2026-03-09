@@ -45,6 +45,11 @@ const AdminCompaniesPage: React.FC = () => {
     queryFn: () => SuperAdminService.getAllCompaniesWithSubscriptions()
   });
 
+  const { data: plans = [] } = useQuery({
+    queryKey: ['admin-active-plans'],
+    queryFn: () => PlanService.getPlans(true)
+  });
+
   const toggleSort = (field: SortField) => {
     if (sortField === field) {
       setSortDir(d => d === 'asc' ? 'desc' : 'asc');
