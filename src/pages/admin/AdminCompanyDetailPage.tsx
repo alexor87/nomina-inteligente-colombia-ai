@@ -33,6 +33,11 @@ const AdminCompanyDetailPage: React.FC = () => {
   const [limitsReason, setLimitsReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Trial extension state
+  const [trialOpen, setTrialOpen] = useState(false);
+  const [trialDate, setTrialDate] = useState('');
+  const [trialReason, setTrialReason] = useState('');
+
   const openLimitsDialog = () => {
     setMaxEmployees(data?.subscription?.max_employees ?? 10);
     setMaxPayrolls(data?.subscription?.max_payrolls_per_month ?? 1);
