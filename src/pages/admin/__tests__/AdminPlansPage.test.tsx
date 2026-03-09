@@ -143,7 +143,7 @@ describe('AdminPlansPage', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('dialog')).toBeInTheDocument();
-      expect(screen.getByLabelText(/ID/)).toBeInTheDocument();
+      expect(screen.getByText('ID (slug único)')).toBeInTheDocument();
     });
   });
 
