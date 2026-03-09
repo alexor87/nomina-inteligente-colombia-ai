@@ -65,6 +65,14 @@ function AppContent() {
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/app" element={<Navigate to="/modules/dashboard" replace />} />
 
+          {/* SuperAdmin Routes */}
+          <Route element={<AdminLayout />}>
+            <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
+            <Route path="/admin/companies" element={<AdminCompaniesPage />} />
+            <Route path="/admin/companies/:companyId" element={<AdminCompanyDetailPage />} />
+            <Route path="/admin/subscriptions" element={<AdminSubscriptionsPage />} />
+          </Route>
+
           <Route element={<MayaFullScreenLayout />}>
             <Route path="/maya" element={<MayaPage />} />
             <Route path="/modules/dashboard" element={<DashboardPage />} />
