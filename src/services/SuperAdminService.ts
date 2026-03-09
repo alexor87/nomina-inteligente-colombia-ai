@@ -110,9 +110,9 @@ export const SuperAdminService = {
     let activeCompanies = 0;
     let trialCompanies = 0;
     let suspendedCompanies = 0;
-    let mrr = 0;
     let expiringTrials = 0;
     const planCounts: Record<string, number> = {};
+    const activePlanTypes: string[] = [];
 
     companies?.forEach(company => {
       const sub = subMap.get(company.id);
@@ -121,7 +121,7 @@ export const SuperAdminService = {
 
       if (status === 'activa') {
         activeCompanies++;
-        // mrr calculated below after async plan price lookup
+        if (planType) activePlanTypes.push(planType);
       }
       if (status === 'trial') {
         trialCompanies++;
@@ -137,6 +137,12 @@ export const SuperAdminService = {
       const planName = planType || 'sin_plan';
       planCounts[planName] = (planCounts[planName] || 0) + 1;
     });
+
+    // Calculate MRR from dynamic plans
+    const plans = await fetchPlans();
+    const planPriceMap = new Map(plans.map(p => [p.plan_id, p.precio]));
+    let mrr = 0;
+    activePlanTypes.forEach(pt => { mrr += planPriceMap.get(pt) || 0; });
 
     // Growth data (last 6 months)
     const growthData: { month: string; companies: number }[] = [];
