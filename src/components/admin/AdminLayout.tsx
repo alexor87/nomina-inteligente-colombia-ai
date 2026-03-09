@@ -3,7 +3,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
 import { 
-  LayoutDashboard, Building2, Receipt, ArrowLeft, Shield
+  LayoutDashboard, Building2, Receipt, ArrowLeft, Shield, Package
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 const NAV_ITEMS = [
   { path: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/admin/companies', label: 'Empresas', icon: Building2 },
+  { path: '/admin/plans', label: 'Planes', icon: Package },
   { path: '/admin/subscriptions', label: 'Suscripciones', icon: Receipt },
 ];
 
