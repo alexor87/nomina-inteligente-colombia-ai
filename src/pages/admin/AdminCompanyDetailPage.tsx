@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
-import { ArrowLeft, Building2, Users, Receipt, History, SlidersHorizontal } from 'lucide-react';
+import { ArrowLeft, Building2, Users, Receipt, History, SlidersHorizontal, CalendarPlus } from 'lucide-react';
 
 const AdminCompanyDetailPage: React.FC = () => {
   const { companyId } = useParams<{ companyId: string }>();
