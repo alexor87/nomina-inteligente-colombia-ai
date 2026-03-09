@@ -35,6 +35,10 @@ const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
 const SocialBenefitsPage = lazy(() => import("./pages/SocialBenefitsPage"));
 const SocialBenefitLiquidationPage = lazy(() => import("./pages/SocialBenefitLiquidationPage"));
 const MayaPage = lazy(() => import("./pages/MayaPage"));
+const AdminDashboardPage = lazy(() => import("./pages/admin/AdminDashboardPage"));
+const AdminCompaniesPage = lazy(() => import("./pages/admin/AdminCompaniesPage"));
+const AdminCompanyDetailPage = lazy(() => import("./pages/admin/AdminCompanyDetailPage"));
+const AdminSubscriptionsPage = lazy(() => import("./pages/admin/AdminSubscriptionsPage"));
 
 const queryClient = new QueryClient();
 
