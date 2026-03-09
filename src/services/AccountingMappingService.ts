@@ -11,6 +11,7 @@ export interface AccountingMapping {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  is_custom?: boolean; // Calculated field - true if not in conceptLabels
 }
 
 // Labels amigables para mostrar en la UI
@@ -90,7 +91,11 @@ export class AccountingMappingService extends SecureBaseService {
       throw error;
     }
 
-    return (data || []) as AccountingMapping[];
+    // Mark custom mappings (those not in standard conceptLabels)
+    return (data || []).map(m => ({
+      ...m,
+      is_custom: !conceptLabels[m.concept]
+    })) as AccountingMapping[];
   }
 
   /**
@@ -144,6 +149,85 @@ export class AccountingMappingService extends SecureBaseService {
         throw error;
       }
     }
+  }
+
+  /**
+   * Crea un nuevo mapeo personalizado
+   */
+  static async createMapping(
+    concept: string,
+    puc_account: string,
+    puc_description: string,
+    entry_type: 'debito' | 'credito'
+  ): Promise<AccountingMapping> {
+    const companyId = await this.getCurrentUserCompanyId();
+    if (!companyId) throw new Error('No company context');
+
+    const { data, error } = await supabase
+      .from('accounting_account_mappings')
+      .insert({
+        company_id: companyId,
+        concept,
+        puc_account,
+        puc_description,
+        entry_type,
+        is_active: true
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating mapping:', error);
+      throw error;
+    }
+
+    return { ...data, is_custom: true } as AccountingMapping;
+  }
+
+  /**
+   * Elimina un mapeo personalizado (solo cuentas custom)
+   */
+  static async deleteMapping(id: string): Promise<void> {
+    const companyId = await this.getCurrentUserCompanyId();
+    if (!companyId) throw new Error('No company context');
+
+    const { error } = await supabase
+      .from('accounting_account_mappings')
+      .delete()
+      .eq('id', id)
+      .eq('company_id', companyId);
+
+    if (error) {
+      console.error('Error deleting mapping:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Verifica si una cuenta PUC ya existe para la empresa
+   */
+  static async isPucAccountDuplicate(puc_account: string, excludeId?: string): Promise<boolean> {
+    const companyId = await this.getCurrentUserCompanyId();
+    if (!companyId) return false;
+
+    let query = supabase
+      .from('accounting_account_mappings')
+      .select('id')
+      .eq('company_id', companyId)
+      .eq('puc_account', puc_account);
+
+    if (excludeId) {
+      query = query.neq('id', excludeId);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error checking duplicate:', error);
+      return false;
+    }
+
+    return (data?.length || 0) > 0;
   }
 
   /**
