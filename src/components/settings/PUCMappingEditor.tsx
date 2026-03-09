@@ -205,7 +205,7 @@ export const PUCMappingEditor = () => {
           {/* Débitos - Gastos */}
           <div>
             <h3 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-blue-500" />
+              <span className="w-2 h-2 rounded-full bg-primary" />
               Devengados y Aportes Patronales (Débito)
             </h3>
             <MappingTable 
