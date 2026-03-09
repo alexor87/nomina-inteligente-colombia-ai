@@ -70,6 +70,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Use the optimized role management hook
   const { roles, isLoadingRoles, hasOptimisticRole, refetchRoles } = useRoleManagement(user, profile);
 
+  // Detect superadmin from roles
+  useEffect(() => {
+    const hasSuperAdminRole = roles.some(r => r.role === 'superadmin');
+    setIsSuperAdmin(hasSuperAdminRole);
+  }, [roles]);
+
   const hasRole = useCallback((role: AppRole, companyId?: string): boolean => {
     if (roles.length === 0) {
       return false;

@@ -88,6 +88,15 @@ export const UserMenu = () => {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        {isSuperAdmin && (
+          <>
+            <DropdownMenuItem onClick={() => navigate('/admin/dashboard')}>
+              <Shield className="mr-2 h-4 w-4 text-yellow-600" />
+              <span>Panel Admin</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
         <DropdownMenuItem onClick={handleProfileClick}>
           <User className="mr-2 h-4 w-4" />
           <span>Perfil</span>
