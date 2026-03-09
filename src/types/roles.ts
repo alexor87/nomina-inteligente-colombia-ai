@@ -16,6 +16,12 @@ export interface RolePermissions {
 
 // Matriz de permisos por rol - CON PRESTACIONES SOCIALES
 export const ROLE_PERMISSIONS: Record<AppRole, RolePermissions> = {
+  superadmin: {
+    modules: ['dashboard', 'employees', 'payroll', 'prestaciones-sociales', 'vouchers', 'payments', 'reports', 'settings', 'admin'],
+    canEdit: true,
+    canDelete: true,
+    canExport: true
+  },
   administrador: {
     modules: ['dashboard', 'employees', 'payroll', 'prestaciones-sociales', 'vouchers', 'payments', 'reports', 'settings'],
     canEdit: true,
