@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { PUCMappingEditor } from './PUCMappingEditor';
-import { AccountingMappingService } from '@/services/AccountingMappingService';
+import { AccountingMappingService, AccountingMapping } from '@/services/AccountingMappingService';
 
 // Mock the service
 vi.mock('@/services/AccountingMappingService', () => ({
@@ -33,14 +33,14 @@ vi.mock('@/hooks/use-toast', () => ({
   }),
 }));
 
-const mockMappings = [
+const mockMappings: AccountingMapping[] = [
   {
     id: '1',
     company_id: 'company-1',
     concept: 'salario_basico',
     puc_account: '510506',
     puc_description: 'Sueldos',
-    entry_type: 'debito',
+    entry_type: 'debito' as const,
     is_active: true,
     created_at: '2024-01-01',
     updated_at: '2024-01-01',
@@ -52,7 +52,7 @@ const mockMappings = [
     concept: 'custom_bonus',
     puc_account: '510595',
     puc_description: 'Bono Personalizado',
-    entry_type: 'debito',
+    entry_type: 'debito' as const,
     is_active: true,
     created_at: '2024-01-01',
     updated_at: '2024-01-01',
@@ -64,7 +64,7 @@ const mockMappings = [
     concept: 'salud_empleado',
     puc_account: '237005',
     puc_description: 'Aportes a EPS',
-    entry_type: 'credito',
+    entry_type: 'credito' as const,
     is_active: true,
     created_at: '2024-01-01',
     updated_at: '2024-01-01',
