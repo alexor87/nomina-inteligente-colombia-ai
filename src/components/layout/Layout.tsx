@@ -8,6 +8,8 @@ import { LoadingWithTimeout } from '@/components/ui/LoadingWithTimeout';
 import { MayaProvider } from '@/maya/MayaProvider';
 import { MayaFloatingAssistant } from '@/maya/MayaFloatingAssistant';
 import { MayaGlobalManager } from '@/maya/MayaGlobalManager';
+import { useSubscription } from '@/contexts/SubscriptionContext';
+import { TrialExpiredBanner } from '@/components/subscription/TrialExpiredBanner';
 
 export const Layout = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
