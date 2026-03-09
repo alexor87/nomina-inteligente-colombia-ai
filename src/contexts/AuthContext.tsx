@@ -49,6 +49,7 @@ export const useAuth = () => {
 
 // Enhanced role permissions matrix - SINCRONIZADO CON src/types/roles.ts
 const ROLE_PERMISSIONS: Record<AppRole, string[]> = {
+  superadmin: ['dashboard', 'employees', 'payroll', 'payroll-history', 'prestaciones-sociales', 'vouchers', 'payments', 'reports', 'settings', 'vacations-absences', 'admin'],
   administrador: ['dashboard', 'employees', 'payroll', 'payroll-history', 'prestaciones-sociales', 'vouchers', 'payments', 'reports', 'settings', 'vacations-absences'],
   rrhh: ['dashboard', 'employees', 'payroll-history', 'prestaciones-sociales', 'vouchers', 'reports', 'vacations-absences'],
   contador: ['dashboard', 'payroll-history', 'prestaciones-sociales', 'vouchers', 'reports', 'vacations-absences'],
