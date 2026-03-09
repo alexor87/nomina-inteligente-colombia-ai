@@ -14,7 +14,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { toast } from '@/hooks/use-toast';
-import { Search, Eye, ArrowUpDown, Pause, Play, ChevronUp, ChevronDown, SlidersHorizontal } from 'lucide-react';
+import { Search, Eye, ArrowUpDown, Pause, Play, ChevronUp, ChevronDown, SlidersHorizontal, Download } from 'lucide-react';
+import { AdminExportService } from '@/services/AdminExportService';
 
 type SortField = 'razon_social' | 'created_at' | 'employee_count' | 'trial_ends_at';
 type SortDir = 'asc' | 'desc';
