@@ -26,6 +26,10 @@ export interface SaaSMetrics {
   totalEmployees: number;
   mrr: number;
   expiringTrials: number;
+  churnRate: number;
+  arpu: number;
+  trialConversion: number;
+  revenuePerPlan: { name: string; revenue: number }[];
   planDistribution: { name: string; value: number }[];
   growthData: { month: string; companies: number }[];
 }
