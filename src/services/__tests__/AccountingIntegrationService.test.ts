@@ -1,17 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AccountingIntegrationService } from '../AccountingIntegrationService';
 
-// Mock Supabase client
-const mockSupabase = {
-  from: vi.fn(),
-  functions: {
-    invoke: vi.fn()
-  }
-};
+// Mock Supabase client with hoisted factory
+vi.mock('@/integrations/supabase/client', () => {
+  const mockFrom = vi.fn();
+  const mockFunctionsInvoke = vi.fn();
+  
+  return {
+    supabase: {
+      from: mockFrom,
+      functions: {
+        invoke: mockFunctionsInvoke
+      }
+    },
+    __mockFrom: mockFrom,
+    __mockFunctionsInvoke: mockFunctionsInvoke
+  };
+});
 
-vi.mock('@/integrations/supabase/client', () => ({
-  supabase: mockSupabase
-}));
+// Import mock references after mock setup
+import { supabase } from '@/integrations/supabase/client';
 
 describe('AccountingIntegrationService', () => {
   beforeEach(() => {
@@ -20,13 +28,13 @@ describe('AccountingIntegrationService', () => {
 
   describe('getIntegration', () => {
     it('should return null when no integration exists', async () => {
-      mockSupabase.from.mockReturnValue({
+      vi.mocked(supabase.from).mockReturnValue({
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
             maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null })
           })
         })
-      });
+      } as any);
 
       const result = await AccountingIntegrationService.getIntegration('company-123');
       expect(result).toBeNull();
@@ -41,26 +49,26 @@ describe('AccountingIntegrationService', () => {
         auto_sync: false
       };
 
-      mockSupabase.from.mockReturnValue({
+      vi.mocked(supabase.from).mockReturnValue({
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
             maybeSingle: vi.fn().mockResolvedValue({ data: mockIntegration, error: null })
           })
         })
-      });
+      } as any);
 
       const result = await AccountingIntegrationService.getIntegration('company-123');
       expect(result).toEqual(mockIntegration);
     });
 
     it('should return null on error', async () => {
-      mockSupabase.from.mockReturnValue({
+      vi.mocked(supabase.from).mockReturnValue({
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
             maybeSingle: vi.fn().mockResolvedValue({ data: null, error: { message: 'DB error' } })
           })
         })
-      });
+      } as any);
 
       const result = await AccountingIntegrationService.getIntegration('company-123');
       expect(result).toBeNull();
@@ -69,19 +77,19 @@ describe('AccountingIntegrationService', () => {
 
   describe('saveIntegration', () => {
     it('should create new integration when none exists', async () => {
-      // Mock getIntegration returning null
-      mockSupabase.from.mockReturnValueOnce({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null })
+      // First call: getIntegration returns null
+      vi.mocked(supabase.from)
+        .mockReturnValueOnce({
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null })
+            })
           })
-        })
-      });
-
-      // Mock insert
-      mockSupabase.from.mockReturnValueOnce({
-        insert: vi.fn().mockResolvedValue({ error: null })
-      });
+        } as any)
+        // Second call: insert
+        .mockReturnValueOnce({
+          insert: vi.fn().mockResolvedValue({ error: null })
+        } as any);
 
       const result = await AccountingIntegrationService.saveIntegration('company-123', 'siigo', true);
       expect(result.success).toBe(true);
@@ -94,38 +102,36 @@ describe('AccountingIntegrationService', () => {
         provider: 'siigo'
       };
 
-      // Mock getIntegration returning existing
-      mockSupabase.from.mockReturnValueOnce({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            maybeSingle: vi.fn().mockResolvedValue({ data: existingIntegration, error: null })
+      vi.mocked(supabase.from)
+        .mockReturnValueOnce({
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              maybeSingle: vi.fn().mockResolvedValue({ data: existingIntegration, error: null })
+            })
           })
-        })
-      });
-
-      // Mock update
-      mockSupabase.from.mockReturnValueOnce({
-        update: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ error: null })
-        })
-      });
+        } as any)
+        .mockReturnValueOnce({
+          update: vi.fn().mockReturnValue({
+            eq: vi.fn().mockResolvedValue({ error: null })
+          })
+        } as any);
 
       const result = await AccountingIntegrationService.saveIntegration('company-123', 'alegra', false);
       expect(result.success).toBe(true);
     });
 
     it('should return error on failure', async () => {
-      mockSupabase.from.mockReturnValueOnce({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null })
+      vi.mocked(supabase.from)
+        .mockReturnValueOnce({
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null })
+            })
           })
-        })
-      });
-
-      mockSupabase.from.mockReturnValueOnce({
-        insert: vi.fn().mockResolvedValue({ error: { message: 'Insert failed' } })
-      });
+        } as any)
+        .mockReturnValueOnce({
+          insert: vi.fn().mockResolvedValue({ error: { message: 'Insert failed' } })
+        } as any);
 
       const result = await AccountingIntegrationService.saveIntegration('company-123', 'siigo');
       expect(result.success).toBe(false);
@@ -135,22 +141,22 @@ describe('AccountingIntegrationService', () => {
 
   describe('activateIntegration', () => {
     it('should activate integration successfully', async () => {
-      mockSupabase.from.mockReturnValue({
+      vi.mocked(supabase.from).mockReturnValue({
         update: vi.fn().mockReturnValue({
           eq: vi.fn().mockResolvedValue({ error: null })
         })
-      });
+      } as any);
 
       const result = await AccountingIntegrationService.activateIntegration('company-123');
       expect(result.success).toBe(true);
     });
 
     it('should return error on failure', async () => {
-      mockSupabase.from.mockReturnValue({
+      vi.mocked(supabase.from).mockReturnValue({
         update: vi.fn().mockReturnValue({
           eq: vi.fn().mockResolvedValue({ error: { message: 'Update failed' } })
         })
-      });
+      } as any);
 
       const result = await AccountingIntegrationService.activateIntegration('company-123');
       expect(result.success).toBe(false);
@@ -160,11 +166,11 @@ describe('AccountingIntegrationService', () => {
 
   describe('deactivateIntegration', () => {
     it('should deactivate and clear credentials', async () => {
-      mockSupabase.from.mockReturnValue({
+      vi.mocked(supabase.from).mockReturnValue({
         update: vi.fn().mockReturnValue({
           eq: vi.fn().mockResolvedValue({ error: null })
         })
-      });
+      } as any);
 
       const result = await AccountingIntegrationService.deactivateIntegration('company-123');
       expect(result.success).toBe(true);
@@ -173,7 +179,7 @@ describe('AccountingIntegrationService', () => {
 
   describe('testConnection', () => {
     it('should return success for valid connection', async () => {
-      mockSupabase.functions.invoke.mockResolvedValue({
+      vi.mocked(supabase.functions.invoke).mockResolvedValue({
         data: { success: true, message: 'Conexión exitosa' },
         error: null
       });
@@ -188,10 +194,10 @@ describe('AccountingIntegrationService', () => {
     });
 
     it('should return error message on failure', async () => {
-      mockSupabase.functions.invoke.mockResolvedValue({
+      vi.mocked(supabase.functions.invoke).mockResolvedValue({
         data: null,
         error: { message: 'API error' }
-      });
+      } as any);
 
       const result = await AccountingIntegrationService.testConnection('siigo', {
         api_key: 'invalid-key',
@@ -205,7 +211,7 @@ describe('AccountingIntegrationService', () => {
 
   describe('syncPeriod', () => {
     it('should sync period successfully', async () => {
-      mockSupabase.functions.invoke.mockResolvedValue({
+      vi.mocked(supabase.functions.invoke).mockResolvedValue({
         data: { success: true, entries_sent: 15, reference: 'SYNC-123' },
         error: null
       });
@@ -217,10 +223,10 @@ describe('AccountingIntegrationService', () => {
     });
 
     it('should return error on sync failure', async () => {
-      mockSupabase.functions.invoke.mockResolvedValue({
+      vi.mocked(supabase.functions.invoke).mockResolvedValue({
         data: null,
         error: { message: 'Sync failed' }
-      });
+      } as any);
 
       const result = await AccountingIntegrationService.syncPeriod('company-123', 'period-456');
       expect(result.success).toBe(false);
@@ -235,7 +241,7 @@ describe('AccountingIntegrationService', () => {
         { id: 'log-2', created_at: '2024-01-01', status: 'error' }
       ];
 
-      mockSupabase.from.mockReturnValue({
+      vi.mocked(supabase.from).mockReturnValue({
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
             order: vi.fn().mockReturnValue({
@@ -243,7 +249,7 @@ describe('AccountingIntegrationService', () => {
             })
           })
         })
-      });
+      } as any);
 
       const result = await AccountingIntegrationService.getSyncHistory('company-123');
       expect(result).toHaveLength(2);
@@ -251,7 +257,7 @@ describe('AccountingIntegrationService', () => {
     });
 
     it('should return empty array on error', async () => {
-      mockSupabase.from.mockReturnValue({
+      vi.mocked(supabase.from).mockReturnValue({
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
             order: vi.fn().mockReturnValue({
@@ -259,7 +265,7 @@ describe('AccountingIntegrationService', () => {
             })
           })
         })
-      });
+      } as any);
 
       const result = await AccountingIntegrationService.getSyncHistory('company-123');
       expect(result).toEqual([]);
@@ -268,7 +274,7 @@ describe('AccountingIntegrationService', () => {
 
   describe('isAutoSyncEnabled', () => {
     it('should return true when active and auto_sync enabled', async () => {
-      mockSupabase.from.mockReturnValue({
+      vi.mocked(supabase.from).mockReturnValue({
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
             maybeSingle: vi.fn().mockResolvedValue({
@@ -277,14 +283,14 @@ describe('AccountingIntegrationService', () => {
             })
           })
         })
-      });
+      } as any);
 
       const result = await AccountingIntegrationService.isAutoSyncEnabled('company-123');
       expect(result).toBe(true);
     });
 
     it('should return false when not active', async () => {
-      mockSupabase.from.mockReturnValue({
+      vi.mocked(supabase.from).mockReturnValue({
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
             maybeSingle: vi.fn().mockResolvedValue({
@@ -293,14 +299,14 @@ describe('AccountingIntegrationService', () => {
             })
           })
         })
-      });
+      } as any);
 
       const result = await AccountingIntegrationService.isAutoSyncEnabled('company-123');
       expect(result).toBe(false);
     });
 
     it('should return false when auto_sync disabled', async () => {
-      mockSupabase.from.mockReturnValue({
+      vi.mocked(supabase.from).mockReturnValue({
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
             maybeSingle: vi.fn().mockResolvedValue({
@@ -309,20 +315,20 @@ describe('AccountingIntegrationService', () => {
             })
           })
         })
-      });
+      } as any);
 
       const result = await AccountingIntegrationService.isAutoSyncEnabled('company-123');
       expect(result).toBe(false);
     });
 
     it('should return false when no integration exists', async () => {
-      mockSupabase.from.mockReturnValue({
+      vi.mocked(supabase.from).mockReturnValue({
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
             maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null })
           })
         })
-      });
+      } as any);
 
       const result = await AccountingIntegrationService.isAutoSyncEnabled('company-123');
       expect(result).toBe(false);
