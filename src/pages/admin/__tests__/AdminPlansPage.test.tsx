@@ -135,10 +135,15 @@ describe('AdminPlansPage', () => {
       expect(screen.getByText('No hay planes configurados')).toBeInTheDocument();
     });
 
-    await userEvent.click(screen.getByText('Crear Plan'));
+    // Click the button (not the dialog title)
+    const buttons = screen.getAllByRole('button');
+    const createBtn = buttons.find(b => b.textContent?.includes('Crear Plan'));
+    expect(createBtn).toBeDefined();
+    await userEvent.click(createBtn!);
 
     await waitFor(() => {
-      expect(screen.getByText('Crear Plan', { selector: '[role="dialog"] *' })).toBeInTheDocument();
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+      expect(screen.getByLabelText(/ID/)).toBeInTheDocument();
     });
   });
 
