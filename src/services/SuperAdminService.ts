@@ -112,7 +112,7 @@ export const SuperAdminService = {
 
       if (status === 'activa') {
         activeCompanies++;
-        mrr += getPlanPrice(planType);
+        // mrr calculated below after async plan price lookup
       }
       if (status === 'trial') {
         trialCompanies++;
