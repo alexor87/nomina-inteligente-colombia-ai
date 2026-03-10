@@ -3,7 +3,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
 import { 
-  LayoutDashboard, Building2, Receipt, ArrowLeft, Shield, Package, Users, Settings
+  LayoutDashboard, Building2, Receipt, ArrowLeft, Shield, Package, Users, Settings, Bell, CreditCard
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +15,8 @@ const NAV_ITEMS = [
   { path: '/admin/users', label: 'Usuarios', icon: Users },
   { path: '/admin/plans', label: 'Planes', icon: Package },
   { path: '/admin/subscriptions', label: 'Suscripciones', icon: Receipt },
+  { path: '/admin/notifications', label: 'Notificaciones', icon: Bell },
+  { path: '/admin/billing', label: 'Facturación', icon: CreditCard },
   { path: '/admin/settings', label: 'Configuración', icon: Settings },
 ];
 
