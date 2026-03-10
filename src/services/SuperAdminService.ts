@@ -501,5 +501,247 @@ export const SuperAdminService = {
       .eq('user_id', userId)
       .eq('role', role as any);
     if (error) throw error;
+  },
+
+  // ========== NOTIFICATIONS ==========
+
+  async getNotifications(): Promise<AdminNotification[]> {
+    const { data, error } = await supabase
+      .from('admin_notifications')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return (data || []) as unknown as AdminNotification[];
+  },
+
+  async createNotification(notif: {
+    title: string;
+    message: string;
+    priority: string;
+    target_plans: string[] | null;
+    target_statuses: string[] | null;
+    expires_at: string | null;
+    created_by: string;
+  }): Promise<void> {
+    const { error } = await supabase
+      .from('admin_notifications')
+      .insert(notif as any);
+    if (error) throw error;
+  },
+
+  async deleteNotification(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('admin_notifications')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+  },
+
+  async getNotificationReadCounts(notificationIds: string[]): Promise<Record<string, number>> {
+    if (notificationIds.length === 0) return {};
+    const { data, error } = await supabase
+      .from('admin_notification_reads')
+      .select('notification_id')
+      .in('notification_id', notificationIds);
+    if (error) throw error;
+    const counts: Record<string, number> = {};
+    (data || []).forEach((r: any) => {
+      counts[r.notification_id] = (counts[r.notification_id] || 0) + 1;
+    });
+    return counts;
+  },
+
+  async getUserNotificationsForCompany(
+    userId: string,
+    companyPlan: string | null,
+    companyStatus: string | null
+  ): Promise<(AdminNotification & { read: boolean })[]> {
+    const { data: notifs, error } = await supabase
+      .from('admin_notifications')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+
+    // Filter by targeting
+    const filtered = ((notifs || []) as unknown as AdminNotification[]).filter(n => {
+      if (n.expires_at && new Date(n.expires_at) < new Date()) return false;
+      if (n.target_plans && n.target_plans.length > 0 && companyPlan && !n.target_plans.includes(companyPlan)) return false;
+      if (n.target_statuses && n.target_statuses.length > 0 && companyStatus && !n.target_statuses.includes(companyStatus)) return false;
+      return true;
+    });
+
+    // Get reads
+    const { data: reads } = await supabase
+      .from('admin_notification_reads')
+      .select('notification_id')
+      .eq('user_id', userId);
+    const readSet = new Set((reads || []).map((r: any) => r.notification_id));
+
+    return filtered.map(n => ({ ...n, read: readSet.has(n.id) }));
+  },
+
+  async markNotificationRead(notificationId: string, userId: string, companyId: string): Promise<void> {
+    const { error } = await supabase
+      .from('admin_notification_reads')
+      .upsert(
+        { notification_id: notificationId, user_id: userId, company_id: companyId } as any,
+        { onConflict: 'notification_id,user_id' }
+      );
+    if (error) throw error;
+  },
+
+  // ========== BILLING ==========
+
+  async getBillingRecords(period?: string): Promise<BillingRecord[]> {
+    let query = supabase
+      .from('company_billing')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (period) query = query.eq('period', period);
+    const { data, error } = await query;
+    if (error) throw error;
+
+    // Enrich with company names
+    const companyIds = [...new Set((data || []).map((b: any) => b.company_id))];
+    let companyMap = new Map<string, string>();
+    if (companyIds.length > 0) {
+      const { data: companies } = await supabase
+        .from('companies')
+        .select('id, razon_social')
+        .in('id', companyIds);
+      companyMap = new Map(companies?.map(c => [c.id, c.razon_social]) || []);
+    }
+
+    return ((data || []) as unknown as BillingRecord[]).map(b => ({
+      ...b,
+      company_name: companyMap.get(b.company_id) || 'Desconocida'
+    }));
+  },
+
+  async generateMonthlyBilling(period: string): Promise<{ created: number; skipped: number }> {
+    // Get all active companies with subscriptions
+    const { data: subs } = await supabase
+      .from('company_subscriptions')
+      .select('company_id, plan_type, status')
+      .eq('status', 'activa');
+
+    const plans = await fetchPlans();
+    const planPriceMap = new Map(plans.map(p => [p.plan_id, p.precio]));
+
+    // Check existing billing for this period
+    const { data: existing } = await supabase
+      .from('company_billing')
+      .select('company_id')
+      .eq('period', period);
+    const existingSet = new Set((existing || []).map((e: any) => e.company_id));
+
+    const toCreate = (subs || []).filter(s => !existingSet.has(s.company_id));
+    let created = 0;
+
+    // Due date: last day of the period month
+    const [year, month] = period.split('-').map(Number);
+    const dueDate = new Date(year, month, 0).toISOString().split('T')[0];
+
+    for (const sub of toCreate) {
+      const amount = planPriceMap.get(sub.plan_type || '') || 0;
+      const { error } = await supabase
+        .from('company_billing')
+        .insert({
+          company_id: sub.company_id,
+          period,
+          plan_type: sub.plan_type,
+          amount,
+          status: 'pendiente',
+          due_date: dueDate
+        } as any);
+      if (!error) created++;
+    }
+
+    return { created, skipped: existingSet.size };
+  },
+
+  async registerPayment(
+    billingId: string,
+    method: string,
+    reference: string,
+    notes?: string
+  ): Promise<void> {
+    const { error } = await supabase
+      .from('company_billing')
+      .update({
+        status: 'pagado',
+        payment_method: method,
+        payment_reference: reference,
+        notes: notes || null,
+        paid_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      } as any)
+      .eq('id', billingId);
+    if (error) throw error;
+  },
+
+  async markOverdueBilling(): Promise<{ updated: number }> {
+    const today = new Date().toISOString().split('T')[0];
+    const { data, error } = await supabase
+      .from('company_billing')
+      .update({ status: 'vencido', updated_at: new Date().toISOString() } as any)
+      .eq('status', 'pendiente')
+      .lt('due_date', today)
+      .select('id');
+    if (error) throw error;
+    return { updated: (data || []).length };
+  },
+
+  async getBillingSummary(period: string): Promise<BillingSummary> {
+    const { data, error } = await supabase
+      .from('company_billing')
+      .select('amount, status')
+      .eq('period', period);
+    if (error) throw error;
+    const records = (data || []) as any[];
+    return {
+      total: records.reduce((s, r) => s + Number(r.amount), 0),
+      paid: records.filter(r => r.status === 'pagado').reduce((s, r) => s + Number(r.amount), 0),
+      pending: records.filter(r => r.status === 'pendiente').reduce((s, r) => s + Number(r.amount), 0),
+      overdue: records.filter(r => r.status === 'vencido').reduce((s, r) => s + Number(r.amount), 0),
+    };
   }
 };
+
+// ========== Types ==========
+
+export interface AdminNotification {
+  id: string;
+  title: string;
+  message: string;
+  priority: 'info' | 'warning' | 'critical';
+  target_plans: string[] | null;
+  target_statuses: string[] | null;
+  created_by: string;
+  expires_at: string | null;
+  created_at: string;
+}
+
+export interface BillingRecord {
+  id: string;
+  company_id: string;
+  period: string;
+  plan_type: string | null;
+  amount: number;
+  status: 'pendiente' | 'pagado' | 'vencido';
+  due_date: string;
+  paid_at: string | null;
+  payment_method: string | null;
+  payment_reference: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  company_name?: string;
+}
+
+export interface BillingSummary {
+  total: number;
+  paid: number;
+  pending: number;
+  overdue: number;
+}

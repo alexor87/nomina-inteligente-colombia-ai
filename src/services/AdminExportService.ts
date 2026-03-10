@@ -44,7 +44,6 @@ export const AdminExportService = {
   },
 
   exportDashboardMetricsToExcel(metrics: SaaSMetrics) {
-    // KPIs sheet
     const kpis = [
       { 'Métrica': 'Total Empresas', 'Valor': metrics.totalCompanies },
       { 'Métrica': 'Activas', 'Valor': metrics.activeCompanies },
@@ -58,21 +57,34 @@ export const AdminExportService = {
       { 'Métrica': 'Conversión Trial→Pago (%)', 'Valor': metrics.trialConversion ?? 0 },
     ];
     const wsKpis = XLSX.utils.json_to_sheet(kpis);
-
-    // Plan distribution
     const wsPlan = XLSX.utils.json_to_sheet(metrics.planDistribution.map(p => ({
       'Plan': p.name, 'Empresas': p.value,
     })));
-
-    // Revenue per plan
     const wsRevenue = XLSX.utils.json_to_sheet((metrics.revenuePerPlan || []).map(p => ({
       'Plan': p.name, 'Revenue': p.revenue,
     })));
-
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, wsKpis, 'KPIs');
     XLSX.utils.book_append_sheet(wb, wsPlan, 'Distribución');
     XLSX.utils.book_append_sheet(wb, wsRevenue, 'Revenue por Plan');
     downloadWorkbook(wb, `metricas_dashboard_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  },
+
+  exportBillingToExcel(records: any[], period: string) {
+    const data = records.map(r => ({
+      'Empresa': r.company_name || r.company_id,
+      'Plan': r.plan_type || 'N/A',
+      'Monto': r.amount,
+      'Estado': r.status,
+      'Vencimiento': r.due_date,
+      'Fecha Pago': r.paid_at ? new Date(r.paid_at).toLocaleDateString('es-CO') : '—',
+      'Método': r.payment_method || '—',
+      'Referencia': r.payment_reference || '—',
+      'Notas': r.notes || '—',
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Facturación');
+    downloadWorkbook(wb, `facturacion_${period}_${new Date().toISOString().slice(0, 10)}.xlsx`);
   },
 };
