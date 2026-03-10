@@ -3,7 +3,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
 import { 
-  LayoutDashboard, Building2, Receipt, ArrowLeft, Shield, Package, Users, Settings
+  LayoutDashboard, Building2, Receipt, ArrowLeft, Shield, Package, Users, Settings, Bell, CreditCard
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
