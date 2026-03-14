@@ -123,6 +123,7 @@ describe('AccountingSoftwareWizard', () => {
         auto_sync: false,
         last_sync_at: '2024-01-15T10:00:00Z',
         last_sync_status: 'success',
+        provider_config: {},
         created_at: '2024-01-01',
         updated_at: '2024-01-01'
       });
