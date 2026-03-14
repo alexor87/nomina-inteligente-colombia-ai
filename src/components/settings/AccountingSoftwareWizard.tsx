@@ -10,10 +10,16 @@ import { useToast } from '@/hooks/use-toast';
 import { useCurrentCompany } from '@/hooks/useCurrentCompany';
 import { 
   AccountingIntegrationService, 
-  AccountingProvider,
   AccountingIntegration,
   AccountingSyncLog
 } from '@/services/AccountingIntegrationService';
+import { 
+  ACCOUNTING_PROVIDERS,
+  getProviderName,
+  getProvidersByCategory,
+  type AccountingProvider,
+  type ProviderConfig
+} from '@/config/accountingProviders';
 import { 
   Loader2, 
   CheckCircle2, 
@@ -22,7 +28,8 @@ import {
   Plug, 
   Info,
   ExternalLink,
-  Clock
+  Clock,
+  ArrowLeft
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -38,9 +45,8 @@ export const AccountingSoftwareWizard = () => {
   const [integration, setIntegration] = useState<AccountingIntegration | null>(null);
   const [syncHistory, setSyncHistory] = useState<AccountingSyncLog[]>([]);
   
-  // Form states
-  const [username, setUsername] = useState('');
-  const [apiKey, setApiKey] = useState('');
+  // Dynamic form state
+  const [formValues, setFormValues] = useState<Record<string, string>>({});
   const [autoSync, setAutoSync] = useState(false);
   
   // Loading states
@@ -48,16 +54,14 @@ export const AccountingSoftwareWizard = () => {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
-  // Load existing integration
+  const providerConfig = selectedProvider ? ACCOUNTING_PROVIDERS[selectedProvider] : null;
+
   useEffect(() => {
-    if (companyId) {
-      loadIntegration();
-    }
+    if (companyId) loadIntegration();
   }, [companyId]);
 
   const loadIntegration = async () => {
     if (!companyId) return;
-    
     setLoading(true);
     try {
       const int = await AccountingIntegrationService.getIntegration(companyId);
@@ -67,8 +71,6 @@ export const AccountingSoftwareWizard = () => {
         setStep('connected');
         setSelectedProvider(int.provider as AccountingProvider);
         setAutoSync(int.auto_sync);
-        
-        // Load sync history
         const history = await AccountingIntegrationService.getSyncHistory(companyId);
         setSyncHistory(history);
       }
@@ -82,36 +84,64 @@ export const AccountingSoftwareWizard = () => {
   const handleSelectProvider = (provider: AccountingProvider) => {
     setSelectedProvider(provider);
     setTestResult(null);
-    setUsername('');
-    setApiKey('');
-    setStep('credentials');
+    setFormValues({});
+    
+    // CSV export doesn't need credentials
+    if (provider === 'csv_export') {
+      setStep('configure');
+    } else {
+      setStep('credentials');
+    }
+  };
+
+  const handleFieldChange = (key: string, value: string) => {
+    setFormValues(prev => ({ ...prev, [key]: value }));
+  };
+
+  const isFormValid = () => {
+    if (!providerConfig) return false;
+    return providerConfig.fields
+      .filter(f => f.required)
+      .every(f => formValues[f.key]?.trim());
   };
 
   const handleTestConnection = async () => {
-    if (!selectedProvider || !username || !apiKey) return;
+    if (!selectedProvider || !providerConfig || !isFormValid()) return;
     
     setTesting(true);
     setTestResult(null);
     
     try {
+      const credentials: Record<string, string> = {};
+      const provConfig: Record<string, any> = {};
+
+      for (const field of providerConfig.fields) {
+        if (field.key === 'base_url' || field.key === 'header_name') {
+          provConfig[field.key] = formValues[field.key] || '';
+        } else {
+          credentials[field.key] = formValues[field.key] || '';
+        }
+      }
+
+      // Pass base URL and auth type in provider_config
+      if (providerConfig.baseUrl) {
+        provConfig.base_url = providerConfig.baseUrl;
+      }
+      provConfig.auth_type = providerConfig.authType;
+      provConfig.test_endpoint = providerConfig.testEndpoint;
+
       const result = await AccountingIntegrationService.testConnection(
         selectedProvider,
-        { api_key: apiKey, username }
+        credentials,
+        provConfig
       );
       setTestResult(result);
       
-      if (result.success) {
-        toast({
-          title: '✅ Conexión exitosa',
-          description: result.message
-        });
-      } else {
-        toast({
-          title: '❌ Error de conexión',
-          description: result.message,
-          variant: 'destructive'
-        });
-      }
+      toast({
+        title: result.success ? '✅ Conexión exitosa' : '❌ Error de conexión',
+        description: result.message,
+        variant: result.success ? 'default' : 'destructive'
+      });
     } catch (error: any) {
       setTestResult({ success: false, message: error.message });
       toast({
@@ -125,36 +155,39 @@ export const AccountingSoftwareWizard = () => {
   };
 
   const handleSaveIntegration = async () => {
-    if (!companyId || !selectedProvider || !testResult?.success) return;
+    if (!companyId || !selectedProvider) return;
+    // For non-csv providers, require successful test
+    if (selectedProvider !== 'csv_export' && !testResult?.success) return;
     
     setLoading(true);
     try {
-      // Save integration config
+      const provConfig: Record<string, any> = {};
+      if (providerConfig) {
+        if (providerConfig.baseUrl) provConfig.base_url = providerConfig.baseUrl;
+        else if (formValues.base_url) provConfig.base_url = formValues.base_url;
+        provConfig.auth_type = providerConfig.authType;
+        if (formValues.header_name) provConfig.header_name = formValues.header_name;
+      }
+
       const saveResult = await AccountingIntegrationService.saveIntegration(
         companyId,
         selectedProvider,
-        autoSync
+        autoSync,
+        provConfig
       );
       
-      if (!saveResult.success) {
-        throw new Error(saveResult.error);
-      }
+      if (!saveResult.success) throw new Error(saveResult.error);
       
-      // Activate integration
       const activateResult = await AccountingIntegrationService.activateIntegration(companyId);
-      if (!activateResult.success) {
-        throw new Error(activateResult.error);
-      }
+      if (!activateResult.success) throw new Error(activateResult.error);
       
       toast({
         title: '✅ Integración guardada',
-        description: `Conexión con ${selectedProvider === 'siigo' ? 'Siigo' : 'Alegra'} configurada correctamente`
+        description: `Conexión con ${getProviderName(selectedProvider)} configurada correctamente`
       });
       
-      // Reload and show connected state
       await loadIntegration();
       setStep('connected');
-      
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -168,25 +201,16 @@ export const AccountingSoftwareWizard = () => {
 
   const handleDisconnect = async () => {
     if (!companyId) return;
-    
     setLoading(true);
     try {
       await AccountingIntegrationService.deactivateIntegration(companyId);
-      toast({
-        title: 'Integración desconectada',
-        description: 'La conexión ha sido removida'
-      });
-      
+      toast({ title: 'Integración desconectada', description: 'La conexión ha sido removida' });
       setIntegration(null);
       setSelectedProvider(null);
       setStep('select');
       setSyncHistory([]);
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'No se pudo desconectar la integración',
-        variant: 'destructive'
-      });
+      toast({ title: 'Error', description: 'No se pudo desconectar la integración', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -194,7 +218,6 @@ export const AccountingSoftwareWizard = () => {
 
   const handleToggleAutoSync = async (enabled: boolean) => {
     if (!companyId) return;
-    
     try {
       await AccountingIntegrationService.updateAutoSync(companyId, enabled);
       setAutoSync(enabled);
@@ -205,11 +228,7 @@ export const AccountingSoftwareWizard = () => {
           : 'Deberás sincronizar manualmente cada período'
       });
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'No se pudo actualizar la configuración',
-        variant: 'destructive'
-      });
+      toast({ title: 'Error', description: 'No se pudo actualizar la configuración', variant: 'destructive' });
     }
   };
 
@@ -223,8 +242,10 @@ export const AccountingSoftwareWizard = () => {
     );
   }
 
-  // Step: Select Provider
+  // ========== STEP: SELECT PROVIDER ==========
   if (step === 'select') {
+    const { popular, other, generic } = getProvidersByCategory();
+
     return (
       <Card>
         <CardHeader>
@@ -236,129 +257,105 @@ export const AccountingSoftwareWizard = () => {
             Selecciona el software contable que utilizas para sincronizar automáticamente los asientos de nómina
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <button
-              onClick={() => handleSelectProvider('siigo')}
-              className="p-6 border rounded-lg hover:border-primary hover:bg-accent transition-colors text-left group"
-            >
-              <div className="font-semibold text-lg mb-2 group-hover:text-primary">Siigo</div>
-              <p className="text-sm text-muted-foreground">
-                Software contable líder en Colombia. Conecta tu cuenta empresarial para enviar asientos de nómina.
-              </p>
-            </button>
-            
-            <button
-              onClick={() => handleSelectProvider('alegra')}
-              className="p-6 border rounded-lg hover:border-primary hover:bg-accent transition-colors text-left group"
-            >
-              <div className="font-semibold text-lg mb-2 group-hover:text-primary">Alegra</div>
-              <p className="text-sm text-muted-foreground">
-                Sistema de facturación y contabilidad en la nube. Sincroniza tus comprobantes de nómina.
-              </p>
-            </button>
+        <CardContent className="space-y-6">
+          {/* Popular */}
+          <div>
+            <h3 className="text-sm font-medium text-muted-foreground mb-3">Populares</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {popular.map(p => (
+                <ProviderCard key={p.id} provider={p} onSelect={handleSelectProvider} />
+              ))}
+            </div>
+          </div>
+
+          {/* Other providers */}
+          <div>
+            <h3 className="text-sm font-medium text-muted-foreground mb-3">Otros proveedores</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3">
+              {other.map(p => (
+                <ProviderCard key={p.id} provider={p} onSelect={handleSelectProvider} compact />
+              ))}
+            </div>
+          </div>
+
+          {/* Generic options */}
+          <div>
+            <h3 className="text-sm font-medium text-muted-foreground mb-3">Opciones genéricas</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {generic.map(p => (
+                <ProviderCard key={p.id} provider={p} onSelect={handleSelectProvider} />
+              ))}
+            </div>
           </div>
         </CardContent>
       </Card>
     );
   }
 
-  // Step: Enter Credentials
-  if (step === 'credentials') {
-    const providerName = selectedProvider === 'siigo' ? 'Siigo' : 'Alegra';
-    
+  // ========== STEP: CREDENTIALS ==========
+  if (step === 'credentials' && providerConfig) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Conectar con {providerName}</CardTitle>
+          <CardTitle>Conectar con {providerConfig.name}</CardTitle>
           <CardDescription>
-            Ingresa tus credenciales de API para establecer la conexión
+            Ingresa tus credenciales para establecer la conexión
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="username">
-                {selectedProvider === 'siigo' ? 'Usuario Siigo' : 'Email de Alegra'}
-              </Label>
-              <Input
-                id="username"
-                type="text"
-                placeholder={selectedProvider === 'siigo' ? 'usuario@empresa.com' : 'email@empresa.com'}
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="apiKey">Token API</Label>
-              <Input
-                id="apiKey"
-                type="password"
-                placeholder="••••••••••••••••"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-              />
-            </div>
+            {providerConfig.fields.map(field => (
+              <div key={field.key} className="space-y-2">
+                <Label htmlFor={field.key}>
+                  {field.label}
+                  {!field.required && <span className="text-muted-foreground ml-1">(opcional)</span>}
+                </Label>
+                <Input
+                  id={field.key}
+                  type={field.type}
+                  placeholder={field.placeholder}
+                  value={formValues[field.key] || ''}
+                  onChange={(e) => handleFieldChange(field.key, e.target.value)}
+                />
+              </div>
+            ))}
             
             <div className="bg-muted/50 rounded-lg p-4 flex gap-3">
               <Info className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
               <div className="text-sm text-muted-foreground">
-                {selectedProvider === 'siigo' ? (
-                  <>
-                    <p className="font-medium mb-1">¿Dónde encontrar el Token API?</p>
-                    <p>Siigo → Configuración → Integraciones → API → Generar Token</p>
-                  </>
-                ) : (
-                  <>
-                    <p className="font-medium mb-1">¿Dónde encontrar el Token API?</p>
-                    <p>Alegra → Configuración → Integraciones → Tokens de API → Crear Token</p>
-                  </>
-                )}
+                <p className="font-medium mb-1">¿Dónde encontrar las credenciales?</p>
+                <p>{providerConfig.helpText}</p>
               </div>
             </div>
           </div>
 
           {testResult && (
             <div className={`p-4 rounded-lg flex items-center gap-3 ${
-              testResult.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+              testResult.success 
+                ? 'bg-green-50 text-green-700 dark:bg-green-950/30 dark:text-green-400' 
+                : 'bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-400'
             }`}>
-              {testResult.success ? (
-                <CheckCircle2 className="h-5 w-5" />
-              ) : (
-                <XCircle className="h-5 w-5" />
-              )}
+              {testResult.success ? <CheckCircle2 className="h-5 w-5" /> : <XCircle className="h-5 w-5" />}
               <span>{testResult.message}</span>
             </div>
           )}
 
           <div className="flex gap-3">
-            <Button
-              variant="outline"
-              onClick={() => setStep('select')}
-            >
+            <Button variant="outline" onClick={() => { setStep('select'); setTestResult(null); }}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
               Volver
             </Button>
             
-            <Button
-              onClick={handleTestConnection}
-              disabled={!username || !apiKey || testing}
-            >
+            <Button onClick={handleTestConnection} disabled={!isFormValid() || testing}>
               {testing ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Probando...
-                </>
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Probando...</>
               ) : (
                 'Probar conexión'
               )}
             </Button>
             
             {testResult?.success && (
-              <Button
-                onClick={() => setStep('configure')}
-                className="ml-auto"
-              >
+              <Button onClick={() => setStep('configure')} className="ml-auto">
                 Continuar
               </Button>
             )}
@@ -368,7 +365,7 @@ export const AccountingSoftwareWizard = () => {
     );
   }
 
-  // Step: Configure Options
+  // ========== STEP: CONFIGURE ==========
   if (step === 'configure') {
     return (
       <Card>
@@ -376,40 +373,31 @@ export const AccountingSoftwareWizard = () => {
           <CardTitle>Configuración de sincronización</CardTitle>
           <CardDescription>
             Configura cómo quieres sincronizar los asientos de nómina
+            {selectedProvider === 'csv_export' && ' — se generará un archivo descargable por período'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="flex items-center justify-between p-4 border rounded-lg">
-            <div className="space-y-1">
-              <div className="font-medium">Sincronización automática</div>
-              <div className="text-sm text-muted-foreground">
-                Enviar asientos automáticamente al liquidar cada período de nómina
+          {selectedProvider !== 'csv_export' && (
+            <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div className="space-y-1">
+                <div className="font-medium">Sincronización automática</div>
+                <div className="text-sm text-muted-foreground">
+                  Enviar asientos automáticamente al liquidar cada período de nómina
+                </div>
               </div>
+              <Switch checked={autoSync} onCheckedChange={setAutoSync} />
             </div>
-            <Switch
-              checked={autoSync}
-              onCheckedChange={setAutoSync}
-            />
-          </div>
+          )}
 
           <div className="flex gap-3">
-            <Button
-              variant="outline"
-              onClick={() => setStep('credentials')}
-            >
+            <Button variant="outline" onClick={() => setStep(selectedProvider === 'csv_export' ? 'select' : 'credentials')}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
               Volver
             </Button>
             
-            <Button
-              onClick={handleSaveIntegration}
-              disabled={loading}
-              className="ml-auto"
-            >
+            <Button onClick={handleSaveIntegration} disabled={loading} className="ml-auto">
               {loading ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Guardando...
-                </>
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Guardando...</>
               ) : (
                 'Guardar configuración'
               )}
@@ -420,9 +408,9 @@ export const AccountingSoftwareWizard = () => {
     );
   }
 
-  // Step: Connected State
+  // ========== STEP: CONNECTED ==========
   if (step === 'connected' && integration) {
-    const providerName = integration.provider === 'siigo' ? 'Siigo' : 'Alegra';
+    const name = getProviderName(integration.provider);
     
     return (
       <div className="space-y-6">
@@ -432,33 +420,32 @@ export const AccountingSoftwareWizard = () => {
               <div>
                 <CardTitle className="flex items-center gap-2">
                   <CheckCircle2 className="h-5 w-5 text-green-500" />
-                  Conectado a {providerName}
+                  Conectado a {name}
                 </CardTitle>
                 <CardDescription>
                   Tu cuenta está vinculada y lista para sincronizar asientos
                 </CardDescription>
               </div>
-              <Badge variant="secondary" className="bg-green-100 text-green-700">
+              <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
                 Activo
               </Badge>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between p-4 border rounded-lg">
-              <div className="space-y-1">
-                <div className="font-medium">Sincronización automática</div>
-                <div className="text-sm text-muted-foreground">
-                  {autoSync 
-                    ? 'Los asientos se envían automáticamente al liquidar' 
-                    : 'Sincronización manual desde cada período'
-                  }
+            {integration.provider !== 'csv_export' && (
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="space-y-1">
+                  <div className="font-medium">Sincronización automática</div>
+                  <div className="text-sm text-muted-foreground">
+                    {autoSync 
+                      ? 'Los asientos se envían automáticamente al liquidar' 
+                      : 'Sincronización manual desde cada período'
+                    }
+                  </div>
                 </div>
+                <Switch checked={autoSync} onCheckedChange={handleToggleAutoSync} />
               </div>
-              <Switch
-                checked={autoSync}
-                onCheckedChange={handleToggleAutoSync}
-              />
-            </div>
+            )}
 
             {integration.last_sync_at && (
               <div className="text-sm text-muted-foreground flex items-center gap-2">
@@ -481,7 +468,7 @@ export const AccountingSoftwareWizard = () => {
               disabled={loading}
               className="text-destructive hover:text-destructive"
             >
-              Desconectar {providerName}
+              Desconectar {name}
             </Button>
           </CardContent>
         </Card>
@@ -499,10 +486,7 @@ export const AccountingSoftwareWizard = () => {
             ) : (
               <div className="space-y-3">
                 {syncHistory.map((log) => (
-                  <div
-                    key={log.id}
-                    className="flex items-center justify-between p-3 border rounded-lg"
-                  >
+                  <div key={log.id} className="flex items-center justify-between p-3 border rounded-lg">
                     <div className="flex items-center gap-3">
                       {log.status === 'success' ? (
                         <CheckCircle2 className="h-5 w-5 text-green-500" />
@@ -523,17 +507,10 @@ export const AccountingSoftwareWizard = () => {
                     
                     <div className="flex items-center gap-2">
                       {log.external_reference && (
-                        <Button variant="ghost" size="sm" asChild>
-                          <a 
-                            href={`https://${integration.provider === 'siigo' ? 'app.siigo.com' : 'app.alegra.com'}/journals/${log.external_reference}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                          </a>
-                        </Button>
+                        <Badge variant="outline" className="text-xs">
+                          Ref: {log.external_reference}
+                        </Badge>
                       )}
-                      
                       {log.status === 'error' && log.error_message && (
                         <span className="text-xs text-red-500 max-w-[200px] truncate">
                           {log.error_message}
@@ -551,4 +528,40 @@ export const AccountingSoftwareWizard = () => {
   }
 
   return null;
+};
+
+// ========== Provider Card Component ==========
+interface ProviderCardProps {
+  provider: ProviderConfig;
+  onSelect: (id: AccountingProvider) => void;
+  compact?: boolean;
+}
+
+const ProviderCard = ({ provider, onSelect, compact }: ProviderCardProps) => {
+  const Icon = provider.icon;
+
+  if (compact) {
+    return (
+      <button
+        onClick={() => onSelect(provider.id)}
+        className="p-4 border rounded-lg hover:border-primary hover:bg-accent transition-colors text-center group"
+      >
+        <Icon className="h-6 w-6 mx-auto mb-2 text-muted-foreground group-hover:text-primary" />
+        <div className="font-medium text-sm group-hover:text-primary">{provider.name}</div>
+      </button>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => onSelect(provider.id)}
+      className="p-6 border rounded-lg hover:border-primary hover:bg-accent transition-colors text-left group"
+    >
+      <div className="flex items-center gap-3 mb-2">
+        <Icon className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
+        <div className="font-semibold text-lg group-hover:text-primary">{provider.name}</div>
+      </div>
+      <p className="text-sm text-muted-foreground">{provider.description}</p>
+    </button>
+  );
 };

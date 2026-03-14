@@ -3,11 +3,11 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.50.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
 // ============================================================================
-// ACCOUNTING SYNC - Integration with Siigo & Alegra
+// ACCOUNTING SYNC - Multi-Provider Integration
 // ============================================================================
 
 interface SyncRequest {
@@ -15,11 +15,9 @@ interface SyncRequest {
   data: {
     company_id?: string;
     period_id?: string;
-    provider?: 'siigo' | 'alegra';
-    credentials?: {
-      api_key?: string;
-      username?: string;
-    };
+    provider?: string;
+    credentials?: Record<string, string>;
+    provider_config?: Record<string, any>;
   };
 }
 
@@ -30,117 +28,49 @@ interface JournalEntry {
   credit: number;
 }
 
-// Siigo API adapter
-class SiigoAdapter {
-  private baseUrl = 'https://api.siigo.com/v1';
-  private apiKey: string;
-  private username: string;
+// ============================================================================
+// Adapter Interface & Implementations
+// ============================================================================
 
-  constructor(apiKey: string, username: string) {
-    this.apiKey = apiKey;
-    this.username = username;
-  }
-
-  async testConnection(): Promise<{ success: boolean; message: string }> {
-    try {
-      const response = await fetch(`${this.baseUrl}/users`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Basic ${btoa(`${this.username}:${this.apiKey}`)}`,
-          'Content-Type': 'application/json',
-          'Partner-Id': 'NominaInteligente'
-        }
-      });
-
-      if (response.ok) {
-        return { success: true, message: 'Conexión exitosa con Siigo' };
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        return { 
-          success: false, 
-          message: errorData.message || `Error de autenticación: ${response.status}` 
-        };
-      }
-    } catch (error: any) {
-      return { success: false, message: `Error de conexión: ${error.message}` };
-    }
-  }
-
-  async createJournalEntry(entries: JournalEntry[], periodLabel: string): Promise<{ success: boolean; reference?: string; error?: string }> {
-    try {
-      const journalData = {
-        document: {
-          id: 24 // Comprobante de nómina
-        },
-        date: new Date().toISOString().split('T')[0],
-        items: entries.map(entry => ({
-          account: { code: entry.account },
-          description: entry.description,
-          debit: entry.debit,
-          credit: entry.credit
-        })),
-        observations: `Asiento contable nómina - ${periodLabel}`
-      };
-
-      const response = await fetch(`${this.baseUrl}/journals`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Basic ${btoa(`${this.username}:${this.apiKey}`)}`,
-          'Content-Type': 'application/json',
-          'Partner-Id': 'NominaInteligente'
-        },
-        body: JSON.stringify(journalData)
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        return { success: true, reference: data.id?.toString() };
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        return { success: false, error: errorData.message || `Error: ${response.status}` };
-      }
-    } catch (error: any) {
-      return { success: false, error: error.message };
-    }
-  }
+interface AccountingAdapter {
+  testConnection(): Promise<{ success: boolean; message: string }>;
+  createJournalEntry(entries: JournalEntry[], periodLabel: string): Promise<{ success: boolean; reference?: string; error?: string }>;
 }
 
-// Alegra API adapter
-class AlegraAdapter {
-  private baseUrl = 'https://api.alegra.com/api/v1';
-  private apiKey: string;
-  private email: string;
+// Basic Auth Adapter (Siigo, Alegra, Helisa)
+class BasicAuthAdapter implements AccountingAdapter {
+  constructor(
+    private baseUrl: string,
+    private username: string,
+    private apiKey: string,
+    private testEndpoint: string,
+    private journalEndpoint: string,
+    private providerName: string,
+    private extraHeaders: Record<string, string> = {}
+  ) {}
 
-  constructor(apiKey: string, email: string) {
-    this.apiKey = apiKey;
-    this.email = email;
-  }
-
-  async testConnection(): Promise<{ success: boolean; message: string }> {
+  async testConnection() {
     try {
-      const response = await fetch(`${this.baseUrl}/company`, {
+      const response = await fetch(`${this.baseUrl}${this.testEndpoint}`, {
         method: 'GET',
         headers: {
-          'Authorization': `Basic ${btoa(`${this.email}:${this.apiKey}`)}`,
-          'Content-Type': 'application/json'
+          'Authorization': `Basic ${btoa(`${this.username}:${this.apiKey}`)}`,
+          'Content-Type': 'application/json',
+          ...this.extraHeaders
         }
       });
 
       if (response.ok) {
-        return { success: true, message: 'Conexión exitosa con Alegra' };
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        return { 
-          success: false, 
-          message: errorData.message || `Error de autenticación: ${response.status}` 
-        };
+        return { success: true, message: `Conexión exitosa con ${this.providerName}` };
       }
+      const errorData = await response.json().catch(() => ({}));
+      return { success: false, message: errorData.message || `Error de autenticación: ${response.status}` };
     } catch (error: any) {
       return { success: false, message: `Error de conexión: ${error.message}` };
     }
   }
 
-  async createJournalEntry(entries: JournalEntry[], periodLabel: string): Promise<{ success: boolean; reference?: string; error?: string }> {
+  async createJournalEntry(entries: JournalEntry[], periodLabel: string) {
     try {
       const journalData = {
         date: new Date().toISOString().split('T')[0],
@@ -153,10 +83,75 @@ class AlegraAdapter {
         }))
       };
 
-      const response = await fetch(`${this.baseUrl}/journal-entries`, {
+      const response = await fetch(`${this.baseUrl}${this.journalEndpoint}`, {
         method: 'POST',
         headers: {
-          'Authorization': `Basic ${btoa(`${this.email}:${this.apiKey}`)}`,
+          'Authorization': `Basic ${btoa(`${this.username}:${this.apiKey}`)}`,
+          'Content-Type': 'application/json',
+          ...this.extraHeaders
+        },
+        body: JSON.stringify(journalData)
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return { success: true, reference: data.id?.toString() };
+      }
+      const errorData = await response.json().catch(() => ({}));
+      return { success: false, error: errorData.message || `Error: ${response.status}` };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  }
+}
+
+// Bearer Token Adapter (World Office, Contai, Monica, TNS)
+class BearerTokenAdapter implements AccountingAdapter {
+  constructor(
+    private baseUrl: string,
+    private apiKey: string,
+    private testEndpoint: string,
+    private journalEndpoint: string,
+    private providerName: string
+  ) {}
+
+  async testConnection() {
+    try {
+      const response = await fetch(`${this.baseUrl}${this.testEndpoint}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        return { success: true, message: `Conexión exitosa con ${this.providerName}` };
+      }
+      const errorData = await response.json().catch(() => ({}));
+      return { success: false, message: errorData.message || `Error de autenticación: ${response.status}` };
+    } catch (error: any) {
+      return { success: false, message: `Error de conexión: ${error.message}` };
+    }
+  }
+
+  async createJournalEntry(entries: JournalEntry[], periodLabel: string) {
+    try {
+      const journalData = {
+        date: new Date().toISOString().split('T')[0],
+        observations: `Asiento contable nómina - ${periodLabel}`,
+        entries: entries.map(entry => ({
+          account: { id: entry.account },
+          description: entry.description,
+          debit: entry.debit,
+          credit: entry.credit
+        }))
+      };
+
+      const response = await fetch(`${this.baseUrl}${this.journalEndpoint}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(journalData)
@@ -165,77 +160,188 @@ class AlegraAdapter {
       if (response.ok) {
         const data = await response.json();
         return { success: true, reference: data.id?.toString() };
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        return { success: false, error: errorData.message || `Error: ${response.status}` };
       }
+      const errorData = await response.json().catch(() => ({}));
+      return { success: false, error: errorData.message || `Error: ${response.status}` };
     } catch (error: any) {
       return { success: false, error: error.message };
     }
   }
 }
 
+// Generic Webhook Adapter
+class WebhookAdapter implements AccountingAdapter {
+  constructor(
+    private webhookUrl: string,
+    private apiKey: string | null,
+    private headerName: string
+  ) {}
+
+  async testConnection() {
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (this.apiKey && this.headerName) {
+        headers[this.headerName] = this.apiKey;
+      }
+
+      const response = await fetch(this.webhookUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ action: 'test', timestamp: new Date().toISOString() })
+      });
+
+      if (response.ok || response.status === 204) {
+        return { success: true, message: 'Conexión exitosa con el webhook' };
+      }
+      return { success: false, message: `El webhook respondió con código ${response.status}` };
+    } catch (error: any) {
+      return { success: false, message: `Error de conexión: ${error.message}` };
+    }
+  }
+
+  async createJournalEntry(entries: JournalEntry[], periodLabel: string) {
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (this.apiKey && this.headerName) {
+        headers[this.headerName] = this.apiKey;
+      }
+
+      const payload = {
+        action: 'create_journal_entry',
+        date: new Date().toISOString().split('T')[0],
+        period: periodLabel,
+        entries
+      };
+
+      const response = await fetch(this.webhookUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload)
+      });
+
+      if (response.ok) {
+        const data = await response.json().catch(() => ({}));
+        return { success: true, reference: data.reference || data.id || 'webhook-ok' };
+      }
+      return { success: false, error: `Webhook error: ${response.status}` };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  }
+}
+
+// CSV Export "Adapter" (no-op for sync, entries are generated client-side)
+class CsvExportAdapter implements AccountingAdapter {
+  async testConnection() {
+    return { success: true, message: 'Exportación CSV no requiere conexión' };
+  }
+  async createJournalEntry(entries: JournalEntry[], periodLabel: string) {
+    return { success: true, reference: `csv-${periodLabel}` };
+  }
+}
+
+// ============================================================================
+// Provider config definitions (server-side)
+// ============================================================================
+const PROVIDER_DEFAULTS: Record<string, { authType: string; baseUrl: string; testEndpoint: string; journalEndpoint: string; extraHeaders?: Record<string, string> }> = {
+  siigo: { authType: 'basic', baseUrl: 'https://api.siigo.com/v1', testEndpoint: '/users', journalEndpoint: '/journals', extraHeaders: { 'Partner-Id': 'NominaInteligente' } },
+  alegra: { authType: 'basic', baseUrl: 'https://api.alegra.com/api/v1', testEndpoint: '/company', journalEndpoint: '/journal-entries' },
+  helisa: { authType: 'basic', baseUrl: 'https://api.helisa.com', testEndpoint: '/status', journalEndpoint: '/accounting/journal-entries' },
+  world_office: { authType: 'bearer', baseUrl: '', testEndpoint: '/status', journalEndpoint: '/journal-entries' },
+  contai: { authType: 'bearer', baseUrl: 'https://api.contai.co', testEndpoint: '/v1/account', journalEndpoint: '/v1/journal-entries' },
+  monica: { authType: 'bearer', baseUrl: '', testEndpoint: '/status', journalEndpoint: '/journal-entries' },
+  tns: { authType: 'bearer', baseUrl: '', testEndpoint: '/health', journalEndpoint: '/api/journal-entries' },
+  webhook: { authType: 'custom', baseUrl: '', testEndpoint: '', journalEndpoint: '' },
+  csv_export: { authType: 'none', baseUrl: '', testEndpoint: '', journalEndpoint: '' },
+};
+
+function createAdapter(
+  provider: string,
+  credentials: Record<string, string>,
+  providerConfig: Record<string, any>
+): AccountingAdapter {
+  const defaults = PROVIDER_DEFAULTS[provider];
+  if (!defaults) {
+    throw new Error(`Proveedor no soportado: ${provider}`);
+  }
+
+  const baseUrl = providerConfig.base_url || defaults.baseUrl;
+  const testEndpoint = providerConfig.test_endpoint || defaults.testEndpoint;
+  const journalEndpoint = defaults.journalEndpoint;
+  const authType = providerConfig.auth_type || defaults.authType;
+
+  switch (authType) {
+    case 'basic':
+      return new BasicAuthAdapter(
+        baseUrl,
+        credentials.username || credentials.email || '',
+        credentials.api_key || '',
+        testEndpoint,
+        journalEndpoint,
+        provider,
+        defaults.extraHeaders || {}
+      );
+    case 'bearer':
+      return new BearerTokenAdapter(
+        baseUrl,
+        credentials.api_key || '',
+        testEndpoint,
+        journalEndpoint,
+        provider
+      );
+    case 'custom':
+      return new WebhookAdapter(
+        baseUrl || credentials.webhook_url || providerConfig.webhook_url || '',
+        credentials.api_key || null,
+        providerConfig.header_name || credentials.header_name || 'Authorization'
+      );
+    case 'none':
+      return new CsvExportAdapter();
+    default:
+      throw new Error(`Tipo de autenticación no soportado: ${authType}`);
+  }
+}
+
+// ============================================================================
 // Generate journal entries from payroll data
+// ============================================================================
 async function generatePayrollJournalEntries(
   supabaseClient: any,
   companyId: string,
   periodId: string
 ): Promise<{ entries: JournalEntry[]; periodLabel: string }> {
-  // Get period info
   const { data: period } = await supabaseClient
     .from('payroll_periods_real')
     .select('periodo, total_devengado, total_deducciones, total_neto')
     .eq('id', periodId)
     .single();
 
-  if (!period) {
-    throw new Error('Período no encontrado');
-  }
+  if (!period) throw new Error('Período no encontrado');
 
-  // Get PUC mappings
   const { data: mappings } = await supabaseClient
     .from('accounting_account_mappings')
     .select('concept, entry_type, puc_account, puc_description')
     .eq('company_id', companyId)
     .eq('is_active', true);
 
-  if (!mappings || mappings.length === 0) {
-    throw new Error('No hay mapeo de cuentas PUC configurado');
-  }
+  if (!mappings || mappings.length === 0) throw new Error('No hay mapeo de cuentas PUC configurado');
 
-  // Get payroll details for breakdown
   const { data: payrolls } = await supabaseClient
     .from('payrolls')
     .select('*')
     .eq('period_id', periodId)
     .eq('company_id', companyId);
 
-  // Create mapping lookup
   const mappingLookup: Record<string, { account: string; description: string }> = {};
   for (const m of mappings) {
-    mappingLookup[`${m.concept}_${m.entry_type}`] = {
-      account: m.puc_account,
-      description: m.puc_description
-    };
+    mappingLookup[`${m.concept}_${m.entry_type}`] = { account: m.puc_account, description: m.puc_description };
   }
 
   const entries: JournalEntry[] = [];
-
-  // Calculate totals from payrolls
-  let totalSalarios = 0;
-  let totalAuxTransporte = 0;
-  let totalSaludEmpleado = 0;
-  let totalPensionEmpleado = 0;
-  let totalSaludEmpleador = 0;
-  let totalPensionEmpleador = 0;
-  let totalARL = 0;
-  let totalCaja = 0;
-  let totalICBF = 0;
-  let totalSENA = 0;
-  let totalCesantias = 0;
-  let totalInteresesCesantias = 0;
-  let totalPrima = 0;
-  let totalVacaciones = 0;
+  let totalSalarios = 0, totalAuxTransporte = 0, totalSaludEmpleado = 0, totalPensionEmpleado = 0;
+  let totalSaludEmpleador = 0, totalPensionEmpleador = 0, totalARL = 0, totalCaja = 0;
+  let totalICBF = 0, totalSENA = 0, totalCesantias = 0, totalInteresesCesantias = 0;
+  let totalPrima = 0, totalVacaciones = 0;
 
   if (payrolls) {
     for (const p of payrolls) {
@@ -256,7 +362,6 @@ async function generatePayrollJournalEntries(
     }
   }
 
-  // Generate entries based on mappings
   const addEntry = (concept: string, type: 'debito' | 'credito', amount: number) => {
     if (amount <= 0) return;
     const mapping = mappingLookup[`${concept}_${type}`];
@@ -270,7 +375,6 @@ async function generatePayrollJournalEntries(
     }
   };
 
-  // Débitos (Gastos)
   addEntry('salario_basico', 'debito', totalSalarios);
   addEntry('auxilio_transporte', 'debito', totalAuxTransporte);
   addEntry('salud_empleador', 'debito', totalSaludEmpleador);
@@ -283,8 +387,6 @@ async function generatePayrollJournalEntries(
   addEntry('intereses_cesantias', 'debito', totalInteresesCesantias);
   addEntry('prima', 'debito', totalPrima);
   addEntry('vacaciones', 'debito', totalVacaciones);
-
-  // Créditos (Pasivos/Bancos)
   addEntry('salud_empleado', 'credito', totalSaludEmpleado);
   addEntry('pension_empleado', 'credito', totalPensionEmpleado);
   addEntry('neto_pagar', 'credito', period.total_neto || 0);
@@ -292,14 +394,15 @@ async function generatePayrollJournalEntries(
   return { entries, periodLabel: period.periodo };
 }
 
+// ============================================================================
+// Main Handler
+// ============================================================================
 serve(async (req: Request) => {
-  // Handle CORS
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Validate JWT authentication
     const authHeader = req.headers.get('Authorization');
     if (!authHeader?.startsWith('Bearer ')) {
       return new Response(
@@ -323,17 +426,15 @@ serve(async (req: Request) => {
       );
     }
 
-    // Service role client for DB operations
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabaseClient = createClient(supabaseUrl, supabaseKey);
 
     const { action, data }: SyncRequest = await req.json();
-
     console.log(`📊 [ACCOUNTING-SYNC] Action: ${action}`, data);
 
     switch (action) {
       case 'test-connection': {
-        const { provider, credentials } = data;
+        const { provider, credentials, provider_config } = data;
         
         if (!provider || !credentials) {
           return new Response(
@@ -342,13 +443,7 @@ serve(async (req: Request) => {
           );
         }
 
-        let adapter;
-        if (provider === 'siigo') {
-          adapter = new SiigoAdapter(credentials.api_key!, credentials.username!);
-        } else {
-          adapter = new AlegraAdapter(credentials.api_key!, credentials.username!);
-        }
-
+        const adapter = createAdapter(provider, credentials, provider_config || {});
         const result = await adapter.testConnection();
         
         return new Response(
@@ -367,7 +462,6 @@ serve(async (req: Request) => {
           );
         }
 
-        // Get integration config
         const { data: integration, error: intError } = await supabaseClient
           .from('accounting_integrations')
           .select('*')
@@ -382,7 +476,6 @@ serve(async (req: Request) => {
           );
         }
 
-        // Create sync log entry
         const { data: syncLog } = await supabaseClient
           .from('accounting_sync_logs')
           .insert({
@@ -396,39 +489,28 @@ serve(async (req: Request) => {
           .single();
 
         try {
-          // Get credentials from secrets (stored per company)
-          const secretKey = `${integration.provider.toUpperCase()}_API_KEY_${company_id}`;
-          const usernameKey = `${integration.provider.toUpperCase()}_USERNAME_${company_id}`;
-          
-          const apiKey = Deno.env.get(secretKey);
-          const username = Deno.env.get(usernameKey);
+          // Get credentials from secrets
+          const providerUpper = integration.provider.toUpperCase();
+          const apiKey = Deno.env.get(`${providerUpper}_API_KEY_${company_id}`);
+          const username = Deno.env.get(`${providerUpper}_USERNAME_${company_id}`);
 
-          if (!apiKey || !username) {
+          const credentials: Record<string, string> = {};
+          if (apiKey) credentials.api_key = apiKey;
+          if (username) credentials.username = username;
+
+          if (!apiKey && integration.provider !== 'csv_export') {
             throw new Error('Credenciales no configuradas. Configure las credenciales desde la interfaz de configuración.');
           }
 
-          // Generate journal entries
-          const { entries, periodLabel } = await generatePayrollJournalEntries(
-            supabaseClient,
-            company_id,
-            period_id
-          );
+          const { entries, periodLabel } = await generatePayrollJournalEntries(supabaseClient, company_id, period_id);
 
           if (entries.length === 0) {
             throw new Error('No se generaron asientos contables. Verifique el mapeo de cuentas PUC.');
           }
 
-          // Create adapter and send to provider
-          let adapter;
-          if (integration.provider === 'siigo') {
-            adapter = new SiigoAdapter(apiKey, username);
-          } else {
-            adapter = new AlegraAdapter(apiKey, username);
-          }
-
+          const adapter = createAdapter(integration.provider, credentials, integration.provider_config || {});
           const result = await adapter.createJournalEntry(entries, periodLabel);
 
-          // Update sync log
           await supabaseClient
             .from('accounting_sync_logs')
             .update({
@@ -441,7 +523,6 @@ serve(async (req: Request) => {
             })
             .eq('id', syncLog.id);
 
-          // Update integration last sync status
           await supabaseClient
             .from('accounting_integrations')
             .update({
@@ -461,7 +542,6 @@ serve(async (req: Request) => {
           );
 
         } catch (error: any) {
-          // Update sync log with error
           if (syncLog) {
             await supabaseClient
               .from('accounting_sync_logs')
@@ -490,7 +570,6 @@ serve(async (req: Request) => {
           );
         }
 
-        // Get integration and recent logs
         const { data: integration } = await supabaseClient
           .from('accounting_integrations')
           .select('*')
@@ -505,11 +584,7 @@ serve(async (req: Request) => {
           .limit(10);
 
         return new Response(
-          JSON.stringify({
-            success: true,
-            integration,
-            recent_syncs: recentLogs || []
-          }),
+          JSON.stringify({ success: true, integration, recent_syncs: recentLogs || [] }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }

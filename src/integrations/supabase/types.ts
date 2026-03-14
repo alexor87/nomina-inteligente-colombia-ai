@@ -69,6 +69,7 @@ export type Database = {
           last_sync_at: string | null
           last_sync_status: string | null
           provider: string
+          provider_config: Json | null
           updated_at: string | null
         }
         Insert: {
@@ -81,6 +82,7 @@ export type Database = {
           last_sync_at?: string | null
           last_sync_status?: string | null
           provider: string
+          provider_config?: Json | null
           updated_at?: string | null
         }
         Update: {
@@ -93,6 +95,7 @@ export type Database = {
           last_sync_at?: string | null
           last_sync_status?: string | null
           provider?: string
+          provider_config?: Json | null
           updated_at?: string | null
         }
         Relationships: [
