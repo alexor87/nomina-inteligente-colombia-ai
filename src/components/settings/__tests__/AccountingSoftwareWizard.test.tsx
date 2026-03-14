@@ -92,6 +92,7 @@ describe('AccountingSoftwareWizard', () => {
         auto_sync: false,
         last_sync_at: null,
         last_sync_status: null,
+        provider_config: {},
         created_at: '2024-01-01',
         updated_at: '2024-01-01'
       });
