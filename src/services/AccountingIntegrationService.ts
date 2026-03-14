@@ -1,20 +1,23 @@
 import { supabase } from '@/integrations/supabase/client';
+import type { AccountingProvider } from '@/config/accountingProviders';
+
+// Re-export the type for backward compatibility
+export type { AccountingProvider } from '@/config/accountingProviders';
 
 // ============================================================================
-// AccountingIntegrationService - Siigo & Alegra Integration Management
+// AccountingIntegrationService - Multi-Provider Integration Management
 // ============================================================================
-
-export type AccountingProvider = 'siigo' | 'alegra';
 
 export interface AccountingIntegration {
   id: string;
   company_id: string;
-  provider: AccountingProvider;
+  provider: string;
   credentials_ref: string | null;
   is_active: boolean;
   auto_sync: boolean;
   last_sync_at: string | null;
   last_sync_status: 'success' | 'error' | 'pending' | null;
+  provider_config: Record<string, any>;
   created_at: string;
   updated_at: string;
 }
@@ -47,9 +50,6 @@ export interface SyncResult {
 }
 
 export class AccountingIntegrationService {
-  /**
-   * Get the current integration configuration for the company
-   */
   static async getIntegration(companyId: string): Promise<AccountingIntegration | null> {
     const { data, error } = await supabase
       .from('accounting_integrations')
@@ -65,67 +65,53 @@ export class AccountingIntegrationService {
     return data as AccountingIntegration | null;
   }
 
-  /**
-   * Create or update an integration configuration
-   */
   static async saveIntegration(
     companyId: string,
     provider: AccountingProvider,
-    autoSync: boolean = false
+    autoSync: boolean = false,
+    providerConfig: Record<string, any> = {}
   ): Promise<{ success: boolean; error?: string }> {
     const existing = await this.getIntegration(companyId);
 
     if (existing) {
-      // Update existing
       const { error } = await supabase
         .from('accounting_integrations')
         .update({
           provider,
           auto_sync: autoSync,
+          provider_config: providerConfig,
           updated_at: new Date().toISOString()
         })
         .eq('id', existing.id);
 
-      if (error) {
-        return { success: false, error: error.message };
-      }
+      if (error) return { success: false, error: error.message };
     } else {
-      // Create new
       const { error } = await supabase
         .from('accounting_integrations')
         .insert({
           company_id: companyId,
           provider,
           auto_sync: autoSync,
-          is_active: false // Will be activated after successful test
+          provider_config: providerConfig,
+          is_active: false
         });
 
-      if (error) {
-        return { success: false, error: error.message };
-      }
+      if (error) return { success: false, error: error.message };
     }
 
     return { success: true };
   }
 
-  /**
-   * Activate integration after successful credential test
-   */
   static async activateIntegration(companyId: string): Promise<{ success: boolean; error?: string }> {
     const { error } = await supabase
       .from('accounting_integrations')
       .update({ is_active: true, updated_at: new Date().toISOString() })
       .eq('company_id', companyId);
 
-    if (error) {
-      return { success: false, error: error.message };
-    }
+    if (error) return { success: false, error: error.message };
     return { success: true };
   }
 
-  /**
-   * Deactivate/disconnect integration
-   */
   static async deactivateIntegration(companyId: string): Promise<{ success: boolean; error?: string }> {
     const { error } = await supabase
       .from('accounting_integrations')
@@ -136,40 +122,32 @@ export class AccountingIntegrationService {
       })
       .eq('company_id', companyId);
 
-    if (error) {
-      return { success: false, error: error.message };
-    }
+    if (error) return { success: false, error: error.message };
     return { success: true };
   }
 
-  /**
-   * Update auto-sync setting
-   */
   static async updateAutoSync(companyId: string, autoSync: boolean): Promise<{ success: boolean; error?: string }> {
     const { error } = await supabase
       .from('accounting_integrations')
       .update({ auto_sync: autoSync, updated_at: new Date().toISOString() })
       .eq('company_id', companyId);
 
-    if (error) {
-      return { success: false, error: error.message };
-    }
+    if (error) return { success: false, error: error.message };
     return { success: true };
   }
 
-  /**
-   * Test connection to accounting software
-   */
   static async testConnection(
     provider: AccountingProvider,
-    credentials: { api_key: string; username: string }
+    credentials: Record<string, string>,
+    providerConfig?: Record<string, any>
   ): Promise<TestConnectionResult> {
     const { data, error } = await supabase.functions.invoke('accounting-sync', {
       body: {
         action: 'test-connection',
         data: {
           provider,
-          credentials
+          credentials,
+          provider_config: providerConfig
         }
       }
     });
@@ -181,9 +159,6 @@ export class AccountingIntegrationService {
     return data as TestConnectionResult;
   }
 
-  /**
-   * Sync payroll period to accounting software
-   */
   static async syncPeriod(companyId: string, periodId: string): Promise<SyncResult> {
     const { data, error } = await supabase.functions.invoke('accounting-sync', {
       body: {
@@ -195,16 +170,10 @@ export class AccountingIntegrationService {
       }
     });
 
-    if (error) {
-      return { success: false, error: error.message };
-    }
-
+    if (error) return { success: false, error: error.message };
     return data as SyncResult;
   }
 
-  /**
-   * Get sync history for a company
-   */
   static async getSyncHistory(companyId: string, limit: number = 10): Promise<AccountingSyncLog[]> {
     const { data, error } = await supabase
       .from('accounting_sync_logs')
@@ -221,9 +190,6 @@ export class AccountingIntegrationService {
     return (data || []) as AccountingSyncLog[];
   }
 
-  /**
-   * Get sync logs for a specific period
-   */
   static async getPeriodSyncLogs(periodId: string): Promise<AccountingSyncLog[]> {
     const { data, error } = await supabase
       .from('accounting_sync_logs')
@@ -239,9 +205,6 @@ export class AccountingIntegrationService {
     return (data || []) as AccountingSyncLog[];
   }
 
-  /**
-   * Check if a company has auto-sync enabled
-   */
   static async isAutoSyncEnabled(companyId: string): Promise<boolean> {
     const integration = await this.getIntegration(companyId);
     return integration?.is_active === true && integration?.auto_sync === true;
