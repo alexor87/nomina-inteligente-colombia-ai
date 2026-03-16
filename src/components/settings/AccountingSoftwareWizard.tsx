@@ -167,6 +167,9 @@ export const AccountingSoftwareWizard = () => {
         else if (formValues.base_url) provConfig.base_url = formValues.base_url;
         provConfig.auth_type = providerConfig.authType;
         if (formValues.header_name) provConfig.header_name = formValues.header_name;
+        if (selectedProvider === 'custom' && formValues.custom_name) {
+          provConfig.custom_name = formValues.custom_name;
+        }
       }
 
       const saveResult = await AccountingIntegrationService.saveIntegration(
@@ -183,7 +186,7 @@ export const AccountingSoftwareWizard = () => {
       
       toast({
         title: '✅ Integración guardada',
-        description: `Conexión con ${getProviderName(selectedProvider)} configurada correctamente`
+        description: `Conexión con ${getProviderName(selectedProvider, provConfig)} configurada correctamente`
       });
       
       await loadIntegration();
@@ -410,7 +413,7 @@ export const AccountingSoftwareWizard = () => {
 
   // ========== STEP: CONNECTED ==========
   if (step === 'connected' && integration) {
-    const name = getProviderName(integration.provider);
+    const name = getProviderName(integration.provider, integration.provider_config as Record<string, any>);
     
     return (
       <div className="space-y-6">
