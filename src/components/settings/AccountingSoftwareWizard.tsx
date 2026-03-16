@@ -186,7 +186,7 @@ export const AccountingSoftwareWizard = () => {
       
       toast({
         title: '✅ Integración guardada',
-        description: `Conexión con ${getProviderName(selectedProvider)} configurada correctamente`
+        description: `Conexión con ${getProviderName(selectedProvider, provConfig)} configurada correctamente`
       });
       
       await loadIntegration();
