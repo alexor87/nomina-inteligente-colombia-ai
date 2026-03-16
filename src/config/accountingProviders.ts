@@ -189,9 +189,30 @@ export const ACCOUNTING_PROVIDERS: Record<AccountingProvider, ProviderConfig> = 
     icon: FileSpreadsheet,
     category: 'generic',
   },
+  custom: {
+    id: 'custom',
+    name: 'Otro Software',
+    description: 'Conecta con cualquier software contable usando su API REST. Define el nombre, URL y autenticación manualmente.',
+    authType: 'custom',
+    fields: [
+      { key: 'custom_name', label: 'Nombre del software', placeholder: 'Ej: MiSoftware Contable', type: 'text', required: true },
+      { key: 'base_url', label: 'URL del Endpoint / API', placeholder: 'https://api.tu-software.com/journal-entries', type: 'url', required: true },
+      { key: 'api_key', label: 'Token / API Key', placeholder: '••••••••••••••••', type: 'password', required: true },
+      { key: 'header_name', label: 'Nombre del Header de Auth', placeholder: 'Authorization, X-API-Key, etc.', type: 'text', required: false },
+    ],
+    baseUrl: null,
+    testEndpoint: null,
+    journalEndpoint: null,
+    helpText: 'Consulta la documentación de tu software contable para obtener la URL de la API y las credenciales de acceso.',
+    icon: Globe,
+    category: 'generic',
+  },
 };
 
-export const getProviderName = (providerId: string): string => {
+export const getProviderName = (providerId: string, providerConfig?: Record<string, any>): string => {
+  if (providerId === 'custom') {
+    return providerConfig?.custom_name || 'Software personalizado';
+  }
   return ACCOUNTING_PROVIDERS[providerId as AccountingProvider]?.name || providerId;
 };
 

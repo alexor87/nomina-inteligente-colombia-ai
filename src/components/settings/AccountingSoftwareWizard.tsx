@@ -167,6 +167,9 @@ export const AccountingSoftwareWizard = () => {
         else if (formValues.base_url) provConfig.base_url = formValues.base_url;
         provConfig.auth_type = providerConfig.authType;
         if (formValues.header_name) provConfig.header_name = formValues.header_name;
+        if (selectedProvider === 'custom' && formValues.custom_name) {
+          provConfig.custom_name = formValues.custom_name;
+        }
       }
 
       const saveResult = await AccountingIntegrationService.saveIntegration(
