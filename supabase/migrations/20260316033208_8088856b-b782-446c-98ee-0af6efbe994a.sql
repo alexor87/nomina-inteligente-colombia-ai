@@ -1,0 +1,1 @@
+ALTER TABLE public.accounting_integrations DROP CONSTRAINT IF EXISTS accounting_integrations_provider_check;

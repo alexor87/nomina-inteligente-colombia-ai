@@ -20,7 +20,8 @@ export type AccountingProvider =
   | 'monica' 
   | 'tns' 
   | 'webhook' 
-  | 'csv_export';
+  | 'csv_export'
+  | 'custom';
 
 export type AuthType = 'basic' | 'bearer' | 'custom' | 'none';
 
