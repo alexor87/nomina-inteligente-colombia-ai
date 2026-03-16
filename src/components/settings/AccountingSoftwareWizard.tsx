@@ -413,7 +413,7 @@ export const AccountingSoftwareWizard = () => {
 
   // ========== STEP: CONNECTED ==========
   if (step === 'connected' && integration) {
-    const name = getProviderName(integration.provider);
+    const name = getProviderName(integration.provider, integration.provider_config as Record<string, any>);
     
     return (
       <div className="space-y-6">
