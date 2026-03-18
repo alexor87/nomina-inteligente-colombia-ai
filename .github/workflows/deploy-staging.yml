@@ -19,13 +19,17 @@ jobs:
           
       - name: Install dependencies
         run: npm install --legacy-peer-deps
-        
+
+      - name: Run tests
+        run: npm run test -- --run
+
       - name: Build Staging
         run: npm run build:stg
         env:
           VITE_SUPABASE_URL: ${{ secrets.STG_VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.STG_VITE_SUPABASE_PUBLISHABLE_KEY }}
           VITE_SUPABASE_PROJECT_ID: ${{ secrets.STG_VITE_SUPABASE_PROJECT_ID }}
+          VITE_SENTRY_DSN: ${{ secrets.STG_VITE_SENTRY_DSN }}
           
       - name: Deploy to Vercel (Staging)
         uses: amondnet/vercel-action@v20
@@ -34,5 +38,5 @@ jobs:
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          vercel-args: '--prebuilt --token=${{ secrets.VERCEL_TOKEN }}'
+          vercel-args: '--token=${{ secrets.VERCEL_TOKEN }}'
           scope: ${{ secrets.VERCEL_ORG_ID }}
