@@ -17,6 +17,7 @@ const mockSupabase = supabase as unknown as {
 describe('SuperAdminService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    SuperAdminService.invalidatePlansCache();
   });
 
   describe('getDashboardMetrics()', () => {
@@ -55,6 +56,15 @@ describe('SuperAdminService', () => {
         if (table === 'employees') {
           return {
             select: vi.fn().mockResolvedValue({ data: mockEmployees, error: null })
+          };
+        }
+        if (table === 'subscription_plans') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: [], error: null })
+              })
+            })
           };
         }
         return { select: vi.fn().mockResolvedValue({ data: [], error: null }) };
@@ -101,6 +111,15 @@ describe('SuperAdminService', () => {
             select: vi.fn().mockResolvedValue({ data: [], error: null })
           };
         }
+        if (table === 'subscription_plans') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: [], error: null })
+              })
+            })
+          };
+        }
         return { select: vi.fn().mockResolvedValue({ data: [], error: null }) };
       });
 
@@ -111,9 +130,20 @@ describe('SuperAdminService', () => {
     });
 
     it('throws error when companies query fails', async () => {
-      mockSupabase.from.mockImplementation(() => ({
-        select: vi.fn().mockResolvedValue({ data: null, error: new Error('DB Error') })
-      }));
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'subscription_plans') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: [], error: null })
+              })
+            })
+          };
+        }
+        return {
+          select: vi.fn().mockResolvedValue({ data: null, error: new Error('DB Error') })
+        };
+      });
 
       await expect(SuperAdminService.getDashboardMetrics()).rejects.toThrow('DB Error');
     });
@@ -150,6 +180,15 @@ describe('SuperAdminService', () => {
         }
         if (table === 'subscription_events') {
           return { insert: insertMock };
+        }
+        if (table === 'subscription_plans') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: [], error: null })
+              })
+            })
+          };
         }
         return {};
       });
@@ -203,6 +242,15 @@ describe('SuperAdminService', () => {
         }
         if (table === 'subscription_events') {
           return { insert: insertMock };
+        }
+        if (table === 'subscription_plans') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: [], error: null })
+              })
+            })
+          };
         }
         return {};
       });
