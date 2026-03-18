@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCompanyName } from '@/hooks/useCompanyName';
 import { TeamInvitationService, TeamInvitation } from '@/services/TeamInvitationService';
 import {
   Table,
@@ -116,6 +117,7 @@ const AUDIT_KEY = 'empresa_auditoria';
 export const UsuariosRolesSettings = () => {
   const { toast } = useToast();
   const { user, profile, loading: authLoading } = useAuth();
+  const { companyName } = useCompanyName();
   
   // Estados principales
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
@@ -269,7 +271,7 @@ export const UsuariosRolesSettings = () => {
     try {
       await TeamInvitationService.createInvitation(
         profile.company_id,
-        profile.company_id, // Will be replaced by company name if needed
+        companyName || 'Tu empresa',
         user.id,
         {
           email: inviteForm.email.toLowerCase().trim(),
@@ -367,8 +369,7 @@ export const UsuariosRolesSettings = () => {
     if (!usuario || usuario.estado !== 'Invitación pendiente') return;
 
     try {
-      const companyName = profile?.company_id || 'Tu empresa';
-      await TeamInvitationService.resendInvitation(id, companyName);
+      await TeamInvitationService.resendInvitation(id, companyName || 'Tu empresa');
 
       agregarActividad({
         usuario: getCurrentUserEmail(),

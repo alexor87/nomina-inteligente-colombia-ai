@@ -158,14 +158,11 @@ export class TeamInvitationService {
     const appUrl = import.meta.env.VITE_APP_URL || window.location.origin;
     const inviteUrl = `${appUrl}/join?token=${invitation.token}`;
 
-    await supabase.functions.invoke('send-team-invitation-email', {
-      body: {
-        to: invitation.invited_email,
-        name: invitation.invited_name,
-        role: invitation.role,
-        companyName,
-        inviteUrl,
-      },
-    });
+    const { data: fnData, error: fnError } = await supabase.functions.invoke(
+      'send-team-invitation-email',
+      { body: { to: invitation.invited_email, name: invitation.invited_name, role: invitation.role, companyName, inviteUrl } }
+    );
+    if (fnError) throw new Error(`Error al enviar email: ${fnError.message}`);
+    if (fnData && !fnData.success) throw new Error(fnData.error || 'Error reenviando email de invitación');
   }
 }
