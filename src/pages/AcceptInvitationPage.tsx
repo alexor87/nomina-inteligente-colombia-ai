@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { TeamInvitationService, TeamInvitation } from '@/services/TeamInvitationService';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function AcceptInvitationPage() {
   const [searchParams] = useSearchParams();
@@ -47,14 +48,23 @@ export default function AcceptInvitationPage() {
     });
   }, [token]);
 
-  // Once we have auth state and invitation, auto-accept or redirect to register
+  // Once we have auth state and invitation, redirect to login if needed
   useEffect(() => {
     if (authLoading || status !== 'ready' || !invitation) return;
 
     if (!user) {
-      // Not logged in — send to login (with invite token so we can redirect back after auth)
+      // Not logged in — send to login with invite token
       sessionStorage.setItem('pendingInviteToken', token!);
       navigate(`/login?invite=${token}`, { replace: true });
+      return;
+    }
+
+    // Wrong account logged in — sign out and redirect to login
+    if (user.email?.toLowerCase() !== invitation.invited_email) {
+      sessionStorage.setItem('pendingInviteToken', token!);
+      supabase.auth.signOut().then(() => {
+        navigate(`/login?invite=${token}`, { replace: true });
+      });
     }
   }, [authLoading, user, status, invitation, token, navigate]);
 
@@ -99,42 +109,24 @@ export default function AcceptInvitationPage() {
             </div>
           )}
 
-          {status === 'ready' && invitation && user && (() => {
-            const emailMatches = user.email?.toLowerCase() === invitation.invited_email;
-            return (
-              <div className="space-y-4">
-                <p className="text-gray-700">
-                  Has sido invitado a unirte al equipo como:
+          {status === 'ready' && invitation && user && user.email?.toLowerCase() === invitation.invited_email && (
+            <div className="space-y-4">
+              <p className="text-gray-700">
+                Has sido invitado a unirte al equipo como:
+              </p>
+              <div className="bg-blue-50 rounded-lg p-4">
+                <p className="text-2xl font-semibold text-blue-700">
+                  {roleLabels[invitation.role] || invitation.role}
                 </p>
-                <div className="bg-blue-50 rounded-lg p-4">
-                  <p className="text-2xl font-semibold text-blue-700">
-                    {roleLabels[invitation.role] || invitation.role}
-                  </p>
-                </div>
-                {emailMatches ? (
-                  <>
-                    <p className="text-sm text-gray-500">
-                      Cuenta: <strong>{user.email}</strong>
-                    </p>
-                    <Button onClick={handleAccept} className="w-full">
-                      Aceptar y unirme al equipo
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800 text-left">
-                      <p className="font-medium mb-2">Esta invitación es para otro email</p>
-                      <p>Invitado: <strong>{invitation.invited_email}</strong></p>
-                      <p>Cuenta actual: <strong>{user.email}</strong></p>
-                    </div>
-                    <Button variant="outline" className="w-full" onClick={() => navigate('/login')}>
-                      Cambiar cuenta
-                    </Button>
-                  </>
-                )}
               </div>
-            );
-          })()}
+              <p className="text-sm text-gray-500">
+                Cuenta: <strong>{user.email}</strong>
+              </p>
+              <Button onClick={handleAccept} className="w-full">
+                Aceptar y unirme al equipo
+              </Button>
+            </div>
+          )}
 
           {status === 'accepting' && (
             <div className="flex flex-col items-center gap-3 py-8">
