@@ -63,11 +63,26 @@ export class CompanyRegistrationService {
         if (companyError) {
           logger.error('❌ Error creando empresa:', companyError);
           if (companyError.code === '23505') {
-            return { success: false, error: companyError, message: 'Este NIT ya está registrado en el sistema. Contacta al soporte si crees que esto es un error.' };
+            // NIT duplicado: puede ser un registro parcial previo donde created_by quedó NULL
+            // Buscar la empresa por NIT y verificar si no tiene dueño
+            const { data: orphanCompany } = await supabase
+              .from('companies')
+              .select('id, nit, created_by')
+              .eq('nit', data.nit)
+              .maybeSingle();
+
+            if (orphanCompany && (orphanCompany.created_by === null || orphanCompany.created_by === user.id)) {
+              logger.warn('⚠️ Empresa huérfana encontrada por NIT, reutilizando:', orphanCompany.id);
+              company = orphanCompany;
+            } else {
+              return { success: false, error: companyError, message: 'Este NIT ya está registrado en el sistema. Contacta al soporte si crees que esto es un error.' };
+            }
+          } else {
+            throw companyError;
           }
-          throw companyError;
+        } else {
+          company = newCompany;
         }
-        company = newCompany;
       }
 
       // Paso 3: Upsert perfil (cubre caso donde el perfil no existe)
