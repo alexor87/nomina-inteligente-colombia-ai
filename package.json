@@ -8,6 +8,7 @@
     "build": "vite build",
     "build:stg": "vite build --mode staging",
     "build:prod": "vite build --mode production",
+    "test": "vitest",
     "lint": "eslint .",
     "preview": "vite preview",
     "test:e2e": "node --env-file=.env.e2e node_modules/.bin/playwright test",
