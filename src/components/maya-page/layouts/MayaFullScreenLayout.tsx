@@ -10,7 +10,7 @@ import { MayaFloatingAssistant } from '@/maya/MayaFloatingAssistant';
 import { MayaGlobalManager } from '@/maya/MayaGlobalManager';
 
 export const MayaFullScreenLayout: React.FC = () => {
-  const { user, loading } = useAuth();
+  const { user, profile, loading } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -25,6 +25,11 @@ export const MayaFullScreenLayout: React.FC = () => {
 
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Usuario autenticado sin empresa → completar registro
+  if (!profile?.company_id) {
+    return <Navigate to="/register/company" replace />;
   }
 
   return (
