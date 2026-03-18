@@ -72,8 +72,18 @@ export class CompanyRegistrationService {
               .maybeSingle();
 
             if (orphanCompany && (orphanCompany.created_by === null || orphanCompany.created_by === user.id)) {
-              logger.warn('⚠️ Empresa huérfana encontrada por NIT, reutilizando:', orphanCompany.id);
-              company = orphanCompany;
+              // Verificar que nadie más está usando esta empresa antes de reclamarla
+              const [{ count: profileCount }, { count: roleCount }] = await Promise.all([
+                supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('company_id', orphanCompany.id),
+                supabase.from('user_roles').select('*', { count: 'exact', head: true }).eq('company_id', orphanCompany.id),
+              ]);
+
+              if ((profileCount ?? 0) === 0 && (roleCount ?? 0) === 0) {
+                logger.warn('⚠️ Empresa huérfana sin usuarios, reutilizando:', orphanCompany.id);
+                company = orphanCompany;
+              } else {
+                return { success: false, error: companyError, message: 'Este NIT ya está registrado en el sistema. Contacta al soporte si crees que esto es un error.' };
+              }
             } else {
               return { success: false, error: companyError, message: 'Este NIT ya está registrado en el sistema. Contacta al soporte si crees que esto es un error.' };
             }
