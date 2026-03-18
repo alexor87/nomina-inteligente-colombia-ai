@@ -27,33 +27,56 @@ export class CompanyRegistrationService {
       if (!data.email?.trim()) throw new Error('El email de la empresa es obligatorio');
       if (!data.nit?.trim()) throw new Error('El NIT es obligatorio');
 
+      // Paso 0: Refrescar sesión para garantizar JWT válido
+      await supabase.auth.refreshSession();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuario no autenticado');
 
-      const { data: company, error: companyError } = await supabase
+      // Paso 1: Verificar si el usuario ya tiene una empresa (registro parcial previo)
+      let company: { id: string; nit: string } | null = null;
+      const { data: existingCompany } = await supabase
         .from('companies')
-        .insert({
-          nit: data.nit,
-          razon_social: data.razon_social,
-          email: data.email,
-          telefono: data.telefono,
-          direccion: data.direccion,
-          ciudad: data.ciudad,
-          estado: 'activa',
-          plan: data.plan
-        })
-        .select()
-        .single();
+        .select('id, nit')
+        .eq('created_by', user.id)
+        .maybeSingle();
 
-      if (companyError) {
-        logger.error('❌ Error creando empresa:', companyError);
-        throw companyError;
+      if (existingCompany) {
+        logger.warn('⚠️ Empresa ya existe para este usuario, reutilizando:', existingCompany.id);
+        company = existingCompany;
+      } else {
+        // Paso 2: INSERT con manejo explícito de conflicto de NIT
+        const { data: newCompany, error: companyError } = await supabase
+          .from('companies')
+          .insert({
+            nit: data.nit,
+            razon_social: data.razon_social,
+            email: data.email,
+            telefono: data.telefono,
+            direccion: data.direccion,
+            ciudad: data.ciudad,
+            estado: 'activa',
+            plan: data.plan
+          })
+          .select()
+          .single();
+
+        if (companyError) {
+          logger.error('❌ Error creando empresa:', companyError);
+          if (companyError.code === '23505') {
+            return { success: false, error: companyError, message: 'Este NIT ya está registrado en el sistema. Contacta al soporte si crees que esto es un error.' };
+          }
+          throw companyError;
+        }
+        company = newCompany;
       }
 
+      // Paso 3: Upsert perfil (cubre caso donde el perfil no existe)
       const { error: profileError } = await supabase
         .from('profiles')
-        .update({ company_id: company.id, updated_at: new Date().toISOString() })
-        .eq('user_id', user.id);
+        .upsert(
+          { user_id: user.id, company_id: company.id, updated_at: new Date().toISOString() },
+          { onConflict: 'user_id' }
+        );
 
       if (profileError) {
         logger.error('❌ Error actualizando perfil:', profileError);
