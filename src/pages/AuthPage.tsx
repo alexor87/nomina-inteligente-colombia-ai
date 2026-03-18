@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -29,8 +29,19 @@ const AuthPage = () => {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [activeTab, setActiveTab] = useState('login');
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { signIn, signUp } = useAuth();
   const { toast } = useToast();
+
+  const inviteToken = searchParams.get('invite') || sessionStorage.getItem('pendingInviteToken');
+
+  const getPostAuthRedirect = () => {
+    if (inviteToken) {
+      sessionStorage.removeItem('pendingInviteToken');
+      return `/join?token=${inviteToken}`;
+    }
+    return '/modules/dashboard';
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,7 +69,7 @@ const AuthPage = () => {
         return;
       }
       
-      navigate('/modules/dashboard');
+      navigate(getPostAuthRedirect());
     } catch (error: any) {
       toast({
         title: "Error inesperado",
@@ -126,12 +137,11 @@ const AuthPage = () => {
       
       toast({
         title: "¡Cuenta creada exitosamente!",
-        description: "Ahora configuremos tu empresa para completar el proceso.",
+        description: inviteToken ? "Ahora acepta la invitación para unirte al equipo." : "Ahora configuremos tu empresa para completar el proceso.",
       });
 
-      // Redirigir al wizard completo de empresa
       setTimeout(() => {
-        navigate('/register/company');
+        navigate(getPostAuthRedirect());
       }, 1500);
       
     } catch (error: any) {
@@ -174,6 +184,12 @@ const AuthPage = () => {
           <h1 className="text-2xl font-bold text-gray-900">Sistema de Nómina</h1>
           <p className="text-gray-600 mt-2">Gestiona la nómina de tu empresa</p>
         </div>
+
+        {inviteToken && (
+          <div className="mb-4 rounded-lg bg-blue-50 border border-blue-200 px-4 py-3 text-sm text-blue-800 text-center">
+            Tienes una invitación pendiente. Inicia sesión o crea una cuenta para aceptarla.
+          </div>
+        )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2">

@@ -52,8 +52,9 @@ export default function AcceptInvitationPage() {
     if (authLoading || status !== 'ready' || !invitation) return;
 
     if (!user) {
-      // Not logged in — send to register with token in query so we can accept after
-      navigate(`/register?invite=${token}`, { replace: true });
+      // Not logged in — send to login (with invite token so we can redirect back after auth)
+      sessionStorage.setItem('pendingInviteToken', token!);
+      navigate(`/login?invite=${token}`, { replace: true });
     }
   }, [authLoading, user, status, invitation, token, navigate]);
 

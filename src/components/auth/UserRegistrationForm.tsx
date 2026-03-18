@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -26,6 +26,8 @@ export const UserRegistrationForm = () => {
   });
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const inviteToken = searchParams.get('invite') || sessionStorage.getItem('pendingInviteToken');
   const { signUp } = useAuth();
   const { toast } = useToast();
 
@@ -121,12 +123,16 @@ export const UserRegistrationForm = () => {
       
       toast({
         title: "¡Registro exitoso!",
-        description: "Ahora configuremos tu empresa para completar el proceso.",
+        description: inviteToken ? "Ahora acepta la invitación para unirte al equipo." : "Ahora configuremos tu empresa para completar el proceso.",
       });
 
-      // Redirigir al asistente de configuración de empresa
       setTimeout(() => {
-        navigate('/register/company');
+        if (inviteToken) {
+          sessionStorage.removeItem('pendingInviteToken');
+          navigate(`/join?token=${inviteToken}`);
+        } else {
+          navigate('/register/company');
+        }
       }, 1500);
       
     } catch (error: any) {
