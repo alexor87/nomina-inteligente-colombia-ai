@@ -49,19 +49,12 @@ export class TeamInvitationService {
     const appUrl = import.meta.env.VITE_APP_URL || window.location.origin;
     const inviteUrl = `${appUrl}/join?token=${token}`;
 
-    try {
-      await supabase.functions.invoke('send-team-invitation-email', {
-        body: {
-          to: params.email,
-          name: params.name,
-          role: params.role,
-          companyName,
-          inviteUrl,
-        },
-      });
-    } catch (emailError) {
-      logger.warn('Invitation created but email failed:', emailError);
-    }
+    const { data: fnData, error: fnError } = await supabase.functions.invoke(
+      'send-team-invitation-email',
+      { body: { to: params.email, name: params.name, role: params.role, companyName, inviteUrl } }
+    );
+    if (fnError) throw new Error(`Error al enviar email: ${fnError.message}`);
+    if (fnData && !fnData.success) throw new Error(fnData.error || 'Error enviando email de invitación');
 
     return { token };
   }
