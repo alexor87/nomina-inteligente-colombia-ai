@@ -10,6 +10,7 @@ import { ContratoNominaSettings } from '@/components/settings/ContratoNominaSett
 import { NotificacionesSettings } from '@/components/settings/NotificacionesSettings';
 import { IntegracionesSettings } from '@/components/settings/IntegracionesSettings';
 import { FacturacionPlanSettings } from '@/components/settings/FacturacionPlanSettings';
+import { UsuariosRolesSettings } from '@/components/settings/UsuariosRolesSettings';
 
 
 const SettingsPage = () => {
@@ -21,7 +22,7 @@ const SettingsPage = () => {
       </div>
       
       <Tabs defaultValue="empresa" className="w-full">
-        <TabsList className="grid w-full grid-cols-5 lg:grid-cols-9 mb-6">
+        <TabsList className="grid w-full grid-cols-5 lg:grid-cols-10 mb-6">
           <TabsTrigger value="empresa">🏢 Empresa</TabsTrigger>
           <TabsTrigger value="empleados">👥 Empleados</TabsTrigger>
           <TabsTrigger value="aportes">💰 Aportes</TabsTrigger>
@@ -31,7 +32,7 @@ const SettingsPage = () => {
           <TabsTrigger value="notificaciones">✉️ Alertas</TabsTrigger>
           <TabsTrigger value="integraciones">🔌 Integraciones</TabsTrigger>
           <TabsTrigger value="facturacion">📦 Facturación</TabsTrigger>
-          
+          <TabsTrigger value="usuarios-roles">👤 Equipo</TabsTrigger>
         </TabsList>
 
         <TabsContent value="empresa">
@@ -68,6 +69,10 @@ const SettingsPage = () => {
 
         <TabsContent value="facturacion">
           <FacturacionPlanSettings />
+        </TabsContent>
+
+        <TabsContent value="usuarios-roles">
+          <UsuariosRolesSettings />
         </TabsContent>
 
       </Tabs>
