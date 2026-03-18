@@ -49,6 +49,7 @@ export class TeamInvitationService {
     const appUrl = import.meta.env.VITE_APP_URL || window.location.origin;
     const inviteUrl = `${appUrl}/join?token=${token}`;
 
+    await supabase.auth.refreshSession();
     const { data: fnData, error: fnError } = await supabase.functions.invoke(
       'send-team-invitation-email',
       { body: { to: params.email, name: params.name, role: params.role, companyName, inviteUrl } }
@@ -158,6 +159,7 @@ export class TeamInvitationService {
     const appUrl = import.meta.env.VITE_APP_URL || window.location.origin;
     const inviteUrl = `${appUrl}/join?token=${invitation.token}`;
 
+    await supabase.auth.refreshSession();
     const { data: fnData, error: fnError } = await supabase.functions.invoke(
       'send-team-invitation-email',
       { body: { to: invitation.invited_email, name: invitation.invited_name, role: invitation.role, companyName, inviteUrl } }
