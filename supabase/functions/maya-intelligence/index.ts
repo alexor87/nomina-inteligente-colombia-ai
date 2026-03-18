@@ -6,6 +6,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { checkRateLimit, rateLimitResponse } from '../_shared/rate-limiter.ts';
 import { SimpleIntentMatcher } from './SimpleIntentMatcher.ts';
 import { liquidarNomina, registrarNovedad, calcularPrestacion, generarReporte } from './payroll-handlers.ts';
 import { buildStructuredResponse, extractPeriod } from './structured-response-builder.ts';
@@ -535,6 +536,11 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+
+  // Rate limiting — 30 requests/min per user
+  const rateLimitClient = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
+  const rateLimit = await checkRateLimit(rateLimitClient, req.headers.get('Authorization') || '', 'maya-intelligence');
+  if (!rateLimit.allowed) return rateLimitResponse(rateLimit.retryAfter, corsHeaders);
 
   try {
     // Get user token from auth header

@@ -1,6 +1,7 @@
 
 import { useState, useCallback } from 'react';
 import { PayrollAutoSaveService } from '@/services/PayrollAutoSaveService';
+import { logger } from '@/lib/logger';
 import { PayrollLiquidationService } from '@/services/PayrollLiquidationService';
 import { NovedadesCalculationService } from '@/services/NovedadesCalculationService';
 import { PayrollEmployee } from '@/types/payroll';
@@ -59,18 +60,18 @@ export const usePayrollIntelligentLoad = () => {
     setIsLoading(true);
     
     try {
-      console.log('🧠 INTELLIGENT LOAD: Starting intelligent payroll load for dates:', { startDate, endDate });
+      logger.log('🧠 INTELLIGENT LOAD: Starting intelligent payroll load for dates:', { startDate, endDate });
       
       // PASO 1: Asegurar que el período existe
       const periodId = await PayrollLiquidationService.ensurePeriodExists(startDate, endDate);
-      console.log('📋 Period ID confirmed:', periodId);
+      logger.log('📋 Period ID confirmed:', periodId);
       
       // PASO 2: DETECCIÓN INTELIGENTE - ¿Existen empleados en payrolls para este período?
       const existingPayrolls = await PayrollAutoSaveService.loadDraftEmployeesFiltered(periodId);
       
       if (existingPayrolls.length > 0) {
-        console.log('🔄 RECOVERY MODE: Found existing payroll data, loading from payrolls table');
-        console.log('👥 Existing employees in payrolls:', existingPayrolls.map(emp => emp.name));
+        logger.log('🔄 RECOVERY MODE: Found existing payroll data, loading from payrolls table');
+        logger.log('👥 Existing employees in payrolls:', existingPayrolls.map(emp => emp.name));
         
         // Enriquecer con novedades
         const employeesWithNovedades = await Promise.all(
@@ -102,7 +103,7 @@ export const usePayrollIntelligentLoad = () => {
         };
         
       } else {
-        console.log('🆕 FRESH LOAD MODE: No existing payroll data, loading fresh from employees table');
+        logger.log('🆕 FRESH LOAD MODE: No existing payroll data, loading fresh from employees table');
         
         // Cargar empleados frescos desde employees
         const employeesData = await PayrollLiquidationService.loadEmployeesForPeriod(startDate, endDate);
@@ -148,7 +149,7 @@ export const usePayrollIntelligentLoad = () => {
       }
       
     } catch (error) {
-      console.error('❌ Error in intelligent load:', error);
+      logger.error('❌ Error in intelligent load:', error);
       toast({
         title: "Error",
         description: "No se pudieron cargar los empleados",

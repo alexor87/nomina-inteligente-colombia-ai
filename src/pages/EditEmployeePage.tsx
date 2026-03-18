@@ -1,7 +1,7 @@
 
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { EmployeeService } from '@/services/EmployeeService';
+import { SecureEmployeeService } from '@/services/SecureEmployeeService';
 import { EmployeeFormModern } from '@/components/employees/EmployeeFormModern';
 import { Card } from '@/components/ui/card';
 
@@ -11,7 +11,7 @@ const EditEmployeePage = () => {
 
   const { data: employee, isLoading, error } = useQuery({
     queryKey: ['employee', employeeId],
-    queryFn: () => EmployeeService.getEmployeeById(employeeId!),
+    queryFn: () => SecureEmployeeService.getEmployeeById(employeeId!),
     enabled: !!employeeId,
   });
 

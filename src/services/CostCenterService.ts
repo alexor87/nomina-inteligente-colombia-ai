@@ -1,6 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { CostCenter, CostCenterFormData } from '@/types/cost-centers';
+import { logger } from '@/lib/logger';
 
 export class CostCenterService {
   static async getCostCenters(companyId: string): Promise<CostCenter[]> {
@@ -15,7 +16,7 @@ export class CostCenterService {
       if (error) throw error;
       return data || [];
     } catch (error) {
-      console.error('Error loading cost centers:', error);
+      logger.error('Error loading cost centers:', error);
       return [];
     }
   }
@@ -36,12 +37,12 @@ export class CostCenterService {
       if (error) throw error;
       return data;
     } catch (error) {
-      console.error('Error creating cost center:', error);
+      logger.error('Error creating cost center:', error);
       throw error;
     }
   }
 
-  static async updateCostCenter(id: string, formData: CostCenterFormData): Promise<CostCenter | null> {
+  static async updateCostCenter(id: string, formData: CostCenterFormData, companyId: string): Promise<CostCenter | null> {
     try {
       const { data, error } = await supabase
         .from('cost_centers')
@@ -51,28 +52,30 @@ export class CostCenterService {
           description: formData.description || null
         })
         .eq('id', id)
+        .eq('company_id', companyId)
         .select()
         .single();
 
       if (error) throw error;
       return data;
     } catch (error) {
-      console.error('Error updating cost center:', error);
+      logger.error('Error updating cost center:', error);
       throw error;
     }
   }
 
-  static async deleteCostCenter(id: string): Promise<boolean> {
+  static async deleteCostCenter(id: string, companyId: string): Promise<boolean> {
     try {
       const { error } = await supabase
         .from('cost_centers')
         .update({ active: false })
-        .eq('id', id);
+        .eq('id', id)
+        .eq('company_id', companyId);
 
       if (error) throw error;
       return true;
     } catch (error) {
-      console.error('Error deleting cost center:', error);
+      logger.error('Error deleting cost center:', error);
       return false;
     }
   }

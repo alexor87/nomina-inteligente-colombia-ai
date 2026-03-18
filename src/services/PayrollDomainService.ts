@@ -4,7 +4,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollStateManager } from './PayrollStateManager';
-import { PayrollCalculationEngine } from './PayrollCalculationEngine';
+import { PayrollCalculationBackendService } from './PayrollCalculationBackendService';
 import { logger } from '@/lib/logger';
 
 export interface PayrollPeriod {
@@ -48,7 +48,6 @@ export interface PeriodDetectionResult {
 }
 
 export class PayrollDomainService {
-  private static calculator = new PayrollCalculationEngine();
 
   static async detectCurrentPeriodSituation(): Promise<PeriodDetectionResult> {
     try {
@@ -182,12 +181,14 @@ export class PayrollDomainService {
 
       return await Promise.all(
         (employees || []).map(async (emp) => {
-          const calculation = await this.calculator.calculateEmployeePayroll({
+          const calculation = await PayrollCalculationBackendService.calculatePayroll({
             baseSalary: Number(emp.salario_base) || 0,
             workedDays: emp.dias_trabajo || 30,
             extraHours: 0,
+            disabilities: 0,
             bonuses: 0,
-            absences: 0
+            absences: 0,
+            periodType: 'mensual',
           });
 
           return {

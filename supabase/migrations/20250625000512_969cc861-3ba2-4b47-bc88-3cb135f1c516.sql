@@ -25,7 +25,7 @@ CREATE TYPE public.novedad_type AS ENUM (
 
 -- Agregar una nueva columna temporal con el enum
 ALTER TABLE public.payroll_novedades 
-ADD COLUMN tipo_novedad_new public.novedad_type;
+ADD COLUMN IF NOT EXISTS tipo_novedad_new public.novedad_type;
 
 -- Actualizar la nueva columna con los valores válidos
 UPDATE public.payroll_novedades 

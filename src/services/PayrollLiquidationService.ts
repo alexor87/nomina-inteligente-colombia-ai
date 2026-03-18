@@ -1,9 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { SecureBaseService } from './SecureBaseService';
-import { NovedadesCalculationService } from './NovedadesCalculationService';
-import { ConfigurationService } from './ConfigurationService';
-import { DeductionCalculationService } from './DeductionCalculationService';
+import { logger } from '@/lib/logger';
 import { format } from 'date-fns';
 
 interface Employee {
@@ -29,30 +27,9 @@ interface Employee {
  */
 export class PayrollLiquidationService extends SecureBaseService {
 
-  static calculateWorkingDays(startDate: string, endDate: string): number {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const diffTime = Math.abs(end.getTime() - start.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-    return Math.min(diffDays, 30);
-  }
-
-  static calculateTransportAllowance(baseSalary: number, workedDays: number, year?: string): number {
-    const configYear = year || new Date().getFullYear().toString();
-    const config = ConfigurationService.getConfiguration(configYear);
-    
-    const dosSmmlv = config.salarioMinimo * 2;
-    
-    if (baseSalary <= dosSmmlv) {
-      return Math.round((config.auxilioTransporte / 30) * workedDays);
-    }
-    
-    return 0;
-  }
-
   static async ensurePeriodExists(startDate: string, endDate: string): Promise<string> {
     try {
-      console.log('🔒 Ensuring period exists securely');
+      logger.log('🔒 Ensuring period exists securely');
       const periodName = `${format(new Date(startDate), 'dd/MM/yyyy')} - ${format(new Date(endDate), 'dd/MM/yyyy')}`;
       
       // Use secure query to check for existing period
@@ -91,14 +68,14 @@ export class PayrollLiquidationService extends SecureBaseService {
 
       return newPeriod[0].id;
     } catch (error) {
-      console.error('Error ensuring period exists:', error);
+      logger.error('Error ensuring period exists:', error);
       throw error;
     }
   }
 
   static async loadEmployeesForPeriod(startDate: string, endDate: string, year?: string): Promise<Employee[]> {
     try {
-      console.log('🔒 Loading employees for period using BACKEND calculations');
+      logger.log('🔒 Loading employees for period using BACKEND calculations');
 
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) {
@@ -141,17 +118,17 @@ export class PayrollLiquidationService extends SecureBaseService {
         deducciones_novedades: 0
       }));
 
-      console.log(`✅ Loaded ${processedEmployees.length} employees using BACKEND`);
+      logger.log(`✅ Loaded ${processedEmployees.length} employees using BACKEND`);
       return processedEmployees;
     } catch (error) {
-      console.error('Error loading employees for period:', error);
+      logger.error('Error loading employees for period:', error);
       throw error;
     }
   }
 
   static async loadSpecificEmployeesForPeriod(employeeIds: string[], startDate: string, endDate: string, year?: string): Promise<Employee[]> {
     try {
-      console.log('🔒 Loading specific employees for period using BACKEND calculations');
+      logger.log('🔒 Loading specific employees for period using BACKEND calculations');
 
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) {
@@ -196,10 +173,10 @@ export class PayrollLiquidationService extends SecureBaseService {
           deducciones_novedades: 0
         }));
 
-      console.log(`✅ Loaded ${processedEmployees.length} specific employees using BACKEND`);
+      logger.log(`✅ Loaded ${processedEmployees.length} specific employees using BACKEND`);
       return processedEmployees;
     } catch (error) {
-      console.error('Error loading specific employees for period:', error);
+      logger.error('Error loading specific employees for period:', error);
       throw error;
     }
   }
@@ -276,12 +253,12 @@ export class PayrollLiquidationService extends SecureBaseService {
       }
 
       // ✅ CORREGIDO: Calcular totales CORRECTOS una sola vez con validación
-      console.log('🧮 Calculando totales. Registros:', payrollInserts.length);
+      logger.log('🧮 Calculando totales. Registros:', payrollInserts.length);
       
       // Log valores para debugging
       payrollInserts.forEach((p, index) => {
         if (!Number.isFinite(p.neto_pagado) || p.neto_pagado == null) {
-          console.warn(`⚠️ Valor inválido en empleado ${index}:`, {
+          logger.warn(`⚠️ Valor inválido en empleado ${index}:`, {
             employee_id: p.employee_id,
             neto_pagado: p.neto_pagado,
             tipo: typeof p.neto_pagado
@@ -293,7 +270,7 @@ export class PayrollLiquidationService extends SecureBaseService {
       const finalTotalDeducciones = payrollInserts.reduce((sum, p) => sum + (Number(p.total_deducciones) || 0), 0);
       const finalTotalNeto = payrollInserts.reduce((sum, p) => sum + (Number(p.neto_pagado) || 0), 0);
       
-      console.log('💰 Totales calculados:', {
+      logger.log('💰 Totales calculados:', {
         devengado: finalTotalDevengado,
         deducciones: finalTotalDeducciones,
         neto: finalTotalNeto,
@@ -302,7 +279,7 @@ export class PayrollLiquidationService extends SecureBaseService {
       
       // Validación adicional
       if (!Number.isFinite(finalTotalNeto) || finalTotalNeto < 0) {
-        console.error('❌ Error en cálculo de neto total:', finalTotalNeto);
+        logger.error('❌ Error en cálculo de neto total:', finalTotalNeto);
         throw new Error(`Error en cálculo de neto total: ${finalTotalNeto}`);
       }
 
@@ -320,7 +297,7 @@ export class PayrollLiquidationService extends SecureBaseService {
         throw updateError;
       }
 
-      console.log('✅ LIQUIDACIÓN COMPLETADA CON TOTALES ÚNICOS:', {
+      logger.log('✅ LIQUIDACIÓN COMPLETADA CON TOTALES ÚNICOS:', {
         totalDevengado: finalTotalDevengado,
         totalDeducciones: finalTotalDeducciones,
         totalNeto: finalTotalNeto
@@ -341,7 +318,7 @@ export class PayrollLiquidationService extends SecureBaseService {
         }
       };
     } catch (error) {
-      console.error('Error liquidating payroll:', error);
+      logger.error('Error liquidating payroll:', error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Error desconocido'
@@ -349,100 +326,4 @@ export class PayrollLiquidationService extends SecureBaseService {
     }
   }
 
-  /**
-   * ✅ CORREGIDO: Consolidar novedades con transacciones atómicas
-   */
-  static async consolidatePayrollWithNovedades(periodId: string): Promise<void> {
-    try {
-      console.log('🔄 Iniciando consolidación CORREGIDA para período:', periodId);
-      
-      const companyId = await this.getCurrentUserCompanyId();
-      if (!companyId) {
-        throw new Error('No se pudo obtener la empresa del usuario');
-      }
-
-      const { data: payrollRecords, error: payrollError } = await supabase
-        .from('payrolls')
-        .select('id, employee_id, salario_base, dias_trabajados, auxilio_transporte')
-        .eq('period_id', periodId)
-        .eq('company_id', companyId);
-
-      if (payrollError) {
-        throw payrollError;
-      }
-
-      if (!payrollRecords || payrollRecords.length === 0) {
-        console.log('⚠️ No hay registros de payroll para consolidar');
-        return;
-      }
-
-      const employeeIds = payrollRecords.map(record => record.employee_id);
-      const novedadesTotals = await NovedadesCalculationService.calculateAllEmployeesNovedadesTotals(employeeIds, periodId);
-
-      // ✅ CORREGIDO: Procesar en lotes para evitar bloqueos
-      const batchSize = 10;
-      for (let i = 0; i < payrollRecords.length; i += batchSize) {
-        const batch = payrollRecords.slice(i, i + batchSize);
-        const updates = [];
-
-        for (const payrollRecord of batch) {
-          const employeeNovedades = novedadesTotals[payrollRecord.employee_id] || {
-            totalDevengos: 0,
-            totalDeducciones: 0,
-            totalNeto: 0,
-            hasNovedades: false
-          };
-
-          const salarioBase = Number(payrollRecord.salario_base) || 0;
-          const auxilioTransporte = Number(payrollRecord.auxilio_transporte) || 0;
-          const diasTrabajados = Number(payrollRecord.dias_trabajados) || 15;
-          
-          const salarioProporcional = (salarioBase / 30) * diasTrabajados;
-          
-          const deductionResult = await DeductionCalculationService.calculateDeductions({
-            salarioBase: salarioBase,
-            totalDevengado: salarioProporcional + auxilioTransporte + employeeNovedades.totalDevengos,
-            auxilioTransporte: auxilioTransporte,
-            periodType: 'quincenal',
-            year: new Date().getFullYear().toString() // Usar año actual para consolidación
-          });
-
-          const totalDevengadoFinal = salarioProporcional + auxilioTransporte + employeeNovedades.totalDevengos;
-          const totalDeduccionesFinal = deductionResult.totalDeducciones + employeeNovedades.totalDeducciones;
-          const netoPagadoFinal = totalDevengadoFinal - totalDeduccionesFinal;
-
-          updates.push({
-            id: payrollRecord.id,
-            total_devengado: totalDevengadoFinal,
-            total_deducciones: totalDeduccionesFinal,
-            neto_pagado: netoPagadoFinal,
-            salud_empleado: deductionResult.saludEmpleado,
-            pension_empleado: deductionResult.pensionEmpleado,
-            fondo_solidaridad: deductionResult.fondoSolidaridad,
-            retencion_fuente: deductionResult.retencionFuente,
-            otras_deducciones: employeeNovedades.totalDeducciones,
-            updated_at: new Date().toISOString()
-          });
-        }
-
-        // ✅ CORREGIDO: Actualizar en lotes
-        for (const update of updates) {
-          const { error: updateError } = await supabase
-            .from('payrolls')
-            .update(update)
-            .eq('id', update.id);
-
-          if (updateError) {
-            console.error(`❌ Error actualizando payroll ${update.id}:`, updateError);
-          }
-        }
-      }
-
-      console.log('✅ Consolidación CORREGIDA completada exitosamente');
-      
-    } catch (error) {
-      console.error('❌ Error en consolidación corregida:', error);
-      throw error;
-    }
-  }
 }

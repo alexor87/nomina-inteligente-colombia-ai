@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { PayrollPeriod } from '@/types/payroll';
 import { BiWeeklyPeriodService } from './payroll-intelligent/BiWeeklyPeriodService';
 import { PayrollPeriodCalculationService } from './payroll-intelligent/PayrollPeriodCalculationService';
+import { logger } from '@/lib/logger';
 
 export interface CompanySettings {
   id: string;
@@ -17,11 +18,11 @@ export class PayrollPeriodService {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        console.log('No authenticated user found');
+        logger.log('No authenticated user found');
         return null;
       }
 
-      console.log('Getting company ID for user:', user.id);
+      logger.log('Getting company ID for user:', user.id);
 
       const { data: profile, error } = await supabase
         .from('profiles')
@@ -30,19 +31,19 @@ export class PayrollPeriodService {
         .single();
 
       if (error) {
-        console.error('Error fetching user profile:', error);
+        logger.error('Error fetching user profile:', error);
         return null;
       }
 
       if (!profile?.company_id) {
-        console.warn('User profile found but no company_id assigned');
+        logger.warn('User profile found but no company_id assigned');
         return null;
       }
 
-      console.log('Company ID found:', profile.company_id);
+      logger.log('Company ID found:', profile.company_id);
       return profile.company_id;
     } catch (error) {
-      console.error('Error getting user company ID:', error);
+      logger.error('Error getting user company ID:', error);
       return null;
     }
   }
@@ -52,7 +53,7 @@ export class PayrollPeriodService {
     try {
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) {
-        console.log('No company ID available for settings');
+        logger.log('No company ID available for settings');
         return null;
       }
 
@@ -63,24 +64,24 @@ export class PayrollPeriodService {
         .single();
 
       if (error) {
-        console.log('No company settings found, will use defaults');
+        logger.log('No company settings found, will use defaults');
         return null;
       }
       
       return data as CompanySettings;
     } catch (error) {
-      console.error('Error getting company settings:', error);
+      logger.error('Error getting company settings:', error);
       return null;
     }
   }
 
   // Generar rango de fechas según periodicidad - VERSIÓN PROFESIONAL CON BD
   static async generatePeriodDatesFromDatabase(periodicity: string, companyId?: string): Promise<{ startDate: string; endDate: string }> {
-    console.log('📅 Generando fechas DESDE BASE DE DATOS para periodicidad:', periodicity);
+    logger.log('📅 Generando fechas DESDE BASE DE DATOS para periodicidad:', periodicity);
     
     const currentCompanyId = companyId || await this.getCurrentUserCompanyId();
     if (!currentCompanyId) {
-      console.warn('No se pudo obtener company_id, usando lógica de respaldo');
+      logger.warn('No se pudo obtener company_id, usando lógica de respaldo');
       return this.generatePeriodDates(periodicity);
     }
     
@@ -88,18 +89,18 @@ export class PayrollPeriodService {
       // Usar el nuevo servicio que consulta la BD
       return await PayrollPeriodCalculationService.calculateNextPeriodFromDatabase(periodicity, currentCompanyId);
     } catch (error) {
-      console.error('Error generando período desde BD, usando respaldo:', error);
+      logger.error('Error generando período desde BD, usando respaldo:', error);
       return this.generatePeriodDates(periodicity);
     }
   }
 
   // Generar rango de fechas según periodicidad - MÉTODO DE RESPALDO CORREGIDO
   static generatePeriodDates(periodicity: string, referenceDate: Date = new Date()): { startDate: string; endDate: string } {
-    console.log('📅 Generando fechas de respaldo para periodicidad:', periodicity);
+    logger.log('📅 Generando fechas de respaldo para periodicidad:', periodicity);
     
     switch (periodicity) {
       case 'mensual':
-        console.log('📅 Generando periodo mensual');
+        logger.log('📅 Generando periodo mensual');
         const monthlyDate = new Date(referenceDate);
         const year = monthlyDate.getFullYear();
         const month = monthlyDate.getMonth();
@@ -110,11 +111,11 @@ export class PayrollPeriodService {
         };
 
       case 'quincenal':
-        console.log('📅 Generando periodo quincenal PROFESIONAL de respaldo');
+        logger.log('📅 Generando periodo quincenal PROFESIONAL de respaldo');
         return BiWeeklyPeriodService.generateCurrentBiWeeklyPeriod();
 
       case 'semanal':
-        console.log('📅 Generando periodo semanal');
+        logger.log('📅 Generando periodo semanal');
         const today = new Date(referenceDate);
         const dayOfWeek = today.getDay();
         const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
@@ -131,7 +132,7 @@ export class PayrollPeriodService {
 
       case 'personalizado':
       default:
-        console.log('📅 Periodicidad personalizada o no reconocida, usando mensual como fallback');
+        logger.log('📅 Periodicidad personalizada o no reconocida, usando mensual como fallback');
         const fallbackDate = new Date(referenceDate);
         const fallbackYear = fallbackDate.getFullYear();
         const fallbackMonth = fallbackDate.getMonth();
@@ -148,16 +149,16 @@ export class PayrollPeriodService {
     try {
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) {
-        console.warn('No company ID found, usando período actual');
+        logger.warn('No company ID found, usando período actual');
         return BiWeeklyPeriodService.generateCurrentBiWeeklyPeriod();
       }
 
       // Usar nuevo servicio que consulta la BD para períodos consecutivos
-      console.log('📅 Generando siguiente período quincenal consecutivo desde BD');
+      logger.log('📅 Generando siguiente período quincenal consecutivo desde BD');
       return await BiWeeklyPeriodService.generateNextConsecutivePeriodFromDatabase(companyId);
 
     } catch (error) {
-      console.error('Error generando período quincenal:', error);
+      logger.error('Error generando período quincenal:', error);
       return BiWeeklyPeriodService.generateCurrentBiWeeklyPeriod();
     }
   }
@@ -205,11 +206,11 @@ export class PayrollPeriodService {
     try {
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) {
-        console.error('Cannot create payroll period: No company ID found');
+        logger.error('Cannot create payroll period: No company ID found');
         return null;
       }
 
-      console.log('🚀 Creando nuevo período con validaciones completas:', { startDate, endDate, periodType });
+      logger.log('🚀 Creando nuevo período con validaciones completas:', { startDate, endDate, periodType });
 
       // Importar PayrollPeriodValidationService dinámicamente para evitar dependencias circulares
       const { PayrollPeriodValidationService } = await import('./payroll-intelligent/PayrollPeriodValidationService');
@@ -222,12 +223,12 @@ export class PayrollPeriodService {
       );
 
       if (!validation.isValid) {
-        console.error('❌ Validación de período falló:', validation.errors);
+        logger.error('❌ Validación de período falló:', validation.errors);
         throw new Error(`No se puede crear el período: ${validation.errors.join(', ')}`);
       }
 
       if (validation.warnings.length > 0) {
-        console.warn('⚠️ Advertencias en creación de período:', validation.warnings);
+        logger.warn('⚠️ Advertencias en creación de período:', validation.warnings);
       }
 
       // Generate period string (e.g., "2025-01")
@@ -252,14 +253,14 @@ export class PayrollPeriodService {
         .single();
 
       if (error) {
-        console.error('❌ Error insertando período de nómina:', error);
+        logger.error('❌ Error insertando período de nómina:', error);
         throw error;
       }
       
-      console.log('✅ Período de nómina creado exitosamente:', data);
+      logger.log('✅ Período de nómina creado exitosamente:', data);
       return data as PayrollPeriod;
     } catch (error) {
-      console.error('❌ Error creando período de nómina:', error);
+      logger.error('❌ Error creando período de nómina:', error);
       return null;
     }
   }
@@ -280,7 +281,7 @@ export class PayrollPeriodService {
       if (error) throw error;
       return data as PayrollPeriod;
     } catch (error) {
-      console.error('Error updating payroll period:', error);
+      logger.error('Error updating payroll period:', error);
       return null;
     }
   }
@@ -291,7 +292,7 @@ export class PayrollPeriodService {
       const companyId = await this.getCurrentUserCompanyId();
       if (!companyId) return null;
 
-      console.log('🔍 Buscando período activo en payroll_periods_real para company:', companyId);
+      logger.log('🔍 Buscando período activo en payroll_periods_real para company:', companyId);
 
       // Buscar período activo en payroll_periods_real
       const { data: activePeriod, error } = await supabase
@@ -304,17 +305,17 @@ export class PayrollPeriodService {
         .maybeSingle();
 
       if (error) {
-        console.error('❌ Error buscando período activo:', error);
+        logger.error('❌ Error buscando período activo:', error);
         throw error;
       }
 
       // Si encontramos un período activo, devolverlo
       if (activePeriod) {
-        console.log('✅ Período activo encontrado en payroll_periods_real:', activePeriod);
+        logger.log('✅ Período activo encontrado en payroll_periods_real:', activePeriod);
         return activePeriod as PayrollPeriod;
       }
 
-      console.log('ℹ️ No se encontró período activo en payroll_periods_real');
+      logger.log('ℹ️ No se encontró período activo en payroll_periods_real');
 
       // Si no hay período activo, verificar si hay períodos reabiertos en payrolls
       const { data: reopenedPayrolls, error: reopenedError } = await supabase
@@ -328,13 +329,13 @@ export class PayrollPeriodService {
         .maybeSingle();
 
       if (reopenedError) {
-        console.error('Error checking reopened periods:', reopenedError);
+        logger.error('Error checking reopened periods:', reopenedError);
         return null;
       }
 
       // Si encontramos un período reabierto, crear el período correspondiente en payroll_periods_real
       if (reopenedPayrolls) {
-        console.log('🔄 Período reabierto detectado, creando período en payroll_periods_real:', reopenedPayrolls.periodo);
+        logger.log('🔄 Período reabierto detectado, creando período en payroll_periods_real:', reopenedPayrolls.periodo);
         
         // Generar fechas basadas en el período
         const periodDate = new Date(reopenedPayrolls.periodo + '-01');
@@ -359,17 +360,17 @@ export class PayrollPeriodService {
           .single();
 
         if (createError) {
-          console.error('Error creating period for reopened payroll:', createError);
+          logger.error('Error creating period for reopened payroll:', createError);
           return null;
         }
 
-        console.log('✅ Período creado automáticamente en payroll_periods_real para período reabierto:', newPeriod);
+        logger.log('✅ Período creado automáticamente en payroll_periods_real para período reabierto:', newPeriod);
         return newPeriod as PayrollPeriod;
       }
 
       return null;
     } catch (error) {
-      console.error('Error getting current active period:', error);
+      logger.error('Error getting current active period:', error);
       return null;
     }
   }
@@ -418,7 +419,7 @@ export class PayrollPeriodService {
   // Obtener un período específico por ID usando payroll_periods_real
   static async getPayrollPeriodById(periodId: string): Promise<PayrollPeriod | null> {
     try {
-      console.log('🔍 Buscando período por ID en payroll_periods_real:', periodId);
+      logger.log('🔍 Buscando período por ID en payroll_periods_real:', periodId);
       
       const { data, error } = await supabase
         .from('payroll_periods_real')
@@ -427,19 +428,19 @@ export class PayrollPeriodService {
         .maybeSingle();
 
       if (error) {
-        console.error('❌ Error obteniendo período por ID:', error);
+        logger.error('❌ Error obteniendo período por ID:', error);
         throw error;
       }
 
       if (!data) {
-        console.log('ℹ️ Período no encontrado con ID:', periodId);
+        logger.log('ℹ️ Período no encontrado con ID:', periodId);
         return null;
       }
 
-      console.log('✅ Período encontrado en payroll_periods_real:', data);
+      logger.log('✅ Período encontrado en payroll_periods_real:', data);
       return data as PayrollPeriod;
     } catch (error) {
-      console.error('❌ Error en getPayrollPeriodById:', error);
+      logger.error('❌ Error en getPayrollPeriodById:', error);
       return null;
     }
   }
@@ -452,7 +453,7 @@ export class PayrollPeriodService {
     warnings: string[];
   }> {
     try {
-      console.log('🔒 Iniciando cierre de período con validaciones:', periodId);
+      logger.log('🔒 Iniciando cierre de período con validaciones:', periodId);
 
       // Importar PayrollPeriodValidationService dinámicamente
       const { PayrollPeriodValidationService } = await import('./payroll-intelligent/PayrollPeriodValidationService');
@@ -461,7 +462,7 @@ export class PayrollPeriodService {
       const closureValidation = await PayrollPeriodValidationService.validatePeriodClosure(periodId);
       
       if (!closureValidation.canClose) {
-        console.error('❌ No se puede cerrar el período:', closureValidation.errors);
+        logger.error('❌ No se puede cerrar el período:', closureValidation.errors);
         return {
           success: false,
           errors: closureValidation.errors,
@@ -473,7 +474,7 @@ export class PayrollPeriodService {
       const voucherValidation = await PayrollPeriodValidationService.validateVouchersGeneration(periodId);
       
       if (!voucherValidation.isValid) {
-        console.error('❌ Error en validación de comprobantes:', voucherValidation.errors);
+        logger.error('❌ Error en validación de comprobantes:', voucherValidation.errors);
         return {
           success: false,
           errors: voucherValidation.errors,
@@ -481,14 +482,14 @@ export class PayrollPeriodService {
         };
       }
 
-      console.log('✅ Validaciones de cierre exitosas, procediendo con el cierre');
+      logger.log('✅ Validaciones de cierre exitosas, procediendo con el cierre');
 
       // 3. Generar comprobantes automáticamente si faltan algunos
       if (voucherValidation.voucherInfo && voucherValidation.voucherInfo.vouchersPending > 0) {
-        console.log('📄 Generando comprobantes faltantes...');
+        logger.log('📄 Generando comprobantes faltantes...');
         // Aquí se podría integrar con el servicio de generación de comprobantes
         // Por ahora solo logueamos la acción
-        console.log(`📄 Se deberían generar ${voucherValidation.voucherInfo.vouchersPending} comprobantes`);
+        logger.log(`📄 Se deberían generar ${voucherValidation.voucherInfo.vouchersPending} comprobantes`);
       }
 
       // 4. Actualizar estado del período a 'aprobado'
@@ -503,7 +504,7 @@ export class PayrollPeriodService {
         .single();
 
       if (updateError) {
-        console.error('❌ Error actualizando estado del período:', updateError);
+        logger.error('❌ Error actualizando estado del período:', updateError);
         return {
           success: false,
           errors: ['Error al actualizar el estado del período'],
@@ -511,7 +512,7 @@ export class PayrollPeriodService {
         };
       }
 
-      console.log('✅ Período cerrado exitosamente:', updatedPeriod);
+      logger.log('✅ Período cerrado exitosamente:', updatedPeriod);
 
       return {
         success: true,
@@ -521,7 +522,7 @@ export class PayrollPeriodService {
       };
 
     } catch (error) {
-      console.error('❌ Error cerrando período:', error);
+      logger.error('❌ Error cerrando período:', error);
       return {
         success: false,
         errors: ['Error interno al cerrar el período'],
@@ -538,7 +539,7 @@ export class PayrollPeriodService {
     warnings: string[];
   }> {
     try {
-      console.log('🔓 Reabriendo período:', periodId);
+      logger.log('🔓 Reabriendo período:', periodId);
 
       // 1. Verificar que el período existe y está cerrado
       const { data: period, error: periodError } = await supabase
@@ -587,7 +588,7 @@ export class PayrollPeriodService {
         .single();
 
       if (reopenError) {
-        console.error('❌ Error reabriendo período:', reopenError);
+        logger.error('❌ Error reabriendo período:', reopenError);
         return {
           success: false,
           errors: ['Error al reabrir el período'],
@@ -595,7 +596,7 @@ export class PayrollPeriodService {
         };
       }
 
-      console.log('✅ Período reabierto exitosamente:', reopenedPeriod);
+      logger.log('✅ Período reabierto exitosamente:', reopenedPeriod);
 
       return {
         success: true,
@@ -605,7 +606,7 @@ export class PayrollPeriodService {
       };
 
     } catch (error) {
-      console.error('❌ Error reabriendo período:', error);
+      logger.error('❌ Error reabriendo período:', error);
       return {
         success: false,
         errors: ['Error interno al reabrir el período'],

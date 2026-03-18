@@ -10,7 +10,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useEmployeeList } from '@/hooks/useEmployeeList';
 import { EmployeeUnified } from '@/types/employee-unified';
-import { EmployeeService } from '@/services/EmployeeService';
+import { SecureEmployeeService } from '@/services/SecureEmployeeService';
 import { EmployeeBulkActions } from './EmployeeBulkActions';
 import { ImportEmployeesDrawer } from './ImportEmployeesDrawer';
 import { useNavigate } from 'react-router-dom';
@@ -108,7 +108,7 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
     if (!employeeToDelete) return;
     
     try {
-      const result = await EmployeeService.deleteEmployee(employeeToDelete.id);
+      const result = await SecureEmployeeService.deleteEmployee(employeeToDelete.id);
       if (result.success) {
         toast({
           title: "Empleado archivado",
@@ -136,7 +136,7 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
 
   const handleRestoreEmployee = async (employeeId: string, employeeName: string) => {
     try {
-      const result = await EmployeeService.restoreEmployee(employeeId);
+      const result = await SecureEmployeeService.restoreEmployee(employeeId);
       if (result.success) {
         toast({
           title: "Empleado restaurado",
@@ -162,7 +162,7 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
 
   const loadDeletedEmployees = async () => {
     try {
-      const result = await EmployeeService.getDeletedEmployees();
+      const result = await SecureEmployeeService.getDeletedEmployees();
       if (result.success && result.data) {
         setDeletedEmployees(result.data);
       }
@@ -183,7 +183,7 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
 
     try {
       setIsUpdating(true);
-      const result = await EmployeeService.bulkDeleteEmployees(selectedEmployees);
+      const result = await SecureEmployeeService.bulkDeleteEmployees(selectedEmployees);
       
       if (result.success) {
         const { results } = result;
@@ -228,7 +228,7 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
 
     try {
       setIsUpdating(true);
-      const result = await EmployeeService.bulkUpdateStatus(selectedEmployees, newStatus);
+      const result = await SecureEmployeeService.bulkUpdateStatus(selectedEmployees, newStatus);
       
       if (result.success) {
         const { results } = result;

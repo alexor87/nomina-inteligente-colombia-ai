@@ -16,6 +16,7 @@ import { Plus, Edit, Trash2 } from 'lucide-react';
 export const CostCenterManagement = () => {
   const { toast } = useToast();
   const [costCenters, setCostCenters] = useState<CostCenter[]>([]);
+  const [companyId, setCompanyId] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCostCenter, setEditingCostCenter] = useState<CostCenter | null>(null);
   const [formData, setFormData] = useState<CostCenterFormData>({
@@ -26,9 +27,10 @@ export const CostCenterManagement = () => {
 
   const loadCostCenters = async () => {
     try {
-      const companyId = await CompanyConfigurationService.getCurrentUserCompanyId();
-      if (companyId) {
-        const centers = await CostCenterService.getCostCenters(companyId);
+      const id = await CompanyConfigurationService.getCurrentUserCompanyId();
+      if (id) {
+        setCompanyId(id);
+        const centers = await CostCenterService.getCostCenters(id);
         setCostCenters(centers);
       }
     } catch (error) {
@@ -55,17 +57,17 @@ export const CostCenterManagement = () => {
     }
 
     try {
-      const companyId = await CompanyConfigurationService.getCurrentUserCompanyId();
-      if (!companyId) return;
+      const cId = companyId ?? await CompanyConfigurationService.getCurrentUserCompanyId();
+      if (!cId) return;
 
       if (editingCostCenter) {
-        await CostCenterService.updateCostCenter(editingCostCenter.id, formData);
+        await CostCenterService.updateCostCenter(editingCostCenter.id, formData, cId);
         toast({
           title: "✅ Centro de costo actualizado",
           description: "Los cambios se han guardado exitosamente"
         });
       } else {
-        await CostCenterService.createCostCenter(companyId, formData);
+        await CostCenterService.createCostCenter(cId, formData);
         toast({
           title: "✅ Centro de costo creado",
           description: "El centro de costo se ha creado exitosamente"
@@ -97,7 +99,8 @@ export const CostCenterManagement = () => {
 
   const handleDelete = async (id: string) => {
     if (confirm('¿Está seguro de eliminar este centro de costo?')) {
-      const success = await CostCenterService.deleteCostCenter(id);
+      if (!companyId) return;
+      const success = await CostCenterService.deleteCostCenter(id, companyId);
       if (success) {
         toast({
           title: "✅ Centro de costo eliminado",

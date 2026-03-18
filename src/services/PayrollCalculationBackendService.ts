@@ -2,6 +2,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { NovedadForIBC } from '@/types/payroll';
 import { ConfigurationService } from './ConfigurationService';
+import { logger } from '@/lib/logger';
 
 export interface PayrollCalculationInput {
   baseSalary: number;
@@ -49,7 +50,7 @@ export interface ValidationResult {
 export class PayrollCalculationBackendService {
   static async calculatePayroll(input: PayrollCalculationInput): Promise<PayrollCalculationResult> {
     try {
-      console.log('🔍 PayrollCalculationBackendService: Calculando nómina con novedades:', {
+      logger.log('🔍 PayrollCalculationBackendService: Calculando nómina con novedades:', {
         baseSalary: input.baseSalary,
         novedadesCount: input.novedades?.length || 0,
         novedades: input.novedades
@@ -63,7 +64,7 @@ export class PayrollCalculationBackendService {
       });
 
       if (error) {
-        console.error('Error calling payroll calculation function:', error);
+        logger.error('Error calling payroll calculation function:', error);
         throw new Error('Error en el cálculo de nómina');
       }
 
@@ -71,7 +72,7 @@ export class PayrollCalculationBackendService {
         throw new Error(data.error || 'Error desconocido en el cálculo');
       }
 
-      console.log('✅ PayrollCalculationBackendService: Resultado del cálculo:', {
+      logger.log('✅ PayrollCalculationBackendService: Resultado del cálculo:', {
         ibc: data.data.ibc,
         healthDeduction: data.data.healthDeduction,
         pensionDeduction: data.data.pensionDeduction
@@ -79,7 +80,7 @@ export class PayrollCalculationBackendService {
 
       return data.data;
     } catch (error) {
-      console.error('Error in calculatePayroll:', error);
+      logger.error('Error in calculatePayroll:', error);
       throw error;
     }
   }
@@ -98,7 +99,7 @@ export class PayrollCalculationBackendService {
       });
 
       if (error) {
-        console.error('Error calling validation function:', error);
+        logger.error('Error calling validation function:', error);
         throw new Error('Error en la validación');
       }
 
@@ -108,7 +109,7 @@ export class PayrollCalculationBackendService {
 
       return data.data;
     } catch (error) {
-      console.error('Error in validateEmployee:', error);
+      logger.error('Error in validateEmployee:', error);
       throw error;
     }
   }
@@ -123,7 +124,7 @@ export class PayrollCalculationBackendService {
       });
 
       if (error) {
-        console.error('Error calling batch calculation function:', error);
+        logger.error('Error calling batch calculation function:', error);
         throw new Error('Error en el cálculo por lotes');
       }
 
@@ -133,7 +134,7 @@ export class PayrollCalculationBackendService {
 
       return data.data;
     } catch (error) {
-      console.error('Error in calculateBatch:', error);
+      logger.error('Error in calculateBatch:', error);
       throw error;
     }
   }

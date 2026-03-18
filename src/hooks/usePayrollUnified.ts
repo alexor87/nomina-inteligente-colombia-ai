@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/lib/logger';
 import { PayrollEmployee } from '@/types/payroll';
 import { useToast } from '@/hooks/use-toast';
 import { VacationPayrollIntegrationService } from '@/services/vacation-integration/VacationPayrollIntegrationService';
@@ -46,16 +47,16 @@ export const usePayrollUnified = (companyId: string) => {
       const { error } = await supabase.rpc('clean_specific_duplicate_periods', {
         p_company_id: companyId
       });
-      if (error) console.error('Error cleaning duplicates:', error);
+      if (error) logger.error('Error cleaning duplicates:', error);
     } catch (error) {
-      console.error('Error in cleanDuplicates:', error);
+      logger.error('Error in cleanDuplicates:', error);
     }
   }, [companyId]);
 
   // Función simple para encontrar o crear período
   const findOrCreatePeriod = useCallback(async (startDate: string, endDate: string): Promise<PayrollPeriod | null> => {
     try {
-      console.log('🔍 Buscando período:', { startDate, endDate, companyId });
+      logger.log('🔍 Buscando período:', { startDate, endDate, companyId });
 
       // Limpiar duplicados primero
       await cleanDuplicates();
@@ -71,7 +72,7 @@ export const usePayrollUnified = (companyId: string) => {
         .limit(1);
 
       if (searchError) {
-        console.error('Error buscando período:', searchError);
+        logger.error('Error buscando período:', searchError);
         return null;
       }
 
@@ -80,7 +81,7 @@ export const usePayrollUnified = (companyId: string) => {
         
         // Si el período está cancelado, reactivarlo Y limpiar payrolls antiguos
         if (period.estado === 'cancelado') {
-          console.log('🔄 Reactivando período cancelado y limpiando payrolls:', period.id);
+          logger.log('🔄 Reactivando período cancelado y limpiando payrolls:', period.id);
           
           // Primero limpiar registros antiguos de payrolls
           const { error: deleteError } = await supabase
@@ -89,9 +90,9 @@ export const usePayrollUnified = (companyId: string) => {
             .eq('period_id', period.id);
           
           if (deleteError) {
-            console.error('Error limpiando payrolls antiguos:', deleteError);
+            logger.error('Error limpiando payrolls antiguos:', deleteError);
           } else {
-            console.log('✅ Payrolls antiguos eliminados');
+            logger.log('✅ Payrolls antiguos eliminados');
           }
           
           // Luego reactivar el período
@@ -101,14 +102,14 @@ export const usePayrollUnified = (companyId: string) => {
             .eq('id', period.id);
           
           if (updateError) {
-            console.error('Error reactivando período:', updateError);
+            logger.error('Error reactivando período:', updateError);
           } else {
             period.estado = 'en_proceso';
-            console.log('✅ Período reactivado exitosamente');
+            logger.log('✅ Período reactivado exitosamente');
           }
         }
         
-        console.log('✅ Período encontrado:', period.id);
+        logger.log('✅ Período encontrado:', period.id);
         return {
           id: period.id,
           periodo: period.periodo,
@@ -135,11 +136,11 @@ export const usePayrollUnified = (companyId: string) => {
         .single();
 
       if (createError) {
-        console.error('Error creando período:', createError);
+        logger.error('Error creando período:', createError);
         return null;
       }
 
-      console.log('✅ Período creado:', newPeriod.id);
+      logger.log('✅ Período creado:', newPeriod.id);
       return {
         id: newPeriod.id,
         periodo: newPeriod.periodo,
@@ -150,7 +151,7 @@ export const usePayrollUnified = (companyId: string) => {
       };
 
     } catch (error) {
-      console.error('Error en findOrCreatePeriod:', error);
+      logger.error('Error en findOrCreatePeriod:', error);
       return null;
     }
   }, [companyId, cleanDuplicates]);
@@ -159,7 +160,7 @@ export const usePayrollUnified = (companyId: string) => {
   const loadEmployees = useCallback(async (startDate: string, endDate: string): Promise<string | undefined> => {
     // Evitar llamadas concurrentes
     if (loadingRef.current) {
-      console.log('⏳ loadEmployees ignorado - ya hay una carga en progreso');
+      logger.log('⏳ loadEmployees ignorado - ya hay una carga en progreso');
       return;
     }
 
@@ -168,7 +169,7 @@ export const usePayrollUnified = (companyId: string) => {
     let periodId: string | undefined;
     
     try {
-      console.log('📋 Cargando empleados para período:', { startDate, endDate });
+      logger.log('📋 Cargando empleados para período:', { startDate, endDate });
 
       const period = await findOrCreatePeriod(startDate, endDate);
       if (!period) {
@@ -186,7 +187,7 @@ export const usePayrollUnified = (companyId: string) => {
         .single();
 
       if (periodDataError) {
-        console.error('Error verificando estado del período:', periodDataError);
+        logger.error('Error verificando estado del período:', periodDataError);
         setEmployees([]);
         return;
       }
@@ -199,12 +200,12 @@ export const usePayrollUnified = (companyId: string) => {
         .eq('period_id', period.id);
 
       if (periodError) {
-        console.error('Error cargando empleados del período:', periodError);
+        logger.error('Error cargando empleados del período:', periodError);
         setEmployees([]);
         return;
       }
 
-      console.log('📊 Resultado del query de empleados:', {
+      logger.log('📊 Resultado del query de empleados:', {
         periodEmployees: periodEmployees?.length || 0,
         employees_loaded: periodData.employees_loaded,
         period_id: period.id
@@ -215,7 +216,7 @@ export const usePayrollUnified = (companyId: string) => {
                                  (!periodEmployees || periodEmployees.length === 0);
 
       if (isInconsistentState) {
-        console.warn('⚠️ Estado inconsistente detectado: período marcado como inicializado pero sin empleados. Corrigiendo...');
+        logger.warn('⚠️ Estado inconsistente detectado: período marcado como inicializado pero sin empleados. Corrigiendo...');
         
         await supabase
           .from('payroll_periods_real')
@@ -226,7 +227,7 @@ export const usePayrollUnified = (companyId: string) => {
       // Crear empleados si NO está inicializado O si hay inconsistencia
       if (!periodData.employees_loaded || isInconsistentState) {
         // MOVIDO: Integración de vacaciones SOLO en inicialización para evitar reprocesos
-        console.log('🏖️ Procesando vacaciones/ausencias automáticamente (solo en inicialización)...');
+        logger.log('🏖️ Procesando vacaciones/ausencias automáticamente (solo en inicialización)...');
         try {
           const integrationResult = await VacationPayrollIntegrationService.processVacationsForPayroll({
             periodId: period.id,
@@ -243,11 +244,11 @@ export const usePayrollUnified = (companyId: string) => {
             });
           }
         } catch (integrationError) {
-          console.warn('⚠️ Error en integración de vacaciones (no bloqueante):', integrationError);
+          logger.warn('⚠️ Error en integración de vacaciones (no bloqueante):', integrationError);
           // Continuar sin bloquear la carga de empleados
         }
 
-        console.log('🔧 No hay empleados en payrolls, creando desde empleados activos...');
+        logger.log('🔧 No hay empleados en payrolls, creando desde empleados activos...');
         
         const { data: activeEmployees, error: empError } = await supabase
           .from('employees')
@@ -256,13 +257,13 @@ export const usePayrollUnified = (companyId: string) => {
           .eq('estado', 'activo');
 
         if (empError) {
-          console.error('Error cargando empleados activos:', empError);
+          logger.error('Error cargando empleados activos:', empError);
           setEmployees([]);
           return;
         }
 
         if (activeEmployees && activeEmployees.length > 0) {
-          console.log(`✅ Encontrados ${activeEmployees.length} empleados activos`);
+          logger.log(`✅ Encontrados ${activeEmployees.length} empleados activos`);
           
           const workedDays = calculateWorkedDays(startDate, endDate);
           const payrollRecords = activeEmployees.map(emp => ({
@@ -283,12 +284,12 @@ export const usePayrollUnified = (companyId: string) => {
             .insert(payrollRecords);
 
           if (insertError) {
-            console.error('Error creando registros de payroll:', insertError);
+            logger.error('Error creando registros de payroll:', insertError);
             setEmployees([]);
             return;
           }
 
-          console.log('✅ Registros de payroll creados exitosamente');
+          logger.log('✅ Registros de payroll creados exitosamente');
 
           await supabase
             .from('payroll_periods_real')
@@ -298,7 +299,7 @@ export const usePayrollUnified = (companyId: string) => {
             })
             .eq('id', period.id);
 
-          console.log('✅ Período marcado como inicializado');
+          logger.log('✅ Período marcado como inicializado');
 
           const employeesList: PayrollEmployee[] = activeEmployees.map(emp => ({
             id: emp.id,
@@ -325,12 +326,12 @@ export const usePayrollUnified = (companyId: string) => {
 
           setEmployees(employeesList);
         } else {
-          console.log('⚠️ No se encontraron empleados activos');
+          logger.log('⚠️ No se encontraron empleados activos');
           setEmployees([]);
         }
       } else {
         // Si el período YA fue inicializado, solo cargar empleados existentes
-        console.log(`✅ Período ya inicializado. Empleados en payrolls: ${periodEmployees?.length || 0}`);
+        logger.log(`✅ Período ya inicializado. Empleados en payrolls: ${periodEmployees?.length || 0}`);
         
         const employeesList: PayrollEmployee[] = (periodEmployees || []).map(payroll => {
           const emp = payroll.employees as any;
@@ -362,7 +363,7 @@ export const usePayrollUnified = (companyId: string) => {
       }
 
     } catch (error) {
-      console.error('Error cargando empleados:', error);
+      logger.error('Error cargando empleados:', error);
       toast({
         title: "Error",
         description: "No se pudieron cargar los empleados",
@@ -418,7 +419,7 @@ export const usePayrollUnified = (companyId: string) => {
         .update({ empleados_count: newEmployeeCount })
         .eq('id', currentPeriod.id);
 
-      console.log(`✅ Empleados agregados. Nuevo contador: ${newEmployeeCount}`);
+      logger.log(`✅ Empleados agregados. Nuevo contador: ${newEmployeeCount}`);
 
       const newEmployeesList: PayrollEmployee[] = (newEmployees || []).map(emp => ({
         id: emp.id,
@@ -446,7 +447,7 @@ export const usePayrollUnified = (companyId: string) => {
       setEmployees(prev => [...prev, ...newEmployeesList]);
 
     } catch (error) {
-      console.error('Error agregando empleados:', error);
+      logger.error('Error agregando empleados:', error);
       toast({
         title: "Error",
         description: "No se pudieron agregar los empleados",
@@ -459,7 +460,7 @@ export const usePayrollUnified = (companyId: string) => {
     if (!currentPeriod) return;
 
     try {
-      console.log('🗑️ Eliminando empleado del período:', { employeeId, periodId: currentPeriod.id, companyId });
+      logger.log('🗑️ Eliminando empleado del período:', { employeeId, periodId: currentPeriod.id, companyId });
 
       // CORRECCIÓN: Incluir company_id para eliminación segura y correcta
       const { error: deleteError } = await supabase
@@ -470,7 +471,7 @@ export const usePayrollUnified = (companyId: string) => {
         .eq('period_id', currentPeriod.id);
 
       if (deleteError) {
-        console.error('Error eliminando empleado de payrolls:', deleteError);
+        logger.error('Error eliminando empleado de payrolls:', deleteError);
         throw deleteError;
       }
 
@@ -482,16 +483,16 @@ export const usePayrollUnified = (companyId: string) => {
         .eq('id', currentPeriod.id);
 
       if (updateError) {
-        console.warn('Error actualizando contador de empleados:', updateError);
+        logger.warn('Error actualizando contador de empleados:', updateError);
       }
 
-      console.log(`✅ Empleado eliminado correctamente. Nuevo contador: ${newEmployeeCount}`);
+      logger.log(`✅ Empleado eliminado correctamente. Nuevo contador: ${newEmployeeCount}`);
 
       // Actualizar estado local
       setEmployees(prev => prev.filter(emp => emp.id !== employeeId));
 
     } catch (error) {
-      console.error('Error removiendo empleado:', error);
+      logger.error('Error removiendo empleado:', error);
       toast({
         title: "Error",
         description: "No se pudo remover el empleado",
@@ -503,7 +504,7 @@ export const usePayrollUnified = (companyId: string) => {
   // ✅ NUEVA FUNCIÓN: Verificar y ejecutar provisiones automáticas
   const executeAutomaticProvisioning = useCallback(async (periodId: string, startDate: string, endDate: string) => {
     try {
-      console.log('🔍 Verificando configuración de provisiones automáticas...');
+      logger.log('🔍 Verificando configuración de provisiones automáticas...');
       
       // Verificar configuración de la empresa
       const { data: companySettings, error: settingsError } = await supabase
@@ -513,17 +514,17 @@ export const usePayrollUnified = (companyId: string) => {
         .single();
 
       if (settingsError) {
-        console.warn('⚠️ No se pudo obtener configuración de provisiones:', settingsError);
+        logger.warn('⚠️ No se pudo obtener configuración de provisiones:', settingsError);
         return;
       }
 
       // Solo ejecutar si está configurado para provisionar en liquidación
       if (companySettings?.provision_mode !== 'on_liquidation') {
-        console.log('ℹ️ Provisiones no configuradas para ejecutar automáticamente en liquidación');
+        logger.log('ℹ️ Provisiones no configuradas para ejecutar automáticamente en liquidación');
         return;
       }
 
-      console.log('✅ Ejecutando provisiones automáticas para período:', periodId);
+      logger.log('✅ Ejecutando provisiones automáticas para período:', periodId);
 
       // Invocar función de provisiones
       const { data: provisionResult, error: provisionError } = await supabase.functions.invoke('provision-social-benefits', {
@@ -536,7 +537,7 @@ export const usePayrollUnified = (companyId: string) => {
       });
 
       if (provisionError) {
-        console.error('❌ Error ejecutando provisiones automáticas:', provisionError);
+        logger.error('❌ Error ejecutando provisiones automáticas:', provisionError);
         toast({
           title: "⚠️ Advertencia",
           description: "Las provisiones no se pudieron calcular automáticamente. Puede hacerlo manualmente en el módulo de Prestaciones Sociales.",
@@ -547,18 +548,18 @@ export const usePayrollUnified = (companyId: string) => {
       }
 
       if (provisionResult?.success) {
-        console.log('✅ Provisiones automáticas completadas:', provisionResult);
+        logger.log('✅ Provisiones automáticas completadas:', provisionResult);
         toast({
           title: "✅ Provisiones Calculadas",
           description: "Las provisiones de prestaciones sociales se calcularon automáticamente.",
           className: "border-green-200 bg-green-50"
         });
       } else {
-        console.warn('⚠️ Provisiones no completadas:', provisionResult);
+        logger.warn('⚠️ Provisiones no completadas:', provisionResult);
       }
 
     } catch (error) {
-      console.error('❌ Error en provisiones automáticas:', error);
+      logger.error('❌ Error en provisiones automáticas:', error);
       // No mostrar toast para errores inesperados, solo log
     }
   }, [companyId, toast]);
@@ -571,7 +572,7 @@ export const usePayrollUnified = (companyId: string) => {
       // ===== TRAZA TEMPORAL: INICIO DE LIQUIDACIÓN =====
       const traceId = `liquidation_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       const vacationStart = performance.now();
-      console.log(`🔍 [TRACE-${traceId}] INICIANDO LIQUIDACIÓN COMPLETA`, {
+      logger.log(`🔍 [TRACE-${traceId}] INICIANDO LIQUIDACIÓN COMPLETA`, {
         periodId: currentPeriod.id,
         periodo: currentPeriod.periodo,
         companyId: companyId,
@@ -582,7 +583,7 @@ export const usePayrollUnified = (companyId: string) => {
       });
 
       // PASO 1: Procesar todas las vacaciones/ausencias pendientes
-      console.log(`🔍 [TRACE-${traceId}] PASO 1: Integrando vacaciones para período...`, currentPeriod.periodo);
+      logger.log(`🔍 [TRACE-${traceId}] PASO 1: Integrando vacaciones para período...`, currentPeriod.periodo);
       
       const integrationResult = await VacationPayrollIntegrationService.processVacationsForPayroll({
         periodId: currentPeriod.id,
@@ -592,13 +593,13 @@ export const usePayrollUnified = (companyId: string) => {
       });
 
       const vacationDuration = performance.now() - vacationStart;
-      console.log(`🔍 [TRACE-${traceId}] ✅ Integración de vacaciones completada`, {
+      logger.log(`🔍 [TRACE-${traceId}] ✅ Integración de vacaciones completada`, {
         resultado: integrationResult,
         duracion: `${vacationDuration.toFixed(2)}ms`
       });
 
       // PASO 2: Validación pre-liquidación
-      console.log('🔍 Ejecutando validación pre-liquidación...');
+      logger.log('🔍 Ejecutando validación pre-liquidación...');
       const { data: validationData, error: validationError } = await supabase.functions.invoke('payroll-liquidation-atomic', {
         body: {
           action: 'validate_pre_liquidation',
@@ -610,7 +611,7 @@ export const usePayrollUnified = (companyId: string) => {
       });
 
       if (validationError || !validationData.success) {
-        console.error(`🔍 [TRACE-${traceId}] ❌ ERROR EN VALIDACIÓN:`, {
+        logger.error(`🔍 [TRACE-${traceId}] ❌ ERROR EN VALIDACIÓN:`, {
           validationError: validationError,
           validationData: validationData,
           success: validationData?.success
@@ -623,15 +624,15 @@ export const usePayrollUnified = (companyId: string) => {
       // Verificar si hay errores críticos
       const criticalIssues = validation.issues.filter((issue: any) => issue.severity === 'high');
       if (criticalIssues.length > 0) {
-        console.error(`🔍 [TRACE-${traceId}] ❌ ISSUES CRÍTICOS ENCONTRADOS:`, criticalIssues);
+        logger.error(`🔍 [TRACE-${traceId}] ❌ ISSUES CRÍTICOS ENCONTRADOS:`, criticalIssues);
         throw new Error(`Validación fallida: ${criticalIssues.map((i: any) => i.message).join(', ')}`);
       }
 
-      console.log(`🔍 [TRACE-${traceId}] ✅ Validación pre-liquidación completada:`, validation.summary);
+      logger.log(`🔍 [TRACE-${traceId}] ✅ Validación pre-liquidación completada:`, validation.summary);
 
       // PASO 3: Ejecutar liquidación atómica
       const liquidationStart = performance.now();
-      console.log(`🔍 [TRACE-${traceId}] PASO 3: Ejecutando liquidación atómica...`);
+      logger.log(`🔍 [TRACE-${traceId}] PASO 3: Ejecutando liquidación atómica...`);
       
       const { data: liquidationData, error: liquidationError } = await supabase.functions.invoke('payroll-liquidation-atomic', {
         body: {
@@ -645,7 +646,7 @@ export const usePayrollUnified = (companyId: string) => {
       });
 
       const liquidationDuration = performance.now() - liquidationStart;
-      console.log(`🔍 [TRACE-${traceId}] LIQUIDACIÓN ATÓMICA RESPONSE:`, {
+      logger.log(`🔍 [TRACE-${traceId}] LIQUIDACIÓN ATÓMICA RESPONSE:`, {
         success: liquidationData?.success,
         error: liquidationError,
         data: liquidationData,
@@ -653,7 +654,7 @@ export const usePayrollUnified = (companyId: string) => {
       });
 
       if (liquidationError || !liquidationData.success) {
-        console.error(`🔍 [TRACE-${traceId}] ❌ ERROR EN LIQUIDACIÓN ATÓMICA:`, {
+        logger.error(`🔍 [TRACE-${traceId}] ❌ ERROR EN LIQUIDACIÓN ATÓMICA:`, {
           liquidationError: liquidationError,
           liquidationData: liquidationData,
           success: liquidationData?.success
@@ -664,7 +665,7 @@ export const usePayrollUnified = (companyId: string) => {
       const liquidation = liquidationData.liquidation;
       const totalDuration = performance.now() - vacationStart;
 
-      console.log(`🔍 [TRACE-${traceId}] ✅ LIQUIDACIÓN ATÓMICA COMPLETADA:`, {
+      logger.log(`🔍 [TRACE-${traceId}] ✅ LIQUIDACIÓN ATÓMICA COMPLETADA:`, {
         liquidation: liquidation,
         duracionTotal: `${totalDuration.toFixed(2)}ms`,
         empleadosProcesados: liquidation.employees_processed,
@@ -672,7 +673,7 @@ export const usePayrollUnified = (companyId: string) => {
       });
 
       // PASO 4: ✅ NUEVO - Ejecutar provisiones automáticas
-      console.log(`🔍 [TRACE-${traceId}] PASO 4: Ejecutando provisiones automáticas...`);
+      logger.log(`🔍 [TRACE-${traceId}] PASO 4: Ejecutando provisiones automáticas...`);
       
       // Ejecutar provisiones de forma no bloqueante
       executeAutomaticProvisioning(currentPeriod.id, startDate, endDate);
@@ -684,7 +685,7 @@ export const usePayrollUnified = (companyId: string) => {
       });
 
     } catch (error: any) {
-      console.error(`🔍 [TRACE-ERROR] ❌ ERROR GENERAL EN LIQUIDACIÓN:`, {
+      logger.error(`🔍 [TRACE-ERROR] ❌ ERROR GENERAL EN LIQUIDACIÓN:`, {
         error: error,
         message: error?.message,
         stack: error?.stack,
@@ -698,15 +699,15 @@ export const usePayrollUnified = (companyId: string) => {
       });
     } finally {
       setIsLiquidating(false);
-      console.log(`🔍 [TRACE-FINAL] FINALIZANDO LIQUIDACIÓN - setIsLiquidating(false)`);
+      logger.log(`🔍 [TRACE-FINAL] FINALIZANDO LIQUIDACIÓN - setIsLiquidating(false)`);
     }
   }, [currentPeriod, employees, companyId, toast, executeAutomaticProvisioning]);
 
   const refreshEmployeeNovedades = useCallback(async (employeeId: string) => {
-    console.log('🔄 Refrescando novedades para empleado:', employeeId);
+    logger.log('🔄 Refrescando novedades para empleado:', employeeId);
     // Evitar recarga si ya hay una en curso
     if (loadingRef.current || isLoading) {
-      console.log('⏳ Saltando refreshEmployeeNovedades: carga en curso');
+      logger.log('⏳ Saltando refreshEmployeeNovedades: carga en curso');
       return;
     }
     if (currentPeriod) {
@@ -730,11 +731,11 @@ export const usePayrollUnified = (companyId: string) => {
     if (!currentPeriod?.id || Object.keys(employeeCalculations).length === 0) return;
 
     try {
-      console.log('💾 Persistiendo cálculos de preliquidación para', Object.keys(employeeCalculations).length, 'empleados');
+      logger.log('💾 Persistiendo cálculos de preliquidación para', Object.keys(employeeCalculations).length, 'empleados');
       
       // Actualizar cada empleado en la tabla payrolls
       for (const [employeeId, calculation] of Object.entries(employeeCalculations)) {
-        console.log('💾 Persistiendo valores exactos del backend para empleado:', employeeId, {
+        logger.log('💾 Persistiendo valores exactos del backend para empleado:', employeeId, {
           ibc: calculation.ibc,
           effectiveWorkedDays: calculation.effectiveWorkedDays,
           healthDeduction: calculation.healthDeduction,
@@ -749,7 +750,7 @@ export const usePayrollUnified = (companyId: string) => {
         // 📸 SNAPSHOT PROFESIONAL: Guardar IBC base y novedades constitutivas para auditoría
         const employee = employees.find(e => e.id === employeeId);
         if (!employee) {
-          console.error('❌ Empleado no encontrado para snapshot:', employeeId);
+          logger.error('❌ Empleado no encontrado para snapshot:', employeeId);
           continue;
         }
         
@@ -782,7 +783,7 @@ export const usePayrollUnified = (companyId: string) => {
           fecha_calculo: new Date().toISOString()
         };
         
-        console.log('📸 Guardando snapshot IBC para empleado:', employeeId, {
+        logger.log('📸 Guardando snapshot IBC para empleado:', employeeId, {
           ibc_base: ibc_base_salario,
           novedades_count: ibc_novedades_constitutivas.length,
           ibc_total: calculation.ibc
@@ -807,9 +808,9 @@ export const usePayrollUnified = (companyId: string) => {
           .eq('period_id', currentPeriod.id);
 
         if (error) {
-          console.error('❌ Error actualizando empleado:', employeeId, error);
+          logger.error('❌ Error actualizando empleado:', employeeId, error);
         } else {
-          console.log('✅ Empleado actualizado:', employeeId, 'Neto:', calculation.totalToPay);
+          logger.log('✅ Empleado actualizado:', employeeId, 'Neto:', calculation.totalToPay);
         }
       }
 
@@ -828,14 +829,14 @@ export const usePayrollUnified = (companyId: string) => {
         })
         .eq('id', currentPeriod.id);
 
-      console.log('✅ Totales del período actualizados:', {
+      logger.log('✅ Totales del período actualizados:', {
         devengado: totalDevengado,
         deducciones: totalDeducciones,
         neto: totalNeto
       });
 
     } catch (error) {
-      console.error('❌ Error persistiendo cálculos:', error);
+      logger.error('❌ Error persistiendo cálculos:', error);
     }
   }, [currentPeriod, companyId]);
 

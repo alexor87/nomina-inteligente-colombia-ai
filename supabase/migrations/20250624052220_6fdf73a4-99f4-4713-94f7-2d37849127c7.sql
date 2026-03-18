@@ -39,34 +39,26 @@ BEGIN
         RETURNING id INTO existing_company_id;
     END IF;
     
-    -- Verificar si existe perfil
-    SELECT EXISTS(
-        SELECT 1 FROM public.profiles 
-        WHERE user_id = '3716ea94-cab9-47a5-b83d-0ef05a817bf2'
-    ) INTO user_profile_exists;
-    
-    -- Crear o actualizar perfil
-    IF user_profile_exists THEN
-        UPDATE public.profiles 
-        SET 
-            company_id = existing_company_id,
-            first_name = COALESCE(first_name, 'Admin'),
-            last_name = COALESCE(last_name, 'Demo'),
-            updated_at = now()
-        WHERE user_id = '3716ea94-cab9-47a5-b83d-0ef05a817bf2';
-    ELSE
-        INSERT INTO public.profiles (
-            user_id,
-            first_name,
-            last_name,
-            company_id
-        ) VALUES (
-            '3716ea94-cab9-47a5-b83d-0ef05a817bf2',
-            'Admin',
-            'Demo',
-            existing_company_id
-        );
+    -- Solo operar sobre el usuario si existe en auth.users (no aplica en staging/db vacía)
+    IF EXISTS (SELECT 1 FROM auth.users WHERE id = '3716ea94-cab9-47a5-b83d-0ef05a817bf2') THEN
+        SELECT EXISTS(
+            SELECT 1 FROM public.profiles
+            WHERE user_id = '3716ea94-cab9-47a5-b83d-0ef05a817bf2'
+        ) INTO user_profile_exists;
+
+        IF user_profile_exists THEN
+            UPDATE public.profiles
+            SET
+                company_id = existing_company_id,
+                first_name = COALESCE(first_name, 'Admin'),
+                last_name = COALESCE(last_name, 'Demo'),
+                updated_at = now()
+            WHERE user_id = '3716ea94-cab9-47a5-b83d-0ef05a817bf2';
+        ELSE
+            INSERT INTO public.profiles (user_id, first_name, last_name, company_id)
+            VALUES ('3716ea94-cab9-47a5-b83d-0ef05a817bf2', 'Admin', 'Demo', existing_company_id);
+        END IF;
+
+        RAISE NOTICE 'Perfil configurado correctamente con company_id: %', existing_company_id;
     END IF;
-    
-    RAISE NOTICE 'Perfil configurado correctamente con company_id: %', existing_company_id;
 END $$;

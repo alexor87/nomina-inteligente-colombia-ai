@@ -662,6 +662,7 @@ export const SuperAdminService = {
 
   async registerPayment(
     billingId: string,
+    companyId: string,
     method: string,
     reference: string,
     notes?: string
@@ -676,7 +677,8 @@ export const SuperAdminService = {
         paid_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       } as any)
-      .eq('id', billingId);
+      .eq('id', billingId)
+      .eq('company_id', companyId);
     if (error) throw error;
   },
 

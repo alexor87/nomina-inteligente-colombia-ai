@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/lib/logger';
 
 export interface AtomicTransaction {
   id: string;
@@ -70,7 +71,7 @@ export class PayrollAtomicLiquidationService {
   ): Promise<LiquidationResult> {
     const transactionId = `liquidation_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
     
-    console.log(`🔄 [ATOMIC-${transactionId}] INICIANDO LIQUIDACIÓN ATÓMICA`, {
+    logger.log(`🔄 [ATOMIC-${transactionId}] INICIANDO LIQUIDACIÓN ATÓMICA`, {
       periodId,
       companyId,
       userId,
@@ -147,7 +148,7 @@ export class PayrollAtomicLiquidationService {
       transaction.status = 'completed';
       transaction.endTime = new Date();
 
-      console.log(`✅ [ATOMIC-${transactionId}] LIQUIDACIÓN COMPLETADA EXITOSAMENTE`);
+      logger.log(`✅ [ATOMIC-${transactionId}] LIQUIDACIÓN COMPLETADA EXITOSAMENTE`);
 
       return {
         success: true,
@@ -161,7 +162,7 @@ export class PayrollAtomicLiquidationService {
       };
 
     } catch (error: any) {
-      console.error(`❌ [ATOMIC-${transactionId}] ERROR EN LIQUIDACIÓN:`, error);
+      logger.error(`❌ [ATOMIC-${transactionId}] ERROR EN LIQUIDACIÓN:`, error);
       
       transaction.status = 'failed';
       transaction.error = error.message;
@@ -190,18 +191,18 @@ export class PayrollAtomicLiquidationService {
    * EJECUCIÓN DE PASO CON MANEJO DE ERRORES
    */
   private static async executeStep(transaction: AtomicTransaction, step: AtomicStep): Promise<void> {
-    console.log(`🔄 [ATOMIC-${transaction.id}] EJECUTANDO PASO: ${step.name}`);
+    logger.log(`🔄 [ATOMIC-${transaction.id}] EJECUTANDO PASO: ${step.name}`);
     
     try {
       step.result = await step.operation();
       step.executed = true;
       transaction.currentStep++;
       
-      console.log(`✅ [ATOMIC-${transaction.id}] PASO COMPLETADO: ${step.name}`);
+      logger.log(`✅ [ATOMIC-${transaction.id}] PASO COMPLETADO: ${step.name}`);
       
     } catch (error: any) {
       step.error = error.message;
-      console.error(`❌ [ATOMIC-${transaction.id}] ERROR EN PASO ${step.name}:`, error);
+      logger.error(`❌ [ATOMIC-${transaction.id}] ERROR EN PASO ${step.name}:`, error);
       throw error;
     }
   }
@@ -210,7 +211,7 @@ export class PayrollAtomicLiquidationService {
    * ROLLBACK AUTOMÁTICO
    */
   private static async performRollback(transaction: AtomicTransaction): Promise<{ success: boolean; errors: string[] }> {
-    console.log(`🔄 [ATOMIC-${transaction.id}] INICIANDO ROLLBACK AUTOMÁTICO`);
+    logger.log(`🔄 [ATOMIC-${transaction.id}] INICIANDO ROLLBACK AUTOMÁTICO`);
     
     const errors: string[] = [];
     transaction.status = 'rolled_back';
@@ -222,19 +223,19 @@ export class PayrollAtomicLiquidationService {
       const step = executedSteps[i];
       
       try {
-        console.log(`🔄 [ATOMIC-${transaction.id}] ROLLBACK PASO: ${step.name}`);
+        logger.log(`🔄 [ATOMIC-${transaction.id}] ROLLBACK PASO: ${step.name}`);
         await step.rollback();
-        console.log(`✅ [ATOMIC-${transaction.id}] ROLLBACK EXITOSO: ${step.name}`);
+        logger.log(`✅ [ATOMIC-${transaction.id}] ROLLBACK EXITOSO: ${step.name}`);
         
       } catch (rollbackError: any) {
         const errorMsg = `Error en rollback de ${step.name}: ${rollbackError.message}`;
         errors.push(errorMsg);
-        console.error(`❌ [ATOMIC-${transaction.id}] ${errorMsg}`);
+        logger.error(`❌ [ATOMIC-${transaction.id}] ${errorMsg}`);
       }
     }
 
     const success = errors.length === 0;
-    console.log(`${success ? '✅' : '⚠️'} [ATOMIC-${transaction.id}] ROLLBACK ${success ? 'COMPLETADO' : 'PARCIAL'}`);
+    logger.log(`${success ? '✅' : '⚠️'} [ATOMIC-${transaction.id}] ROLLBACK ${success ? 'COMPLETADO' : 'PARCIAL'}`);
     
     return { success, errors };
   }
@@ -249,7 +250,7 @@ export class PayrollAtomicLiquidationService {
       executed: false,
       canRollback: false,
       operation: async () => {
-        console.log(`🔍 Ejecutando validación ${exhaustive ? 'exhaustiva' : 'básica'}...`);
+        logger.log(`🔍 Ejecutando validación ${exhaustive ? 'exhaustiva' : 'básica'}...`);
         
         if (exhaustive) {
           // Validación clase mundial con 15+ checks
@@ -495,7 +496,7 @@ export class PayrollAtomicLiquidationService {
       canRollback: false, // Los emails no se pueden "des-enviar"
       operation: async () => {
         // TODO: Implementar envío de emails
-        console.log('📧 Enviando emails...');
+        logger.log('📧 Enviando emails...');
         return { emailsSent: 0 };
       },
       rollback: async () => {
@@ -547,7 +548,7 @@ export class PayrollAtomicLiquidationService {
       canRollback: false,
       operation: async () => {
         // TODO: Implementar auditoría
-        console.log('📝 Registrando auditoría...');
+        logger.log('📝 Registrando auditoría...');
         return { auditLogged: true };
       },
       rollback: async () => {
@@ -583,7 +584,7 @@ export class PayrollAtomicLiquidationService {
     
     for (const [id, transaction] of this.activeTransactions) {
       if (transaction.startTime < cutoff && transaction.status !== 'completed') {
-        console.log(`🧹 Limpiando transacción abandonada: ${id}`);
+        logger.log(`🧹 Limpiando transacción abandonada: ${id}`);
         this.activeTransactions.delete(id);
       }
     }

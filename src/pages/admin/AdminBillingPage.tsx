@@ -91,7 +91,7 @@ const AdminBillingPage: React.FC = () => {
     }
     try {
       setPaying(true);
-      await SuperAdminService.registerPayment(payDialog.id, payForm.method, payForm.reference, payForm.notes);
+      await SuperAdminService.registerPayment(payDialog.id, payDialog.company_id, payForm.method, payForm.reference, payForm.notes);
       toast({ title: 'Pago registrado' });
       setPayDialog(null);
       setPayForm({ method: 'transferencia', reference: '', notes: '' });

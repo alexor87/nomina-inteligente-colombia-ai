@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/lib/logger';
 import { useToast } from '@/hooks/use-toast';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { PayrollLiquidationService } from '@/services/PayrollLiquidationService';
@@ -34,7 +35,7 @@ export const usePayrollLiquidation = () => {
   const { triggerAutoSave, isSaving: isAutoSaving, lastSaveTime: lastAutoSaveTime } = useAutoSave({
     onSave: async () => {
       if (!currentPeriodId || employees.length === 0) return;
-      console.log('💾 Auto-guardando datos de nómina...');
+      logger.log('💾 Auto-guardando datos de nómina...');
       try {
         for (const employee of employees) {
           await supabase
@@ -51,9 +52,9 @@ export const usePayrollLiquidation = () => {
             })
             .eq('id', employee.payrollId);
         }
-        console.log('✅ Auto-guardado exitoso');
+        logger.log('✅ Auto-guardado exitoso');
       } catch (error) {
-        console.error('Error auto-guardando:', error);
+        logger.error('Error auto-guardando:', error);
         toast({
           title: "Error auto-guardando",
           description: "Hubo un problema al guardar automáticamente los datos.",
@@ -71,16 +72,16 @@ export const usePayrollLiquidation = () => {
   const loadEmployees = useCallback(async (startDate: string, endDate: string, year?: string) => {
     setIsLoading(true);
     try {
-      console.log('🔄 Cargando empleados con cálculos correctos...');
+      logger.log('🔄 Cargando empleados con cálculos correctos...');
       
       // ✅ CORREGIDO: Usar el servicio que ya calcula correctamente con año
       const employeesData = await PayrollLiquidationService.loadEmployeesForPeriod(startDate, endDate, year);
       
       // ✅ CORREGIDO: Obtener o crear período usando el servicio
       const periodId = await PayrollLiquidationService.ensurePeriodExists(startDate, endDate);
-      console.log('🔍 DEBUG - ensurePeriodExists returned periodId:', periodId);
+      logger.log('🔍 DEBUG - ensurePeriodExists returned periodId:', periodId);
       setCurrentPeriodId(periodId);
-      console.log('🔍 DEBUG - currentPeriodId set to:', periodId);
+      logger.log('🔍 DEBUG - currentPeriodId set to:', periodId);
 
       // ✅ CORREGIDO: Mapear datos con valores ya calculados correctamente
       const mappedEmployees = employeesData.map(employee => ({
@@ -107,11 +108,11 @@ export const usePayrollLiquidation = () => {
 
       setEmployees(mappedEmployees);
       
-      console.log('✅ Empleados cargados con cálculos correctos:', mappedEmployees.length);
-      console.log('📊 Ejemplo - Primer empleado:', mappedEmployees[0]);
+      logger.log('✅ Empleados cargados con cálculos correctos:', mappedEmployees.length);
+      logger.log('📊 Ejemplo - Primer empleado:', mappedEmployees[0]);
 
     } catch (error) {
-      console.error('❌ Error cargando empleados:', error);
+      logger.error('❌ Error cargando empleados:', error);
       toast({
         title: "Error",
         description: "No se pudieron cargar los empleados",
@@ -174,7 +175,7 @@ export const usePayrollLiquidation = () => {
       });
 
     } catch (error) {
-      console.error('Error adding employees:', error);
+      logger.error('Error adding employees:', error);
       toast({
         title: "Error",
         description: "No se pudieron agregar los empleados",
@@ -210,7 +211,7 @@ export const usePayrollLiquidation = () => {
         return;
       }
 
-      console.log(`🗑️ Removiendo empleado ${employeeId} del período ${currentPeriodId}`);
+      logger.log(`🗑️ Removiendo empleado ${employeeId} del período ${currentPeriodId}`);
 
       // 1. PRIMERO: Eliminar novedades del empleado para este período
       const { data: deletedNovedades, error: novedadesDeleteError } = await supabase
@@ -221,11 +222,11 @@ export const usePayrollLiquidation = () => {
         .select('id');
 
       if (novedadesDeleteError) {
-        console.error('❌ Error eliminando novedades:', novedadesDeleteError);
+        logger.error('❌ Error eliminando novedades:', novedadesDeleteError);
         // Continuar con la eliminación del payroll de todos modos
       } else {
         const novedadesCount = deletedNovedades?.length || 0;
-        console.log(`✅ Novedades eliminadas: ${novedadesCount}`);
+        logger.log(`✅ Novedades eliminadas: ${novedadesCount}`);
       }
 
       // 2. SEGUNDO: Eliminar el registro de nómina
@@ -236,7 +237,7 @@ export const usePayrollLiquidation = () => {
 
       if (deleteError) throw deleteError;
 
-      console.log(`✅ Empleado ${employeeId} removido exitosamente`);
+      logger.log(`✅ Empleado ${employeeId} removido exitosamente`);
 
       // Actualizar el estado local
       setEmployees(prevEmployees => prevEmployees.filter(emp => emp.id !== employeeId));
@@ -246,7 +247,7 @@ export const usePayrollLiquidation = () => {
       });
 
     } catch (error) {
-      console.error('Error removing employee:', error);
+      logger.error('Error removing employee:', error);
       toast({
         title: "Error",
         description: "No se pudo remover el empleado",
@@ -306,7 +307,7 @@ export const usePayrollLiquidation = () => {
       triggerManualSave();
 
     } catch (error) {
-      console.error('Error refreshing employee novedades:', error);
+      logger.error('Error refreshing employee novedades:', error);
       toast({
         title: "Error",
         description: "No se pudieron actualizar las novedades del empleado",
@@ -339,7 +340,7 @@ export const usePayrollLiquidation = () => {
     try {
       setIsLiquidating(true);
       
-      console.log('🚀 Iniciando liquidación con datos correctos...');
+      logger.log('🚀 Iniciando liquidación con datos correctos...');
 
       const result = await PayrollLiquidationService.liquidatePayroll(
         employees, 
@@ -348,10 +349,10 @@ export const usePayrollLiquidation = () => {
       );
 
       if (result.success && result.summary) {
-        console.log('✅ Liquidación exitosa:', result.message);
+        logger.log('✅ Liquidación exitosa:', result.message);
         
         // 🔍 DEBUGGING summary antes del modal
-        console.log('🔍 DEBUGGING summary antes del modal:', {
+        logger.log('🔍 DEBUGGING summary antes del modal:', {
           totalNetPay: result.summary.totalNetPay,
           tipo: typeof result.summary.totalNetPay,
           isFinite: Number.isFinite(result.summary.totalNetPay)
@@ -384,25 +385,25 @@ export const usePayrollLiquidation = () => {
           }
 
           if (provisionMode === 'on_liquidation') {
-            console.log('🧮 Registrando provisiones automáticamente...');
+            logger.log('🧮 Registrando provisiones automáticamente...');
             
             // ✅ CORREGIDO: Usar el período correcto del resultado, no currentPeriodId
             const finalPeriodId = result.periodId || currentPeriodId;
-            console.log('📋 Usando período para provisiones:', finalPeriodId);
+            logger.log('📋 Usando período para provisiones:', finalPeriodId);
 
             const { data: provisionResp, error: provisionErr } = await supabase.functions.invoke('provision-social-benefits', {
               body: { period_id: finalPeriodId }
             });
 
             if (provisionErr) {
-              console.error('❌ Error calculando provisiones:', provisionErr);
+              logger.error('❌ Error calculando provisiones:', provisionErr);
               toast({
                 title: "Advertencia",
                 description: "La nómina se liquidó exitosamente, pero hubo un problema calculando las provisiones automáticamente. Puede recalcularlas manualmente desde el módulo de Prestaciones Sociales.",
                 variant: "destructive",
               });
             } else {
-              console.log('✅ Provisiones registradas automáticamente:', provisionResp);
+              logger.log('✅ Provisiones registradas automáticamente:', provisionResp);
               
               // Mostrar notificación de éxito con conteo
               const provisionCount = provisionResp?.count || 0;
@@ -415,7 +416,7 @@ export const usePayrollLiquidation = () => {
               }
             }
           } else {
-            console.log('📋 Provisiones en modo consolidado mensual - no se calculan automáticamente');
+            logger.log('📋 Provisiones en modo consolidado mensual - no se calculan automáticamente');
             toast({
               title: "Modo consolidación mensual",
               description: "Las provisiones se registrarán cuando ejecute la consolidación mensual desde Prestaciones Sociales.",
@@ -423,7 +424,7 @@ export const usePayrollLiquidation = () => {
             });
           }
         } catch (provError) {
-          console.warn('⚠️ Error procesando provisiones:', provError);
+          logger.warn('⚠️ Error procesando provisiones:', provError);
           toast({
             title: "Advertencia",
             description: "La nómina se liquidó exitosamente, pero no se pudieron calcular las provisiones automáticamente. Puede hacerlo manualmente desde Prestaciones Sociales.",
@@ -452,7 +453,7 @@ export const usePayrollLiquidation = () => {
       }
 
     } catch (error) {
-      console.error('❌ Error liquidating payroll:', error);
+      logger.error('❌ Error liquidating payroll:', error);
       toast({
         title: "Error",
         description: "No se pudo liquidar la nómina: " + (error instanceof Error ? error.message : 'Error desconocido'),

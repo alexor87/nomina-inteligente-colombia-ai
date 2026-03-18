@@ -150,16 +150,17 @@ CREATE POLICY "Simple company update"
     public.has_role_in_company(auth.uid(), 'administrador'::app_role, id)
   );
 
--- PASO 6: Asignar rol de soporte a tu usuario
+-- PASO 6: Asignar rol de soporte al usuario solo si existe en auth.users
 INSERT INTO public.user_roles (user_id, role, company_id, assigned_by)
-SELECT 
+SELECT
   '3716ea94-cab9-47a5-b83d-0ef05a817bf2'::uuid,
   'soporte'::app_role,
   c.id,
   '3716ea94-cab9-47a5-b83d-0ef05a817bf2'::uuid
 FROM public.companies c
-WHERE NOT EXISTS (
-  SELECT 1 FROM public.user_roles ur 
+WHERE EXISTS (SELECT 1 FROM auth.users WHERE id = '3716ea94-cab9-47a5-b83d-0ef05a817bf2')
+AND NOT EXISTS (
+  SELECT 1 FROM public.user_roles ur
   WHERE ur.user_id = '3716ea94-cab9-47a5-b83d-0ef05a817bf2'::uuid
   AND ur.company_id = c.id
   AND ur.role = 'soporte'::app_role

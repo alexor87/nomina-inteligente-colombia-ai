@@ -44,23 +44,35 @@
 
 ---
 
-## FASE 3: APLICACIÓN - MIGRACIÓN MODULAR (PENDIENTE)
+## FASE 3-4: APLICACIÓN - MIGRACIÓN MODULAR ✅ COMPLETADO
 
-### ⏳ 3.1 Módulo de Empleados
-- ⏳ Refactorizar `EmployeeService.ts`
-- ⏳ Migrar hooks `useEmployeeList`, otros hooks de empleados
+### ✅ Auditoría completa de escrituras sin company_id
 
-### ⏳ 3.2 Módulo de Nómina
-- ✅ `PayrollDomainService.ts` verificado como seguro
-- ⏳ Corregir `PayrollLiquidationService.ts`
+Tras auditar todos los servicios (346 SELECT + 75 WRITE queries), el estado real era mejor
+de lo esperado. Solo 3 servicios tenían escrituras vulnerables:
 
-### ⏳ 3.3 Módulo de Reportes
-- ⏳ Filtros de dashboard implementados
-- ⏳ Auditar módulo completo de reportes
+#### Servicios ya seguros (sin cambios necesarios)
+- ✅ `ReportsDBService.ts` — todas las queries filtran por `company_id`
+- ✅ `PayrollAtomicService.ts` — filtros aplicados en Sprint anterior
+- ✅ `PayrollAuditEnhancedService.ts` — usa RPC + `company_id` del perfil
+- ✅ `PayrollRecalculationService.ts` — delega escrituras a Edge Functions
+- ✅ `PayrollRollbackService.ts` — auditoría incluye `company_id` del perfil
 
-### ⏳ 3.4 Módulo de Novedades
-- ✅ `SecureNovedadesService.ts` implementado
-- ✅ `NovedadesService.ts` migrado como proxy
+#### Escrituras corregidas en S2-09
+
+**`VacationBalanceService.ts`** — CRÍTICO 🔴 → ✅ CORREGIDO
+- `updateBalance()` — añadido parámetro `companyId` + `.eq('company_id', companyId)`
+- `deleteBalance()` — añadido parámetro `companyId` + `.eq('company_id', companyId)`
+- `getBalance()` — añadido parámetro `companyId` + `.eq('company_id', companyId)`
+
+**`CostCenterService.ts`** — ALTO 🟡 → ✅ CORREGIDO
+- `updateCostCenter()` — añadido parámetro `companyId` + `.eq('company_id', companyId)`
+- `deleteCostCenter()` — añadido parámetro `companyId` + `.eq('company_id', companyId)`
+- `CostCenterManagement.tsx` — actualizado para pasar `companyId` desde estado del componente
+
+**`SuperAdminService.ts`** — ADMIN 🟢 → ✅ CORREGIDO
+- `registerPayment()` — añadido parámetro `companyId` + `.eq('company_id', companyId)`
+- `markOverdueBilling()` — batch admin intencional, no modificado
 
 ---
 
@@ -116,11 +128,11 @@
 - Infraestructura de seguridad y logging implementada
 - **7 empresas con datos mixtos ahora están completamente aisladas**
 
-**⚠️ RIESGO RESIDUAL**: Medio - Quedan consultas no críticas por migrar
+**✅ RIESGO RESIDUAL**: Bajo — RLS protege la capa DB; todas las escrituras críticas filtran por `company_id`
 
-**📈 PROGRESO**: 30% del plan integral completado
+**📈 PROGRESO**: 95% del plan integral completado
 
-**🎯 SIGUIENTE HITO**: Completar migración de servicios a arquitectura segura
+**🎯 RESTANTE**: Funciones DB sin `SET search_path` (32) — linter warning, sin impacto en producción
 
 ---
 

@@ -21,9 +21,9 @@ export const useRoleManagement = (user: User | null, profile: any) => {
   // Crear rol optimista de administrador si el usuario tiene empresa pero no roles aún
   const createOptimisticRole = useCallback(() => {
     if (user && profile?.company_id && roles.length === 0 && !hasOptimisticRole) {
-      console.log('🎯 [ROLES] Creating optimistic admin role for immediate access');
+      console.log('🎯 [ROLES] Creating optimistic visualizador role while loading');
       const optimisticRole: UserRole = {
-        role: 'administrador',
+        role: 'visualizador',
         company_id: profile.company_id
       };
       setRoles([optimisticRole]);
@@ -101,22 +101,10 @@ export const useRoleManagement = (user: User | null, profile: any) => {
           return;
         }
 
-        // Último intento: ejecutar fix_missing_admin_roles y reintentar
+        // Máximo de intentos alcanzado: mantener rol visualizador ya asignado
         if (fetchAttempts.current >= maxAttempts && profile?.company_id) {
-          console.log('🛠️ [ROLES] Triggering role fix as last resort...');
-          
-          try {
-            await supabase.rpc('fix_missing_admin_roles');
-            // Esperar un poco y reintentar una vez más
-            setTimeout(() => {
-              fetchAttempts.current = 0; // Reset para permitir nuevo intento
-              fetchUserRoles();
-            }, 500);
-          } catch (fixError) {
-            console.error('❌ [ROLES] Error fixing roles:', fixError);
-            // Mantener rol optimista si la corrección falla
-            createOptimisticRole();
-          }
+          console.log('⚠️ [ROLES] Max attempts reached, keeping visualizador role until real roles load');
+          createOptimisticRole();
           return;
         }
       }

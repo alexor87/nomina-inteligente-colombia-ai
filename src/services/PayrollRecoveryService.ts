@@ -1,6 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollConsistencyService, ConsistencyReport } from './PayrollConsistencyService';
-import { PayrollAtomicService } from './PayrollAtomicService';
 
 export interface RecoveryPlan {
   periodId: string;

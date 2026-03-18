@@ -3,12 +3,13 @@ import { PayrollEmployee, PayrollSummary } from '@/types/payroll';
 import { PayrollCalculationEnhancedService } from './PayrollCalculationEnhancedService';
 import { ConfigurationService } from './ConfigurationService';
 import { PORCENTAJES_NOMINA } from '@/constants';
+import { logger } from '@/lib/logger';
 
 export class PayrollLiquidationNewService {
   static async loadEmployeesForActivePeriod(period: any): Promise<PayrollEmployee[]> {
     try {
-      console.log('🔍 ALELUYA - Cargando empleados para período:', period.periodo);
-      console.log('📅 Período completo:', period);
+      logger.log('🔍 ALELUYA - Cargando empleados para período:', period.periodo);
+      logger.log('📅 Período completo:', period);
 
       const companyId = period.company_id;
       
@@ -20,20 +21,20 @@ export class PayrollLiquidationNewService {
         .eq('estado', 'activo');
 
       if (employeesError) {
-        console.error('❌ Error cargando empleados:', employeesError);
+        logger.error('❌ Error cargando empleados:', employeesError);
         throw employeesError;
       }
 
-      console.log(`👥 Empleados activos encontrados: ${employees?.length || 0}`);
+      logger.log(`👥 Empleados activos encontrados: ${employees?.length || 0}`);
 
       if (!employees || employees.length === 0) {
-        console.log('⚠️ No se encontraron empleados activos');
+        logger.log('⚠️ No se encontraron empleados activos');
         return [];
       }
 
       // **CORRECCIÓN ALELUYA: Obtener la periodicidad real de la empresa**
       const companyPeriodicity = await PayrollCalculationEnhancedService.getUserConfiguredPeriodicity();
-      console.log(`⚙️ Periodicidad ALELUYA: ${companyPeriodicity}`);
+      logger.log(`⚙️ Periodicidad ALELUYA: ${companyPeriodicity}`);
 
       // Buscar nóminas existentes para este período
       const { data: existingPayrolls, error: payrollsError } = await supabase
@@ -43,10 +44,10 @@ export class PayrollLiquidationNewService {
         .eq('periodo', period.periodo);
 
       if (payrollsError) {
-        console.error('❌ Error consultando nóminas existentes:', payrollsError);
+        logger.error('❌ Error consultando nóminas existentes:', payrollsError);
       }
 
-      console.log(`💼 Nóminas existentes para período: ${existingPayrolls?.length || 0}`);
+      logger.log(`💼 Nóminas existentes para período: ${existingPayrolls?.length || 0}`);
 
       // Obtener novedades para el período
       const { data: novedades, error: novedadesError } = await supabase
@@ -56,10 +57,10 @@ export class PayrollLiquidationNewService {
         .eq('periodo_id', period.id);
 
       if (novedadesError) {
-        console.error('❌ Error cargando novedades:', novedadesError);
+        logger.error('❌ Error cargando novedades:', novedadesError);
       }
 
-      console.log(`📋 Novedades encontradas: ${novedades?.length || 0}`);
+      logger.log(`📋 Novedades encontradas: ${novedades?.length || 0}`);
 
       // Procesar cada empleado
       const processedEmployees: PayrollEmployee[] = [];
@@ -76,11 +77,11 @@ export class PayrollLiquidationNewService {
 
           if (existingPayroll) {
             // ✅ CORRECCIÓN ALELUYA: Usar datos existentes pero con periodicidad correcta
-            console.log(`✅ Nómina existente ALELUYA para: ${employee.nombre} - Verificando valores`);
+            logger.log(`✅ Nómina existente ALELUYA para: ${employee.nombre} - Verificando valores`);
             payrollEmployee = this.mapExistingPayrollToEmployee(employee, existingPayroll, companyPeriodicity);
           } else {
             // ✅ CORRECCIÓN ALELUYA: Calcular nueva nómina con lógica exacta
-            console.log(`🔄 Calculando ALELUYA para: ${employee.nombre} con periodicidad: ${companyPeriodicity}`);
+            logger.log(`🔄 Calculando ALELUYA para: ${employee.nombre} con periodicidad: ${companyPeriodicity}`);
             payrollEmployee = await this.calculateEmployeePayrollAleluya(
               employee, 
               period, 
@@ -91,7 +92,7 @@ export class PayrollLiquidationNewService {
 
           processedEmployees.push(payrollEmployee);
         } catch (error) {
-          console.error(`❌ Error procesando empleado ${employee.nombre}:`, error);
+          logger.error(`❌ Error procesando empleado ${employee.nombre}:`, error);
           
           // Crear entrada con error usando días correctos
           processedEmployees.push({
@@ -119,11 +120,11 @@ export class PayrollLiquidationNewService {
         }
       }
 
-      console.log(`✅ ALELUYA - Empleados procesados: ${processedEmployees.length}`);
+      logger.log(`✅ ALELUYA - Empleados procesados: ${processedEmployees.length}`);
       return processedEmployees;
 
     } catch (error) {
-      console.error('💥 Error crítico en loadEmployeesForActivePeriod:', error);
+      logger.error('💥 Error crítico en loadEmployeesForActivePeriod:', error);
       throw error;
     }
   }
@@ -147,7 +148,7 @@ export class PayrollLiquidationNewService {
     const maxDays = this.getDefaultWorkedDays(periodicity);
     
     if (workedDays > maxDays) {
-      console.warn(`⚠️ ALELUYA - Días trabajados (${workedDays}) exceden máximo para período ${periodicity} (${maxDays}). Ajustando.`);
+      logger.warn(`⚠️ ALELUYA - Días trabajados (${workedDays}) exceden máximo para período ${periodicity} (${maxDays}). Ajustando.`);
       return maxDays;
     }
     
@@ -163,7 +164,7 @@ export class PayrollLiquidationNewService {
     const rawWorkedDays = payroll.dias_trabajados || employee.dias_trabajo;
     const validatedWorkedDays = this.validateWorkedDays(rawWorkedDays, periodicity);
     
-    console.log(`📊 ALELUYA - ${employee.nombre}: días=${validatedWorkedDays}, periodicidad=${periodicity}`);
+    logger.log(`📊 ALELUYA - ${employee.nombre}: días=${validatedWorkedDays}, periodicidad=${periodicity}`);
     
     const healthDeduction = Number(payroll.salud_empleado) || 0;
     const pensionDeduction = Number(payroll.pension_empleado) || 0;
@@ -203,7 +204,7 @@ export class PayrollLiquidationNewService {
       const baseSalary = Number(employee.salario_base) || 0;
       const workedDays = this.validateWorkedDays(employee.dias_trabajo, periodicity);
       
-      console.log(`🔢 ALELUYA - Calculando para ${employee.nombre}:`, {
+      logger.log(`🔢 ALELUYA - Calculando para ${employee.nombre}:`, {
         baseSalary,
         workedDays,
         periodicity,
@@ -213,7 +214,7 @@ export class PayrollLiquidationNewService {
       // ✅ OBTENER CONFIGURACIÓN DINÁMICA
       const currentYear = new Date().getFullYear().toString();
       const config = ConfigurationService.getConfiguration(currentYear);
-      console.log(`⚙️ Usando configuración para año: ${currentYear}`, config);
+      logger.log(`⚙️ Usando configuración para año: ${currentYear}`, config);
       
       // ✅ CÁLCULO ALELUYA EXACTO
       // 1. Salario proporcional: (salario_mensual / 30) × días_trabajados
@@ -235,13 +236,13 @@ export class PayrollLiquidationNewService {
       let additionalDeductions = 0;
       let additionalEarnings = 0;
 
-      console.log(`📋 Procesando ${novedades.length} novedades para ${employee.nombre}:`);
+      logger.log(`📋 Procesando ${novedades.length} novedades para ${employee.nombre}:`);
       
       for (const novedad of novedades) {
         const valor = Number(novedad.valor) || 0;
         const esConstitutivo = Boolean(novedad.constitutivo_salario);
         
-        console.log(`   - ${novedad.tipo_novedad}: $${valor.toLocaleString()}, constitutivo: ${esConstitutivo}`);
+        logger.log(`   - ${novedad.tipo_novedad}: $${valor.toLocaleString()}, constitutivo: ${esConstitutivo}`);
         
         // Clasificar novedades
         switch (novedad.tipo_novedad) {
@@ -257,10 +258,10 @@ export class PayrollLiquidationNewService {
             // ✅ NUEVA LÓGICA: Separar bonificaciones constitutivas vs no constitutivas
             if (esConstitutivo) {
               bonusesConstitutivos += valor;
-              console.log(`   ✅ Bonificación CONSTITUTIVA: $${valor.toLocaleString()}`);
+              logger.log(`   ✅ Bonificación CONSTITUTIVA: $${valor.toLocaleString()}`);
             } else {
               bonusesNoConstitutivos += valor;
-              console.log(`   ➡️ Bonificación NO CONSTITUTIVA: $${valor.toLocaleString()}`);
+              logger.log(`   ➡️ Bonificación NO CONSTITUTIVA: $${valor.toLocaleString()}`);
             }
             additionalEarnings += valor;
             break;
@@ -272,7 +273,7 @@ export class PayrollLiquidationNewService {
             additionalDeductions += valor;
             break;
           default:
-            console.log(`   ⚠️ Tipo de novedad no clasificado: ${novedad.tipo_novedad}`);
+            logger.log(`   ⚠️ Tipo de novedad no clasificado: ${novedad.tipo_novedad}`);
         }
       }
 
@@ -295,7 +296,7 @@ export class PayrollLiquidationNewService {
         ibcPension = Math.max(salarioBaseParaAportes, minIbc);
       }
       
-      console.log(`💰 IBC para ${employee.nombre}:`, {
+      logger.log(`💰 IBC para ${employee.nombre}:`, {
         salarioBaseParaAportes: salarioBaseParaAportes.toLocaleString(),
         ibcSalud: ibcSalud.toLocaleString(),
         ibcPension: ibcPension.toLocaleString(),
@@ -315,7 +316,7 @@ export class PayrollLiquidationNewService {
       // 7. Neto a pagar
       const netPay = grossPay - totalDeductions;
       
-      console.log(`💰 RESULTADO ALELUYA CON BONIFICACIONES CONSTITUTIVAS para ${employee.nombre}:`, {
+      logger.log(`💰 RESULTADO ALELUYA CON BONIFICACIONES CONSTITUTIVAS para ${employee.nombre}:`, {
         proportionalSalary,
         bonusesConstitutivos,
         bonusesNoConstitutivos,
@@ -355,7 +356,7 @@ export class PayrollLiquidationNewService {
         pensionDeduction
       };
     } catch (error) {
-      console.error('❌ Error en cálculo ALELUYA:', error);
+      logger.error('❌ Error en cálculo ALELUYA:', error);
       
       // Fallback básico
       const baseSalary = Number(employee.salario_base) || 0;
@@ -397,7 +398,7 @@ export class PayrollLiquidationNewService {
     
     const totalContributions = saludEmpleador + pensionEmpleador + arl + cajaCompensacion + icbf + sena;
     
-    console.log(`👔 Aportes patronales detallados:`, {
+    logger.log(`👔 Aportes patronales detallados:`, {
       base: salarioBaseParaAportes.toLocaleString(),
       salud: saludEmpleador.toLocaleString(),
       pension: pensionEmpleador.toLocaleString(),
@@ -420,15 +421,15 @@ export class PayrollLiquidationNewService {
 
       if (error) throw error;
       
-      console.log(`✅ Contador de empleados actualizado: ${count}`);
+      logger.log(`✅ Contador de empleados actualizado: ${count}`);
     } catch (error) {
-      console.error('❌ Error actualizando contador de empleados:', error);
+      logger.error('❌ Error actualizando contador de empleados:', error);
     }
   }
 
   static async removeEmployeeFromPeriod(employeeId: string, periodId: string): Promise<void> {
     try {
-      console.log(`🗑️ Removiendo empleado ${employeeId} del período ${periodId}`);
+      logger.log(`🗑️ Removiendo empleado ${employeeId} del período ${periodId}`);
       
       // Eliminar nómina del empleado para este período
       const { error: payrollError } = await supabase
@@ -438,7 +439,7 @@ export class PayrollLiquidationNewService {
         .eq('period_id', periodId);
 
       if (payrollError) {
-        console.error('❌ Error eliminando nómina:', payrollError);
+        logger.error('❌ Error eliminando nómina:', payrollError);
         throw payrollError;
       }
 
@@ -450,20 +451,20 @@ export class PayrollLiquidationNewService {
         .eq('periodo_id', periodId);
 
       if (novedadesError) {
-        console.error('❌ Error eliminando novedades:', novedadesError);
+        logger.error('❌ Error eliminando novedades:', novedadesError);
         throw novedadesError;
       }
 
-      console.log(`✅ Empleado ${employeeId} removido del período ${periodId}`);
+      logger.log(`✅ Empleado ${employeeId} removido del período ${periodId}`);
     } catch (error) {
-      console.error('❌ Error removiendo empleado del período:', error);
+      logger.error('❌ Error removiendo empleado del período:', error);
       throw error;
     }
   }
 
   static async closePeriod(period: any, employees: PayrollEmployee[]): Promise<string> {
     try {
-      console.log(`🔐 ALELUYA - Iniciando cierre de período: ${period.periodo}`);
+      logger.log(`🔐 ALELUYA - Iniciando cierre de período: ${period.periodo}`);
       
       // VALIDACIONES PRE-CIERRE
       const validEmployees = employees.filter(emp => emp.status === 'valid');
@@ -471,7 +472,7 @@ export class PayrollLiquidationNewService {
         throw new Error('No hay empleados válidos para cerrar el período');
       }
 
-      console.log(`💾 ALELUYA - Guardando ${validEmployees.length} registros válidos...`);
+      logger.log(`💾 ALELUYA - Guardando ${validEmployees.length} registros válidos...`);
       
       // TRANSACCIÓN: Usar una sola operación para consistencia
       const payrollRecords = [];
@@ -501,7 +502,7 @@ export class PayrollLiquidationNewService {
             updated_at: new Date().toISOString()
           };
 
-          console.log(`💾 ALELUYA - Preparando datos para ${employee.name}:`, {
+          logger.log(`💾 ALELUYA - Preparando datos para ${employee.name}:`, {
             grossPay: payrollData.total_devengado,
             netPay: payrollData.neto_pagado,
             days: payrollData.dias_trabajados
@@ -509,7 +510,7 @@ export class PayrollLiquidationNewService {
 
           payrollRecords.push(payrollData);
         } catch (error) {
-          console.error(`❌ Error preparando datos para ${employee.name}:`, error);
+          logger.error(`❌ Error preparando datos para ${employee.name}:`, error);
           failedRecords.push(employee.name);
         }
       }
@@ -525,12 +526,12 @@ export class PayrollLiquidationNewService {
           .select();
 
         if (batchError) {
-          console.error('❌ Error en guardado masivo:', batchError);
+          logger.error('❌ Error en guardado masivo:', batchError);
           throw new Error(`Error guardando nóminas: ${batchError.message}`);
         }
 
         successfulRecords = data?.length || 0;
-        console.log(`✅ ALELUYA - Guardados ${successfulRecords} registros exitosamente`);
+        logger.log(`✅ ALELUYA - Guardados ${successfulRecords} registros exitosamente`);
       }
 
       // CALCULAR TOTALES CORRECTOS
@@ -538,7 +539,7 @@ export class PayrollLiquidationNewService {
       const totalDeducciones = validEmployees.reduce((sum, emp) => sum + emp.deductions, 0);
       const totalNeto = validEmployees.reduce((sum, emp) => sum + emp.netPay, 0);
 
-      console.log(`📊 ALELUYA - Totales calculados:`, {
+      logger.log(`📊 ALELUYA - Totales calculados:`, {
         totalDevengado,
         totalDeducciones,
         totalNeto,
@@ -559,7 +560,7 @@ export class PayrollLiquidationNewService {
         .eq('id', period.id);
 
       if (periodError) {
-        console.error('❌ Error actualizando período:', periodError);
+        logger.error('❌ Error actualizando período:', periodError);
         
         // ROLLBACK: Eliminar registros de nómina si falló la actualización del período
         await supabase
@@ -575,11 +576,11 @@ export class PayrollLiquidationNewService {
         ? `Período ${period.periodo} cerrado con ${successfulRecords} empleados. ${failedRecords.length} empleados fallaron.`
         : `Período ${period.periodo} cerrado exitosamente con ${successfulRecords} empleados procesados`;
 
-      console.log(`✅ ALELUYA - CIERRE COMPLETADO: ${message}`);
+      logger.log(`✅ ALELUYA - CIERRE COMPLETADO: ${message}`);
       return message;
 
     } catch (error) {
-      console.error('💥 Error crítico cerrando período:', error);
+      logger.error('💥 Error crítico cerrando período:', error);
       
       // ROLLBACK COMPLETO en caso de error
       try {
@@ -589,9 +590,9 @@ export class PayrollLiquidationNewService {
           .eq('period_id', period.id)
           .eq('estado', 'procesada');
         
-        console.log('🔄 Rollback ejecutado - datos de nómina eliminados');
+        logger.log('🔄 Rollback ejecutado - datos de nómina eliminados');
       } catch (rollbackError) {
-        console.error('❌ Error en rollback:', rollbackError);
+        logger.error('❌ Error en rollback:', rollbackError);
       }
       
       throw error;
@@ -600,7 +601,7 @@ export class PayrollLiquidationNewService {
 
   static async recalculateAfterNovedadChange(employeeId: string, periodId: string): Promise<PayrollEmployee | null> {
     try {
-      console.log(`🔄 Recalculando empleado ${employeeId} en período ${periodId}`);
+      logger.log(`🔄 Recalculando empleado ${employeeId} en período ${periodId}`);
       
       // Obtener datos del período
       const { data: period, error: periodError } = await supabase
@@ -610,7 +611,7 @@ export class PayrollLiquidationNewService {
         .single();
 
       if (periodError || !period) {
-        console.error('❌ Error obteniendo período:', periodError);
+        logger.error('❌ Error obteniendo período:', periodError);
         return null;
       }
 
@@ -622,7 +623,7 @@ export class PayrollLiquidationNewService {
         .single();
 
       if (employeeError || !employee) {
-        console.error('❌ Error obteniendo empleado:', employeeError);
+        logger.error('❌ Error obteniendo empleado:', employeeError);
         return null;
       }
 
@@ -634,7 +635,7 @@ export class PayrollLiquidationNewService {
         .eq('periodo_id', periodId);
 
       if (novedadesError) {
-        console.error('❌ Error obteniendo novedades:', novedadesError);
+        logger.error('❌ Error obteniendo novedades:', novedadesError);
       }
 
       // Obtener periodicidad
@@ -673,15 +674,15 @@ export class PayrollLiquidationNewService {
         });
 
       if (upsertError) {
-        console.error('❌ Error guardando recálculo:', upsertError);
+        logger.error('❌ Error guardando recálculo:', upsertError);
         throw upsertError;
       }
 
-      console.log(`✅ Empleado ${employee.nombre} recalculado exitosamente`);
+      logger.log(`✅ Empleado ${employee.nombre} recalculado exitosamente`);
       return recalculatedEmployee;
 
     } catch (error) {
-      console.error('❌ Error en recálculo:', error);
+      logger.error('❌ Error en recálculo:', error);
       return null;
     }
   }

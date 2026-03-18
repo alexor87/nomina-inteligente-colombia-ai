@@ -25,3 +25,6 @@ dist-ssr
 .env.local
 .env.staging
 .env.production
+.env.e2e
+playwright-report/
+test-results/

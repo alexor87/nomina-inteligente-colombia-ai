@@ -14,6 +14,17 @@ CREATE TABLE IF NOT EXISTS public.user_roles (
   UNIQUE(user_id, role, company_id)
 );
 
+-- Si el DROP TYPE CASCADE eliminó la columna role, restaurarla
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'user_roles' AND column_name = 'role'
+    ) THEN
+        ALTER TABLE public.user_roles ADD COLUMN role public.app_role;
+    END IF;
+END $$;
+
 -- Habilitar RLS
 ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
 

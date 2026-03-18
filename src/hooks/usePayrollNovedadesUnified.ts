@@ -1,6 +1,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { logger } from '@/lib/logger';
 import { NovedadesEnhancedService, CreateNovedadData } from '@/services/NovedadesEnhancedService';
 import { NovedadesCalculationService, NovedadesTotals } from '@/services/NovedadesCalculationService';
 import { PayrollNovedad } from '@/types/novedades-enhanced';
@@ -117,7 +118,7 @@ export const usePayrollNovedadesUnified = (
   const loadNovedadesTotals = useCallback(async (employeeIds: string[]) => {
     if (!periodId) return;
     
-    console.log('📊 Loading novedades totals for employees:', employeeIds);
+    logger.log('📊 Loading novedades totals for employees:', employeeIds);
     
     const updates: Record<string, PayrollNovedad[]> = {};
     const totalsMap: Record<string, NovedadesTotals> = {};
@@ -131,7 +132,7 @@ export const usePayrollNovedadesUnified = (
         const backendTotals = await NovedadesCalculationService.calculateEmployeeNovedadesTotals(employeeId, periodId);
         totalsMap[employeeId] = backendTotals;
       } catch (error) {
-        console.error(`Error loading novedades for employee ${employeeId}:`, error);
+        logger.error(`Error loading novedades for employee ${employeeId}:`, error);
       }
     }
     
@@ -140,7 +141,7 @@ export const usePayrollNovedadesUnified = (
     
     // ✅ NUEVO: Actualizar estado síncrono
     setNovedadesTotals(totalsMap);
-    console.log('✅ Totales síncronos actualizados:', totalsMap);
+    logger.log('✅ Totales síncronos actualizados:', totalsMap);
   }, [periodId, updateEmployeeNovedades]);
 
   // ✅ CRÍTICO: Get employee novedades totals usando BACKEND CALCULATION SERVICE
@@ -149,7 +150,7 @@ export const usePayrollNovedadesUnified = (
     // ✅ USAR: Backend calculated totals
     
     if (!periodId) {
-      console.warn('⚠️ No periodId available for backend calculation');
+      logger.warn('⚠️ No periodId available for backend calculation');
       return { totalNeto: 0, devengos: 0, deducciones: 0 };
     }
 
@@ -157,7 +158,7 @@ export const usePayrollNovedadesUnified = (
       // ✅ USAR SERVICIO BACKEND PARA OBTENER TOTALES CALCULADOS
       const backendTotals = await NovedadesCalculationService.calculateEmployeeNovedadesTotals(employeeId, periodId);
       
-      console.log('✅ Backend calculated totals for employee:', employeeId, {
+      logger.log('✅ Backend calculated totals for employee:', employeeId, {
         totalDevengos: backendTotals.totalDevengos,
         totalDeducciones: backendTotals.totalDeducciones,
         totalNeto: backendTotals.totalNeto,
@@ -170,7 +171,7 @@ export const usePayrollNovedadesUnified = (
         deducciones: backendTotals.totalDeducciones 
       };
     } catch (error) {
-      console.error('❌ Error getting backend calculated totals:', error);
+      logger.error('❌ Error getting backend calculated totals:', error);
       return { totalNeto: 0, devengos: 0, deducciones: 0 };
     }
   }, [periodId]);
@@ -180,7 +181,7 @@ export const usePayrollNovedadesUnified = (
     if (!periodId) return null;
     
     try {
-      console.log('🔄 Refrescando novedades específicas del empleado:', employeeId);
+      logger.log('🔄 Refrescando novedades específicas del empleado:', employeeId);
       
       // ✅ CRÍTICO: Invalidar caché ANTES de calcular para forzar recálculo fresco
       NovedadesCalculationService.invalidateCache(employeeId, periodId);
@@ -194,11 +195,11 @@ export const usePayrollNovedadesUnified = (
         ...prev,
         [employeeId]: backendTotals
       }));
-      console.log('✅ Totales síncronos refrescados para empleado:', employeeId, backendTotals);
+      logger.log('✅ Totales síncronos refrescados para empleado:', employeeId, backendTotals);
       
       return backendTotals; // ✅ RETORNAR los totales calculados
     } catch (error) {
-      console.error(`Error refreshing novedades for employee ${employeeId}:`, error);
+      logger.error(`Error refreshing novedades for employee ${employeeId}:`, error);
       return null;
     }
   }, [periodId, setEmployeeNovedades]);
@@ -221,7 +222,7 @@ export const usePayrollNovedadesUnified = (
       const employeeNovedades = await NovedadesEnhancedService.getNovedadesByEmployee(employeeId, periodId);
       return employeeNovedades;
     } catch (error) {
-      console.error(`Error getting novedades list for employee ${employeeId}:`, error);
+      logger.error(`Error getting novedades list for employee ${employeeId}:`, error);
       return [];
     }
   }, [periodId]);
@@ -230,7 +231,7 @@ export const usePayrollNovedadesUnified = (
   const createMutation = useMutation({
     mutationFn: async (data: CreateNovedadData) => {
       setIsCreating(true);
-      console.log('🔄 Creando novedad:', data);
+      logger.log('🔄 Creando novedad:', data);
       
       const result = await NovedadesEnhancedService.createNovedad(data);
       
@@ -241,7 +242,7 @@ export const usePayrollNovedadesUnified = (
       return result;
     },
     onSuccess: (newNovedad) => {
-      console.log('✅ Novedad creada exitosamente:', newNovedad);
+      logger.log('✅ Novedad creada exitosamente:', newNovedad);
       
       // Transform the novedad for cache update
       const transformedNovedad = transformNovedadForQuery(newNovedad);
@@ -260,7 +261,7 @@ export const usePayrollNovedadesUnified = (
         // ✅ CRÍTICO: Actualizar lastRefreshTime para disparar recálculo
         const newRefreshTime = Date.now();
         setLastRefreshTime(newRefreshTime);
-        console.log('⏰ lastRefreshTime actualizado:', newRefreshTime);
+        logger.log('⏰ lastRefreshTime actualizado:', newRefreshTime);
       }
       
       queryClient.invalidateQueries({ 
@@ -279,7 +280,7 @@ export const usePayrollNovedadesUnified = (
       });
     },
     onError: (error: Error) => {
-      console.error('❌ Error creando novedad:', error);
+      logger.error('❌ Error creando novedad:', error);
       toast({
         title: "Error",
         description: error.message || "Error creando la novedad",
@@ -295,7 +296,7 @@ export const usePayrollNovedadesUnified = (
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<CreateNovedadData> }) => {
       setIsUpdating(true);
-      console.log('🔄 Actualizando novedad:', id, data);
+      logger.log('🔄 Actualizando novedad:', id, data);
       
       const result = await NovedadesEnhancedService.updateNovedad(id, data);
       
@@ -306,7 +307,7 @@ export const usePayrollNovedadesUnified = (
       return result;
     },
     onSuccess: (updatedNovedad) => {
-      console.log('✅ Novedad actualizada exitosamente:', updatedNovedad);
+      logger.log('✅ Novedad actualizada exitosamente:', updatedNovedad);
       
       // Transform the novedad for cache update
       const transformedNovedad = transformNovedadForQuery(updatedNovedad);
@@ -341,7 +342,7 @@ export const usePayrollNovedadesUnified = (
       });
     },
     onError: (error: Error) => {
-      console.error('❌ Error actualizando novedad:', error);
+      logger.error('❌ Error actualizando novedad:', error);
       toast({
         title: "Error",
         description: error.message || "Error actualizando la novedad",
@@ -357,7 +358,7 @@ export const usePayrollNovedadesUnified = (
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       setIsDeleting(true);
-      console.log('🔄 Eliminando novedad:', id);
+      logger.log('🔄 Eliminando novedad:', id);
       
       // Obtener la novedad antes de eliminarla para saber el empleado afectado
       const novedadToDelete = novedades.find(n => n.id === id);
@@ -367,7 +368,7 @@ export const usePayrollNovedadesUnified = (
       return { deletedId: id, employeeId: affectedEmployeeId };
     },
     onSuccess: ({ deletedId, employeeId }) => {
-      console.log('✅ Novedad eliminada exitosamente:', deletedId, 'Empleado afectado:', employeeId);
+      logger.log('✅ Novedad eliminada exitosamente:', deletedId, 'Empleado afectado:', employeeId);
       
       // Actualizar cache local de la query actual
       queryClient.setQueryData(queryKey, (old: any[] = []) => {
@@ -375,27 +376,27 @@ export const usePayrollNovedadesUnified = (
       });
 
       // ✅ CRÍTICO: Actualizar store global inmediatamente
-      console.log('🏪 Removiendo novedad del store global:', deletedId);
+      logger.log('🏪 Removiendo novedad del store global:', deletedId);
       removeNovedadFromCache(deletedId);
 
       // ✅ CRÍTICO: Si conocemos el empleado afectado, refrescar su cache específicamente
       if (employeeId) {
-        console.log('🔄 Refrescando cache específico del empleado en store global:', employeeId);
+        logger.log('🔄 Refrescando cache específico del empleado en store global:', employeeId);
         refreshEmployeeNovedades(employeeId).then((freshTotals) => {
-          console.log('✅ Cache del empleado actualizado exitosamente en store global', freshTotals);
+          logger.log('✅ Cache del empleado actualizado exitosamente en store global', freshTotals);
           
           // ✅ CRÍTICO: Actualizar lastRefreshTime DESPUÉS de actualizar novedadesTotals
           const newRefreshTime = Date.now();
           setLastRefreshTime(newRefreshTime);
-          console.log('⏰ Nuevo lastRefreshTime establecido en store global:', newRefreshTime);
+          logger.log('⏰ Nuevo lastRefreshTime establecido en store global:', newRefreshTime);
         }).catch(err => {
-          console.error('❌ Error refrescando cache del empleado:', err);
+          logger.error('❌ Error refrescando cache del empleado:', err);
         });
       } else {
         // Si no hay employeeId, actualizar lastRefreshTime inmediatamente
         const newRefreshTime = Date.now();
         setLastRefreshTime(newRefreshTime);
-        console.log('⏰ Nuevo lastRefreshTime establecido en store global (sin employeeId):', newRefreshTime);
+        logger.log('⏰ Nuevo lastRefreshTime establecido en store global (sin employeeId):', newRefreshTime);
       }
       
       // ✅ MEJORADO: Invalidación más agresiva y específica
@@ -423,7 +424,7 @@ export const usePayrollNovedadesUnified = (
       });
     },
     onError: (error: Error) => {
-      console.error('❌ Error eliminando novedad:', error);
+      logger.error('❌ Error eliminando novedad:', error);
       toast({
         title: "Error",
         description: error.message || "Error eliminando la novedad",
@@ -440,7 +441,7 @@ export const usePayrollNovedadesUnified = (
     try {
       return await createMutation.mutateAsync(data);
     } catch (error) {
-      console.error('Error en createNovedad:', error);
+      logger.error('Error en createNovedad:', error);
       return null;
     }
   };
@@ -449,7 +450,7 @@ export const usePayrollNovedadesUnified = (
     try {
       return await updateMutation.mutateAsync({ id, data });
     } catch (error) {
-      console.error('Error en updateNovedad:', error);
+      logger.error('Error en updateNovedad:', error);
       return null;
     }
   };
@@ -458,7 +459,7 @@ export const usePayrollNovedadesUnified = (
     try {
       await deleteMutation.mutateAsync(id);
     } catch (error) {
-      console.error('Error en deleteNovedad:', error);
+      logger.error('Error en deleteNovedad:', error);
       throw error;
     }
   };

@@ -28,15 +28,16 @@ BEGIN
         VALUES (company_uuid, 'mensual');
     END IF;
     
-    -- Actualizar el perfil del usuario para asignarlo a la empresa
-    UPDATE profiles 
-    SET company_id = company_uuid 
-    WHERE user_id = user_uuid;
-    
-    -- Asignar rol de administrador al usuario
-    INSERT INTO user_roles (user_id, role, company_id)
-    VALUES (user_uuid, 'administrador', company_uuid)
-    ON CONFLICT (user_id, role, company_id) DO NOTHING;
+    -- Solo asignar si el usuario existe en auth.users (no aplica en staging/db vacía)
+    IF EXISTS (SELECT 1 FROM auth.users WHERE id = user_uuid) THEN
+        UPDATE profiles
+        SET company_id = company_uuid
+        WHERE user_id = user_uuid;
+
+        INSERT INTO user_roles (user_id, role, company_id)
+        VALUES (user_uuid, 'administrador', company_uuid)
+        ON CONFLICT (user_id, role, company_id) DO NOTHING;
+    END IF;
     
 END $$;
 

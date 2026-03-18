@@ -18,13 +18,13 @@ CREATE POLICY "Superadmins can manage superadmins table"
   TO authenticated 
   USING (user_id = auth.uid());
 
--- Insertar tu usuario como superadmin
-INSERT INTO public.superadmins (user_id, email, created_by) 
-VALUES (
+-- Insertar usuario como superadmin solo si existe en auth.users
+INSERT INTO public.superadmins (user_id, email, created_by)
+SELECT
   '3716ea94-cab9-47a5-b83d-0ef05a817bf2',
   'alexor87@gmail.com',
   '3716ea94-cab9-47a5-b83d-0ef05a817bf2'
-);
+WHERE EXISTS (SELECT 1 FROM auth.users WHERE id = '3716ea94-cab9-47a5-b83d-0ef05a817bf2');
 
 -- Recrear la función is_superadmin para usar la tabla superadmins
 CREATE OR REPLACE FUNCTION public.is_superadmin(_user_id UUID DEFAULT auth.uid())
