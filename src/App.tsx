@@ -32,6 +32,7 @@ const PayrollHistoryPage = lazy(() => import("./pages/PayrollHistoryPage").then(
 const PayrollHistoryDetailPage = lazy(() => import("./pages/PayrollHistoryDetailPage"));
 const CompanyRegistrationPage = lazy(() => import("./pages/CompanyRegistrationPage"));
 const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
+const AcceptInvitationPage = lazy(() => import("./pages/AcceptInvitationPage"));
 const SocialBenefitsPage = lazy(() => import("./pages/SocialBenefitsPage"));
 const SocialBenefitLiquidationPage = lazy(() => import("./pages/SocialBenefitLiquidationPage"));
 const MayaPage = lazy(() => import("./pages/MayaPage"));
@@ -68,6 +69,7 @@ function AppContent() {
           <Route path="/auth" element={<Navigate to="/login" replace />} />
           <Route path="/logout" element={<LogoutPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/join" element={<AcceptInvitationPage />} />
           <Route path="/app" element={<Navigate to="/modules/dashboard" replace />} />
 
           {/* SuperAdmin Routes */}

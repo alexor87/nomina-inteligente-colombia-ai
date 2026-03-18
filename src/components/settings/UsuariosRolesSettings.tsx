@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { TeamInvitationService, TeamInvitation } from '@/services/TeamInvitationService';
 import {
   Table,
   TableBody,
@@ -110,15 +111,15 @@ const rolesDisponibles = [
   }
 ];
 
-const STORAGE_KEY = 'empresa_usuarios';
 const AUDIT_KEY = 'empresa_auditoria';
 
 export const UsuariosRolesSettings = () => {
   const { toast } = useToast();
-  const { user, profile } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   
   // Estados principales
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [pendingInvitations, setPendingInvitations] = useState<TeamInvitation[]>([]);
   const [historialAuditoria, setHistorialAuditoria] = useState<ActividadAuditoria[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
@@ -153,76 +154,53 @@ export const UsuariosRolesSettings = () => {
 
   // Cargar datos al montar el componente
   useEffect(() => {
-    cargarDatos();
-  }, []);
+    if (!authLoading) {
+      cargarDatos();
+    }
+  }, [authLoading]);
 
-  const cargarDatos = () => {
+  const cargarDatos = async () => {
     try {
-      // Cargar usuarios
-      const usuariosGuardados = localStorage.getItem(STORAGE_KEY);
-      if (usuariosGuardados) {
-        let usuarios = JSON.parse(usuariosGuardados);
-        
-        // Migrar datos: reemplazar admin@empresa.com con usuario actual
-        const currentUserEmail = getCurrentUserEmail();
-        if (currentUserEmail) {
-          usuarios = usuarios.map((u: Usuario) => {
-            if (u.email === 'admin@empresa.com') {
-              return {
-                ...u,
-                email: currentUserEmail,
-                nombreCompleto: getCurrentUserName()
-              };
-            }
-            return u;
-          });
-          
-          // Guardar los datos migrados
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(usuarios));
-        }
-        
-        setUsuarios(usuarios);
+      const currentUserEmail = getCurrentUserEmail();
+      const currentUserName = getCurrentUserName();
+
+      // Always show the current user as active admin
+      const usuariosBase: Usuario[] = currentUserEmail
+        ? [{
+            id: user?.id || '1',
+            nombreCompleto: currentUserName,
+            email: currentUserEmail,
+            rol: 'administrador',
+            estado: 'Activo',
+            ultimoAcceso: new Date().toISOString().split('T')[0],
+            fechaRegistro: new Date().toISOString().split('T')[0]
+          }]
+        : [];
+
+      // Load real invitations from Supabase
+      if (profile?.company_id) {
+        const invitations = await TeamInvitationService.getCompanyInvitations(profile.company_id);
+        setPendingInvitations(invitations);
+
+        const invitedUsers: Usuario[] = invitations.map((inv) => ({
+          id: inv.id,
+          nombreCompleto: inv.invited_name || 'Nombre pendiente',
+          email: inv.invited_email,
+          rol: inv.role,
+          estado: inv.status === 'accepted' ? 'Activo' : inv.status === 'pending' ? 'Invitación pendiente' : 'Suspendido',
+          ultimoAcceso: inv.status === 'accepted' ? inv.created_at.split('T')[0] : 'N/A',
+          fechaInvitacion: inv.created_at.split('T')[0],
+        }));
+
+        setUsuarios([...usuariosBase, ...invitedUsers]);
       } else {
-        // Datos iniciales con el usuario actual
-        const currentUserEmail = getCurrentUserEmail();
-        const currentUserName = getCurrentUserName();
-        
-        if (currentUserEmail) {
-          const usuariosIniciales: Usuario[] = [
-            {
-              id: '1',
-              nombreCompleto: currentUserName,
-              email: currentUserEmail,
-              rol: 'administrador',
-              estado: 'Activo',
-              ultimoAcceso: new Date().toISOString().split('T')[0],
-              fechaRegistro: new Date().toISOString().split('T')[0]
-            }
-          ];
-          setUsuarios(usuariosIniciales);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(usuariosIniciales));
-        }
+        setUsuarios(usuariosBase);
       }
 
-      // Cargar auditoría y migrar registros
+      // Load audit log
       const auditoriaGuardada = localStorage.getItem(AUDIT_KEY);
       if (auditoriaGuardada) {
-        let auditoria = JSON.parse(auditoriaGuardada);
-        
-        // Migrar registros de auditoría
-        const currentUserEmail = getCurrentUserEmail();
-        if (currentUserEmail) {
-          auditoria = auditoria.map((a: ActividadAuditoria) => {
-            if (a.usuario === 'admin@empresa.com') {
-              return { ...a, usuario: currentUserEmail };
-            }
-            return a;
-          });
-          
-          localStorage.setItem(AUDIT_KEY, JSON.stringify(auditoria));
-        }
-        
-        setHistorialAuditoria(auditoria);
+        setHistorialAuditoria(JSON.parse(auditoriaGuardada));
       }
     } catch (error) {
       console.error('Error cargando datos:', error);
@@ -237,17 +215,7 @@ export const UsuariosRolesSettings = () => {
   };
 
   const guardarUsuarios = (nuevosUsuarios: Usuario[]) => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(nuevosUsuarios));
-      setUsuarios(nuevosUsuarios);
-    } catch (error) {
-      console.error('Error guardando usuarios:', error);
-      toast({
-        title: "Error",
-        description: "No se pudieron guardar los cambios",
-        variant: "destructive"
-      });
-    }
+    setUsuarios(nuevosUsuarios);
   };
 
   const agregarActividad = (actividad: Omit<ActividadAuditoria, 'id' | 'fecha'>) => {
@@ -292,32 +260,29 @@ export const UsuariosRolesSettings = () => {
   };
 
   const handleInviteUser = async () => {
-    if (!validarFormularioInvitacion()) {
+    if (!validarFormularioInvitacion()) return;
+    if (!profile?.company_id || !user) {
+      toast({ title: "Error", description: "No se pudo identificar tu empresa", variant: "destructive" });
       return;
     }
 
     try {
-      const nuevoUsuario: Usuario = {
-        id: Date.now().toString(),
-        nombreCompleto: inviteForm.nombreCompleto.trim() || 'Nombre pendiente',
-        email: inviteForm.email.toLowerCase().trim(),
-        rol: inviteForm.rol,
-        estado: 'Invitación pendiente',
-        ultimoAcceso: 'N/A',
-        fechaInvitacion: new Date().toISOString().split('T')[0]
-      };
-
-      const usuariosActualizados = [...usuarios, nuevoUsuario];
-      guardarUsuarios(usuariosActualizados);
-
-      // Simular envío de invitación por correo
-      await simularEnvioInvitacion(nuevoUsuario.email);
+      await TeamInvitationService.createInvitation(
+        profile.company_id,
+        profile.company_id, // Will be replaced by company name if needed
+        user.id,
+        {
+          email: inviteForm.email.toLowerCase().trim(),
+          name: inviteForm.nombreCompleto.trim(),
+          role: inviteForm.rol,
+        }
+      );
 
       agregarActividad({
         usuario: getCurrentUserEmail(),
-        accion: `Invitó a nuevo usuario: ${nuevoUsuario.email}`,
+        accion: `Invitó a nuevo usuario: ${inviteForm.email}`,
         resultado: 'Éxito',
-        detalles: `Rol asignado: ${getRolLabel(nuevoUsuario.rol)}`
+        detalles: `Rol asignado: ${getRolLabel(inviteForm.rol)}`
       });
 
       setInviteForm({ email: '', rol: '', nombreCompleto: '' });
@@ -326,22 +291,15 @@ export const UsuariosRolesSettings = () => {
 
       toast({
         title: "Invitación enviada",
-        description: `Se ha enviado una invitación a ${nuevoUsuario.email}`,
+        description: `Se ha enviado una invitación a ${inviteForm.email}`,
       });
+
+      // Reload to show new invitation
+      await cargarDatos();
     } catch (error) {
       console.error('Error invitando usuario:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo enviar la invitación",
-        variant: "destructive"
-      });
+      toast({ title: "Error", description: "No se pudo enviar la invitación", variant: "destructive" });
     }
-  };
-
-  const simularEnvioInvitacion = async (email: string): Promise<void> => {
-    // Simular delay de red
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    console.log(`Invitación enviada a: ${email}`);
   };
 
   const cambiarEstadoUsuario = (id: string, nuevoEstado: Usuario['estado']) => {
@@ -409,8 +367,9 @@ export const UsuariosRolesSettings = () => {
     if (!usuario || usuario.estado !== 'Invitación pendiente') return;
 
     try {
-      await simularEnvioInvitacion(usuario.email);
-      
+      const companyName = profile?.company_id || 'Tu empresa';
+      await TeamInvitationService.resendInvitation(id, companyName);
+
       agregarActividad({
         usuario: getCurrentUserEmail(),
         accion: `Reenvió invitación a: ${usuario.email}`,

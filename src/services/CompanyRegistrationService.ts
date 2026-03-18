@@ -1,6 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/lib/logger';
+import { TeamInvitationService } from './TeamInvitationService';
 
 export interface CompanyRegistrationData {
   nit: string;
@@ -11,6 +12,11 @@ export interface CompanyRegistrationData {
   ciudad?: string;
   plan: 'basico' | 'profesional' | 'empresarial';
   periodicity?: 'quincenal' | 'mensual';
+  invitedMember?: {
+    email: string;
+    name: string;
+    role: string;
+  };
 }
 
 export class CompanyRegistrationService {
@@ -71,6 +77,24 @@ export class CompanyRegistrationService {
         max_payrolls_per_month: 12,
         created_at: new Date().toISOString()
       });
+
+      // Send team invitation if provided (non-blocking)
+      if (data.invitedMember?.email && data.invitedMember?.role) {
+        try {
+          await TeamInvitationService.createInvitation(
+            company.id,
+            data.razon_social,
+            user.id,
+            {
+              email: data.invitedMember.email,
+              name: data.invitedMember.name || '',
+              role: data.invitedMember.role,
+            }
+          );
+        } catch (inviteError) {
+          logger.warn('⚠️ Invitación fallida (registro continúa):', inviteError);
+        }
+      }
 
       return { success: true, company, message: 'Empresa registrada exitosamente con acceso completo' };
     } catch (error) {

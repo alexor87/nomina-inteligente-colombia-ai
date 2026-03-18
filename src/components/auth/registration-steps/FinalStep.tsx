@@ -83,6 +83,13 @@ export const FinalStep = ({ onComplete, onCancel }: FinalStepProps) => {
         ciudad: data.companyCity,
         plan: 'profesional' as const,
         periodicity: data.payrollFrequency,
+        invitedMember: data.invitedMember
+          ? {
+              email: data.invitedMember.email,
+              name: data.invitedMember.name || '',
+              role: data.invitedMember.role,
+            }
+          : undefined,
       };
 
       console.log('🏢 Registrando empresa con datos:', registrationData);
