@@ -76,51 +76,12 @@ export class TeamInvitationService {
   }
 
   static async acceptInvitation(token: string): Promise<{ success: boolean; message: string }> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { success: false, message: 'Debes iniciar sesión primero' };
-
-    const invitation = await this.getInvitationByToken(token);
-
-    if (!invitation) return { success: false, message: 'Invitación no encontrada' };
-    if (invitation.status !== 'pending') return { success: false, message: 'Esta invitación ya fue usada o expiró' };
-    if (new Date(invitation.expires_at) < new Date()) return { success: false, message: 'Esta invitación ha expirado' };
-    if (invitation.invited_email !== user.email?.toLowerCase()) {
-      return { success: false, message: 'Esta invitación no corresponde a tu email' };
-    }
-
-    // Update invitation status
-    const { error: updateError } = await supabase
-      .from('team_invitations' as any)
-      .update({ status: 'accepted' })
-      .eq('token', token);
-
-    if (updateError) {
-      logger.error('Error accepting invitation:', updateError);
+    const { data, error } = await supabase.rpc('accept_team_invitation', { p_token: token });
+    if (error) {
+      logger.error('Error accepting invitation:', error);
       return { success: false, message: 'Error al aceptar la invitación' };
     }
-
-    // Assign role in company
-    const { error: roleError } = await supabase
-      .from('user_roles')
-      .insert({
-        user_id: user.id,
-        company_id: invitation.company_id,
-        role: invitation.role as any,
-        assigned_by: invitation.invited_by || user.id,
-      });
-
-    if (roleError && roleError.code !== '23505') {
-      logger.error('Error assigning role:', roleError);
-      return { success: false, message: 'Error al asignar el rol' };
-    }
-
-    // Update profile with company
-    await supabase
-      .from('profiles')
-      .update({ company_id: invitation.company_id })
-      .eq('user_id', user.id);
-
-    return { success: true, message: '¡Bienvenido al equipo!' };
+    return data as { success: boolean; message: string };
   }
 
   static async getCompanyInvitations(companyId: string): Promise<TeamInvitation[]> {
