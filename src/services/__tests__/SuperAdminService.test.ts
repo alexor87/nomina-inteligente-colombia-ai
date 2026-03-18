@@ -62,7 +62,13 @@ describe('SuperAdminService', () => {
           return {
             select: vi.fn().mockReturnValue({
               eq: vi.fn().mockReturnValue({
-                order: vi.fn().mockResolvedValue({ data: [], error: null })
+                order: vi.fn().mockResolvedValue({
+                  data: [
+                    { plan_id: 'basico', nombre: 'Básico', precio: 15000, max_employees: 10, max_payrolls_per_month: 5 },
+                    { plan_id: 'profesional', nombre: 'Profesional', precio: 35000, max_employees: 50, max_payrolls_per_month: 20 }
+                  ],
+                  error: null
+                })
               })
             })
           };
