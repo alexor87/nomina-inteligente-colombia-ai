@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EmpresaSettings } from '@/components/settings/EmpresaSettings';
 import { EmpleadosSettings } from '@/components/settings/EmpleadosSettings';
@@ -14,14 +15,17 @@ import { UsuariosRolesSettings } from '@/components/settings/UsuariosRolesSettin
 
 
 const SettingsPage = () => {
+  const { state } = useLocation();
+  const defaultTab = (state as any)?.activeTab || 'empresa';
+
   return (
     <div className="px-6 py-6 space-y-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Configuración</h1>
         <p className="text-gray-600">Administra las configuraciones de tu empresa y sistema</p>
       </div>
-      
-      <Tabs defaultValue="empresa" className="w-full">
+
+      <Tabs defaultValue={defaultTab} className="w-full">
         <TabsList className="grid w-full grid-cols-5 lg:grid-cols-10 mb-6">
           <TabsTrigger value="empresa">🏢 Empresa</TabsTrigger>
           <TabsTrigger value="empleados">👥 Empleados</TabsTrigger>
