@@ -193,8 +193,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setTimeout(async () => {
             if (!isRefreshingUserData.current) {
               await refreshUserData();
+              setLoading(false);
             }
-            setLoading(false);
+            // If another refresh is in progress, it will call setLoading(false) when done
           }, 200);
         } else {
           setProfile(null);
@@ -214,8 +215,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setTimeout(async () => {
           if (!isRefreshingUserData.current) {
             await refreshUserData();
+            setLoading(false);
           }
-          setLoading(false);
+          // If another refresh is in progress, it will call setLoading(false) when done
         }, 200);
       } else {
         setLoading(false);
