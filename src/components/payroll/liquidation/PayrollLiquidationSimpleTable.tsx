@@ -82,6 +82,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
   const lastRecalcAtRef = useRef(0);
   const lastPersistedHashRef = useRef('');
   const prevKeyRef = useRef('');
+  const isInitialCalcRef = useRef(true);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
   const { companyId } = useCurrentCompany();
@@ -289,11 +290,17 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
 
       } catch (error) {
         console.error('❌ Error en batch calculation:', error);
-        toast({
-          title: "Error en cálculo",
-          description: "Hubo un problema calculando la nómina. Intenta de nuevo.",
-          variant: "destructive"
-        });
+        if (isInitialCalcRef.current) {
+          // Primer fallo: posible cold start del Edge Function. No mostrar error — reintento automático.
+          console.warn('⚠️ Initial calculation failed (possible cold start), will retry on next render');
+          isInitialCalcRef.current = false;
+        } else {
+          toast({
+            title: "Error en cálculo",
+            description: "Hubo un problema calculando la nómina. Intenta de nuevo.",
+            variant: "destructive"
+          });
+        }
       } finally {
         setIsCalculating(false);
         setCalculationProgress({ current: 0, total: 0 });
