@@ -4,7 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
 import { YearProvider } from "@/contexts/YearContext";
@@ -48,6 +48,12 @@ const AdminBillingPage = lazy(() => import("./pages/admin/AdminBillingPage"));
 
 const queryClient = new QueryClient();
 
+// Redirect legacy /app/* paths to /modules/*
+const AppRedirect = () => {
+  const { '*': splat } = useParams();
+  return <Navigate to={`/modules/${splat || 'dashboard'}`} replace />;
+};
+
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center">
     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
@@ -71,6 +77,7 @@ function AppContent() {
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/join" element={<AcceptInvitationPage />} />
           <Route path="/app" element={<Navigate to="/modules/dashboard" replace />} />
+          <Route path="/app/*" element={<AppRedirect />} />
 
           {/* SuperAdmin Routes */}
           <Route element={<AdminLayout />}>
