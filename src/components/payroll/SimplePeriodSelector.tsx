@@ -44,7 +44,7 @@ export const SimplePeriodSelector: React.FC<SimplePeriodSelectorProps> = ({
     setIsLoading(true);
     try {
       // Verificar si existe configuración legal para el año seleccionado
-      const availableConfigYears = ConfigurationService.getAvailableYears();
+      const availableConfigYears = await ConfigurationService.getAvailableYearsAsync();
       const hasConfiguration = availableConfigYears.includes(selectedYear);
       
       if (!hasConfiguration) {
