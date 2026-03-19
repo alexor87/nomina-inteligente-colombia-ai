@@ -23,7 +23,7 @@ BEGIN
     WHERE user_id = v_caller_id
       AND company_id = v_invitation.company_id
       AND role = 'administrador'
-  ) AND NOT public.is_superadmin(v_caller_id) THEN
+  ) THEN
     RETURN json_build_object('success', false, 'message', 'No tienes permisos para realizar esta acción');
   END IF;
 
