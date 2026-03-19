@@ -430,6 +430,7 @@ const PayrollLiquidationPageSimplified = () => {
             <PayrollEmptyState
               periodLabel={selectedPeriod.label}
               onNavigateToEmployees={handleNavigateToEmployees}
+              onAddEmployee={currentPeriodId ? () => setShowAddEmployeeModal(true) : undefined}
             />
           </CardContent>
         </Card>
