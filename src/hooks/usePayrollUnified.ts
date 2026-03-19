@@ -279,9 +279,11 @@ export const usePayrollUnified = (companyId: string) => {
             estado: 'borrador'
           }));
 
+          // Upsert con ignoreDuplicates: true para no sobreescribir registros existentes
+          // (evita unique constraint failure si addEmployees ya insertó algunos registros)
           const { error: insertError } = await supabase
             .from('payrolls')
-            .insert(payrollRecords);
+            .upsert(payrollRecords, { onConflict: 'company_id,employee_id,period_id', ignoreDuplicates: true });
 
           if (insertError) {
             logger.error('Error creando registros de payroll:', insertError);
