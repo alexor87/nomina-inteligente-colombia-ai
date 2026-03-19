@@ -194,11 +194,10 @@ export class ConfigurationService {
       
       const { error } = await supabase
         .from('company_payroll_configurations')
-        .upsert({
-          company_id: companyId,
-          year,
-          ...dbConfig
-        });
+        .upsert(
+          { company_id: companyId, year, ...dbConfig },
+          { onConflict: 'company_id,year' }
+        );
 
       if (error) {
         console.error('Error saving configuration:', error);
