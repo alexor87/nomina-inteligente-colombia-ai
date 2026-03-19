@@ -194,7 +194,8 @@ export const UsuariosRolesSettings = () => {
           fechaInvitacion: inv.created_at.split('T')[0],
         }));
 
-        setUsuarios([...usuariosBase, ...invitedUsers]);
+        const currentUserInInvitations = invitedUsers.some(u => u.email === currentUserEmail);
+        setUsuarios([...(currentUserInInvitations ? [] : usuariosBase), ...invitedUsers]);
       } else {
         setUsuarios(usuariosBase);
       }
