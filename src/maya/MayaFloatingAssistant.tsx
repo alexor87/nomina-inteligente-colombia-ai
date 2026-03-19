@@ -79,7 +79,7 @@ export const MayaFloatingAssistant: React.FC = () => {
       initial={{ opacity: 0, y: 100, x: 50 }}
       animate={{ opacity: 1, y: 0, x: 0 }}
       exit={{ opacity: 0, y: 100, x: 50 }}
-      className="fixed bottom-6 right-6 z-50 max-w-sm"
+      className="fixed bottom-20 right-6 z-50 max-w-sm"
     >
       <AnimatePresence mode="wait">
         {!isMinimized ? (
