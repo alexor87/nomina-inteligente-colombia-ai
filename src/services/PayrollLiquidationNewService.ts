@@ -213,7 +213,7 @@ export class PayrollLiquidationNewService {
       
       // ✅ OBTENER CONFIGURACIÓN DINÁMICA
       const currentYear = new Date().getFullYear().toString();
-      const config = ConfigurationService.getConfiguration(currentYear);
+      const config = await ConfigurationService.getConfigurationAsync(currentYear);
       logger.log(`⚙️ Usando configuración para año: ${currentYear}`, config);
       
       // ✅ CÁLCULO ALELUYA EXACTO

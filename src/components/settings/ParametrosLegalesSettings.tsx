@@ -195,7 +195,7 @@ export const ParametrosLegalesSettings = () => {
     try {
       await ConfigurationService.deleteYear(year);
       await loadAvailableYears();
-      const remainingYears = await ConfigurationService.getAvailableYears();
+      const remainingYears = await ConfigurationService.getAvailableYearsAsync();
       if (remainingYears.length > 0) {
         setSelectedYear(remainingYears[0]);
       }

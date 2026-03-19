@@ -133,7 +133,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
 
       const currentWorkedDays = workedDays;
       const periodType = periodForCalculation.tipo_periodo;
-      const config = getCurrentYearConfig();
+      const config = await getCurrentYearConfig();
 
       const calculation = await PayrollCalculationBackendService.calculatePayroll({
         baseSalary: employee.baseSalary,
@@ -213,7 +213,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
       }> = {};
 
       try {
-        const config = getCurrentYearConfig();
+        const config = await getCurrentYearConfig();
         const currentWorkedDays = workedDays;
         const periodType = periodForCalculation.tipo_periodo;
 
@@ -334,7 +334,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
   });
 
   const getCurrentYearConfig = () => {
-    return ConfigurationService.getConfiguration(year);
+    return ConfigurationService.getConfigurationAsync(year);
   };
 
   const handleOpenNovedadModal = (employee: PayrollEmployee) => {

@@ -44,7 +44,7 @@ export class EndOfYearDetectionService {
         new Date(lastLiquidatedPeriod.fecha_fin).getMonth() === 11 : false;
       
       // 3. Verificar si ya existe configuración para el próximo año
-      const availableYears = ConfigurationService.getAvailableYears();
+      const availableYears = await ConfigurationService.getAvailableYearsAsync();
       const hasNextYearConfig = availableYears.includes(nextYear.toString());
       
       // 4. Verificar si ya existen períodos del próximo año

@@ -30,16 +30,19 @@ export const NewYearConfigurationModal: React.FC<NewYearConfigurationModalProps>
   const [baseYear, setBaseYear] = useState(endOfYearSituation.currentYear.toString());
   const [isCreating, setIsCreating] = useState(false);
   const [configuration, setConfiguration] = useState<PayrollConfiguration | null>(null);
-  
+
   // Años disponibles
-  const availableBaseYears = ConfigurationService.getAvailableYears();
+  const [availableBaseYears, setAvailableBaseYears] = useState<string[]>([]);
   const suggestedYears = [`${endOfYearSituation.nextYear}`, `${endOfYearSituation.nextYear + 1}`];
-  
+
+  useEffect(() => {
+    ConfigurationService.getAvailableYearsAsync().then(setAvailableBaseYears);
+  }, []);
+
   // Cargar configuración base cuando cambia el año base
   useEffect(() => {
     if (baseYear) {
-      const baseConfig = ConfigurationService.getConfiguration(baseYear);
-      setConfiguration(baseConfig);
+      ConfigurationService.getConfigurationAsync(baseYear).then(setConfiguration);
     }
   }, [baseYear]);
   
