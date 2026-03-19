@@ -46,8 +46,8 @@ export const useEmployeeList = (): EmployeeListHook => {
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
   const [filters, setFiltersState] = useState<EmployeeFilters>({
     searchTerm: '',
-    estado: '',
-    tipoContrato: ''
+    estado: 'all',
+    tipoContrato: 'all'
   });
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -60,8 +60,8 @@ export const useEmployeeList = (): EmployeeListHook => {
   const clearFilters = () => {
     setFiltersState({
       searchTerm: '',
-      estado: '',
-      tipoContrato: ''
+      estado: 'all',
+      tipoContrato: 'all'
     });
     setCurrentPage(1);
   };
@@ -107,8 +107,8 @@ export const useEmployeeList = (): EmployeeListHook => {
         employee.apellido.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
         employee.cedula.includes(filters.searchTerm);
       
-      const matchesStatus = !filters.estado || employee.estado === filters.estado;
-      const matchesContract = !filters.tipoContrato || employee.tipoContrato === filters.tipoContrato;
+      const matchesStatus = filters.estado === 'all' || employee.estado === filters.estado;
+      const matchesContract = filters.tipoContrato === 'all' || employee.tipoContrato === filters.tipoContrato;
       
       return matchesSearch && matchesStatus && matchesContract;
     });
