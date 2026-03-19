@@ -81,7 +81,7 @@ export const Dashboard = () => {
               <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
             </Button>
             <Button 
-              onClick={() => navigate('/app/payroll')}
+              onClick={() => navigate('/modules/payroll')}
               className="bg-primary hover:bg-primary/90"
             >
               <Calculator className="h-4 w-4 mr-2" />
