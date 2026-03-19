@@ -359,7 +359,7 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
                   <SelectValue placeholder="Estado" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos</SelectItem>
+                  <SelectItem value="all">Todos</SelectItem>
                   <SelectItem value="activo">Activo</SelectItem>
                   <SelectItem value="inactivo">Inactivo</SelectItem>
                   <SelectItem value="vacaciones">Vacaciones</SelectItem>
@@ -375,7 +375,7 @@ export const EmployeeList = ({ onEmployeeSelect, selectionMode = false }: Employ
                   <SelectValue placeholder="Tipo de Contrato" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos</SelectItem>
+                  <SelectItem value="all">Todos</SelectItem>
                   <SelectItem value="indefinido">Indefinido</SelectItem>
                   <SelectItem value="fijo">Fijo</SelectItem>
                   <SelectItem value="obra">Obra</SelectItem>
