@@ -335,7 +335,7 @@ export const UsuariosRolesSettings = () => {
     });
   };
 
-  const eliminarUsuario = (id: string) => {
+  const eliminarUsuario = async (id: string) => {
     const usuario = usuarios.find(u => u.id === id);
     if (!usuario) return;
 
@@ -350,15 +350,18 @@ export const UsuariosRolesSettings = () => {
       return;
     }
 
-    const usuariosActualizados = usuarios.filter(u => u.id !== id);
-    guardarUsuarios(usuariosActualizados);
+    const result = await TeamInvitationService.deleteTeamMember(id);
+    if (!result.success) {
+      toast({ title: "Error", description: result.message, variant: "destructive" });
+      return;
+    }
 
+    guardarUsuarios(usuarios.filter(u => u.id !== id));
     agregarActividad({
       usuario: getCurrentUserEmail(),
       accion: `Eliminó usuario: ${usuario.email}`,
       resultado: 'Éxito'
     });
-
     toast({
       title: "Usuario eliminado",
       description: "El usuario ha sido eliminado del sistema",

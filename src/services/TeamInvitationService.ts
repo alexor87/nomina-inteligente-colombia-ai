@@ -107,6 +107,15 @@ export class TeamInvitationService {
     return (data as TeamInvitation[]) || [];
   }
 
+  static async deleteTeamMember(invitationId: string): Promise<{ success: boolean; message: string }> {
+    const { data, error } = await supabase.rpc('delete_team_member', { p_invitation_id: invitationId });
+    if (error) {
+      logger.error('Error deleting team member:', error);
+      return { success: false, message: 'Error al eliminar el usuario' };
+    }
+    return data as { success: boolean; message: string };
+  }
+
   static async resendInvitation(invitationId: string, companyName: string): Promise<void> {
     const { data, error } = await supabase
       .from('team_invitations' as any)
