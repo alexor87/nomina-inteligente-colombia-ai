@@ -1,6 +1,8 @@
--- RPC function to accept a team invitation
--- SECURITY DEFINER bypasses RLS so any authenticated user can accept their own invitation
--- See also: 20260318210000_fix_accept_invitation_conflict.sql, 20260318220000_fix_accept_invitation_robust.sql
+-- Fix: robust accept_team_invitation
+-- 1. Creates profile if missing (trigger may be absent in some envs)
+-- 2. Explicit cast role::app_role to avoid type ambiguity
+-- 3. EXCEPTION block converts any unhandled error to { success: false } instead of HTTP 400
+-- 4. Null guard for unauthenticated calls
 
 CREATE OR REPLACE FUNCTION accept_team_invitation(p_token uuid)
 RETURNS json

@@ -11,7 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 export default function AcceptInvitationPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, refreshUserData } = useAuth();
   const { toast } = useToast();
 
   const token = searchParams.get('token');
@@ -75,6 +75,7 @@ export default function AcceptInvitationPage() {
     const result = await TeamInvitationService.acceptInvitation(token);
 
     if (result.success) {
+      await refreshUserData();
       setStatus('success');
       toast({ title: '¡Bienvenido!', description: result.message });
       setTimeout(() => navigate('/modules/dashboard', { replace: true }), 2000);
