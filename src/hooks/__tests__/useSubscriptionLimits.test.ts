@@ -40,7 +40,7 @@ describe('useSubscriptionLimits', () => {
       expect(result.current.canAddEmployee()).toBe(false);
     });
 
-    it('returns false when isWriteBlocked (trial expired)', () => {
+    it('returns true when trial is expired but under employee limit (trial does not block)', () => {
       mockUseSubscription.mockReturnValue({
         subscription: {
           plan_type: 'basico',
@@ -49,6 +49,24 @@ describe('useSubscriptionLimits', () => {
           status: 'trial'
         },
         isTrialExpired: true
+      });
+      mockUseActiveEmployeeCount.mockReturnValue({ count: 5 });
+
+      const { result } = renderHook(() => useSubscriptionLimits());
+
+      expect(result.current.canAddEmployee()).toBe(true);
+      expect(result.current.isWriteBlocked).toBe(false);
+    });
+
+    it('returns false when isWriteBlocked (status suspendida)', () => {
+      mockUseSubscription.mockReturnValue({
+        subscription: {
+          plan_type: 'basico',
+          max_employees: 10,
+          max_payrolls_per_month: 5,
+          status: 'suspendida'
+        },
+        isTrialExpired: false
       });
       mockUseActiveEmployeeCount.mockReturnValue({ count: 5 });
 
@@ -89,7 +107,7 @@ describe('useSubscriptionLimits', () => {
   });
 
   describe('canProcessPayroll()', () => {
-    it('returns false when trial is expired', () => {
+    it('returns true when trial is expired (only suspendida/cancelada blocks payroll)', () => {
       mockUseSubscription.mockReturnValue({
         subscription: {
           plan_type: 'basico',
@@ -98,6 +116,23 @@ describe('useSubscriptionLimits', () => {
           status: 'trial'
         },
         isTrialExpired: true
+      });
+      mockUseActiveEmployeeCount.mockReturnValue({ count: 5 });
+
+      const { result } = renderHook(() => useSubscriptionLimits());
+
+      expect(result.current.canProcessPayroll()).toBe(true);
+    });
+
+    it('returns false when status is suspendida', () => {
+      mockUseSubscription.mockReturnValue({
+        subscription: {
+          plan_type: 'basico',
+          max_employees: 10,
+          max_payrolls_per_month: 5,
+          status: 'suspendida'
+        },
+        isTrialExpired: false
       });
       mockUseActiveEmployeeCount.mockReturnValue({ count: 5 });
 
@@ -223,7 +258,7 @@ describe('useSubscriptionLimits', () => {
   });
 
   describe('isWriteBlocked', () => {
-    it('is true when trial expired and status is trial', () => {
+    it('is false when trial expired (trial does not block writes)', () => {
       mockUseSubscription.mockReturnValue({
         subscription: {
           plan_type: 'basico',
@@ -232,6 +267,40 @@ describe('useSubscriptionLimits', () => {
           status: 'trial'
         },
         isTrialExpired: true
+      });
+      mockUseActiveEmployeeCount.mockReturnValue({ count: 5 });
+
+      const { result } = renderHook(() => useSubscriptionLimits());
+
+      expect(result.current.isWriteBlocked).toBe(false);
+    });
+
+    it('is true when status is suspendida', () => {
+      mockUseSubscription.mockReturnValue({
+        subscription: {
+          plan_type: 'basico',
+          max_employees: 10,
+          max_payrolls_per_month: 5,
+          status: 'suspendida'
+        },
+        isTrialExpired: false
+      });
+      mockUseActiveEmployeeCount.mockReturnValue({ count: 5 });
+
+      const { result } = renderHook(() => useSubscriptionLimits());
+
+      expect(result.current.isWriteBlocked).toBe(true);
+    });
+
+    it('is true when status is cancelada', () => {
+      mockUseSubscription.mockReturnValue({
+        subscription: {
+          plan_type: 'basico',
+          max_employees: 10,
+          max_payrolls_per_month: 5,
+          status: 'cancelada'
+        },
+        isTrialExpired: false
       });
       mockUseActiveEmployeeCount.mockReturnValue({ count: 5 });
 
