@@ -101,7 +101,7 @@ export abstract class SecureBaseService {
     };
 
     console.log(`🔒 [SECURITY] Secure insert to ${tableName} for company ${companyId}`);
-    return (supabase as any).from(tableName).insert(insertData);
+    return (supabase as any).from(tableName).insert(insertData).select('*');
   }
 
   /**
