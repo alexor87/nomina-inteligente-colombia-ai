@@ -109,7 +109,7 @@ export const ParametrosLegalesSettings = () => {
 
   const loadAvailableYears = async () => {
     try {
-      const years = await ConfigurationService.getAvailableYears();
+      const years = await ConfigurationService.getAvailableYearsAsync();
       setAvailableYears(years);
       if (years.length > 0 && !years.includes(selectedYear)) {
         setSelectedYear(years[0]);
@@ -123,7 +123,7 @@ export const ParametrosLegalesSettings = () => {
   const loadYearConfiguration = async () => {
     setIsLoading(true);
     try {
-      const yearConfig = await ConfigurationService.getConfiguration(selectedYear);
+      const yearConfig = await ConfigurationService.getConfigurationAsync(selectedYear);
       setConfig(yearConfig);
     } catch (error) {
       console.error('Error loading configuration:', error);
