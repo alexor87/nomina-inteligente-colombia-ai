@@ -17,7 +17,7 @@ export const SimpleQuickActions: React.FC = () => {
     {
       title: 'Procesar Nómina',
       icon: <Calculator className="h-4 w-4" />,
-      action: () => navigate('/app/payroll'),
+      action: () => navigate('/modules/payroll'),
       primary: true,
     },
     {
@@ -35,7 +35,7 @@ export const SimpleQuickActions: React.FC = () => {
     {
       title: 'Reportes',
       icon: <BarChart3 className="h-4 w-4" />,
-      action: () => navigate('/app/reports'),
+      action: () => navigate('/modules/reports'),
       primary: false,
     },
   ];
