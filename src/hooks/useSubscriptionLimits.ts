@@ -31,7 +31,7 @@ export const useSubscriptionLimits = (): SubscriptionLimits => {
   const maxEmployees = subscription?.max_employees ?? 9999;
   const maxPayrolls = subscription?.max_payrolls_per_month ?? 9999;
 
-  const isWriteBlocked = isTrialExpired && subscription?.status === 'trial';
+  const isWriteBlocked = subscription?.status === 'suspendida' || subscription?.status === 'cancelada';
 
   const canAddEmployee = useCallback((): boolean => {
     if (isWriteBlocked) return false;
