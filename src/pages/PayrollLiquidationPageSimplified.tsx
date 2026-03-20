@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calculator, Users, RotateCcw, Upload } from 'lucide-react';
@@ -247,14 +247,19 @@ const PayrollLiquidationPageSimplified = () => {
     console.log('Ver resultados de liquidación...');
   };
 
-  const handleAddEmployees = async (employeeIds: string[]) => {
+  const handleAddEmployees = async (employeeData: Array<{
+    id: string; nombre: string; apellido: string;
+    cargo: string; salario_base: number; eps?: string; afp?: string;
+  }>) => {
     try {
-      await addEmployees(employeeIds);
+      await addEmployees(employeeData);
       setShowAddEmployeeModal(false);
     } catch (error) {
       console.error('Error adding employees:', error);
     }
   };
+
+  const currentEmployeeIds = useMemo(() => employees.map(emp => emp.id), [employees]);
 
   const handleReset = () => {
     resetSelection();
@@ -509,7 +514,7 @@ const PayrollLiquidationPageSimplified = () => {
         isOpen={showAddEmployeeModal}
         onClose={() => setShowAddEmployeeModal(false)}
         onAddEmployees={handleAddEmployees}
-        currentEmployeeIds={employees.map(emp => emp.id)}
+        currentEmployeeIds={currentEmployeeIds}
         companyId={companyId || ''}
       />
 

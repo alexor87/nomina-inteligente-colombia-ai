@@ -21,7 +21,7 @@ interface AvailableEmployee {
 interface EmployeeAddModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddEmployees: (employeeIds: string[]) => Promise<void>;
+  onAddEmployees: (employees: AvailableEmployee[]) => Promise<void>;
   currentEmployeeIds: string[];
   companyId: string;
 }
@@ -45,7 +45,7 @@ export const EmployeeAddModal: React.FC<EmployeeAddModalProps> = ({
     if (isOpen) {
       loadAvailableEmployees();
     }
-  }, [isOpen, currentEmployeeIds]);
+  }, [isOpen]);
 
   const loadAvailableEmployees = async () => {
     setIsLoading(true);
@@ -133,7 +133,8 @@ export const EmployeeAddModal: React.FC<EmployeeAddModalProps> = ({
 
     setIsAdding(true);
     try {
-      await onAddEmployees(selectedEmployeeIds);
+      const selectedEmployees = availableEmployees.filter(e => selectedEmployeeIds.includes(e.id));
+      await onAddEmployees(selectedEmployees);
       
       toast({
         title: "✅ Empleados agregados",
