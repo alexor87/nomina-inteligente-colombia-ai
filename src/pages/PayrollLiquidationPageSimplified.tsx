@@ -256,6 +256,7 @@ const PayrollLiquidationPageSimplified = () => {
       setShowAddEmployeeModal(false);
     } catch (error) {
       console.error('Error adding employees:', error);
+      throw error;
     }
   };
 
@@ -516,6 +517,7 @@ const PayrollLiquidationPageSimplified = () => {
         onAddEmployees={handleAddEmployees}
         currentEmployeeIds={currentEmployeeIds}
         companyId={companyId || ''}
+        periodEndDate={selectedPeriod?.endDate}
       />
 
       <NoveltyImportDrawer
