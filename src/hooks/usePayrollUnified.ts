@@ -380,23 +380,16 @@ export const usePayrollUnified = (companyId: string) => {
     return periodId; // ✅ Retornar el periodId para validación automática
   }, [companyId, findOrCreatePeriod, toast]);
 
-  const addEmployees = useCallback(async (employeeIds: string[]) => {
+  const addEmployees = useCallback(async (employeeData: Array<{
+    id: string; nombre: string; apellido: string;
+    cargo: string; salario_base: number; eps?: string; afp?: string;
+  }>) => {
     if (!currentPeriod) return;
 
     try {
-      const { data: newEmployees, error } = await supabase
-        .from('employees')
-        .select('*')
-        .in('id', employeeIds)
-        .eq('company_id', companyId);
-
-      if (error) throw error;
-
-      // Calcular días trabajados correctamente para el período actual
       const workedDays = calculateWorkedDays(currentPeriod.fecha_inicio, currentPeriod.fecha_fin);
-      
-      // Crear registros en payrolls para persistencia
-      const payrollRecords = (newEmployees || []).map(emp => ({
+
+      const payrollRecords = employeeData.map(emp => ({
         company_id: companyId,
         employee_id: emp.id,
         period_id: currentPeriod.id,
@@ -409,22 +402,20 @@ export const usePayrollUnified = (companyId: string) => {
         estado: 'borrador'
       }));
 
-      // Upsert en lugar de insert para manejar constraint UNIQUE (company_id, employee_id, period_id)
-      // Si el empleado ya existe en payrolls (estado local desincronizado), actualiza en lugar de fallar
       const { error: insertError } = await supabase
         .from('payrolls')
         .upsert(payrollRecords, { onConflict: 'company_id,employee_id,period_id', ignoreDuplicates: false });
 
       if (insertError) throw insertError;
 
-      // Construir lista desde newEmployees (ya en memoria) — sin round-trip post-upsert.
-      // Evita el bug de read-after-write donde un reload inmediato devuelve [] y borra el estado.
-      const freshList: PayrollEmployee[] = (newEmployees || []).map(emp => ({
+      // Construir estado directamente de employeeData (sin query a DB).
+      // Esto elimina cualquier dependencia de RLS, latencia o problemas de read-after-write.
+      const freshList: PayrollEmployee[] = employeeData.map(emp => ({
         id: emp.id,
         name: `${emp.nombre} ${emp.apellido}`,
         position: emp.cargo || 'Sin cargo',
         baseSalary: Number(emp.salario_base) || 0,
-        workedDays: workedDays,
+        workedDays,
         extraHours: 0,
         disabilities: 0,
         bonuses: 0,
@@ -462,7 +453,7 @@ export const usePayrollUnified = (companyId: string) => {
         description: "No se pudieron agregar los empleados",
         variant: "destructive",
       });
-      throw error; // Re-lanzar para que el modal muestre error real en lugar de falso éxito
+      throw error;
     }
   }, [currentPeriod, companyId, employees.length, toast]);
 
