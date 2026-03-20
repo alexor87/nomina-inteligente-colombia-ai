@@ -387,7 +387,8 @@ export const usePayrollUnified = (companyId: string) => {
       const { data: newEmployees, error } = await supabase
         .from('employees')
         .select('*')
-        .in('id', employeeIds);
+        .in('id', employeeIds)
+        .eq('company_id', companyId);
 
       if (error) throw error;
 
@@ -891,6 +892,46 @@ export const usePayrollUnified = (companyId: string) => {
     }
   }, [currentPeriod, companyId]);
 
+  // Función simple para recargar payrolls desde DB sin lógica de inicialización.
+  // Usada como safety-net después de mutaciones (addEmployees, removeEmployee).
+  const refreshPayrolls = useCallback(async () => {
+    if (!currentPeriod) return;
+    const { data, error } = await supabase
+      .from('payrolls')
+      .select('*, employees(*)')
+      .eq('company_id', companyId)
+      .eq('period_id', currentPeriod.id);
+    if (!error && data) {
+      const list: PayrollEmployee[] = data.map(payroll => {
+        const emp = payroll.employees as any;
+        return {
+          id: emp.id,
+          name: `${emp.nombre} ${emp.apellido}`,
+          position: emp.cargo || 'Sin cargo',
+          baseSalary: Number(emp.salario_base) || 0,
+          workedDays: payroll.dias_trabajados || 15,
+          extraHours: payroll.horas_extra || 0,
+          disabilities: payroll.incapacidades || 0,
+          bonuses: payroll.bonificaciones || 0,
+          absences: 0,
+          grossPay: payroll.total_devengado || Number(emp.salario_base) || 0,
+          deductions: payroll.total_deducciones || 0,
+          netPay: payroll.neto_pagado || Number(emp.salario_base) || 0,
+          status: 'valid' as const,
+          errors: [],
+          eps: emp.eps,
+          afp: emp.afp,
+          transportAllowance: payroll.auxilio_transporte || 0,
+          employerContributions: 0,
+          healthDeduction: payroll.salud_empleado || 0,
+          pensionDeduction: payroll.pension_empleado || 0
+        };
+      });
+      setEmployees(list);
+      logger.log(`🔄 refreshPayrolls: ${list.length} empleados cargados`);
+    }
+  }, [currentPeriod, companyId]);
+
   return {
     currentPeriod,
     employees,
@@ -902,6 +943,7 @@ export const usePayrollUnified = (companyId: string) => {
     liquidatePayroll,
     refreshEmployeeNovedades,
     updateEmployeeCalculationsInDB,
+    refreshPayrolls,
     currentPeriodId: currentPeriod?.id
   };
 };
