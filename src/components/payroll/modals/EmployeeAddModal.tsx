@@ -24,6 +24,7 @@ interface EmployeeAddModalProps {
   onAddEmployees: (employees: AvailableEmployee[]) => Promise<void>;
   currentEmployeeIds: string[];
   companyId: string;
+  periodEndDate?: string;
 }
 
 export const EmployeeAddModal: React.FC<EmployeeAddModalProps> = ({
@@ -31,7 +32,8 @@ export const EmployeeAddModal: React.FC<EmployeeAddModalProps> = ({
   onClose,
   onAddEmployees,
   currentEmployeeIds,
-  companyId
+  companyId,
+  periodEndDate
 }) => {
   const [availableEmployees, setAvailableEmployees] = useState<AvailableEmployee[]>([]);
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([]);
@@ -54,13 +56,17 @@ export const EmployeeAddModal: React.FC<EmployeeAddModalProps> = ({
       
       let query = supabase
         .from('employees')
-        .select('id, nombre, apellido, cedula, cargo, salario_base')
+        .select('id, nombre, apellido, cedula, cargo, salario_base, fecha_ingreso')
         .eq('company_id', companyId)
         .eq('estado', 'activo');
 
-      // FASE 2: Corregir la consulta SQL para manejar el caso cuando currentEmployeeIds está vacío
       if (currentEmployeeIds && currentEmployeeIds.length > 0) {
         query = query.not('id', 'in', `(${currentEmployeeIds.join(',')})`);
+      }
+
+      // Excluir empleados contratados después del fin del período (el trigger DB lo rechazaría de todos modos)
+      if (periodEndDate) {
+        query = query.lte('fecha_ingreso', periodEndDate);
       }
 
       const { data: employees, error } = await query;
