@@ -416,14 +416,46 @@ export const usePayrollUnified = (companyId: string) => {
 
       if (insertError) throw insertError;
 
-      // Recargar todos los empleados del período desde DB para garantizar consistencia
+      // Actualización optimista: usar los datos ya disponibles de newEmployees para actualizar
+      // el estado inmediatamente, sin depender del reload (que puede fallar o devolver vacío).
+      const immediateList: PayrollEmployee[] = (newEmployees || []).map(emp => ({
+        id: emp.id,
+        name: `${emp.nombre} ${emp.apellido}`,
+        position: emp.cargo || 'Sin cargo',
+        baseSalary: Number(emp.salario_base) || 0,
+        workedDays: workedDays,
+        extraHours: 0,
+        disabilities: 0,
+        bonuses: 0,
+        absences: 0,
+        grossPay: Number(emp.salario_base) || 0,
+        deductions: 0,
+        netPay: Number(emp.salario_base) || 0,
+        status: 'valid' as const,
+        errors: [],
+        eps: emp.eps,
+        afp: emp.afp,
+        transportAllowance: 0,
+        employerContributions: 0,
+        healthDeduction: 0,
+        pensionDeduction: 0
+      }));
+
+      // Hacer merge con empleados existentes (evitar duplicados)
+      setEmployees(prev => {
+        const existingIds = new Set(prev.map(e => e.id));
+        const toAdd = immediateList.filter(e => !existingIds.has(e.id));
+        return [...prev, ...toAdd];
+      });
+
+      // Recargar todos los empleados del período desde DB para obtener valores precisos de DB
       const { data: updatedPayrolls, error: reloadError } = await supabase
         .from('payrolls')
         .select('*, employees(*)')
         .eq('company_id', companyId)
         .eq('period_id', currentPeriod.id);
 
-      if (!reloadError && updatedPayrolls) {
+      if (!reloadError && updatedPayrolls && updatedPayrolls.length > 0) {
         const freshList: PayrollEmployee[] = updatedPayrolls.map(payroll => {
           const emp = payroll.employees as any;
           return {
@@ -450,15 +482,19 @@ export const usePayrollUnified = (companyId: string) => {
           };
         });
         setEmployees(freshList);
-
-        // Actualizar contador real
-        await supabase
-          .from('payroll_periods_real')
-          .update({ empleados_count: freshList.length })
-          .eq('id', currentPeriod.id);
-
-        logger.log(`✅ Empleados agregados. Total en período: ${freshList.length}`);
       }
+
+      // Actualizar contador y marcar período como inicializado con empleados
+      const finalCount = (updatedPayrolls && updatedPayrolls.length > 0)
+        ? updatedPayrolls.length
+        : immediateList.length;
+
+      await supabase
+        .from('payroll_periods_real')
+        .update({ employees_loaded: true, empleados_count: finalCount })
+        .eq('id', currentPeriod.id);
+
+      logger.log(`✅ Empleados agregados. Total en período: ${finalCount}`);
 
     } catch (error) {
       logger.error('Error agregando empleados:', error);
