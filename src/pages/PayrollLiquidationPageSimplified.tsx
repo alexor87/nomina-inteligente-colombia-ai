@@ -62,6 +62,7 @@ const PayrollLiquidationPageSimplified = () => {
     liquidatePayroll,
     refreshEmployeeNovedades,
     updateEmployeeCalculationsInDB,
+    refreshPayrolls,
     isAutoSaving,
     lastAutoSaveTime,
     isRemovingEmployee,
@@ -250,6 +251,9 @@ const PayrollLiquidationPageSimplified = () => {
     try {
       await addEmployees(employeeIds);
       setShowAddEmployeeModal(false);
+      // Safety-net: recargar payrolls desde DB para garantizar que el estado
+      // refleja la realidad, independientemente de lo que ocurra en addEmployees.
+      await refreshPayrolls();
     } catch (error) {
       console.error('Error adding employees:', error);
     }
