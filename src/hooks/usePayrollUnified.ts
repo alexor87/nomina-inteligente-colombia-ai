@@ -417,9 +417,9 @@ export const usePayrollUnified = (companyId: string) => {
 
       if (insertError) throw insertError;
 
-      // Actualización optimista: usar los datos ya disponibles de newEmployees para actualizar
-      // el estado inmediatamente, sin depender del reload (que puede fallar o devolver vacío).
-      const immediateList: PayrollEmployee[] = (newEmployees || []).map(emp => ({
+      // Construir lista desde newEmployees (ya en memoria) — sin round-trip post-upsert.
+      // Evita el bug de read-after-write donde un reload inmediato devuelve [] y borra el estado.
+      const freshList: PayrollEmployee[] = (newEmployees || []).map(emp => ({
         id: emp.id,
         name: `${emp.nombre} ${emp.apellido}`,
         position: emp.cargo || 'Sin cargo',
@@ -442,60 +442,18 @@ export const usePayrollUnified = (companyId: string) => {
         pensionDeduction: 0
       }));
 
-      // Hacer merge con empleados existentes (evitar duplicados)
       setEmployees(prev => {
         const existingIds = new Set(prev.map(e => e.id));
-        const toAdd = immediateList.filter(e => !existingIds.has(e.id));
+        const toAdd = freshList.filter(e => !existingIds.has(e.id));
         return [...prev, ...toAdd];
       });
 
-      // Recargar todos los empleados del período desde DB para obtener valores precisos de DB
-      const { data: updatedPayrolls, error: reloadError } = await supabase
-        .from('payrolls')
-        .select('*, employees(*)')
-        .eq('company_id', companyId)
-        .eq('period_id', currentPeriod.id);
-
-      if (!reloadError && updatedPayrolls && updatedPayrolls.length > 0) {
-        const freshList: PayrollEmployee[] = updatedPayrolls.map(payroll => {
-          const emp = payroll.employees as any;
-          return {
-            id: emp.id,
-            name: `${emp.nombre} ${emp.apellido}`,
-            position: emp.cargo || 'Sin cargo',
-            baseSalary: Number(emp.salario_base) || 0,
-            workedDays: payroll.dias_trabajados || 15,
-            extraHours: payroll.horas_extra || 0,
-            disabilities: payroll.incapacidades || 0,
-            bonuses: payroll.bonificaciones || 0,
-            absences: 0,
-            grossPay: payroll.total_devengado || Number(emp.salario_base) || 0,
-            deductions: payroll.total_deducciones || 0,
-            netPay: payroll.neto_pagado || Number(emp.salario_base) || 0,
-            status: 'valid' as const,
-            errors: [],
-            eps: emp.eps,
-            afp: emp.afp,
-            transportAllowance: payroll.auxilio_transporte || 0,
-            employerContributions: 0,
-            healthDeduction: payroll.salud_empleado || 0,
-            pensionDeduction: payroll.pension_empleado || 0
-          };
-        });
-        setEmployees(freshList);
-      }
-
-      // Actualizar contador y marcar período como inicializado con empleados
-      const finalCount = (updatedPayrolls && updatedPayrolls.length > 0)
-        ? updatedPayrolls.length
-        : immediateList.length;
-
       await supabase
         .from('payroll_periods_real')
-        .update({ employees_loaded: true, empleados_count: finalCount })
+        .update({ employees_loaded: true, empleados_count: employees.length + freshList.length })
         .eq('id', currentPeriod.id);
 
-      logger.log(`✅ Empleados agregados. Total en período: ${finalCount}`);
+      logger.log(`✅ Empleados agregados. Total en período: ${employees.length + freshList.length}`);
 
     } catch (error) {
       logger.error('Error agregando empleados:', error);
@@ -901,7 +859,7 @@ export const usePayrollUnified = (companyId: string) => {
       .select('*, employees(*)')
       .eq('company_id', companyId)
       .eq('period_id', currentPeriod.id);
-    if (!error && data) {
+    if (!error && data && data.length > 0) {
       const list: PayrollEmployee[] = data.map(payroll => {
         const emp = payroll.employees as any;
         return {
