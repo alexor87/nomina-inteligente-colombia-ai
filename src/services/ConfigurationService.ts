@@ -299,8 +299,9 @@ export class ConfigurationService {
 
       if (!error && configs) {
         configs.forEach(config => {
-          const key = `${companyId}-${config.year}`;
-          configCache.set(key, this.transformDBToConfig(config));
+          const transformed = this.transformDBToConfig(config);
+          configCache.set(`${companyId}-${config.year}`, transformed);
+          configCache.set(`default-${config.year}`, transformed); // ✅ para acceso sync
         });
       }
 

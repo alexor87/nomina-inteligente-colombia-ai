@@ -86,6 +86,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
   const [hasOutdatedDbValues, setHasOutdatedDbValues] = useState(false);
+  const [autoPersistedHash, setAutoPersistedHash] = useState('');
   const { companyId } = useCurrentCompany();
 
   const {
@@ -247,7 +248,10 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
             absences: 0,
             periodType: periodType,
             novedades: novedadesForIBC,
-            year: year
+            year: year,
+            salarioMinimo: config.salarioMinimo,
+            auxilioTransporte: config.auxilioTransporte,
+            uvt: config.uvt
           };
         });
 
@@ -255,7 +259,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
 
         // ✅ UNA SOLA LLAMADA AL BACKEND para todos los empleados
         console.log(`📦 Calculando ${employees.length} empleados en batch...`);
-        const batchResults = await PayrollCalculationBackendService.calculateBatch(batchInputs);
+        const batchResults = await PayrollCalculationBackendService.calculateBatch(batchInputs, companyId!);
         
         // ✅ Mapear resultados
         employees.forEach((employee, index) => {
@@ -286,6 +290,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
           console.log('💾 Persistiendo cálculos batch en BD...');
           await updateEmployeeCalculationsInDB(newCalculations);
           lastPersistedHashRef.current = calculationsHash;
+          setAutoPersistedHash(calculationsHash);
           console.log('✅ Cálculos batch persistidos');
         }
 
@@ -351,18 +356,25 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
       setHasOutdatedDbValues(false);
       return;
     }
+    // Si estos cálculos ya fueron guardados en DB, no mostrar banner
+    const currentHash = JSON.stringify(employeeCalculations);
+    if (autoPersistedHash === currentHash) {
+      setHasOutdatedDbValues(false);
+      return;
+    }
     const isOutdated = employees.some(emp => {
       const freshCalc = employeeCalculations[emp.id];
       if (!freshCalc) return false;
       return Math.abs(freshCalc.grossPay - emp.grossPay) > 1;
     });
     setHasOutdatedDbValues(isOutdated);
-  }, [employeeCalculations, employees, isCalculating]);
+  }, [employeeCalculations, employees, isCalculating, autoPersistedHash]);
 
   const handleUpdateDbValues = async () => {
     if (!updateEmployeeCalculationsInDB || Object.keys(employeeCalculations).length === 0) return;
     try {
       await updateEmployeeCalculationsInDB(employeeCalculations);
+      setAutoPersistedHash(JSON.stringify(employeeCalculations));
       setHasOutdatedDbValues(false);
       toast({
         title: "Cálculos actualizados",

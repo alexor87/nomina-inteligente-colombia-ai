@@ -16,6 +16,10 @@ export interface PayrollCalculationInput {
   novedades?: NovedadForIBC[];
   // ✅ NUEVO CAMPO: año para configuración específica
   year?: string;
+  // ✅ NUEVO CAMPO: valores oficiales del año (SMMLV + Auxilio Transporte)
+  salarioMinimo?: number;
+  auxilioTransporte?: number;
+  uvt?: number;
 }
 
 export interface PayrollCalculationResult {
@@ -114,12 +118,12 @@ export class PayrollCalculationBackendService {
     }
   }
 
-  static async calculateBatch(inputs: PayrollCalculationInput[]): Promise<PayrollCalculationResult[]> {
+  static async calculateBatch(inputs: PayrollCalculationInput[], companyId?: string): Promise<PayrollCalculationResult[]> {
     try {
       const { data, error } = await supabase.functions.invoke('payroll-calculations', {
         body: {
           action: 'batch-calculate',
-          data: { inputs }
+          data: { inputs, companyId }
         }
       });
 
