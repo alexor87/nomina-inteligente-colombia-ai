@@ -493,7 +493,7 @@ const PayrollLiquidationPageSimplified = () => {
               onRemoveEmployee={removeEmployee}
               onEmployeeNovedadesChange={refreshEmployeeNovedades}
               updateEmployeeCalculationsInDB={updateEmployeeCalculationsInDB}
-              year={selectedYear}
+              year={selectedPeriod?.startDate?.split('-')[0] || selectedYear}
             />
           </CardContent>
         </Card>
