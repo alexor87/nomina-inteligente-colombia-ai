@@ -259,19 +259,16 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
 
         // ✅ BATCH CON CHUNKING: máx 100 empleados por llamada para soportar cientos/miles
         const CHUNK_SIZE = 100;
-        let batchResults: Awaited<ReturnType<typeof PayrollCalculationBackendService.calculateBatch>>;
-        if (batchInputs.length <= CHUNK_SIZE) {
-          batchResults = await PayrollCalculationBackendService.calculateBatch(batchInputs, companyId!);
-        } else {
-          const chunks: typeof batchInputs[] = [];
-          for (let i = 0; i < batchInputs.length; i += CHUNK_SIZE) {
-            chunks.push(batchInputs.slice(i, i + CHUNK_SIZE));
-          }
-          const chunkResults = await Promise.all(
-            chunks.map(chunk => PayrollCalculationBackendService.calculateBatch(chunk, companyId!))
-          );
-          batchResults = chunkResults.flat();
-        }
+        const batchResults = batchInputs.length <= CHUNK_SIZE
+          ? await PayrollCalculationBackendService.calculateBatch(batchInputs, companyId!)
+          : (await Promise.all(
+              Array.from(
+                { length: Math.ceil(batchInputs.length / CHUNK_SIZE) },
+                (_, i) => PayrollCalculationBackendService.calculateBatch(
+                  batchInputs.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE), companyId!
+                )
+              )
+            )).flat();
         
         // ✅ Mapear resultados
         employees.forEach((employee, index) => {

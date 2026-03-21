@@ -79,7 +79,6 @@ export const usePayrollNovedadesUnified = (
   const lastRefreshTime = useEmployeeNovedadesCacheStore(state => state.lastRefreshTime);
   const setLastRefreshTime = useEmployeeNovedadesCacheStore(state => state.setLastRefreshTime);
   const setEmployeeNovedades = useEmployeeNovedadesCacheStore(state => state.setEmployeeNovedades);
-  const updateEmployeeNovedades = useEmployeeNovedadesCacheStore(state => state.updateEmployeeNovedades);
   const removeNovedadFromCache = useEmployeeNovedadesCacheStore(state => state.removeNovedadFromCache);
 
   // ✅ FIXED: Handle both string and options parameter
@@ -122,12 +121,10 @@ export const usePayrollNovedadesUnified = (
       // Una sola llamada a BD para todas las novedades del período
       const allNovedades = await NovedadesEnhancedService.getNovedadesByPeriod(periodId, companyId);
 
-      const updates: Record<string, PayrollNovedad[]> = {};
       const totalsMap: Record<string, NovedadesTotals> = {};
 
       for (const employeeId of employeeIds) {
         const novedades = allNovedades.filter(n => n.empleado_id === employeeId);
-        updates[employeeId] = novedades;
 
         const totalDevengos = novedades
           .filter(n => (n.valor ?? 0) > 0)
@@ -144,12 +141,11 @@ export const usePayrollNovedadesUnified = (
         };
       }
 
-      updateEmployeeNovedades(updates);
       setNovedadesTotals(totalsMap);
     } catch (error) {
       logger.error('Error loading novedades totals:', error);
     }
-  }, [periodId, companyId, updateEmployeeNovedades]);
+  }, [periodId, companyId]);
 
   // ✅ CRÍTICO: Get employee novedades totals usando BACKEND CALCULATION SERVICE
   const getEmployeeNovedades = useCallback(async (employeeId: string) => {
