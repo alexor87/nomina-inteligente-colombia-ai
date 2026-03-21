@@ -124,25 +124,28 @@ export class MayaChatService {
   async sendMessage(
     userMessage: string,
     context?: RichContext,
-    onMessageUpdate?: (messageId: string, content: string) => void
+    onMessageUpdate?: (messageId: string, content: string) => void,
+    _skipAddUser = false
   ): Promise<ChatMessage> {
     console.log('🤖 MAYA Chat: Sending message:', userMessage);
-    
+
     // Update company_id in conversation if context provided
     if (context?.companyId) {
       this.currentConversation.companyId = context.companyId;
       this.currentConversation.lastUpdated = new Date().toISOString();
     }
-    
-    // Add user message to conversation
+
+    // Add user message to conversation (skipped on retry to avoid duplicates)
     const userChatMessage: ChatMessage = {
       id: `user_${Date.now()}`,
       role: 'user',
       content: userMessage,
       timestamp: new Date().toISOString()
     };
-    
-    this.currentConversation.messages.push(userChatMessage);
+
+    if (!_skipAddUser) {
+      this.currentConversation.messages.push(userChatMessage);
+    }
 
     // Generate idempotency key for this request
     const idempotencyKey = this.generateIdempotencyKey();
@@ -244,15 +247,24 @@ export class MayaChatService {
         }
       };
 
-      const httpResponse = await fetch(`${SUPABASE_URL}/functions/v1/maya-intelligence`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json',
-          ...(requestStreaming && { 'X-Maya-Stream-Request': '1' })
-        },
-        body: JSON.stringify(requestBody)
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30_000);
+
+      let httpResponse: Response;
+      try {
+        httpResponse = await fetch(`${SUPABASE_URL}/functions/v1/maya-intelligence`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${authToken}`,
+            'Content-Type': 'application/json',
+            ...(requestStreaming && { 'X-Maya-Stream-Request': '1' })
+          },
+          body: JSON.stringify(requestBody),
+          signal: controller.signal
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       if (!httpResponse.ok) {
         const status = httpResponse.status;
@@ -376,13 +388,13 @@ export class MayaChatService {
       const debugCode = `E-${Date.now().toString().slice(-6)}`;
       let userFriendlyMessage = `Disculpa, tengo un problema técnico (${debugCode}). Por favor intenta de nuevo en unos segundos.`;
 
-      // Retry once on network failures (fetch rejected)
+      // Retry once on network failures (fetch rejected) — skip re-adding user message
       if (error instanceof TypeError && !error.isRetry) {
         console.warn('⚠️ MAYA Chat: Network error, retrying...');
         await new Promise(resolve => setTimeout(resolve, 1500));
         try {
           error.isRetry = true;
-          return await this.sendMessage(userMessage, context, onMessageUpdate);
+          return await this.sendMessage(userMessage, context, onMessageUpdate, true);
         } catch (retryError) {
           console.error('❌ MAYA Chat: Retry failed:', retryError);
         }
