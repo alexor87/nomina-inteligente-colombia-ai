@@ -268,52 +268,41 @@ export class MayaChatService {
 
       if (!httpResponse.ok) {
         const status = httpResponse.status;
-        const errJson = await httpResponse.json().catch(() => null);
+        const errJson = await httpResponse.json().catch(() => httpResponse.text().catch(() => null));
         const err: any = new Error(errJson?.message || `HTTP ${status}`);
         err.status = status;
         err.errJson = errJson;
         throw err;
       }
 
-      // ── SSE streaming path ──────────────────────────────────────────────
+      // ── Detect SSE vs JSON by body content (Supabase gateway strips response headers) ──
       let data: any;
+      const responseText = await httpResponse.text();
+      const isSSE = responseText.trimStart().startsWith('data: ');
 
-      if (httpResponse.headers.get('X-Maya-Stream') === '1' && onMessageUpdate) {
+      if (isSSE && onMessageUpdate) {
         const streamMsgId = `maya_${Date.now()}`;
         let accumulated = '';
 
-        const reader = httpResponse.body!.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-
-        outer: while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-
-          const lines = buffer.split('\n');
-          buffer = lines.pop() ?? '';
-
-          for (const line of lines) {
-            if (!line.startsWith('data: ')) continue;
-            const raw = line.slice(6).trim();
-            if (raw === '[DONE]') break outer;
-            try {
-              const parsed = JSON.parse(raw);
-              const token = parsed.choices?.[0]?.delta?.content ?? '';
-              if (token) {
-                accumulated += token;
-                onMessageUpdate(streamMsgId, accumulated);
-              }
-            } catch { /* ignore malformed SSE chunks */ }
-          }
+        for (const line of responseText.split('\n')) {
+          if (!line.startsWith('data: ')) continue;
+          const raw = line.slice(6).trim();
+          if (raw === '[DONE]') break;
+          try {
+            const parsed = JSON.parse(raw);
+            const token = parsed.choices?.[0]?.delta?.content ?? '';
+            if (token) {
+              accumulated += token;
+              onMessageUpdate(streamMsgId, accumulated);
+            }
+          } catch { /* ignore malformed SSE chunks */ }
         }
 
         data = { message: accumulated, _streamMsgId: streamMsgId, executableActions: [], quickReplies: [] };
 
       } else {
         // ── JSON path (actions / non-streaming) ────────────────────────────
-        data = await httpResponse.json();
+        data = JSON.parse(responseText);
       }
 
       console.log('🤖 MAYA Chat: Function response:', {
