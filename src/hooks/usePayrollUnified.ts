@@ -839,7 +839,7 @@ export const usePayrollUnified = (companyId: string) => {
     } catch (error) {
       logger.error('❌ Error persistiendo cálculos:', error);
     }
-  }, [currentPeriod, companyId]);
+  }, [currentPeriod, companyId, employees]);
 
   // Función simple para recargar payrolls desde DB sin lógica de inicialización.
   // Usada como safety-net después de mutaciones (addEmployees, removeEmployee).
