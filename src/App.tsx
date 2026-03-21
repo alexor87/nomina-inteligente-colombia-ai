@@ -45,6 +45,7 @@ const AdminUsersPage = lazy(() => import("./pages/admin/AdminUsersPage"));
 const AdminSettingsPage = lazy(() => import("./pages/admin/AdminSettingsPage"));
 const AdminNotificationsPage = lazy(() => import("./pages/admin/AdminNotificationsPage"));
 const AdminBillingPage = lazy(() => import("./pages/admin/AdminBillingPage"));
+const SalaryIncreasePage = lazy(() => import("./pages/settings/SalaryIncreasePage"));
 
 const queryClient = new QueryClient();
 
@@ -106,6 +107,7 @@ function AppContent() {
             <Route path="/modules/vacations-absences" element={<VacationsAbsencesPage />} />
             <Route path="/modules/reports" element={<ReportsPage />} />
             <Route path="/modules/settings" element={<SettingsPage />} />
+            <Route path="/modules/settings/salary-increase/:year" element={<SalaryIncreasePage />} />
             <Route path="/modules/profile" element={<ProfilePage />} />
           </Route>
         </Routes>

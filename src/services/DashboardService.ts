@@ -507,4 +507,38 @@ export class DashboardService {
       throw error;
     }
   }
+
+  static async createAlert(
+    companyId: string,
+    alert: {
+      type: 'warning' | 'error' | 'info';
+      title: string;
+      description: string;
+      priority?: 'high' | 'medium' | 'low';
+      icon?: string;
+      action_required?: boolean;
+      due_date?: string;
+    }
+  ): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('dashboard_alerts')
+        .insert({
+          company_id: companyId,
+          type: alert.type,
+          title: alert.title,
+          description: alert.description,
+          priority: alert.priority ?? 'high',
+          icon: alert.icon ?? '⚠️',
+          action_required: alert.action_required ?? false,
+          due_date: alert.due_date ?? null,
+          dismissed: false,
+        });
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error creating dashboard alert:', error);
+      throw error;
+    }
+  }
 }

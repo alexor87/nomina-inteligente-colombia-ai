@@ -1,20 +1,25 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { ConfigurationService, PayrollConfiguration } from '@/services/ConfigurationService';
 import { CompanyPayrollPoliciesService } from '@/services/CompanyPayrollPoliciesService';
+import { DashboardService } from '@/services/DashboardService';
 import { useCurrentCompany } from '@/hooks/useCurrentCompany';
 import { PayrollPoliciesSettings } from '@/components/settings/PayrollPoliciesSettings';
-import { Plus, Trash2, Copy } from 'lucide-react';
+import { Plus, Trash2, Copy, AlertTriangle, TrendingUp } from 'lucide-react';
 
 export const ParametrosLegalesSettings = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const { companyId } = useCurrentCompany();
+  const [salaryIncreaseBannerYear, setSalaryIncreaseBannerYear] = useState<string | null>(null);
 
   const [availableYears, setAvailableYears] = useState<string[]>([]);
   const [selectedYear, setSelectedYear] = useState('2025');
@@ -144,6 +149,21 @@ export const ParametrosLegalesSettings = () => {
         title: "Parámetros legales guardados",
         description: `Los valores para el año ${selectedYear} han sido actualizados correctamente.`,
       });
+      // Show salary increase banner and create dashboard alert if saving a future year
+      const currentYear = new Date().getFullYear();
+      if (parseInt(selectedYear) > currentYear) {
+        setSalaryIncreaseBannerYear(selectedYear);
+        if (companyId) {
+          DashboardService.createAlert(companyId, {
+            type: 'warning',
+            title: `Incremento salarial ${selectedYear} pendiente`,
+            description: `El SMLMV ${selectedYear} fue configurado en ${config.salarioMinimo.toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })}. Verifica y ajusta los salarios de tus empleados para cumplir con el nuevo mínimo legal.`,
+            priority: 'high',
+            icon: '📈',
+            action_required: true,
+          }).catch(console.error);
+        }
+      }
     } catch (error) {
       toast({
         title: "Error",
@@ -683,6 +703,26 @@ export const ParametrosLegalesSettings = () => {
           Guardar Parámetros {selectedYear}
         </Button>
       </div>
+
+      {salaryIncreaseBannerYear && (
+        <Alert className="border-blue-200 bg-blue-50">
+          <TrendingUp className="h-4 w-4 text-blue-700" />
+          <AlertDescription className="flex items-center justify-between gap-4">
+            <span className="text-blue-900">
+              SMLMV {salaryIncreaseBannerYear} guardado. Puedes ajustar los salarios de tus empleados
+              para cumplir con el nuevo mínimo legal.
+            </span>
+            <Button
+              size="sm"
+              onClick={() => navigate(`/modules/settings/salary-increase/${salaryIncreaseBannerYear}`)}
+              className="shrink-0"
+            >
+              <AlertTriangle className="mr-2 h-3.5 w-3.5" />
+              Iniciar proceso de incremento
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
 
       <Separator className="my-8" />
 

@@ -26,6 +26,7 @@ import { convertNovedadesToIBC } from '@/utils/payrollCalculationsBackend';
 import { PayrollCalculationService } from '@/services/PayrollCalculationService';
 import { NoveltyImportDrawer } from '@/components/payroll/novelties-import/NoveltyImportDrawer';
 import { useEmployeeNovedadesCacheStore } from '@/stores/employeeNovedadesCacheStore';
+import { SalaryIncreaseService } from '@/services/employees/SalaryIncreaseService';
 
 interface PayrollLiquidationSimpleTableProps {
   employees: PayrollEmployee[];
@@ -234,13 +235,23 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
         });
         console.log(`✅ ${allNovedades.length} novedades agrupadas para ${novedadesByEmployee.size} empleados`);
 
+        // ✅ Obtener salarios históricos vigentes a la fecha de inicio del período
+        const periodStartDate = new Date(startDate);
+        const historicalSalaries = await SalaryIncreaseService.getSalariesBatch(
+          employees.map(e => e.id),
+          periodStartDate,
+          companyId!
+        );
+
         // ✅ Preparar inputs para batch (SÍNCRONO - sin más llamadas HTTP)
         const batchInputs = employees.map((employee) => {
           const employeeNovedades = novedadesByEmployee.get(employee.id) || [];
           const novedadesForIBC: NovedadForIBC[] = convertNovedadesToIBC(employeeNovedades);
-          
+          // Usar salario vigente a la fecha del período; fallback al salario actual
+          const effectiveSalary = historicalSalaries.get(employee.id) ?? employee.baseSalary;
+
           return {
-            baseSalary: employee.baseSalary,
+            baseSalary: effectiveSalary,
             workedDays: currentWorkedDays,
             extraHours: 0,
             disabilities: 0,
