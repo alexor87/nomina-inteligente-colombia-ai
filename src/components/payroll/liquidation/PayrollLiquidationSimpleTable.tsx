@@ -257,9 +257,21 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
 
         setCalculationProgress({ current: employees.length / 2, total: employees.length });
 
-        // ✅ UNA SOLA LLAMADA AL BACKEND para todos los empleados
-        console.log(`📦 Calculando ${employees.length} empleados en batch...`);
-        const batchResults = await PayrollCalculationBackendService.calculateBatch(batchInputs, companyId!);
+        // ✅ BATCH CON CHUNKING: máx 100 empleados por llamada para soportar cientos/miles
+        const CHUNK_SIZE = 100;
+        let batchResults: Awaited<ReturnType<typeof PayrollCalculationBackendService.calculateBatch>>;
+        if (batchInputs.length <= CHUNK_SIZE) {
+          batchResults = await PayrollCalculationBackendService.calculateBatch(batchInputs, companyId!);
+        } else {
+          const chunks: typeof batchInputs[] = [];
+          for (let i = 0; i < batchInputs.length; i += CHUNK_SIZE) {
+            chunks.push(batchInputs.slice(i, i + CHUNK_SIZE));
+          }
+          const chunkResults = await Promise.all(
+            chunks.map(chunk => PayrollCalculationBackendService.calculateBatch(chunk, companyId!))
+          );
+          batchResults = chunkResults.flat();
+        }
         
         // ✅ Mapear resultados
         employees.forEach((employee, index) => {

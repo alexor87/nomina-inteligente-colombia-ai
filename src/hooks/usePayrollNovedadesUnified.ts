@@ -114,35 +114,42 @@ export const usePayrollNovedadesUnified = (
     refetchOnWindowFocus: false
   });
 
-  // ✅ CONSOLIDADO: Load novedades totals for multiple employees
+  // ✅ OPTIMIZADO: Una sola query para todas las novedades del período, cálculo in-memory
   const loadNovedadesTotals = useCallback(async (employeeIds: string[]) => {
-    if (!periodId) return;
-    
-    logger.log('📊 Loading novedades totals for employees:', employeeIds);
-    
-    const updates: Record<string, PayrollNovedad[]> = {};
-    const totalsMap: Record<string, NovedadesTotals> = {};
-    
-    for (const employeeId of employeeIds) {
-      try {
-        const employeeNovedades = await NovedadesEnhancedService.getNovedadesByEmployee(employeeId, periodId);
-        updates[employeeId] = employeeNovedades;
-        
-        // ✅ NUEVO: Calcular totales con backend para estado síncrono
-        const backendTotals = await NovedadesCalculationService.calculateEmployeeNovedadesTotals(employeeId, periodId);
-        totalsMap[employeeId] = backendTotals;
-      } catch (error) {
-        logger.error(`Error loading novedades for employee ${employeeId}:`, error);
+    if (!periodId || !companyId) return;
+
+    try {
+      // Una sola llamada a BD para todas las novedades del período
+      const allNovedades = await NovedadesEnhancedService.getNovedadesByPeriod(periodId, companyId);
+
+      const updates: Record<string, PayrollNovedad[]> = {};
+      const totalsMap: Record<string, NovedadesTotals> = {};
+
+      for (const employeeId of employeeIds) {
+        const novedades = allNovedades.filter(n => n.empleado_id === employeeId);
+        updates[employeeId] = novedades;
+
+        const totalDevengos = novedades
+          .filter(n => (n.valor ?? 0) > 0)
+          .reduce((s, n) => s + (n.valor ?? 0), 0);
+        const totalDeducciones = novedades
+          .filter(n => (n.valor ?? 0) < 0)
+          .reduce((s, n) => s + Math.abs(n.valor ?? 0), 0);
+
+        totalsMap[employeeId] = {
+          totalDevengos,
+          totalDeducciones,
+          totalNeto: totalDevengos - totalDeducciones,
+          hasNovedades: novedades.length > 0
+        };
       }
+
+      updateEmployeeNovedades(updates);
+      setNovedadesTotals(totalsMap);
+    } catch (error) {
+      logger.error('Error loading novedades totals:', error);
     }
-    
-    // ✅ Actualizar store global
-    updateEmployeeNovedades(updates);
-    
-    // ✅ NUEVO: Actualizar estado síncrono
-    setNovedadesTotals(totalsMap);
-    logger.log('✅ Totales síncronos actualizados:', totalsMap);
-  }, [periodId, updateEmployeeNovedades]);
+  }, [periodId, companyId, updateEmployeeNovedades]);
 
   // ✅ CRÍTICO: Get employee novedades totals usando BACKEND CALCULATION SERVICE
   const getEmployeeNovedades = useCallback(async (employeeId: string) => {
