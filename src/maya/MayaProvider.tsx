@@ -770,6 +770,15 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
         conversationParams: conversationState
       } : richContext;
       
+      // Optimistic update: show user message immediately without waiting for the response
+      const optimisticUserMsg: ChatMessage = {
+        id: `user_${Date.now()}`,
+        role: 'user',
+        content: message,
+        timestamp: new Date().toISOString()
+      };
+      setChatHistory(prev => [...prev, optimisticUserMsg]);
+
       // Streaming callback: progressively update the placeholder message in chatHistory
       const onMessageUpdate = (msgId: string, content: string) => {
         setChatHistory(prev => {
