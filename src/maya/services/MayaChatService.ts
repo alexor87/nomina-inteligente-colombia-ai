@@ -1,5 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
-import { FunctionsHttpError, FunctionsRelayError, FunctionsFetchError } from '@supabase/supabase-js';
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
 
 export interface ChatMessage {
   id: string;
@@ -17,6 +19,7 @@ export interface ChatMessage {
   isFlowMessage?: boolean;
   flowId?: string;
   stepId?: string;
+  isStreaming?: boolean;
 }
 
 export interface ChatConversation {
@@ -118,7 +121,11 @@ export class MayaChatService {
     return `${this.currentConversation.sessionId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  async sendMessage(userMessage: string, context?: RichContext): Promise<ChatMessage> {
+  async sendMessage(
+    userMessage: string,
+    context?: RichContext,
+    onMessageUpdate?: (messageId: string, content: string) => void
+  ): Promise<ChatMessage> {
     console.log('🤖 MAYA Chat: Sending message:', userMessage);
     
     // Update company_id in conversation if context provided
@@ -214,35 +221,95 @@ export class MayaChatService {
         sessionId: this.currentConversation.sessionId
       });
 
-      // Call MAYA intelligence with idempotency key and action parameters
-      const { data, error } = await supabase.functions.invoke('maya-intelligence', {
-        body: {
-          conversation: simplifiedConversation,
-          sessionId: this.currentConversation.sessionId,
-          richContext: context,
-          idempotencyKey,
-          ...(actionType && { actionType }),
-          ...(actionParameters && { actionParameters }),
-          metadata: {
-            messageCount: this.currentConversation.messages.length,
-            companyId: this.currentConversation.companyId,
-            lastUpdated: this.currentConversation.lastUpdated,
-            ...(lastConversationState && { lastConversationState })
-          }
+      // Get auth token (session token or anon key fallback)
+      const { data: { session } } = await supabase.auth.getSession();
+      const authToken = session?.access_token || SUPABASE_ANON_KEY;
+
+      // Only request streaming for non-action messages when caller supports it
+      const isActionMessage = userMessage.startsWith('action_');
+      const requestStreaming = !isActionMessage && !!onMessageUpdate;
+
+      const requestBody = {
+        conversation: simplifiedConversation,
+        sessionId: this.currentConversation.sessionId,
+        richContext: context,
+        idempotencyKey,
+        ...(actionType && { actionType }),
+        ...(actionParameters && { actionParameters }),
+        metadata: {
+          messageCount: this.currentConversation.messages.length,
+          companyId: this.currentConversation.companyId,
+          lastUpdated: this.currentConversation.lastUpdated,
+          ...(lastConversationState && { lastConversationState })
         }
+      };
+
+      const httpResponse = await fetch(`${SUPABASE_URL}/functions/v1/maya-intelligence`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json',
+          ...(requestStreaming && { 'X-Maya-Stream-Request': '1' })
+        },
+        body: JSON.stringify(requestBody)
       });
 
-      console.log('🤖 MAYA Chat: Function response:', { 
-        hasData: !!data, 
-        hasError: !!error,
+      if (!httpResponse.ok) {
+        const status = httpResponse.status;
+        const errJson = await httpResponse.json().catch(() => null);
+        const err: any = new Error(errJson?.message || `HTTP ${status}`);
+        err.status = status;
+        err.errJson = errJson;
+        throw err;
+      }
+
+      // ── SSE streaming path ──────────────────────────────────────────────
+      let data: any;
+
+      if (httpResponse.headers.get('X-Maya-Stream') === '1' && onMessageUpdate) {
+        const streamMsgId = `maya_${Date.now()}`;
+        let accumulated = '';
+
+        const reader = httpResponse.body!.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        outer: while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          const lines = buffer.split('\n');
+          buffer = lines.pop() ?? '';
+
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const raw = line.slice(6).trim();
+            if (raw === '[DONE]') break outer;
+            try {
+              const parsed = JSON.parse(raw);
+              const token = parsed.choices?.[0]?.delta?.content ?? '';
+              if (token) {
+                accumulated += token;
+                onMessageUpdate(streamMsgId, accumulated);
+              }
+            } catch { /* ignore malformed SSE chunks */ }
+          }
+        }
+
+        data = { message: accumulated, _streamMsgId: streamMsgId, executableActions: [], quickReplies: [] };
+
+      } else {
+        // ── JSON path (actions / non-streaming) ────────────────────────────
+        data = await httpResponse.json();
+      }
+
+      console.log('🤖 MAYA Chat: Function response:', {
+        hasData: !!data,
+        isStreaming: !!data?._streamMsgId,
         conversationStateReturned: !!data?.conversationState,
         actionCount: (data?.executableActions || data?.executable_actions || []).length
       });
-
-      if (error) {
-        console.error('🤖 MAYA Chat: Function error:', error);
-        throw error;
-      }
 
       // Create assistant response con validación de acciones
       const rawActions = data?.executableActions || data?.executable_actions || [];
@@ -251,7 +318,7 @@ export class MayaChatService {
       );
       
       const assistantMessage: ChatMessage = {
-        id: `maya_${Date.now()}`,
+        id: data?._streamMsgId ?? `maya_${Date.now()}`,
         role: 'assistant',
         content: data?.message ?? data?.response ?? "Disculpa, no pude procesar tu mensaje en este momento.",
         timestamp: new Date().toISOString(),
@@ -308,44 +375,28 @@ export class MayaChatService {
     } catch (error: any) {
       const debugCode = `E-${Date.now().toString().slice(-6)}`;
       let userFriendlyMessage = `Disculpa, tengo un problema técnico (${debugCode}). Por favor intenta de nuevo en unos segundos.`;
-      
-      // Retry once for FunctionsFetchError (boot failures)
-      if (error instanceof FunctionsFetchError && !(error as any).isRetry) {
-        console.warn('⚠️ MAYA Chat: Retrying after FunctionsFetchError...');
+
+      // Retry once on network failures (fetch rejected)
+      if (error instanceof TypeError && !error.isRetry) {
+        console.warn('⚠️ MAYA Chat: Network error, retrying...');
         await new Promise(resolve => setTimeout(resolve, 1500));
         try {
-          (error as any).isRetry = true;
-          return await this.sendMessage(userMessage, context);
+          error.isRetry = true;
+          return await this.sendMessage(userMessage, context, onMessageUpdate);
         } catch (retryError) {
           console.error('❌ MAYA Chat: Retry failed:', retryError);
-          // Continue with normal error handling below
         }
       }
-      
-      try {
-        if (error instanceof FunctionsHttpError) {
-          const errJson = await error.context.json().catch(() => null);
-          console.error('🤖 MAYA Chat: FunctionsHttpError', { errJson, status: error.context.status });
-          
-          // Check for specific status codes
-          if (error.context.status === 429) {
-            userFriendlyMessage = 'Maya está recibiendo muchas consultas en este momento. Por favor intenta en unos segundos.';
-          } else if (error.context.status === 402) {
-            userFriendlyMessage = 'Límite de créditos alcanzado. Contacta al administrador para continuar usando Maya.';
-          } else if (errJson?.message) {
-            // Use server's error message if available
-            userFriendlyMessage = errJson.message;
-          }
-        } else if (error instanceof FunctionsRelayError) {
-          console.error('🤖 MAYA Chat: FunctionsRelayError', { name: error.name, message: error.message });
-        } else if (error instanceof FunctionsFetchError) {
-          console.error('🤖 MAYA Chat: FunctionsFetchError', { message: error.message });
-        } else {
-          console.error('🤖 MAYA Chat: Unknown error type', error);
-        }
-      } catch (parseErr) {
-        console.error('🤖 MAYA Chat: Error parsing error context', parseErr);
+
+      const status = error?.status;
+      if (status === 429) {
+        userFriendlyMessage = 'Maya está recibiendo muchas consultas en este momento. Por favor intenta en unos segundos.';
+      } else if (status === 402) {
+        userFriendlyMessage = 'Límite de créditos alcanzado. Contacta al administrador para continuar usando Maya.';
+      } else if (error?.errJson?.message) {
+        userFriendlyMessage = error.errJson.message;
       }
+      console.error('🤖 MAYA Chat: Error', { status, message: error?.message });
       
       // Fallback response with server message or debug code
       const fallbackMessage: ChatMessage = {
