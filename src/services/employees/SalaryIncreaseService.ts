@@ -223,7 +223,10 @@ export class SalaryIncreaseService extends SecureBaseService {
       .lte('fecha_vigencia', isoDate)
       .order('fecha_vigencia', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      console.warn('[SalaryIncreaseService] getSalariesBatch failed, falling back to current salary:', error.message);
+      return new Map();
+    }
 
     // For each employee keep only the latest fecha_vigencia (data is sorted desc)
     const result = new Map<string, number>();
