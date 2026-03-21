@@ -222,7 +222,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
 
         // ✅ UNA SOLA LLAMADA para todas las novedades del período
         console.log('📥 Obteniendo todas las novedades del período en una sola llamada...');
-        const allNovedades = await NovedadesEnhancedService.getNovedades(companyId!, currentPeriodId);
+        const allNovedades = await NovedadesEnhancedService.getNovedadesByPeriod(currentPeriodId, companyId!);
         
         // ✅ Agrupar novedades por empleado en memoria
         const novedadesByEmployee = new Map<string, typeof allNovedades>();
