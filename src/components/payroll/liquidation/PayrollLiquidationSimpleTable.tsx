@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Trash2, Loader2, Users, Upload } from 'lucide-react';
+import { Plus, Trash2, Loader2, Users, Upload, AlertTriangle, RefreshCw } from 'lucide-react';
 import { PayrollEmployee, NovedadForIBC } from '@/types/payroll';
 import { NovedadUnifiedModal } from '@/components/payroll/novedades/NovedadUnifiedModal';
 import { usePayrollNovedadesUnified } from '@/hooks/usePayrollNovedadesUnified';
@@ -85,6 +85,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
   const isInitialCalcRef = useRef(true);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
+  const [hasOutdatedDbValues, setHasOutdatedDbValues] = useState(false);
   const { companyId } = useCurrentCompany();
 
   const {
@@ -344,6 +345,39 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
     return ConfigurationService.getConfigurationAsync(year);
   };
 
+  // Detectar si los valores guardados en DB difieren de los recién calculados
+  useEffect(() => {
+    if (isCalculating || Object.keys(employeeCalculations).length === 0) {
+      setHasOutdatedDbValues(false);
+      return;
+    }
+    const isOutdated = employees.some(emp => {
+      const freshCalc = employeeCalculations[emp.id];
+      if (!freshCalc) return false;
+      return Math.abs(freshCalc.grossPay - emp.grossPay) > 1;
+    });
+    setHasOutdatedDbValues(isOutdated);
+  }, [employeeCalculations, employees, isCalculating]);
+
+  const handleUpdateDbValues = async () => {
+    if (!updateEmployeeCalculationsInDB || Object.keys(employeeCalculations).length === 0) return;
+    try {
+      await updateEmployeeCalculationsInDB(employeeCalculations);
+      setHasOutdatedDbValues(false);
+      toast({
+        title: "Cálculos actualizados",
+        description: "Los valores han sido actualizados con las tarifas correctas.",
+        className: "border-green-200 bg-green-50"
+      });
+    } catch {
+      toast({
+        title: "Error al actualizar",
+        description: "No se pudieron guardar los cálculos actualizados.",
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleOpenNovedadModal = (employee: PayrollEmployee) => {
     console.log('📝 Abriendo modal de novedades para:', employee.name);
     console.log('📅 Fecha del período:', startDate);
@@ -470,6 +504,23 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
 
   return (
     <>
+      {hasOutdatedDbValues && !isCalculating && (
+        <div className="flex items-center gap-3 p-3 mb-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800">
+          <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+          <span className="text-sm flex-1">
+            Los valores de este período fueron calculados con tarifas de un año diferente. Los montos mostrados son correctos — actualiza para guardarlos.
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-amber-300 text-amber-800 hover:bg-amber-100 gap-1"
+            onClick={handleUpdateDbValues}
+          >
+            <RefreshCw className="h-3 w-3" />
+            Actualizar cálculos
+          </Button>
+        </div>
+      )}
           <div className="h-12 mb-4 transition-opacity duration-200">
             {isCalculating ? (
               <div className="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 px-4 py-3 rounded-lg border border-blue-200 h-full">
