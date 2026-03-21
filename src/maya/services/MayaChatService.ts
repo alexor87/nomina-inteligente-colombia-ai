@@ -237,6 +237,7 @@ export class MayaChatService {
         sessionId: this.currentConversation.sessionId,
         richContext: context,
         idempotencyKey,
+        wantsStreaming: requestStreaming,  // flag in body — avoids CORS custom-header issues
         ...(actionType && { actionType }),
         ...(actionParameters && { actionParameters }),
         metadata: {
@@ -256,8 +257,7 @@ export class MayaChatService {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${authToken}`,
-            'Content-Type': 'application/json',
-            ...(requestStreaming && { 'X-Maya-Stream-Request': '1' })
+            'Content-Type': 'application/json'
           },
           body: JSON.stringify(requestBody),
           signal: controller.signal
