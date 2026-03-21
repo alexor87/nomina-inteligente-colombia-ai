@@ -770,8 +770,29 @@ export const MayaProvider: React.FC<MayaProviderProps> = ({
         conversationParams: conversationState
       } : richContext;
       
-      const response = await chatService.sendMessage(message, enrichedContext);
-      
+      // Streaming callback: progressively update the placeholder message in chatHistory
+      const onMessageUpdate = (msgId: string, content: string) => {
+        setChatHistory(prev => {
+          const existing = prev.find(m => m.id === msgId);
+          if (existing) {
+            return prev.map(m => m.id === msgId ? { ...m, content, isStreaming: true } : m);
+          }
+          // First token: add placeholder
+          return [...prev, {
+            id: msgId,
+            role: 'assistant' as const,
+            content,
+            timestamp: new Date().toISOString(),
+            isStreaming: true,
+            executableActions: [],
+            quickReplies: []
+          }];
+        });
+      };
+
+      const response = await chatService.sendMessage(message, enrichedContext, onMessageUpdate);
+
+      // Final update: replace streaming placeholder with complete message
       setChatHistory([...chatService.getConversation().messages]);
       
       const contextualMessage: MayaMessage = {

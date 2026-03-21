@@ -29,6 +29,7 @@ import {
   extractNameFromShortReply
 } from './core/context-enricher.ts';
 import { ResponseOrchestrator } from './core/response-orchestrator.ts';
+import { LLMClient, MODEL_ROUTING } from './core/llm-client.ts';
 import { ConversationStateManager, FlowType } from './core/conversation-state-manager.ts';
 
 // ============================================================================
@@ -558,6 +559,14 @@ serve(async (req) => {
 
     const body = await req.json();
     const { conversation, sessionId, richContext, metadata, idempotencyKey, actionType, actionParameters } = body;
+
+    // Initialize LLM client with available keys
+    const llmClient = new LLMClient(
+      Deno.env.get('OPENAI_API_KEY'),
+      Deno.env.get('ANTHROPIC_API_KEY')
+    );
+    const wantsStreaming = req.headers.get('X-Maya-Stream-Request') === '1';
+
     console.log(`📦 [METADATA] Received metadata:`, metadata ? 'present' : 'missing');
     console.log(`🔑 [IDEMPOTENCY] Received key:`, idempotencyKey ? 'present' : 'missing');
     
@@ -1251,8 +1260,20 @@ serve(async (req) => {
                 // Usar handleConversation directamente con el prompt maestro
                 // que incluye la personalidad de abogado laboral experto
                 // y la fecha actual dinámica (octubre 2025)
+                // Stream if client requested it
+                if (wantsStreaming) {
+                  try {
+                    const streamBody = await handleConversationStreaming(lastMessage, conversation, llmClient);
+                    if (streamBody) {
+                      return new Response(streamBody, {
+                        headers: { ...corsHeaders, 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'X-Maya-Stream': '1' }
+                      });
+                    }
+                  } catch (streamErr) {
+                    console.error('[EXPLANATION] Streaming failed, falling back to JSON:', streamErr);
+                  }
+                }
                 const explanationResponse = await handleConversation(lastMessage, conversation);
-                
                 return new Response(JSON.stringify(explanationResponse), {
                   headers: { ...corsHeaders, 'Content-Type': 'application/json' }
                 });
@@ -4483,6 +4504,78 @@ function extractSalaryAmount(text: string): number | null {
   
   console.log(`💰 [EXTRACTOR] No salary amount found in: "${text}"`);
   return null;
+}
+
+// ============================================================================
+// STREAMING variant of handleConversation — used when client sends X-Maya-Stream-Request: 1
+// Runs same RAG + guardrails logic, but streams tokens via SSE
+// ============================================================================
+async function handleConversationStreaming(
+  message: string,
+  conversation: any[],
+  llmClient: LLMClient
+): Promise<ReadableStream | null> {
+  const openaiKey = Deno.env.get('OPENAI_API_KEY');
+  if (!openaiKey) return null;
+
+  const now = new Date();
+  const currentMonth = now.toLocaleDateString('es-CO', { month: 'long' });
+  const currentYear = now.getFullYear();
+  const currentDate = `${currentMonth} ${currentYear}`;
+
+  // RAG context (same as handleConversation)
+  let legalContext = '';
+  try {
+    const ragKey = Deno.env.get('OPENAI_API_KEY');
+    if (ragKey) {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const ragSupabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+
+      const embeddingResp = await fetch('https://api.openai.com/v1/embeddings', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${ragKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ input: message, model: 'text-embedding-3-small' })
+      });
+
+      if (embeddingResp.ok) {
+        const embeddingData = await embeddingResp.json();
+        const queryEmbedding = embeddingData.data[0]?.embedding;
+
+        if (queryEmbedding) {
+          const { data: docs } = await ragSupabase.rpc('match_legal_documents', {
+            query_embedding: queryEmbedding,
+            match_threshold: 0.7,
+            match_count: 3
+          });
+          if (docs && docs.length > 0) {
+            legalContext = docs.map((d: any) => d.content).join('\n\n---\n\n');
+          }
+        }
+      }
+    }
+  } catch { /* continue without RAG */ }
+
+  const systemPrompt = `**FECHA ACTUAL: ${currentDate.toUpperCase()}**
+${legalContext ? '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🔴 TIENES CONTEXTO LEGAL ACTUALIZADO ABAJO - ES TU ÚNICA FUENTE DE VERDAD\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━' : '⚠️ SIN CONTEXTO LEGAL: No inventes artículos ni cifras.'}
+
+Eres MAYA, asistente laboral colombiano experto en nómina y legislación vigente ${currentYear}.
+- Conciso: Máximo 300 palabras por respuesta
+- Natural: Habla como asesor amigable
+- Visual: Usa bullets, emojis y ejemplos prácticos
+- SMLV ${currentYear}: $1.423.500 | Aux. transporte: $200.000
+
+${legalContext ? `CONTEXTO LEGAL:\n${legalContext}` : ''}`;
+
+  const messages = [
+    { role: 'system' as const, content: systemPrompt },
+    ...conversation.slice(-5).map((m: any) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+    { role: 'user' as const, content: message }
+  ];
+
+  // Use routing to pick the best model for EXPLANATION
+  const model = llmClient.getModelForQueryType('EXPLANATION');
+  return llmClient.stream(model, messages, { maxTokens: 1000, temperature: 0.7 });
 }
 
 async function handleConversation(message: string, conversation: any[]) {
