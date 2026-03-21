@@ -1,13 +1,14 @@
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { 
-  AreaChart, 
-  Area, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
   ResponsiveContainer,
   BarChart,
   Bar
@@ -81,7 +82,7 @@ export const RealPayrollTrends: React.FC<RealPayrollTrendsProps> = ({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-64">
+          <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={data}>
                 <defs>
@@ -117,21 +118,25 @@ export const RealPayrollTrends: React.FC<RealPayrollTrendsProps> = ({
                     boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
                   }}
                 />
-                <Area 
-                  type="monotone" 
-                  dataKey="totalDevengado" 
-                  stroke="#3B82F6" 
+                <Legend
+                  wrapperStyle={{ fontSize: '12px', paddingTop: '8px' }}
+                  formatter={(value) => value === 'totalDevengado' ? 'Total Devengado' : 'Total Neto'}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="totalDevengado"
+                  stroke="#3B82F6"
                   strokeWidth={2}
                   fill="url(#colorDevengado)"
-                  name="Total Devengado"
+                  name="totalDevengado"
                 />
-                <Area 
-                  type="monotone" 
-                  dataKey="totalNeto" 
-                  stroke="#10B981" 
+                <Area
+                  type="monotone"
+                  dataKey="totalNeto"
+                  stroke="#10B981"
                   strokeWidth={2}
                   fill="url(#colorNeto)"
-                  name="Total Neto"
+                  name="totalNeto"
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -148,7 +153,7 @@ export const RealPayrollTrends: React.FC<RealPayrollTrendsProps> = ({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-64">
+          <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
