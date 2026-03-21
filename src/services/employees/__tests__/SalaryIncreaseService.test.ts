@@ -281,15 +281,15 @@ describe('getSalariesBatch', () => {
     expect(result.has('emp-sin-historia')).toBe(false);
   });
 
-  it('lanza error si Supabase falla', async () => {
+  it('retorna Map vacío si Supabase falla (fallback a salario actual)', async () => {
     mockSupabaseChain.order.mockResolvedValueOnce({
       data: null,
       error: { message: 'connection error', code: '500' },
     });
 
-    await expect(
-      SalaryIncreaseService.getSalariesBatch(['emp-1'], new Date(), COMPANY_ID)
-    ).rejects.toMatchObject({ message: 'connection error' });
+    const result = await SalaryIncreaseService.getSalariesBatch(['emp-1'], new Date(), COMPANY_ID);
+    expect(result).toBeInstanceOf(Map);
+    expect(result.size).toBe(0);
   });
 });
 
