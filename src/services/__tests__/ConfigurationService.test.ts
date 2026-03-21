@@ -101,9 +101,9 @@ describe('ConfigurationService', () => {
   });
 
   describe('defaults for unknown years', () => {
-    it('returns 2025 values for unknown year', () => {
+    it('returns 2026 values for unknown year', () => {
       const config = ConfigurationService.getConfigurationSync('2030');
-      expect(config.salarioMinimo).toBe(1423500);
+      expect(config.salarioMinimo).toBe(1750905);
     });
   });
 });

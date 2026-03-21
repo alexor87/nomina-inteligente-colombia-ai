@@ -380,23 +380,16 @@ export const usePayrollUnified = (companyId: string) => {
     return periodId; // ✅ Retornar el periodId para validación automática
   }, [companyId, findOrCreatePeriod, toast]);
 
-  const addEmployees = useCallback(async (employeeIds: string[]) => {
+  const addEmployees = useCallback(async (employeeData: Array<{
+    id: string; nombre: string; apellido: string;
+    cargo: string; salario_base: number; eps?: string; afp?: string;
+  }>) => {
     if (!currentPeriod) return;
 
     try {
-      const { data: newEmployees, error } = await supabase
-        .from('employees')
-        .select('*')
-        .in('id', employeeIds)
-        .eq('company_id', companyId);
-
-      if (error) throw error;
-
-      // Calcular días trabajados correctamente para el período actual
       const workedDays = calculateWorkedDays(currentPeriod.fecha_inicio, currentPeriod.fecha_fin);
-      
-      // Crear registros en payrolls para persistencia
-      const payrollRecords = (newEmployees || []).map(emp => ({
+
+      const payrollRecords = employeeData.map(emp => ({
         company_id: companyId,
         employee_id: emp.id,
         period_id: currentPeriod.id,
@@ -409,22 +402,20 @@ export const usePayrollUnified = (companyId: string) => {
         estado: 'borrador'
       }));
 
-      // Upsert en lugar de insert para manejar constraint UNIQUE (company_id, employee_id, period_id)
-      // Si el empleado ya existe en payrolls (estado local desincronizado), actualiza en lugar de fallar
       const { error: insertError } = await supabase
         .from('payrolls')
         .upsert(payrollRecords, { onConflict: 'company_id,employee_id,period_id', ignoreDuplicates: false });
 
       if (insertError) throw insertError;
 
-      // Actualización optimista: usar los datos ya disponibles de newEmployees para actualizar
-      // el estado inmediatamente, sin depender del reload (que puede fallar o devolver vacío).
-      const immediateList: PayrollEmployee[] = (newEmployees || []).map(emp => ({
+      // Construir estado directamente de employeeData (sin query a DB).
+      // Esto elimina cualquier dependencia de RLS, latencia o problemas de read-after-write.
+      const freshList: PayrollEmployee[] = employeeData.map(emp => ({
         id: emp.id,
         name: `${emp.nombre} ${emp.apellido}`,
         position: emp.cargo || 'Sin cargo',
         baseSalary: Number(emp.salario_base) || 0,
-        workedDays: workedDays,
+        workedDays,
         extraHours: 0,
         disabilities: 0,
         bonuses: 0,
@@ -442,60 +433,18 @@ export const usePayrollUnified = (companyId: string) => {
         pensionDeduction: 0
       }));
 
-      // Hacer merge con empleados existentes (evitar duplicados)
       setEmployees(prev => {
         const existingIds = new Set(prev.map(e => e.id));
-        const toAdd = immediateList.filter(e => !existingIds.has(e.id));
+        const toAdd = freshList.filter(e => !existingIds.has(e.id));
         return [...prev, ...toAdd];
       });
 
-      // Recargar todos los empleados del período desde DB para obtener valores precisos de DB
-      const { data: updatedPayrolls, error: reloadError } = await supabase
-        .from('payrolls')
-        .select('*, employees(*)')
-        .eq('company_id', companyId)
-        .eq('period_id', currentPeriod.id);
-
-      if (!reloadError && updatedPayrolls && updatedPayrolls.length > 0) {
-        const freshList: PayrollEmployee[] = updatedPayrolls.map(payroll => {
-          const emp = payroll.employees as any;
-          return {
-            id: emp.id,
-            name: `${emp.nombre} ${emp.apellido}`,
-            position: emp.cargo || 'Sin cargo',
-            baseSalary: Number(emp.salario_base) || 0,
-            workedDays: payroll.dias_trabajados || 15,
-            extraHours: payroll.horas_extra || 0,
-            disabilities: payroll.incapacidades || 0,
-            bonuses: payroll.bonificaciones || 0,
-            absences: 0,
-            grossPay: payroll.total_devengado || Number(emp.salario_base) || 0,
-            deductions: payroll.total_deducciones || 0,
-            netPay: payroll.neto_pagado || Number(emp.salario_base) || 0,
-            status: 'valid' as const,
-            errors: [],
-            eps: emp.eps,
-            afp: emp.afp,
-            transportAllowance: payroll.auxilio_transporte || 0,
-            employerContributions: 0,
-            healthDeduction: payroll.salud_empleado || 0,
-            pensionDeduction: payroll.pension_empleado || 0
-          };
-        });
-        setEmployees(freshList);
-      }
-
-      // Actualizar contador y marcar período como inicializado con empleados
-      const finalCount = (updatedPayrolls && updatedPayrolls.length > 0)
-        ? updatedPayrolls.length
-        : immediateList.length;
-
       await supabase
         .from('payroll_periods_real')
-        .update({ employees_loaded: true, empleados_count: finalCount })
+        .update({ employees_loaded: true, empleados_count: employees.length + freshList.length })
         .eq('id', currentPeriod.id);
 
-      logger.log(`✅ Empleados agregados. Total en período: ${finalCount}`);
+      logger.log(`✅ Empleados agregados. Total en período: ${employees.length + freshList.length}`);
 
     } catch (error) {
       logger.error('Error agregando empleados:', error);
@@ -504,7 +453,7 @@ export const usePayrollUnified = (companyId: string) => {
         description: "No se pudieron agregar los empleados",
         variant: "destructive",
       });
-      throw error; // Re-lanzar para que el modal muestre error real en lugar de falso éxito
+      throw error;
     }
   }, [currentPeriod, companyId, employees.length, toast]);
 
@@ -901,7 +850,7 @@ export const usePayrollUnified = (companyId: string) => {
       .select('*, employees(*)')
       .eq('company_id', companyId)
       .eq('period_id', currentPeriod.id);
-    if (!error && data) {
+    if (!error && data && data.length > 0) {
       const list: PayrollEmployee[] = data.map(payroll => {
         const emp = payroll.employees as any;
         return {
