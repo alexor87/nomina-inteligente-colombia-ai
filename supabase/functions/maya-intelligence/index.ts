@@ -409,7 +409,7 @@ async function detectTemporalFollowUp(text: string): Promise<{ type: string | nu
 // CORS headers
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-maya-stream-request',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
