@@ -11,7 +11,6 @@ import { MinimalMetricCard } from './MinimalMetricCard';
 import { SimpleQuickActions } from './SimpleQuickActions';
 import { MinimalEmployeeList } from './MinimalEmployeeList';
 import { MinimalActivityFeed } from './MinimalActivityFeed';
-import { EfficiencyMetrics } from './EfficiencyMetrics';
 import { RealPayrollTrends } from './RealPayrollTrends';
 
 export const Dashboard = () => {
@@ -22,7 +21,6 @@ export const Dashboard = () => {
     recentEmployees,
     recentActivity,
     payrollTrends,
-    efficiencyMetrics,
     loading,
     refreshing,
     refreshDashboard
@@ -53,7 +51,7 @@ export const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="space-y-8 p-8">
+      <div className="space-y-6 p-6">
         {/* Header Minimalista */}
         <div className="flex items-center justify-between">
           <div>
@@ -90,9 +88,9 @@ export const Dashboard = () => {
           </div>
         </div>
 
-        {/* Métricas Principales - Layout Horizontal Minimalista */}
+        {/* KPI Row */}
         {metrics && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <MinimalMetricCard
               title="Empleados Activos"
               value={metrics.totalEmpleados}
@@ -117,25 +115,18 @@ export const Dashboard = () => {
           </div>
         )}
 
-        {/* Métricas de Eficiencia */}
-        <EfficiencyMetrics data={efficiencyMetrics} loading={loading} />
+        {/* Contenido Principal */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Gráficos — 2/3 del ancho */}
+          <div className="lg:col-span-2">
+            <RealPayrollTrends data={payrollTrends} loading={loading} />
+          </div>
 
-        {/* Contenido Principal - Sin Tabs */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Columna Izquierda - Acciones y Empleados */}
+          {/* Sidebar — 1/3 del ancho */}
           <div className="space-y-6">
             <SimpleQuickActions />
             <MinimalEmployeeList employees={recentEmployees} />
-          </div>
-
-          {/* Columna Central - Actividad */}
-          <div className="space-y-6">
             <MinimalActivityFeed activities={recentActivity} />
-          </div>
-
-          {/* Columna Derecha - Análisis */}
-          <div className="space-y-6">
-            <RealPayrollTrends data={payrollTrends} loading={loading} />
           </div>
         </div>
       </div>
