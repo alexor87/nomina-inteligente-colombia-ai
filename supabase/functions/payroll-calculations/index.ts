@@ -7,6 +7,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Verbose logging only when DEBUG_PAYROLL=true (prevents serialization overhead in batch)
+const DEBUG = Deno.env.get('DEBUG_PAYROLL') === 'true';
+
 // ✅ Valores legales por año (SMMLV + Auxilio Transporte + UVT)
 const YEAR_CONFIGS: Record<string, { salarioMinimo: number; auxilioTransporte: number; uvt: number }> = {
   '2026': { salarioMinimo: 1750905, auxilioTransporte: 249095, uvt: 49799 },
@@ -69,11 +72,11 @@ const HORAS_MENSUALES_POR_JORNADA: Record<number, number> = {
 // Vigencia específica para RECARGOS (divisor mensual)
 const getHorasParaRecargos = (fecha: Date): number => {
   if (fecha >= new Date('2025-07-01')) {
-    console.log(`🎯 RECARGOS: Desde 1 julio 2025 → usando 220h mensuales`);
+    if (DEBUG) console.log(`🎯 RECARGOS: Desde 1 julio 2025 → usando 220h mensuales`);
     return 220;
   }
   const j = getJornadaLegal(fecha);
-  console.log(`🎯 RECARGOS: Jornada anterior → ${j.horasMensuales}h mensuales`);
+  if (DEBUG) console.log(`🎯 RECARGOS: Jornada anterior → ${j.horasMensuales}h mensuales`);
   return j.horasMensuales;
 };
 
@@ -84,7 +87,7 @@ const getJornadaLegal = (fecha: Date) => {
     .find(j => fecha >= j.fechaInicio) || JORNADAS_LEGALES[JORNADAS_LEGALES.length - 1];
 
   const horasMensuales = HORAS_MENSUALES_POR_JORNADA[vigente.horasSemanales];
-  console.log(`✅ Jornada LABORAL: ${vigente.horasSemanales}h/sem → ${horasMensuales}h/mes (fecha ${fecha.toISOString().slice(0,10)})`);
+  if (DEBUG) console.log(`✅ Jornada LABORAL: ${vigente.horasSemanales}h/sem → ${horasMensuales}h/mes (fecha ${fecha.toISOString().slice(0,10)})`);
 
   return {
     horasSemanales: vigente.horasSemanales,
@@ -99,7 +102,7 @@ const getJornadaLegal = (fecha: Date) => {
 const getDailyHours = (fecha: Date): number => {
   const j = getJornadaLegal(fecha);
   const h = j.horasSemanales / 6;
-  console.log(`⏱️ Horas por día (extra): ${j.horasSemanales} ÷ 6 = ${h}`);
+  if (DEBUG) console.log(`⏱️ Horas por día (extra): ${j.horasSemanales} ÷ 6 = ${h}`);
   return h;
 };
 
@@ -108,7 +111,7 @@ const calcularValorHoraExtraBase = (salarioMensual: number, fecha: Date): number
   const valorDiario = salarioMensual / 30;
   const horasPorDia = getDailyHours(fecha);
   const valorHora = valorDiario / horasPorDia;
-  console.log(`💰 Valor hora base (EXTRA): salario/30=${Math.round(valorDiario)} ÷ horasPorDia=${horasPorDia.toFixed(3)} → ${Math.round(valorHora)}`);
+  if (DEBUG) console.log(`💰 Valor hora base (EXTRA): salario/30=${Math.round(valorDiario)} ÷ horasPorDia=${horasPorDia.toFixed(3)} → ${Math.round(valorHora)}`);
   return valorHora;
 };
 
@@ -116,7 +119,7 @@ const calcularValorHoraExtraBase = (salarioMensual: number, fecha: Date): number
 const calcularValorHoraRecargoBase = (salarioMensual: number, fecha: Date): number => {
   const divisor = getHorasParaRecargos(fecha);
   const valorHora = salarioMensual / divisor;
-  console.log(`💰 Valor hora base (RECARGO): salario=${salarioMensual} ÷ divisor=${divisor} → ${Math.round(valorHora)}`);
+  if (DEBUG) console.log(`💰 Valor hora base (RECARGO): salario=${salarioMensual} ÷ divisor=${divisor} → ${Math.round(valorHora)}`);
   return valorHora;
 };
 
@@ -132,16 +135,16 @@ const calcularValorHoraRecargoBase = (salarioMensual: number, fecha: Date): numb
  */
 const getRecargoDominicalFestivo = (fecha: Date): number => {
   if (fecha < new Date('2025-07-01')) {
-    console.log(`🗓️ Recargo dominical/festivo: 75% (antes de reforma)`);
+    if (DEBUG) console.log(`🗓️ Recargo dominical/festivo: 75% (antes de reforma)`);
     return 0.75;
   } else if (fecha < new Date('2026-07-01')) {
-    console.log(`🗓️ Recargo dominical/festivo: 80% (Ley 2466/2025 Fase 1)`);
+    if (DEBUG) console.log(`🗓️ Recargo dominical/festivo: 80% (Ley 2466/2025 Fase 1)`);
     return 0.80;
   } else if (fecha < new Date('2027-07-01')) {
-    console.log(`🗓️ Recargo dominical/festivo: 90% (Ley 2466/2025 Fase 2)`);
+    if (DEBUG) console.log(`🗓️ Recargo dominical/festivo: 90% (Ley 2466/2025 Fase 2)`);
     return 0.90;
   } else {
-    console.log(`🗓️ Recargo dominical/festivo: 100% (Ley 2466/2025 Final)`);
+    if (DEBUG) console.log(`🗓️ Recargo dominical/festivo: 100% (Ley 2466/2025 Final)`);
     return 1.00;
   }
 };
@@ -162,7 +165,7 @@ const getOvertimeFactor = (subtipoRaw?: string, fecha?: Date): number => {
   if (s === 'dominicales_diurnas' || s === 'dominical_diurna' || s === 'festivas_diurnas' || s === 'festiva_diurna') {
     const recargoDominical = getRecargoDominicalFestivo(fechaCalculo);
     const factorTotal = 1.25 + recargoDominical; // 25% extra diurna + recargo dominical vigente
-    console.log(`✅ FACTOR DIURNO DOMINICAL/FESTIVO: 1.25 + ${recargoDominical} = ${factorTotal} (fecha: ${fechaCalculo.toISOString().slice(0, 10)})`);
+    if (DEBUG) console.log(`✅ FACTOR DIURNO DOMINICAL/FESTIVO: 1.25 + ${recargoDominical} = ${factorTotal} (fecha: ${fechaCalculo.toISOString().slice(0, 10)})`);
     return factorTotal;
   }
   
@@ -170,7 +173,7 @@ const getOvertimeFactor = (subtipoRaw?: string, fecha?: Date): number => {
   if (s === 'dominicales_nocturnas' || s === 'dominical_nocturna' || s === 'festivas_nocturnas' || s === 'festiva_nocturna' || s === 'nocturna_dominical') {
     const recargoDominical = getRecargoDominicalFestivo(fechaCalculo);
     const factorTotal = 1.75 + recargoDominical; // 75% extra nocturna + recargo dominical vigente
-    console.log(`✅ FACTOR NOCTURNO DOMINICAL/FESTIVO: 1.75 + ${recargoDominical} = ${factorTotal} (fecha: ${fechaCalculo.toISOString().slice(0, 10)})`);
+    if (DEBUG) console.log(`✅ FACTOR NOCTURNO DOMINICAL/FESTIVO: 1.75 + ${recargoDominical} = ${factorTotal} (fecha: ${fechaCalculo.toISOString().slice(0, 10)})`);
     return factorTotal;
   }
   
@@ -223,7 +226,7 @@ function calculatePureSurcharge(params: {
   
   const jornada = getJornadaLegal(fecha);
   
-  console.log('✅ calculatePureSurcharge (sin BD):', {
+  if (DEBUG) console.log('✅ calculatePureSurcharge (sin BD):', {
     type,
     salarioBase,
     horas,
@@ -314,7 +317,7 @@ serve(async (req) => {
     )
 
     const { action, data } = await req.json()
-    console.log('📊 Payroll calculation request:', { action, data })
+    if (DEBUG) console.log('📊 Payroll calculation request:', { action, data })
 
     if (action === 'calculate') {
       const result = await calculatePayroll(supabase, data)
@@ -403,7 +406,7 @@ async function calculatePayroll(supabase: any, data: any) {
   let config: { salarioMinimo: number; auxilioTransporte: number; uvt: number };
   if (data.salarioMinimo && data.auxilioTransporte) {
     config = { salarioMinimo: data.salarioMinimo, auxilioTransporte: data.auxilioTransporte, uvt: data.uvt || 49799 };
-    console.log(`✅ Using config from request: SMMLV=${config.salarioMinimo}, AuxTrans=${config.auxilioTransporte}, UVT=${config.uvt}`)
+    if (DEBUG) console.log(`✅ Using config from request: SMMLV=${config.salarioMinimo}, AuxTrans=${config.auxilioTransporte}, UVT=${config.uvt}`)
   } else {
     // Fallback: consultar DB por companyId
     let companyId = data.companyId;
@@ -425,7 +428,7 @@ async function calculatePayroll(supabase: any, data: any) {
   
   const policy = await getCompanyPolicy(supabase);
   
-  console.log('⚙️ Using configuration:', config, 'Policy:', policy);
+  if (DEBUG) console.log('⚙️ Using configuration:', config, 'Policy:', policy);
 
   const {
     baseSalary,
@@ -453,8 +456,7 @@ async function calculatePayroll(supabase: any, data: any) {
   let additionalDeductions = 0; // ✅ NUEVO: Para acumular deducciones explícitas
 
   // ✅ PROCESAR NOVEDADES CON POLÍTICAS
-  console.log('📋 Processing novedades:', novedades.length);
-  console.log('📋 NOVEDADES RAW:', JSON.stringify(novedades, null, 2));
+  if (DEBUG) console.log('📋 NOVEDADES:', novedades.length);
   
   let totalIncapacityValue = 0;
   let totalIncapacityDays = 0;
@@ -465,16 +467,16 @@ async function calculatePayroll(supabase: any, data: any) {
   const deduccionesDetectadas: string[] = [];
 
   for (const novedad of novedades) {
-    console.log('🔍 Procesando novedad:', { 
-      tipo: novedad.tipo_novedad, 
-      dias: novedad.dias, 
+    if (DEBUG) console.log('🔍 Procesando novedad:', {
+      tipo: novedad.tipo_novedad,
+      dias: novedad.dias,
       valor: novedad.valor,
-      constitutivo: novedad.constitutivo_salario 
+      constitutivo: novedad.constitutivo_salario
     });
-    
+
     if (novedad.tipo_novedad === 'incapacidad') {
       const incapacityDays = novedad.dias || 0;
-      console.log('🏥 INCAPACIDAD detectada - días:', incapacityDays);
+      if (DEBUG) console.log('🏥 INCAPACIDAD detectada - días:', incapacityDays);
       
       const incapacityValue = await calculateIncapacityWithPolicy(
         baseSalary, 
@@ -487,7 +489,7 @@ async function calculatePayroll(supabase: any, data: any) {
       totalIncapacityValue += incapacityValue;
       totalIncapacityDays += incapacityDays;
       
-      console.log('🏥 SUMA ACUMULADA - totalIncapacityDays:', totalIncapacityDays, 'totalIncapacityValue:', totalIncapacityValue);
+      if (DEBUG) console.log('🏥 SUMA ACUMULADA - totalIncapacityDays:', totalIncapacityDays, 'totalIncapacityValue:', totalIncapacityValue);
       // ✅ NO sumar novedad.valor aquí - ya está calculado en totalIncapacityValue
       
     } else if (novedad.tipo_novedad === 'licencia_remunerada') {
@@ -501,7 +503,7 @@ async function calculatePayroll(supabase: any, data: any) {
       // ✅ Es constitutiva de salario para IBC (Decreto 1406/1999)
       totalConstitutiveNovedades += licenciaValue;
       
-      console.log('🏖️ LICENCIA REMUNERADA detectada (Art. 57 CST):', {
+      if (DEBUG) console.log('🏖️ LICENCIA REMUNERADA detectada (Art. 57 CST):', {
         dias: licenciaDays,
         valor: licenciaValue,
         acumuladoDias: totalLicenciaRemuneradaDays,
@@ -514,7 +516,7 @@ async function calculatePayroll(supabase: any, data: any) {
       const licenciaDays = novedad.dias || 0;
       totalLicenciaNoRemuneradaDays += licenciaDays;
       
-      console.log('🚫 LICENCIA NO REMUNERADA detectada (Art. 51 CST):', {
+      if (DEBUG) console.log('🚫 LICENCIA NO REMUNERADA detectada (Art. 51 CST):', {
         dias: licenciaDays,
         valor: 0,
         acumuladoDias: totalLicenciaNoRemuneradaDays,
@@ -530,7 +532,7 @@ async function calculatePayroll(supabase: any, data: any) {
       const valorDeduccion = Math.max(0, Number(novedad.valor || 0));
       additionalDeductions += valorDeduccion;
       deduccionesDetectadas.push(`${novedad.tipo_novedad}: $${valorDeduccion.toLocaleString()}`);
-      console.log(`💸 DEDUCCIÓN detectada: ${novedad.tipo_novedad} → $${valorDeduccion.toLocaleString()}`);
+      if (DEBUG) console.log(`💸 DEDUCCIÓN detectada: ${novedad.tipo_novedad} → $${valorDeduccion.toLocaleString()}`);
       // ✅ NO sumar a extraPay
     } else if (novedad.constitutivo_salario) {
       // Other constitutive novedades (NO incluye licencia_remunerada que ya se procesó arriba)
@@ -542,7 +544,7 @@ async function calculatePayroll(supabase: any, data: any) {
     }
   }
 
-  console.log('🔢 ANTES DE CALCULAR effectiveWorkedDays:', {
+  if (DEBUG) console.log('🔢 ANTES DE CALCULAR effectiveWorkedDays:', {
     workedDays,
     totalIncapacityDays,
     totalLicenciaRemuneradaDays,
@@ -559,7 +561,7 @@ async function calculatePayroll(supabase: any, data: any) {
   // ✅ REGULARPY: Salario solo por días efectivamente trabajados
   regularPay = Math.round((dailySalary * effectiveWorkedDays) - absences);
   
-  console.log('📊 CÁLCULO FINAL - Días trabajados:', { 
+  if (DEBUG) console.log('📊 CÁLCULO FINAL - Días trabajados:', {
     workedDays, 
     totalIncapacityDays,
     totalLicenciaRemuneradaDays,
@@ -576,7 +578,7 @@ async function calculatePayroll(supabase: any, data: any) {
   extraPay += totalIncapacityValue;
   extraPay += totalLicenciaRemuneradaValue;  // ✅ NUEVO: Agregar licencias como concepto separado
   
-  console.log('💰 EXTRA PAY DETALLADO:', {
+  if (DEBUG) console.log('💰 EXTRA PAY DETALLADO:', {
     incapacidades: totalIncapacityValue,
     licenciasRemuneradas: totalLicenciaRemuneradaValue,  // ✅ NUEVO
     otrasNovedades: extraPay - totalIncapacityValue - totalLicenciaRemuneradaValue,
@@ -588,7 +590,7 @@ async function calculatePayroll(supabase: any, data: any) {
   const eligibleForTransport = baseSalary <= transportLimit;
   const transportAllowance = eligibleForTransport ? Math.round((config.auxilioTransporte / 30) * effectiveWorkedDays) : 0;
 
-  console.log('🚍 Auxilio Transporte:', {
+  if (DEBUG) console.log('🚍 Auxilio Transporte:', {
     baseSalary,
     transportLimit,
     eligibleForTransport,
@@ -609,7 +611,7 @@ async function calculatePayroll(supabase: any, data: any) {
   // ✅ IBC PARAFISCALES: Solo salario días trabajados + constitutivas (SIN incapacidades)
   const ibcParafiscales = salarioProporcionalIBC + totalConstitutiveNovedades;
   
-  console.log('🧮 IBC DETALLADO (Decreto 1406/1999 + Ley 100/1993):', { 
+  if (DEBUG) console.log('🧮 IBC DETALLADO (Decreto 1406/1999 + Ley 100/1993):', {
     salarioProporcionalIBC,
     totalConstitutiveNovedades,
     totalIncapacityValue,
@@ -625,7 +627,7 @@ async function calculatePayroll(supabase: any, data: any) {
   const pensionDeduction = Math.round(ibcSalud * 0.04);
   const totalDeductions = healthDeduction + pensionDeduction + additionalDeductions;
   
-  console.log('💰 DEDUCCIONES TOTALES:', {
+  if (DEBUG) console.log('💰 DEDUCCIONES TOTALES:', {
     healthDeduction,
     pensionDeduction,
     additionalDeductions,
@@ -670,7 +672,7 @@ async function calculatePayroll(supabase: any, data: any) {
     effectiveWorkedDays: effectiveWorkedDays
   };
 
-  console.log('✅ Calculation (normative IBC) result:', {
+  if (DEBUG) console.log('✅ Calculation (normative IBC) result:', {
     policy,
     totalIncapacityDays,
     totalIncapacityValue,
@@ -700,7 +702,7 @@ async function calculateIncapacityWithPolicy(
   const dailySalary = baseSalary / 30;
   const normalizedSubtype = normalizeIncapacitySubtype(subtipo);
   
-  console.log('🏥 Incapacity with policy:', {
+  if (DEBUG) console.log('🏥 Incapacity with policy:', {
     baseSalary,
     days,
     subtipo,
