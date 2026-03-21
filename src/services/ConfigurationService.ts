@@ -354,11 +354,16 @@ export class ConfigurationService {
   }
 
   private static getFallbackConfig(year: string): PayrollConfiguration {
-    const is2024 = year === '2024';
+    const yearConfigs: Record<string, { salarioMinimo: number; auxilioTransporte: number; uvt: number }> = {
+      '2024': { salarioMinimo: 1300000, auxilioTransporte: 162000, uvt: 47065 },
+      '2025': { salarioMinimo: 1423500, auxilioTransporte: 200000, uvt: 49799 },
+      '2026': { salarioMinimo: 1750905, auxilioTransporte: 249095, uvt: 49799 },
+    };
+    const base = yearConfigs[year] ?? yearConfigs['2026'];
     return {
-      salarioMinimo: is2024 ? 1300000 : 1423500,
-      auxilioTransporte: is2024 ? 162000 : 200000,
-      uvt: is2024 ? 47065 : 49799,
+      salarioMinimo: base.salarioMinimo,
+      auxilioTransporte: base.auxilioTransporte,
+      uvt: base.uvt,
       porcentajes: {
         saludEmpleado: 0.04,
         pensionEmpleado: 0.04,

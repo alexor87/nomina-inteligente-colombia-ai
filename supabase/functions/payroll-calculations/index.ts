@@ -18,10 +18,12 @@ async function getOfficialValues(supabase: any, companyId: string, year: string)
   
   if (error || !data) {
     console.warn(`⚠️ No config for year ${year}, using fallback`)
-    const fallback = year === '2024'
-      ? { salarioMinimo: 1300000, auxilioTransporte: 162000, uvt: 47065 }
-      : { salarioMinimo: 1423500, auxilioTransporte: 200000, uvt: 49799 }
-    return fallback
+    const fallbacks: Record<string, { salarioMinimo: number; auxilioTransporte: number; uvt: number }> = {
+      '2024': { salarioMinimo: 1300000, auxilioTransporte: 162000, uvt: 47065 },
+      '2025': { salarioMinimo: 1423500, auxilioTransporte: 200000, uvt: 49799 },
+      '2026': { salarioMinimo: 1750905, auxilioTransporte: 249095, uvt: 49799 },
+    }
+    return fallbacks[year] ?? fallbacks['2026']
   }
   
   console.log(`✅ Using config for ${year}: SMMLV=${data.salary_min}, AuxTrans=${data.transport_allowance}, UVT=${data.uvt}`)
