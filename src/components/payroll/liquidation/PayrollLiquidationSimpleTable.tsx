@@ -193,7 +193,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
         return;
       }
 
-      if (!currentPeriodId || employees.length === 0) return;
+      if (!currentPeriodId || employees.length === 0 || !companyId) return;
 
       pendingRecalcRef.current = false;
       isRecalculatingRef.current = true;
@@ -336,7 +336,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
         clearTimeout(debounceTimerRef.current);
       }
     };
-  }, [employees.length, currentPeriodId, lastRefreshTime, year]);
+  }, [employees.length, currentPeriodId, lastRefreshTime, year, companyId]);
 
   const periodForCalculation = {
     tipo_periodo: (currentPeriod?.tipo_periodo || 'quincenal') as 'quincenal' | 'mensual',
