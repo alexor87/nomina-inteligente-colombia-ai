@@ -7,6 +7,14 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// ✅ Valores legales por año (SMMLV + Auxilio Transporte + UVT)
+const YEAR_CONFIGS: Record<string, { salarioMinimo: number; auxilioTransporte: number; uvt: number }> = {
+  '2026': { salarioMinimo: 1750905, auxilioTransporte: 249095, uvt: 49799 },
+  '2025': { salarioMinimo: 1423500, auxilioTransporte: 200000, uvt: 49799 },
+  '2024': { salarioMinimo: 1300000, auxilioTransporte: 162000, uvt: 47065 },
+  '2023': { salarioMinimo: 1160000, auxilioTransporte: 140606, uvt: 42412 },
+};
+
 // ✅ Function to get dynamic configuration from database
 async function getOfficialValues(supabase: any, companyId: string, year: string) {
   // 1. Buscar config exacta para el año solicitado
@@ -18,28 +26,13 @@ async function getOfficialValues(supabase: any, companyId: string, year: string)
     .single()
 
   if (!error && data) {
-    console.log(`✅ Using config for ${year}: SMMLV=${data.salary_min}, AuxTrans=${data.transport_allowance}, UVT=${data.uvt}`)
+    console.log(`✅ Using DB config for ${year}: SMMLV=${data.salary_min}, AuxTrans=${data.transport_allowance}, UVT=${data.uvt}`)
     return { salarioMinimo: data.salary_min, auxilioTransporte: data.transport_allowance, uvt: data.uvt }
   }
 
-  // 2. No hay config exacta → usar el año más reciente disponible en la DB
-  console.warn(`⚠️ No config for year ${year}, fetching most recent available for company ${companyId}...`)
-  const { data: latestData } = await supabase
-    .from('company_payroll_configurations')
-    .select('salary_min, transport_allowance, uvt, year')
-    .eq('company_id', companyId)
-    .order('year', { ascending: false })
-    .limit(1)
-    .single()
-
-  if (latestData) {
-    console.warn(`⚠️ Using config from year ${latestData.year} as fallback for ${year}`)
-    return { salarioMinimo: latestData.salary_min, auxilioTransporte: latestData.transport_allowance, uvt: latestData.uvt }
-  }
-
-  // 3. Último recurso: la empresa no tiene ninguna config en la DB
-  console.error(`❌ No config found at all for company ${companyId}, using hardcoded 2026 values`)
-  return { salarioMinimo: 1750905, auxilioTransporte: 249095, uvt: 49799 }
+  // 2. No hay config exacta → usar valores legales del año correcto (no de otro año)
+  console.warn(`⚠️ No DB config for year ${year}, company ${companyId}. Using hardcoded legal values for ${year}.`)
+  return YEAR_CONFIGS[year] ?? YEAR_CONFIGS['2026'];
 }
 
 // ✅ LÍMITE CORRECTO AUXILIO TRANSPORTE: 2 SMMLV
@@ -334,7 +327,8 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     } else if (action === 'batch-calculate') {
-      const results = await Promise.all(data.inputs.map((input: any) => calculatePayroll(supabase, input)))
+      const batchCompanyId = data.companyId;
+      const results = await Promise.all(data.inputs.map((input: any) => calculatePayroll(supabase, { ...input, companyId: batchCompanyId })))
       return new Response(JSON.stringify({ success: true, data: results }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
@@ -403,27 +397,31 @@ async function getCompanyPolicy(supabase: any): Promise<{ incapacity_policy: str
 }
 
 async function calculatePayroll(supabase: any, data: any) {
-  const year = data.year || '2025';
-  
-  // ✅ Get company_id from data or fetch from user profile
-  let companyId = data.companyId;
-  if (!companyId) {
-    // Try to get from supabase context if available
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('company_id')
-        .eq('user_id', user.id)
-        .single();
-      companyId = profile?.company_id;
+  const year = data.year || '2026';
+
+  // ✅ Si el frontend proveyó los valores oficiales, usarlos directamente (fuente de verdad)
+  let config: { salarioMinimo: number; auxilioTransporte: number; uvt: number };
+  if (data.salarioMinimo && data.auxilioTransporte) {
+    config = { salarioMinimo: data.salarioMinimo, auxilioTransporte: data.auxilioTransporte, uvt: data.uvt || 49799 };
+    console.log(`✅ Using config from request: SMMLV=${config.salarioMinimo}, AuxTrans=${config.auxilioTransporte}, UVT=${config.uvt}`)
+  } else {
+    // Fallback: consultar DB por companyId
+    let companyId = data.companyId;
+    if (!companyId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('company_id')
+          .eq('user_id', user.id)
+          .single();
+        companyId = profile?.company_id;
+      }
     }
+    config = companyId
+      ? await getOfficialValues(supabase, companyId, year)
+      : YEAR_CONFIGS[year] ?? YEAR_CONFIGS['2026'];
   }
-  
-  // ✅ Get dynamic configuration
-  const config = companyId 
-    ? await getOfficialValues(supabase, companyId, year)
-    : { salarioMinimo: 1423500, auxilioTransporte: 200000, uvt: 49799 }; // Fallback if no company
   
   const policy = await getCompanyPolicy(supabase);
   
