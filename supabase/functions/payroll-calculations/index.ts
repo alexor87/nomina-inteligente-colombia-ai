@@ -9,29 +9,37 @@ const corsHeaders = {
 
 // ✅ Function to get dynamic configuration from database
 async function getOfficialValues(supabase: any, companyId: string, year: string) {
+  // 1. Buscar config exacta para el año solicitado
   const { data, error } = await supabase
     .from('company_payroll_configurations')
     .select('salary_min, transport_allowance, uvt')
     .eq('company_id', companyId)
     .eq('year', year)
     .single()
-  
-  if (error || !data) {
-    console.warn(`⚠️ No config for year ${year}, using fallback`)
-    const fallbacks: Record<string, { salarioMinimo: number; auxilioTransporte: number; uvt: number }> = {
-      '2024': { salarioMinimo: 1300000, auxilioTransporte: 162000, uvt: 47065 },
-      '2025': { salarioMinimo: 1423500, auxilioTransporte: 200000, uvt: 49799 },
-      '2026': { salarioMinimo: 1750905, auxilioTransporte: 249095, uvt: 49799 },
-    }
-    return fallbacks[year] ?? fallbacks['2026']
+
+  if (!error && data) {
+    console.log(`✅ Using config for ${year}: SMMLV=${data.salary_min}, AuxTrans=${data.transport_allowance}, UVT=${data.uvt}`)
+    return { salarioMinimo: data.salary_min, auxilioTransporte: data.transport_allowance, uvt: data.uvt }
   }
-  
-  console.log(`✅ Using config for ${year}: SMMLV=${data.salary_min}, AuxTrans=${data.transport_allowance}, UVT=${data.uvt}`)
-  return {
-    salarioMinimo: data.salary_min,
-    auxilioTransporte: data.transport_allowance,
-    uvt: data.uvt
+
+  // 2. No hay config exacta → usar el año más reciente disponible en la DB
+  console.warn(`⚠️ No config for year ${year}, fetching most recent available for company ${companyId}...`)
+  const { data: latestData } = await supabase
+    .from('company_payroll_configurations')
+    .select('salary_min, transport_allowance, uvt, year')
+    .eq('company_id', companyId)
+    .order('year', { ascending: false })
+    .limit(1)
+    .single()
+
+  if (latestData) {
+    console.warn(`⚠️ Using config from year ${latestData.year} as fallback for ${year}`)
+    return { salarioMinimo: latestData.salary_min, auxilioTransporte: latestData.transport_allowance, uvt: latestData.uvt }
   }
+
+  // 3. Último recurso: la empresa no tiene ninguna config en la DB
+  console.error(`❌ No config found at all for company ${companyId}, using hardcoded 2026 values`)
+  return { salarioMinimo: 1750905, auxilioTransporte: 249095, uvt: 49799 }
 }
 
 // ✅ LÍMITE CORRECTO AUXILIO TRANSPORTE: 2 SMMLV

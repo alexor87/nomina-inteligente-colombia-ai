@@ -314,7 +314,19 @@ export class ConfigurationService {
 
   // Helper methods
   private static async createDefaultConfiguration(companyId: string, year: string): Promise<PayrollConfiguration> {
-    const defaultConfig = this.getFallbackConfig(year);
+    // Usar el año más reciente disponible como template en lugar de valores hardcodeados
+    const { data: latestData } = await supabase
+      .from('company_payroll_configurations')
+      .select('*')
+      .eq('company_id', companyId)
+      .order('year', { ascending: false })
+      .limit(1)
+      .single();
+
+    const defaultConfig = latestData
+      ? this.transformDBToConfig(latestData)
+      : this.getFallbackConfig(year);
+
     const dbConfig = this.transformConfigToDB(defaultConfig);
 
     const { error } = await supabase
