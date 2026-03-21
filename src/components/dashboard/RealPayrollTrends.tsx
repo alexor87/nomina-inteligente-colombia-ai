@@ -1,6 +1,7 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import {
   AreaChart,
   Area,
@@ -21,11 +22,16 @@ interface RealPayrollTrendsProps {
   loading?: boolean;
 }
 
-export const RealPayrollTrends: React.FC<RealPayrollTrendsProps> = ({ 
-  data, 
-  loading = false 
+export const RealPayrollTrends: React.FC<RealPayrollTrendsProps> = ({
+  data,
+  loading = false
 }) => {
-  const formatCurrency = (value: number) => 
+  type Range = '3M' | '6M' | '12M';
+  const [range, setRange] = useState<Range>('6M');
+  const rangeMap: Record<Range, number> = { '3M': 3, '6M': 6, '12M': 12 };
+  const displayData = data.slice(-rangeMap[range]);
+
+  const formatCurrency = (value: number) =>
     new Intl.NumberFormat('es-CO', { 
       style: 'currency', 
       currency: 'COP',
@@ -72,7 +78,21 @@ export const RealPayrollTrends: React.FC<RealPayrollTrendsProps> = ({
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-medium text-muted-foreground">Tendencias de Nómina</h3>
+        <ToggleGroup
+          type="single"
+          value={range}
+          onValueChange={(v) => v && setRange(v as Range)}
+          size="sm"
+        >
+          <ToggleGroupItem value="3M">3M</ToggleGroupItem>
+          <ToggleGroupItem value="6M">6M</ToggleGroupItem>
+          <ToggleGroupItem value="12M">12M</ToggleGroupItem>
+        </ToggleGroup>
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Tendencia de Costos */}
       <Card>
         <CardHeader>
@@ -84,7 +104,7 @@ export const RealPayrollTrends: React.FC<RealPayrollTrendsProps> = ({
         <CardContent>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data}>
+              <AreaChart data={displayData}>
                 <defs>
                   <linearGradient id="colorDevengado" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3}/>
@@ -155,7 +175,7 @@ export const RealPayrollTrends: React.FC<RealPayrollTrendsProps> = ({
         <CardContent>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data}>
+              <BarChart data={displayData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                 <XAxis 
                   dataKey="month" 
@@ -188,6 +208,7 @@ export const RealPayrollTrends: React.FC<RealPayrollTrendsProps> = ({
           </div>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 };

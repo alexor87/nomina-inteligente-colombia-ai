@@ -366,7 +366,7 @@ export class DashboardService {
         return acc;
       }, {} as Record<string, MonthlyPayrollTrend>);
 
-      const result = Object.values(groupedData || {}).slice(0, 6);
+      const result = Object.values(groupedData || {}).slice(0, 12);
       this.trendsCache[cacheKey] = { data: result, expiresAt: this.now() + this.TTL.trends };
       return result;
     } catch (error) {
