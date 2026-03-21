@@ -558,14 +558,13 @@ serve(async (req) => {
     );
 
     const body = await req.json();
-    const { conversation, sessionId, richContext, metadata, idempotencyKey, actionType, actionParameters } = body;
+    const { conversation, sessionId, richContext, metadata, idempotencyKey, actionType, actionParameters, wantsStreaming } = body;
 
     // Initialize LLM client with available keys
     const llmClient = new LLMClient(
       Deno.env.get('OPENAI_API_KEY'),
       Deno.env.get('ANTHROPIC_API_KEY')
     );
-    const wantsStreaming = req.headers.get('X-Maya-Stream-Request') === '1';
 
     console.log(`📦 [METADATA] Received metadata:`, metadata ? 'present' : 'missing');
     console.log(`🔑 [IDEMPOTENCY] Received key:`, idempotencyKey ? 'present' : 'missing');
