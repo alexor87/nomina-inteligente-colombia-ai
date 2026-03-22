@@ -20,7 +20,7 @@ BEGIN
     PERFORM cron.schedule(
       'maya-proactive-daily',
       '0 14 * * *',
-      $$
+      $cron$
       SELECT net.http_post(
         url := current_setting('app.supabase_url', true) || '/functions/v1/maya-proactive-scheduler',
         headers := jsonb_build_object(
@@ -29,7 +29,7 @@ BEGIN
         ),
         body := '{}'::jsonb
       )
-      $$
+      $cron$
     );
   END IF;
 END $$;
