@@ -143,6 +143,48 @@ export class SimpleIntentMatcher {
       };
     }
 
+    // UVT_VALUE — "cuál es la UVT", "valor UVT 2026", "unidad de valor tributario"
+    if (/\buvt\b/i.test(text) ||
+        /unidad\s+(?:de\s+)?valor\s+tributario/i.test(text) ||
+        /valor\s+(?:de\s+(?:la\s+)?)?\buvt\b/i.test(text)) {
+      const yearMatch = text.match(/\b(20\d{2})\b/);
+      return {
+        type: 'UVT_VALUE',
+        confidence: 0.97,
+        method: 'uvtValue',
+        params: { year: yearMatch ? parseInt(yearMatch[1]) : new Date().getFullYear() }
+      };
+    }
+
+    // TRANSPORT_ALLOWANCE — "cuánto es el auxilio de transporte", "subsidio de transporte"
+    if (/auxilio\s+(?:de\s+)?transporte/i.test(text) ||
+        /subsidio\s+(?:de\s+)?transporte/i.test(text) ||
+        /cu[aá]nto\s+(?:es|vale|está)\s+(?:el\s+)?(?:auxilio|subsidio)\s+(?:de\s+)?transporte/i.test(text) ||
+        /valor\s+(?:del?\s+)?(?:auxilio|subsidio)\s+(?:de\s+)?transporte/i.test(text)) {
+      const yearMatch = text.match(/\b(20\d{2})\b/);
+      return {
+        type: 'TRANSPORT_ALLOWANCE',
+        confidence: 0.96,
+        method: 'transportAllowance',
+        params: { year: yearMatch ? parseInt(yearMatch[1]) : new Date().getFullYear() }
+      };
+    }
+
+    // PENDING_ALERTS — "hay alertas pendientes", "novedades pendientes", "qué alertas hay"
+    if (/alertas?\s*pendientes/i.test(text) ||
+        /hay\s+alertas?/i.test(text) ||
+        /qu[eé]\s+alertas?\s+hay/i.test(text) ||
+        /novedades?\s+pendientes/i.test(text) ||
+        /alertas?\s+de\s+hoy/i.test(text) ||
+        /^alertas?[?\s]*$/i.test(text)) {
+      return {
+        type: 'PENDING_ALERTS',
+        confidence: 0.95,
+        method: 'pendingAlerts',
+        params: {}
+      };
+    }
+
     // EPS Definition
     if (/^(?:qu[eé]|que)\s+(?:es|significa)\s+(?:la\s+|el\s+|una?\s+)?eps[?\s]*$/i.test(text) ||
         /^(?:eps)[\?\.]*$/i.test(text) ||

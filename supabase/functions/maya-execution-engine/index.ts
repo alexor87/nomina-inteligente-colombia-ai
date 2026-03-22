@@ -15,6 +15,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { CostAwareRouter } from './cost-aware-router.ts';
+import { TokenBudgetService } from '../_shared/token-budget-service.ts';
 import type {
   AgentType,
   AgentInvocation,
@@ -54,6 +55,100 @@ async function getPayrollConfig(
     .eq('year', year)
     .single();
   return data ?? null;
+}
+
+// ── kiss_legal_fallback ──────────────────────────────────────────────────────
+// Invokes agent-legal using a shared cache key (no company_id).
+// The legal decree is the same for all companies — cache is global.
+async function executeKissLegalFallback(
+  routing: RoutingDecision,
+  query: string,
+  companyId: string,
+  supabaseUrl: string,
+  serviceRoleKey: string,
+  router: CostAwareRouter,
+): Promise<EngineResponse> {
+  const hint      = routing.fallback_hint;
+  const intent    = routing.matched_intent ?? 'SMLMV_VALUE';
+  const year      = routing.kiss_params?.year ?? new Date().getFullYear();
+  const cacheKey  = router.buildLegalCacheKey(intent, String(year));
+
+  const adminClient = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false },
+  });
+
+  // 1. Check shared legal cache
+  const { data: cached } = await adminClient
+    .from('maya_kiss_cache')
+    .select('response')
+    .eq('cache_key', cacheKey)
+    .gt('expires_at', new Date().toISOString())
+    .maybeSingle();
+
+  if (cached?.response) {
+    console.log(`[ENGINE] Legal cache HIT — ${cacheKey}`);
+    return { ...(cached.response as EngineResponse), routing: { ...routing, from_cache: true } };
+  }
+
+  // 2. Cache miss — invoke agent-legal
+  console.log(`[ENGINE] Legal cache MISS — invoking agent-legal for ${cacheKey}`);
+  try {
+    const agentReq = {
+      plan_id:              crypto.randomUUID(),
+      invocation_id:        crypto.randomUUID(),
+      company_id:           companyId,
+      user_id:              '',
+      session_id:           '',
+      query,
+      intent,
+      params:               { year, legal_query: hint?.legal_query },
+      upstream_results:     [],
+      conversation_history: [],
+      max_tokens:           512,
+      timeout_ms:           4000,
+    };
+
+    const legalRes = await fetch(`${supabaseUrl}/functions/v1/agent-legal`, {
+      method:  'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': `Bearer ${serviceRoleKey}`,
+      },
+      body: JSON.stringify(agentReq),
+    });
+
+    const agentResp = await legalRes.json();
+    const message   = agentResp.explanation ?? agentResp.summary ?? 'No se encontró el valor solicitado.';
+    const found     = agentResp.data?.found === true;
+
+    const engineResponse: EngineResponse = {
+      message,
+      quickReplies: found ? ['Configurar en parámetros legales'] : [],
+      routing:      { ...routing, from_cache: false },
+    };
+
+    // 3. Store in shared legal cache (no company_id key)
+    if (found) {
+      const ttl = hint?.legal_cache_ttl ?? 86400;
+      await adminClient.from('maya_kiss_cache').upsert({
+        company_id: companyId,   // required FK, but key has no company_id
+        cache_key:  cacheKey,
+        intent,
+        response:   engineResponse,
+        ttl_seconds: ttl,
+        expires_at: new Date(Date.now() + ttl * 1000).toISOString(),
+      }, { onConflict: 'company_id,cache_key' }).catch(console.warn);
+    }
+
+    return engineResponse;
+  } catch (err) {
+    console.error('[ENGINE] agent-legal invocation failed:', err);
+    return {
+      message:      'No pude consultar la fuente legal en este momento. Intenta de nuevo en unos segundos.',
+      quickReplies: [],
+      routing,
+    };
+  }
 }
 
 async function executeKissIntent(
@@ -615,6 +710,39 @@ serve(async (req) => {
 
     console.log(`[ENGINE] Routing: ${routing.path} (confidence: ${routing.confidence.toFixed(2)}, threshold: ${kissThreshold})`);
 
+    // ── kiss_clarify — data not found, needs user clarification ─────────────
+    if (routing.path === 'kiss_clarify') {
+      const hint = routing.fallback_hint;
+      const msg  = hint?.clarify_message
+        ? `${hint.clarify_message}${hint.clarify_hint ? `\n${hint.clarify_hint}` : ''}`
+        : 'No encontré los datos que buscas. ¿Puedes darme más detalles?';
+      return new Response(JSON.stringify({
+        message:      msg,
+        quickReplies: ['Buscar por cédula', 'Buscar por nombre completo'],
+        routing,
+      } satisfies EngineResponse), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // ── kiss_configure — configuration missing, offer action ────────────────
+    if (routing.path === 'kiss_configure') {
+      const hint = routing.fallback_hint;
+      const msg  = hint?.configure_message ?? 'Parece que falta configurar este parámetro.';
+      const qr   = hint?.configure_url ? ['Ir a configuración'] : [];
+      return new Response(JSON.stringify({
+        message:      msg,
+        quickReplies: qr,
+        routing,
+      } satisfies EngineResponse), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // ── kiss_legal_fallback — legal_critical data not in DB ─────────────────
+    if (routing.path === 'kiss_legal_fallback') {
+      const supabaseUrl    = Deno.env.get('SUPABASE_URL')!;
+      const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const legalResponse  = await executeKissLegalFallback(routing, query, companyId, supabaseUrl, serviceRoleKey, router);
+      return new Response(JSON.stringify(legalResponse), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
     // ── KISS Path ────────────────────────────────────────────────────────────
     if (routing.path === 'kiss') {
       const kissResponse = await handleKissPath(routing, query, companyId, supabase, router);
@@ -641,7 +769,25 @@ serve(async (req) => {
       });
     }
 
-    // ── DAG Path ─────────────────────────────────────────────────────────────
+    // ── DAG Path — check quota before invoking Plan Generator ───────────────
+    const supabaseUrl    = Deno.env.get('SUPABASE_URL')!;
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const budgetSvc      = new TokenBudgetService(supabaseUrl, serviceRoleKey);
+    const budget         = await budgetSvc.checkBudget(companyId);
+
+    if (!budget.can_consume) {
+      // Quota exhausted — respond with KISS data + upgrade CTA (never say "no")
+      const kissResponse = await handleKissPath(routing, query, companyId, supabase, router);
+      const upgradeMsg   = budget.upgrade_message ?? '';
+      return new Response(JSON.stringify({
+        ...kissResponse,
+        message: kissResponse.message
+          ? `${kissResponse.message}\n\n${upgradeMsg}`
+          : upgradeMsg,
+        quickReplies: ['Ver planes', ...(kissResponse.quickReplies ?? [])],
+      } satisfies EngineResponse), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
     const plan = await generatePlan(query, conversation, context, openaiKey);
     console.log(`[ENGINE] DAG plan: ${plan.phases.length} phases, intent: ${plan.intent}`);
 
@@ -743,6 +889,14 @@ serve(async (req) => {
 
     const executableActions = agentResponses.flatMap(r => r.executable_actions ?? []);
     const quickReplies = agentResponses.flatMap(r => r.quick_replies ?? []);
+
+    // Consume 1 quota after successful DAG execution (fire-and-forget)
+    budgetSvc.consume({
+      companyId,
+      routingPath:      'dag',
+      agentCount:       agentResponses.length,
+      estimatedCostUsd: 0.010,
+    }).catch(console.warn);
 
     const responseBody: EngineResponse = {
       message: consolidatedMessage,
