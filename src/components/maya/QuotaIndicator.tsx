@@ -24,46 +24,63 @@ function useQuotaStatus(companyId: string, externalQuota?: QuotaStatus) {
       const today       = new Date();
       const periodStart = new Date(today.getFullYear(), today.getMonth(), 1)
         .toISOString().slice(0, 10);
+      const resetDate   = new Date(today.getFullYear(), today.getMonth() + 1, 1)
+        .toISOString().slice(0, 10);
 
-      supabase
-        .from('company_quota_usage')
-        .select('maya_queries_used, plan_tier, period_start')
-        .eq('company_id', companyId)
-        .eq('period_start', periodStart)
-        .maybeSingle()
-        .then(({ data }) => {
-          if (!data) {
-            setQuota({
-              plan: 'esencial', monthly_limit: 30,
-              consumed_this_month: 0, remaining: 30,
-              resets_at: new Date(today.getFullYear(), today.getMonth() + 1, 1).toISOString().slice(0, 10),
-              percentage_used: 0, alert_state: 'ok',
-            });
-            return;
-          }
+      // Maps plan_tier → plan_id in subscription_plans
+      const tierToPlanId: Record<string, string> = {
+        esencial: 'basico', profesional: 'profesional', empresarial: 'empresarial',
+      };
+      const fallbackLimits: Record<string, number | null> = {
+        esencial: 30, profesional: 150, empresarial: null,
+      };
 
-          const tier    = (data.plan_tier ?? 'esencial') as QuotaStatus['plan'];
-          const limits: Record<string, number | null> = { esencial: 30, profesional: 150, empresarial: null };
-          const limit   = limits[tier] ?? 30;
-          const used    = data.maya_queries_used ?? 0;
-          const pct     = limit ? Math.min(100, Math.round((used / limit) * 100)) : 0;
+      Promise.all([
+        supabase
+          .from('company_quota_usage')
+          .select('maya_queries_used, plan_tier')
+          .eq('company_id', companyId)
+          .eq('period_start', periodStart)
+          .maybeSingle(),
+        supabase
+          .from('companies')
+          .select('plan_tier')
+          .eq('id', companyId)
+          .maybeSingle(),
+      ]).then(async ([usageRes, companyRes]) => {
+        const tier   = ((usageRes.data?.plan_tier ?? companyRes.data?.plan_tier ?? 'esencial') as QuotaStatus['plan']);
+        const planId = tierToPlanId[tier] ?? 'basico';
 
-          const alertState: QuotaAlertState =
-            !limit         ? 'ok'
-            : pct >= 100   ? 'exhausted'
-            : pct >= 95    ? 'critical'
-            : pct >= 80    ? 'warning'
-            : 'ok';
+        // Read configured limit from subscription_plans (superadmin-controlled)
+        let limit: number | null = fallbackLimits[tier] ?? 30;
+        try {
+          const { data: planConfig } = await supabase
+            .from('subscription_plans')
+            .select('maya_queries_per_month')
+            .eq('plan_id', planId)
+            .maybeSingle();
+          if (planConfig !== null) limit = planConfig.maya_queries_per_month;
+        } catch { /* keep fallback */ }
 
-          setQuota({
-            plan: tier, monthly_limit: limit,
-            consumed_this_month: used,
-            remaining: limit !== null ? Math.max(0, limit - used) : null,
-            resets_at: new Date(today.getFullYear(), today.getMonth() + 1, 1).toISOString().slice(0, 10),
-            percentage_used: pct,
-            alert_state: alertState,
-          });
+        const used = usageRes.data?.maya_queries_used ?? 0;
+        const pct  = limit ? Math.min(100, Math.round((used / limit) * 100)) : 0;
+
+        const alertState: QuotaAlertState =
+          !limit         ? 'ok'
+          : pct >= 100   ? 'exhausted'
+          : pct >= 95    ? 'critical'
+          : pct >= 80    ? 'warning'
+          : 'ok';
+
+        setQuota({
+          plan: tier, monthly_limit: limit,
+          consumed_this_month: used,
+          remaining: limit !== null ? Math.max(0, limit - used) : null,
+          resets_at: resetDate,
+          percentage_used: pct,
+          alert_state: alertState,
         });
+      });
     });
   }, [companyId, externalQuota]);
 
