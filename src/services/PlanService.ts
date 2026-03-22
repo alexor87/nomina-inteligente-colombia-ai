@@ -7,6 +7,7 @@ export interface SubscriptionPlan {
   precio: number;
   max_employees: number;
   max_payrolls_per_month: number;
+  maya_queries_per_month: number | null;
   caracteristicas: string[];
   is_active: boolean;
   sort_order: number;
@@ -20,6 +21,7 @@ export interface PlanFormData {
   precio: number;
   max_employees: number;
   max_payrolls_per_month: number;
+  maya_queries_per_month: number | null;
   caracteristicas: string[];
   sort_order: number;
 }
@@ -49,6 +51,7 @@ export const PlanService = {
         precio: plan.precio,
         max_employees: plan.max_employees,
         max_payrolls_per_month: plan.max_payrolls_per_month,
+        maya_queries_per_month: plan.maya_queries_per_month,
         caracteristicas: plan.caracteristicas as unknown as any,
         sort_order: plan.sort_order,
       });
@@ -61,6 +64,7 @@ export const PlanService = {
     if (plan.precio !== undefined) updateData.precio = plan.precio;
     if (plan.max_employees !== undefined) updateData.max_employees = plan.max_employees;
     if (plan.max_payrolls_per_month !== undefined) updateData.max_payrolls_per_month = plan.max_payrolls_per_month;
+    if ('maya_queries_per_month' in plan) updateData.maya_queries_per_month = plan.maya_queries_per_month;
     if (plan.caracteristicas !== undefined) updateData.caracteristicas = plan.caracteristicas;
     if (plan.sort_order !== undefined) updateData.sort_order = plan.sort_order;
     if (plan.plan_id !== undefined) updateData.plan_id = plan.plan_id;
