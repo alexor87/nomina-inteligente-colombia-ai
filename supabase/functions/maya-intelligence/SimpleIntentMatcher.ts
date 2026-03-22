@@ -126,10 +126,69 @@ export class SimpleIntentMatcher {
     // DOMAIN DEFINITIONS - KISS Route for Colombian Labor Terms
     // ============================================================================
     
+    // SMLMV_VALUE — "cuánto es el SMLMV", "salario mínimo 2026", "valor del SMLMV"
+    if (/cu[aá]nto\s+(?:es|vale|está)\s+(?:el\s+)?(?:smlmv?|smmlv|salario\s+m[ií]nimo)/i.test(text) ||
+        /cu[aá]l\s+es\s+(?:el\s+)?(?:salario\s+m[ií]nimo|smlmv?|smmlv)/i.test(text) ||
+        /(?:valor|monto)\s+(?:del?\s+)?(?:smlmv?|smmlv|salario\s+m[ií]nimo)/i.test(text) ||
+        /salario\s+m[ií]nimo\s+(?:para\s+)?\d{4}/i.test(text) ||
+        /salario\s+m[ií]nimo\s+(?:actual|vigente|hoy|colombia)/i.test(text) ||
+        /smlmv?\s+(?:para\s+)?\d{4}/i.test(text) ||
+        /smlmv?\s+(?:actual|vigente|hoy)/i.test(text) ||
+        /^(?:smlmv?|smmlv)\s*(?:para\s+)?\d{0,4}[?\s]*$/i.test(text)) {
+      return {
+        type: 'SMLMV_VALUE',
+        confidence: 0.97,
+        method: 'smlmvValue',
+        params: { year: 2026 }
+      };
+    }
+
+    // UVT_VALUE — "cuál es la UVT", "valor UVT 2026", "unidad de valor tributario"
+    if (/\buvt\b/i.test(text) ||
+        /unidad\s+(?:de\s+)?valor\s+tributario/i.test(text) ||
+        /valor\s+(?:de\s+(?:la\s+)?)?\buvt\b/i.test(text)) {
+      const yearMatch = text.match(/\b(20\d{2})\b/);
+      return {
+        type: 'UVT_VALUE',
+        confidence: 0.97,
+        method: 'uvtValue',
+        params: { year: yearMatch ? parseInt(yearMatch[1]) : new Date().getFullYear() }
+      };
+    }
+
+    // TRANSPORT_ALLOWANCE — "cuánto es el auxilio de transporte", "subsidio de transporte"
+    if (/auxilio\s+(?:de\s+)?transporte/i.test(text) ||
+        /subsidio\s+(?:de\s+)?transporte/i.test(text) ||
+        /cu[aá]nto\s+(?:es|vale|está)\s+(?:el\s+)?(?:auxilio|subsidio)\s+(?:de\s+)?transporte/i.test(text) ||
+        /valor\s+(?:del?\s+)?(?:auxilio|subsidio)\s+(?:de\s+)?transporte/i.test(text)) {
+      const yearMatch = text.match(/\b(20\d{2})\b/);
+      return {
+        type: 'TRANSPORT_ALLOWANCE',
+        confidence: 0.96,
+        method: 'transportAllowance',
+        params: { year: yearMatch ? parseInt(yearMatch[1]) : new Date().getFullYear() }
+      };
+    }
+
+    // PENDING_ALERTS — "hay alertas pendientes", "novedades pendientes", "qué alertas hay"
+    if (/alertas?\s*pendientes/i.test(text) ||
+        /hay\s+alertas?/i.test(text) ||
+        /qu[eé]\s+alertas?\s+hay/i.test(text) ||
+        /novedades?\s+pendientes/i.test(text) ||
+        /alertas?\s+de\s+hoy/i.test(text) ||
+        /^alertas?[?\s]*$/i.test(text)) {
+      return {
+        type: 'PENDING_ALERTS',
+        confidence: 0.95,
+        method: 'pendingAlerts',
+        params: {}
+      };
+    }
+
     // EPS Definition
-    if (/^(?:qu[eé]|que)\s+(?:es|significa)\s+(?:una?\s+)?eps[?\s]*$/i.test(text) ||
+    if (/^(?:qu[eé]|que)\s+(?:es|significa)\s+(?:la\s+|el\s+|una?\s+)?eps[?\s]*$/i.test(text) ||
         /^(?:eps)[\?\.]*$/i.test(text) ||
-        /^(?:qu[eé]|que)\s+significa\s+eps/i.test(text)) {
+        /^(?:qu[eé]|que)\s+significa\s+(?:la\s+)?eps/i.test(text)) {
       return {
         type: 'DOMAIN_DEFINITION',
         confidence: 0.98,
@@ -137,9 +196,9 @@ export class SimpleIntentMatcher {
         params: { term: 'EPS' }
       };
     }
-    
+
     // ARL Definition
-    if (/^(?:qu[eé]|que)\s+(?:es|significa)\s+(?:una?\s+)?arl[?\s]*$/i.test(text) ||
+    if (/^(?:qu[eé]|que)\s+(?:es|significa)\s+(?:la\s+|el\s+|una?\s+)?arl[?\s]*$/i.test(text) ||
         /^(?:arl)[\?\.]*$/i.test(text)) {
       return {
         type: 'DOMAIN_DEFINITION',
@@ -148,9 +207,9 @@ export class SimpleIntentMatcher {
         params: { term: 'ARL' }
       };
     }
-    
+
     // AFP Definition
-    if (/^(?:qu[eé]|que)\s+(?:es|significa)\s+(?:una?\s+)?afp[?\s]*$/i.test(text) ||
+    if (/^(?:qu[eé]|que)\s+(?:es|significa)\s+(?:la\s+|el\s+|una?\s+)?afp[?\s]*$/i.test(text) ||
         /^(?:afp)[\?\.]*$/i.test(text)) {
       return {
         type: 'DOMAIN_DEFINITION',
@@ -159,9 +218,9 @@ export class SimpleIntentMatcher {
         params: { term: 'AFP' }
       };
     }
-    
+
     // Cajas de Compensación
-    if (/^(?:qu[eé]|que)\s+(?:es|son|significa)\s+(?:una?\s+)?caja[s]?\s+(?:de\s+)?compensaci[oó]n/i.test(text)) {
+    if (/^(?:qu[eé]|que)\s+(?:es|son|significa)\s+(?:la[s]?\s+|una?\s+)?caja[s]?\s+(?:de\s+)?compensaci[oó]n/i.test(text)) {
       return {
         type: 'DOMAIN_DEFINITION',
         confidence: 0.98,
@@ -169,9 +228,9 @@ export class SimpleIntentMatcher {
         params: { term: 'CAJA_COMPENSACION' }
       };
     }
-    
-    // SMLV
-    if (/^(?:qu[eé]|que)\s+(?:es|significa)\s+(?:el\s+)?(?:smlv|salario\s+m[ií]nimo)/i.test(text)) {
+
+    // SMLV definition (qué ES el SMLMV — conceptual question, not asking for the value)
+    if (/^(?:qu[eé]|que)\s+(?:es|significa)\s+(?:el\s+)?(?:smlv|smmlv|salario\s+m[ií]nimo)/i.test(text)) {
       return {
         type: 'DOMAIN_DEFINITION',
         confidence: 0.98,
@@ -1302,7 +1361,7 @@ export class SimpleIntentMatcher {
       console.log('📊 [PAYROLL_TOTALS] General payroll inquiry detected');
       return {
         type: 'PAYROLL_TOTALS',
-        confidence: 0.8,
+        confidence: 0.92,
         method: 'getPayrollTotals'
       };
     }
@@ -1336,7 +1395,7 @@ export class SimpleIntentMatcher {
       
       return {
         type: 'RECENT_PERIODS',
-        confidence: 0.8,
+        confidence: 0.92,
         method: 'getRecentPeriods',
         params: { statusFilter }
       };

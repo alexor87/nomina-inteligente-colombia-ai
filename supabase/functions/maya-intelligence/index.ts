@@ -1262,7 +1262,7 @@ serve(async (req) => {
                 // Stream if client requested it
                 if (wantsStreaming) {
                   try {
-                    const streamBody = await handleConversationStreaming(lastMessage, conversation, llmClient);
+                    const streamBody = await handleConversationStreaming(lastMessage, conversation, llmClient, companyId || undefined);
                     if (streamBody) {
                       return new Response(streamBody, {
                         headers: { ...corsHeaders, 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'X-Maya-Stream': '1' }
@@ -1272,7 +1272,7 @@ serve(async (req) => {
                     console.error('[EXPLANATION] Streaming failed, falling back to JSON:', streamErr);
                   }
                 }
-                const explanationResponse = await handleConversation(lastMessage, conversation);
+                const explanationResponse = await handleConversation(lastMessage, conversation, companyId || undefined);
                 return new Response(JSON.stringify(explanationResponse), {
                   headers: { ...corsHeaders, 'Content-Type': 'application/json' }
                 });
@@ -2642,7 +2642,7 @@ ${calc.jornadaInfo.descripcion ? `\n**Nota:** ${calc.jornadaInfo.descripcion}` :
               emotionalState: 'neutral'
             };
           } else {
-            response = await handleConversation(lastMessage, conversation);
+            response = await handleConversation(lastMessage, conversation, companyId || undefined);
           }
         }
         // Medium confidence (0.7-0.8): Still use KISS (proven reliable)
@@ -4512,7 +4512,8 @@ function extractSalaryAmount(text: string): number | null {
 async function handleConversationStreaming(
   message: string,
   conversation: any[],
-  llmClient: LLMClient
+  llmClient: LLMClient,
+  companyId?: string
 ): Promise<ReadableStream | null> {
   const openaiKey = Deno.env.get('OPENAI_API_KEY');
   if (!openaiKey) return null;
@@ -4524,12 +4525,25 @@ async function handleConversationStreaming(
 
   // RAG context (same as handleConversation)
   let legalContext = '';
+  let smlmvLine = `SMLV ${currentYear}: consultar en Configuración → Parámetros Legales`;
   try {
     const ragKey = Deno.env.get('OPENAI_API_KEY');
     if (ragKey) {
       const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
       const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
       const ragSupabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+
+      if (companyId) {
+        const { data: cfg } = await ragSupabase
+          .from('company_payroll_configurations')
+          .select('salary_min, transport_allowance')
+          .eq('company_id', companyId)
+          .eq('year', currentYear.toString())
+          .single();
+        if (cfg) {
+          smlmvLine = `SMLV ${currentYear}: $${cfg.salary_min} | Aux. transporte: $${cfg.transport_allowance}`;
+        }
+      }
 
       const embeddingResp = await fetch('https://api.openai.com/v1/embeddings', {
         method: 'POST',
@@ -4562,7 +4576,9 @@ Eres MAYA, asistente laboral colombiano experto en nómina y legislación vigent
 - Conciso: Máximo 300 palabras por respuesta
 - Natural: Habla como asesor amigable
 - Visual: Usa bullets, emojis y ejemplos prácticos
-- SMLV ${currentYear}: $1.423.500 | Aux. transporte: $200.000
+- ${smlmvLine}
+
+**CONTEXTO DEL USUARIO:** El usuario es el dueño o administrador de la empresa. "mi nómina" = la nómina de su empresa. "mi información" = datos de la empresa. Nunca interpreta "mi nómina" como nombre de un empleado.
 
 ${legalContext ? `CONTEXTO LEGAL:\n${legalContext}` : ''}`;
 
@@ -4577,20 +4593,37 @@ ${legalContext ? `CONTEXTO LEGAL:\n${legalContext}` : ''}`;
   return llmClient.stream(model, messages, { maxTokens: 1000, temperature: 0.7 });
 }
 
-async function handleConversation(message: string, conversation: any[]) {
+async function handleConversation(message: string, conversation: any[], companyId?: string) {
   const now = new Date();
   const currentMonth = now.toLocaleDateString('es-CO', { month: 'long' });
   const currentYear = now.getFullYear();
   const currentDate = `${currentMonth} ${currentYear}`;
-  
+
   const openaiKey = Deno.env.get('OPENAI_API_KEY');
   const lovableKey = Deno.env.get('LOVABLE_API_KEY');
-  
+
   if (!openaiKey) {
     return {
       message: 'Hola, soy MAYA. Puedo ayudarte con consultas sobre empleados y nómina. ¿Qué necesitas?',
       emotionalState: 'neutral'
     };
+  }
+
+  // Fetch SMLMV from DB to avoid hardcoded values
+  let smlmvLine = `SMLV ${currentYear}: consultar en Configuración → Parámetros Legales`;
+  if (companyId) {
+    try {
+      const cfgClient = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
+      const { data: cfg } = await cfgClient
+        .from('company_payroll_configurations')
+        .select('salary_min, transport_allowance')
+        .eq('company_id', companyId)
+        .eq('year', currentYear.toString())
+        .single();
+      if (cfg) {
+        smlmvLine = `SMLV ${currentYear}: $${cfg.salary_min} | Aux. transporte: $${cfg.transport_allowance}`;
+      }
+    } catch { /* continue without config */ }
   }
   
 // ============================================================================
@@ -5053,11 +5086,12 @@ Tienes acceso a herramientas de cálculo backend que debes usar cuando el usuari
   → NO uses herramienta, solo explica la teoría
 
 📌 **DATOS COLOMBIA ${currentYear}:**
-- SMLV: $1.423.500
-- Auxilio transporte: $200.000
+- ${smlmvLine}
 - Parafiscales: SENA 2%, ICBF 3%, Cajas 4%
 
 Emociones: professional, thoughtful, excited, happy
+
+**CONTEXTO DEL USUARIO:** El usuario es el dueño o administrador de la empresa. "mi nómina" = la nómina de su empresa. "mi información" = datos de la empresa. Nunca interpretes "mi nómina" como nombre de un empleado.
 
 ${legalContext}`;
 

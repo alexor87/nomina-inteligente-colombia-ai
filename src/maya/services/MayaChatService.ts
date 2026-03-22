@@ -198,8 +198,12 @@ export class MayaChatService {
       }
     }
 
+    // Feature flag: route to multi-agent engine when enabled
+    const useMultiAgent = import.meta.env.VITE_MULTI_AGENT_ENABLED === 'true';
+    const edgeFunction = useMultiAgent ? 'maya-execution-engine' : 'maya-intelligence';
+
     try {
-      console.log('🤖 MAYA Chat: Calling maya-intelligence function...');
+      console.log(`🤖 MAYA Chat: Calling ${edgeFunction} function...`);
       
       // ✅ PROFESSIONAL: Preserve executableActions for backend parameter extraction
       const simplifiedConversation = this.currentConversation.messages.map(msg => ({
@@ -253,7 +257,7 @@ export class MayaChatService {
 
       let httpResponse: Response;
       try {
-        httpResponse = await fetch(`${SUPABASE_URL}/functions/v1/maya-intelligence`, {
+        httpResponse = await fetch(`${SUPABASE_URL}/functions/v1/${edgeFunction}`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${authToken}`,
