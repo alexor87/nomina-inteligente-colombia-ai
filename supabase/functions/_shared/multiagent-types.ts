@@ -4,7 +4,7 @@
 // ============================================================================
 
 export type AgentType = 'nomina' | 'legal' | 'analytics' | 'alertas';
-export type RoutingPath = 'kiss' | 'dag';
+export type RoutingPath = 'kiss' | 'dag' | 'kiss_legal_fallback' | 'kiss_clarify' | 'kiss_configure';
 
 // ── Cost-Aware Router ────────────────────────────────────────────────────────
 
@@ -17,6 +17,10 @@ export interface RoutingDecision {
   reason: string;               // for debugging and telemetry
   estimated_cost: number;       // estimated USD cost if going through DAG
   from_cache?: boolean;
+  // v2.2
+  kiss_status?: KissResolutionStatus;
+  data_sensitivity?: DataSensitivity;
+  fallback_hint?: FallbackHint;
 }
 
 // ── Agent Communication Contract ────────────────────────────────────────────
@@ -146,4 +150,53 @@ export interface EngineResponse {
   emotionalState?: string;
   planId?: string;
   routing?: RoutingDecision;  // telemetry: which path was taken
+}
+
+// ============================================================================
+// Maya v2.2 — KISS Resolution States & Fallback Strategies
+// ============================================================================
+
+export type KissResolutionStatus = 'resolved' | 'data_not_found' | 'low_confidence';
+
+export type DataSensitivity = 'legal_critical' | 'company_data' | 'configuration' | 'historical';
+
+export interface FallbackHint {
+  sensitivity:         DataSensitivity;
+  strategy:            'escalate_legal' | 'clarify' | 'configure' | 'inform_with_disclaimer';
+  // escalate_legal
+  legal_query?:        string;
+  legal_cache_ttl?:    number;
+  legal_source_hint?:  string;
+  // clarify
+  clarify_message?:    string;
+  clarify_hint?:       string;
+  // configure
+  configure_message?:  string;
+  configure_url?:      string;
+  // inform_with_disclaimer
+  disclaimer?:         string;
+}
+
+// ============================================================================
+// Maya v2.2 — Quota System
+// ============================================================================
+
+export type PlanTier = 'esencial' | 'profesional' | 'empresarial';
+export type QuotaAlertState = 'ok' | 'warning' | 'critical' | 'exhausted';
+
+export interface QuotaStatus {
+  plan:                 PlanTier;
+  monthly_limit:        number | null;  // null = unlimited (empresarial)
+  consumed_this_month:  number;
+  remaining:            number | null;
+  resets_at:            string;         // ISO date string
+  percentage_used:      number;         // 0–100
+  alert_state:          QuotaAlertState;
+}
+
+export interface BudgetDecision {
+  can_consume:      boolean;
+  quota_status:     QuotaStatus;
+  fallback_mode:    'full_maya' | 'kiss_only' | 'kiss_with_upgrade_cta';
+  upgrade_message?: string;
 }
