@@ -88,6 +88,11 @@ ${lastContext ? `Última consulta fue sobre: ${lastContext.summary}` : 'No hay c
 - "cuánto es el salario mínimo" → EXPLANATION
 - Preguntas sobre teoría/legislación sin mencionar datos específicos → EXPLANATION
 
+**REGLA CRÍTICA — pronombres posesivos:**
+- "mi nómina" / "mi información" / "nuestra nómina" / "analizar mi nómina" / "información de mi nómina" → AGGREGATION (NUNCA EMPLOYEE_FOLLOWUP)
+- Solo usar EMPLOYEE_FOLLOWUP cuando hay un nombre propio específico (Juan, María, Carlos, Ana García, etc.)
+- Pronombres posesivos ("mi", "tu", "su", "nuestra", "nuestro") + "nómina" = consulta de datos de la empresa, NO empleado
+
 **Reglas para otras categorías:**
 - "y el año pasado?" → TEMPORAL_FOLLOWUP (LAST_YEAR)
 - "y este año?" → TEMPORAL_FOLLOWUP (THIS_YEAR)

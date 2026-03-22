@@ -254,20 +254,31 @@ export function extractLastEmployeeFromContext(conversation: any[]): string | nu
   return null;
 }
 
+// Pronouns that should never be treated as employee names
+const SPANISH_PRONOUNS = ['mi', 'tu', 'su', 'nuestro', 'nuestra', 'vuestro', 'vuestros', 'vuestras', 'yo', 'él', 'ella', 'me', 'nos', 'les', 'se'];
+
 /**
  * Extract name from short contextual reply
  */
 export function extractNameFromShortReply(text: string): string | null {
   const lowerText = text.toLowerCase().trim();
-  
+
   // Pattern 1: "de [nombre]" or "del [nombre]"
   const pattern1 = lowerText.match(/^(?:de|del|de\s+la)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)/i);
-  if (pattern1) return pattern1[1].trim();
-  
+  if (pattern1) {
+    const name = pattern1[1].trim();
+    if (SPANISH_PRONOUNS.includes(name.split(' ')[0].toLowerCase())) return null;
+    return name;
+  }
+
   // Pattern 2: Just a name (single or double word)
   const pattern2 = lowerText.match(/^([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)$/i);
-  if (pattern2 && pattern2[1].length > 2) return pattern2[1].trim();
-  
+  if (pattern2 && pattern2[1].length > 2) {
+    const name = pattern2[1].trim();
+    if (SPANISH_PRONOUNS.includes(name.split(' ')[0].toLowerCase())) return null;
+    return name;
+  }
+
   return null;
 }
 
@@ -290,20 +301,37 @@ export function isAwaitingEmployeeNameForDetails(conversation: any[]): boolean {
  */
 export function extractNameFromSalaryQuery(text: string): string | null {
   const lowerText = text.toLowerCase().trim();
-  
+
+  const isPronouns = (name: string | null | undefined): boolean => {
+    if (!name) return false;
+    return SPANISH_PRONOUNS.includes(name.trim().split(/\s+/)[0].toLowerCase());
+  };
+
   // Pattern 1: "cual es el salario de eliana"
   const pattern1Match = lowerText.match(/(?:cuál|cual|cuánto|cuanto|qué|que)\s+(?:es\s+el\s+)?(?:salario|sueldo|gana|cobra)\s+de\s+([a-záéíóúñ\s]+)/i);
-  if (pattern1Match) return pattern1Match[1]?.trim().replace(/[?.,!]+$/, '') || null;
-  
+  if (pattern1Match) {
+    const name = pattern1Match[1]?.trim().replace(/[?.,!]+$/, '') || null;
+    if (isPronouns(name)) return null;
+    return name;
+  }
+
   // Pattern 2: "salario de eliana"
   const pattern2Match = lowerText.match(/(?:salario|sueldo|gana|cobra)\s+(?:de|del|de\s+la)\s+([a-záéíóúñ\s]+)/i);
-  if (pattern2Match) return pattern2Match[1]?.trim().replace(/[?.,!]+$/, '') || null;
-  
+  if (pattern2Match) {
+    const name = pattern2Match[1]?.trim().replace(/[?.,!]+$/, '') || null;
+    if (isPronouns(name)) return null;
+    return name;
+  }
+
   // Pattern 3: "sueldo eliana"
   if (!/nomina|total|cuanto|mes|año|periodo/i.test(lowerText)) {
     const pattern3Match = lowerText.match(/(?:salario|sueldo)\s+([a-záéíóúñ]+(?:\s+[a-záéíóúñ]+)?)/i);
-    if (pattern3Match) return pattern3Match[1]?.trim().replace(/[?.,!]+$/, '') || null;
+    if (pattern3Match) {
+      const name = pattern3Match[1]?.trim().replace(/[?.,!]+$/, '') || null;
+      if (isPronouns(name)) return null;
+      return name;
+    }
   }
-  
+
   return null;
 }
