@@ -5,19 +5,25 @@
 // Only DAG and kiss_legal_fallback (cache miss) consume quota.
 // KISS hits and cache hits are always free.
 //
-// Plans:
-//   esencial:    30 queries/month
-//   profesional: 150 queries/month
-//   empresarial: unlimited (monitored for anomalies)
+// Quota limits are stored in subscription_plans.maya_queries_per_month
+// and read dynamically — superadmins can change them without code deploys.
 // ============================================================================
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import type { BudgetDecision, QuotaStatus, QuotaAlertState, PlanTier } from './multiagent-types.ts';
 
-export const PLAN_LIMITS: Record<PlanTier, number | null> = {
+// Fallback limits — only used when DB lookup fails (fail-open behavior)
+const FALLBACK_LIMITS: Record<PlanTier, number | null> = {
   esencial:    30,
   profesional: 150,
-  empresarial: null,  // unlimited
+  empresarial: null,
+};
+
+// Maps plan_tier (Maya enum) → plan_id in subscription_plans table
+const TIER_TO_PLAN_ID: Record<PlanTier, string> = {
+  esencial:    'basico',
+  profesional: 'profesional',
+  empresarial: 'empresarial',
 };
 
 // Alert thresholds (percentage of monthly quota)
@@ -127,7 +133,7 @@ export class TokenBudgetService {
         .select('plan_tier')
         .eq('id', event.companyId)
         .single();
-      if (data?.plan_tier && data.plan_tier in PLAN_LIMITS) {
+      if (data?.plan_tier && data.plan_tier in TIER_TO_PLAN_ID) {
         planTier = data.plan_tier as PlanTier;
       }
     } catch { /* use default */ }
@@ -172,8 +178,21 @@ export class TokenBudgetService {
         .select('plan_tier')
         .eq('id', companyId)
         .single();
-      if (data?.plan_tier && data.plan_tier in PLAN_LIMITS) {
+      if (data?.plan_tier && data.plan_tier in TIER_TO_PLAN_ID) {
         plan = data.plan_tier as PlanTier;
+      }
+    } catch { /* use default */ }
+
+    // Get quota limit from subscription_plans (dynamic — set by superadmin)
+    let limit: number | null = FALLBACK_LIMITS[plan];
+    try {
+      const { data: planConfig } = await this.adminClient
+        .from('subscription_plans')
+        .select('maya_queries_per_month')
+        .eq('plan_id', TIER_TO_PLAN_ID[plan])
+        .single();
+      if (planConfig !== null) {
+        limit = planConfig.maya_queries_per_month;
       }
     } catch { /* use default */ }
 
@@ -186,7 +205,6 @@ export class TokenBudgetService {
       .single();
 
     const consumed = usage?.maya_queries_used ?? 0;
-    const limit    = PLAN_LIMITS[plan];
     const pct      = limit ? Math.min(100, Math.round((consumed / limit) * 100)) : 0;
 
     return {

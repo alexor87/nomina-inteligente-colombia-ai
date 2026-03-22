@@ -21,6 +21,7 @@ const emptyForm: PlanFormData = {
   precio: 0,
   max_employees: 10,
   max_payrolls_per_month: 1,
+  maya_queries_per_month: null,
   caracteristicas: [],
   sort_order: 0,
 };
@@ -82,6 +83,7 @@ const AdminPlansPage: React.FC = () => {
       precio: plan.precio,
       max_employees: plan.max_employees,
       max_payrolls_per_month: plan.max_payrolls_per_month,
+      maya_queries_per_month: plan.maya_queries_per_month,
       caracteristicas: plan.caracteristicas,
       sort_order: plan.sort_order,
     });
@@ -135,6 +137,7 @@ const AdminPlansPage: React.FC = () => {
               <TableHead>Precio</TableHead>
               <TableHead>Máx. Empleados</TableHead>
               <TableHead>Máx. Nóminas/mes</TableHead>
+              <TableHead>Maya / mes</TableHead>
               <TableHead>Características</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
@@ -143,13 +146,13 @@ const AdminPlansPage: React.FC = () => {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                   Cargando planes...
                 </TableCell>
               </TableRow>
             ) : plans.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                   No hay planes configurados
                 </TableCell>
               </TableRow>
@@ -164,6 +167,7 @@ const AdminPlansPage: React.FC = () => {
                   <TableCell>{formatCurrency(plan.precio)}</TableCell>
                   <TableCell>{plan.max_employees >= 9999 ? '∞' : plan.max_employees}</TableCell>
                   <TableCell>{plan.max_payrolls_per_month >= 9999 ? '∞' : plan.max_payrolls_per_month}</TableCell>
+                  <TableCell>{plan.maya_queries_per_month === null ? '∞' : plan.maya_queries_per_month}</TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
                       {plan.caracteristicas.slice(0, 2).map((c, i) => (
@@ -252,6 +256,19 @@ const AdminPlansPage: React.FC = () => {
                   onChange={e => setForm(f => ({ ...f, max_payrolls_per_month: Number(e.target.value) }))}
                 />
               </div>
+            </div>
+            <div>
+              <Label>Maya — consultas/mes (dejar vacío para ilimitado)</Label>
+              <Input
+                type="number"
+                min={1}
+                value={form.maya_queries_per_month ?? ''}
+                onChange={e => setForm(f => ({
+                  ...f,
+                  maya_queries_per_month: e.target.value === '' ? null : Number(e.target.value),
+                }))}
+                placeholder="Ilimitado"
+              />
             </div>
             <div>
               <Label>Orden</Label>
