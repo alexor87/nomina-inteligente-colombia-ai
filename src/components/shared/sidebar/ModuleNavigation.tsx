@@ -14,6 +14,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { FEATURES } from '@/config/features';
 
 // Navigation items ordered by priority: work modules first, tools/settings last
 const navigation = [
@@ -135,7 +136,9 @@ export const ModuleNavigation: React.FC<ModuleNavigationProps> = ({ collapsed })
       
       {/* Secondary navigation - tools & settings */}
       <div className="space-y-1">
-        {secondaryNavigation.map(renderNavItem)}
+        {secondaryNavigation
+          .filter(item => item.module !== 'maya' || FEATURES.MAYA_ENABLED)
+          .map(renderNavItem)}
       </div>
     </div>
   );
