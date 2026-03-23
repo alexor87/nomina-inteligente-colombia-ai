@@ -1,7 +1,6 @@
 import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { CompanySelector } from '@/components/layout/CompanySelector';
-import { NotificationBell } from '@/components/layout/NotificationBell';
 import { UserMenu } from '@/components/layout/UserMenu';
 import { motion } from 'framer-motion';
 
@@ -35,7 +34,6 @@ export const ModuleHeader: React.FC = () => {
         
         <div className="flex items-center gap-3">
           <CompanySelector />
-          <NotificationBell />
           <UserMenu />
         </div>
       </div>
