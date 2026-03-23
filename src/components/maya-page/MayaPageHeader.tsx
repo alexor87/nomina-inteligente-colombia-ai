@@ -7,6 +7,7 @@ import { motion } from 'framer-motion';
 import { MayaHeaderActions } from './MayaHeaderActions';
 import { Button } from '@/components/ui/button';
 import { CompanySelector } from '@/components/layout/CompanySelector';
+import { NotificationBell } from '@/components/layout/NotificationBell';
 import { UserMenu } from '@/components/layout/UserMenu';
 
 export const MayaPageHeader: React.FC = () => {
@@ -69,6 +70,7 @@ export const MayaPageHeader: React.FC = () => {
           
           {/* Componentes globales de navegación */}
           <CompanySelector />
+          <NotificationBell />
           <UserMenu />
         </div>
       </div>
