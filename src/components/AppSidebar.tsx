@@ -14,6 +14,7 @@ import {
   Sparkles
 } from "lucide-react";
 
+import { FEATURES } from '@/config/features';
 import {
   Sidebar,
   SidebarContent,
@@ -109,7 +110,9 @@ export function AppSidebar() {
           <SidebarGroupLabel>Navegación</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navigationItems.map((item) => {
+              {navigationItems
+                .filter(item => item.title !== 'MAYA' || FEATURES.MAYA_ENABLED)
+                .map((item) => {
                 const isActive = currentPath === item.url;
                 const isMaya = item.title === "MAYA";
                 
