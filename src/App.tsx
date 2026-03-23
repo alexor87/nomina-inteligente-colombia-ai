@@ -13,6 +13,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { MayaFullScreenLayout } from "@/components/maya-page/layouts/MayaFullScreenLayout";
 import { RootRedirect } from "@/components/routing/RootRedirect";
 import { AdminLayout } from "@/components/admin/AdminLayout";
+import { FEATURES } from "@/config/features";
 
 // Lazy-loaded pages for reduced initial bundle
 const Index = lazy(() => import("./pages/Index"));
@@ -34,7 +35,7 @@ const CompanyRegistrationPage = lazy(() => import("./pages/CompanyRegistrationPa
 const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
 const SocialBenefitsPage = lazy(() => import("./pages/SocialBenefitsPage"));
 const SocialBenefitLiquidationPage = lazy(() => import("./pages/SocialBenefitLiquidationPage"));
-const MayaPage = lazy(() => import("./pages/MayaPage"));
+const MayaPage = FEATURES.MAYA_ENABLED ? lazy(() => import("./pages/MayaPage")) : null;
 const AdminDashboardPage = lazy(() => import("./pages/admin/AdminDashboardPage"));
 const AdminCompaniesPage = lazy(() => import("./pages/admin/AdminCompaniesPage"));
 const AdminCompanyDetailPage = lazy(() => import("./pages/admin/AdminCompanyDetailPage"));
@@ -85,7 +86,9 @@ function AppContent() {
           </Route>
 
           <Route element={<MayaFullScreenLayout />}>
-            <Route path="/maya" element={<MayaPage />} />
+            {FEATURES.MAYA_ENABLED && MayaPage && (
+              <Route path="/maya" element={<MayaPage />} />
+            )}
             <Route path="/modules/dashboard" element={<DashboardPage />} />
             <Route path="/modules/employees" element={<EmployeesPage />} />
             <Route path="/modules/employees/create" element={<CreateEmployeeModernPage />} />

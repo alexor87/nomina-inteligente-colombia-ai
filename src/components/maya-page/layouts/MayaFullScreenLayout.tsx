@@ -8,6 +8,7 @@ import { UnifiedSidebar } from '@/components/shared/UnifiedSidebar';
 import { DynamicHeader } from '@/components/shared/DynamicHeader';
 import { MayaFloatingAssistant } from '@/maya/MayaFloatingAssistant';
 import { MayaGlobalManager } from '@/maya/MayaGlobalManager';
+import { FEATURES } from '@/config/features';
 
 export const MayaFullScreenLayout: React.FC = () => {
   const { user, loading } = useAuth();
@@ -27,26 +28,34 @@ export const MayaFullScreenLayout: React.FC = () => {
     return <Navigate to="/login" replace />;
   }
 
+  const layout = (
+    <div className="flex h-screen w-full bg-white overflow-hidden">
+      <MayaBackground />
+
+      {/* Sidebar unificado (MAYA + Módulos) */}
+      <UnifiedSidebar />
+
+      {/* Área principal (derecha) */}
+      <div className="flex-1 flex flex-col relative z-10 overflow-hidden">
+        <DynamicHeader />
+        <div className="flex-1 overflow-y-auto overflow-x-hidden">
+          <Outlet />
+        </div>
+      </div>
+
+      {/* Componentes MAYA Globales */}
+      {FEATURES.MAYA_ENABLED && <MayaFloatingAssistant />}
+      {FEATURES.MAYA_ENABLED && <MayaGlobalManager />}
+    </div>
+  );
+
+  if (!FEATURES.MAYA_ENABLED) {
+    return layout;
+  }
+
   return (
     <MayaProvider autoShow={location.pathname === '/maya'}>
-      <div className="flex h-screen w-full bg-white overflow-hidden">
-        <MayaBackground />
-        
-        {/* Sidebar unificado (MAYA + Módulos) */}
-        <UnifiedSidebar />
-        
-        {/* Área principal (derecha) */}
-        <div className="flex-1 flex flex-col relative z-10 overflow-hidden">
-          <DynamicHeader />
-          <div className="flex-1 overflow-y-auto overflow-x-hidden">
-            <Outlet />
-          </div>
-        </div>
-        
-        {/* Componentes MAYA Globales */}
-        <MayaFloatingAssistant />
-        <MayaGlobalManager />
-      </div>
+      {layout}
     </MayaProvider>
   );
 };
