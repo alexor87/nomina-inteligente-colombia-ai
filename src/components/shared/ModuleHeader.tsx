@@ -28,7 +28,7 @@ export const ModuleHeader: React.FC = () => {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
     >
-      <div className="max-w-7xl mx-auto px-4 md:px-8 py-3.5 flex items-center justify-between">
+      <div className="w-full px-4 md:px-8 py-3.5 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold text-foreground">{getTitle()}</h1>
         </div>
