@@ -7,8 +7,20 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
-import { Settings, Save, Loader2 } from 'lucide-react';
+import { Settings, Save, Loader2, Plus, Pencil, CheckCircle2 } from 'lucide-react';
+
+interface GlobalPayrollDefault {
+  id: string;
+  year: string;
+  salary_min: number;
+  transport_allowance: number;
+  uvt: number;
+  is_current_default: boolean;
+  updated_at: string;
+}
 
 interface SystemSetting {
   id: string;
@@ -18,10 +30,90 @@ interface SystemSetting {
   updated_at: string;
 }
 
+const fmt = (n: number) =>
+  new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n);
+
 const AdminSettingsPage: React.FC = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [formValues, setFormValues] = useState<Record<string, any>>({});
+
+  // ── Parámetros legales globales ──────────────────────────────────────────
+  const [editingDefault, setEditingDefault] = useState<GlobalPayrollDefault | null>(null);
+  const [newDefaultOpen, setNewDefaultOpen] = useState(false);
+  const [newDefaultForm, setNewDefaultForm] = useState({ year: '', salary_min: '', transport_allowance: '', uvt: '' });
+
+  const { data: legalDefaults } = useQuery({
+    queryKey: ['global-payroll-defaults'],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('global_payroll_defaults')
+        .select('*')
+        .order('year', { ascending: false });
+      if (error) throw error;
+      return (data as GlobalPayrollDefault[]) || [];
+    },
+  });
+
+  const activateMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await (supabase as any)
+        .from('global_payroll_defaults')
+        .update({ is_current_default: true, updated_by: user?.id, updated_at: new Date().toISOString() })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['global-payroll-defaults'] });
+      toast({ title: 'Año predeterminado actualizado' });
+    },
+    onError: (err: any) => toast({ title: 'Error', description: err.message, variant: 'destructive' }),
+  });
+
+  const updateDefaultMutation = useMutation({
+    mutationFn: async (row: GlobalPayrollDefault) => {
+      const { error } = await (supabase as any)
+        .from('global_payroll_defaults')
+        .update({
+          salary_min: row.salary_min,
+          transport_allowance: row.transport_allowance,
+          uvt: row.uvt,
+          updated_by: user?.id,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', row.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['global-payroll-defaults'] });
+      setEditingDefault(null);
+      toast({ title: 'Parámetros actualizados' });
+    },
+    onError: (err: any) => toast({ title: 'Error', description: err.message, variant: 'destructive' }),
+  });
+
+  const createDefaultMutation = useMutation({
+    mutationFn: async (activate: boolean) => {
+      const { error } = await (supabase as any)
+        .from('global_payroll_defaults')
+        .insert({
+          year: newDefaultForm.year,
+          salary_min: Number(newDefaultForm.salary_min),
+          transport_allowance: Number(newDefaultForm.transport_allowance),
+          uvt: Number(newDefaultForm.uvt),
+          is_current_default: activate,
+          updated_by: user?.id,
+        });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['global-payroll-defaults'] });
+      setNewDefaultOpen(false);
+      setNewDefaultForm({ year: '', salary_min: '', transport_allowance: '', uvt: '' });
+      toast({ title: 'Año creado exitosamente' });
+    },
+    onError: (err: any) => toast({ title: 'Error', description: err.message, variant: 'destructive' }),
+  });
 
   const { data: settings, isLoading } = useQuery({
     queryKey: ['system-settings'],
@@ -164,6 +256,67 @@ const AdminSettingsPage: React.FC = () => {
           </CardContent>
         </Card>
 
+        {/* Parámetros Legales por Defecto */}
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-sm font-medium">Parámetros Legales por Defecto</CardTitle>
+                <CardDescription>Valores asignados automáticamente a nuevas empresas al registrarse</CardDescription>
+              </div>
+              <Button size="sm" variant="outline" onClick={() => setNewDefaultOpen(true)}>
+                <Plus className="h-4 w-4 mr-1" /> Nuevo año
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border text-left text-muted-foreground">
+                  <th className="pb-2 font-medium">Año</th>
+                  <th className="pb-2 font-medium">Salario mínimo</th>
+                  <th className="pb-2 font-medium">Aux. transporte</th>
+                  <th className="pb-2 font-medium">UVT</th>
+                  <th className="pb-2" />
+                </tr>
+              </thead>
+              <tbody>
+                {(legalDefaults || []).map(row => (
+                  <tr key={row.id} className="border-b border-border last:border-0">
+                    <td className="py-3 font-medium flex items-center gap-2">
+                      {row.year}
+                      {row.is_current_default && (
+                        <Badge variant="default" className="text-xs">Activo</Badge>
+                      )}
+                    </td>
+                    <td className="py-3">{fmt(row.salary_min)}</td>
+                    <td className="py-3">{fmt(row.transport_allowance)}</td>
+                    <td className="py-3">{fmt(row.uvt)}</td>
+                    <td className="py-3 text-right space-x-2">
+                      <Button size="sm" variant="ghost" onClick={() => setEditingDefault({ ...row })}>
+                        <Pencil className="h-3.5 w-3.5 mr-1" /> Editar
+                      </Button>
+                      {!row.is_current_default && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => activateMutation.mutate(row.id)}
+                          disabled={activateMutation.isPending}
+                        >
+                          <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Activar
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {(!legalDefaults || legalDefaults.length === 0) && (
+                  <tr><td colSpan={5} className="py-4 text-center text-muted-foreground">Sin datos</td></tr>
+                )}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+
         {/* Feature Flags */}
         <Card className="lg:col-span-2">
           <CardHeader>
@@ -193,6 +346,98 @@ const AdminSettingsPage: React.FC = () => {
           </CardContent>
         </Card>
       </div>
+      {/* Dialog: Editar año existente */}
+      {editingDefault && (
+        <Dialog open onOpenChange={() => setEditingDefault(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Editar parámetros {editingDefault.year}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              {(['salary_min', 'transport_allowance', 'uvt'] as const).map(field => (
+                <div key={field}>
+                  <Label>{field === 'salary_min' ? 'Salario mínimo' : field === 'transport_allowance' ? 'Auxilio de transporte' : 'UVT'}</Label>
+                  <Input
+                    type="number"
+                    value={editingDefault[field]}
+                    onChange={e => setEditingDefault(prev => prev ? { ...prev, [field]: Number(e.target.value) } : prev)}
+                  />
+                </div>
+              ))}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditingDefault(null)}>Cancelar</Button>
+              <Button onClick={() => updateDefaultMutation.mutate(editingDefault)} disabled={updateDefaultMutation.isPending}>
+                {updateDefaultMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                Guardar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Dialog: Nuevo año */}
+      <Dialog open={newDefaultOpen} onOpenChange={setNewDefaultOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Agregar nuevo año</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label>Año</Label>
+              <Input
+                placeholder="2027"
+                value={newDefaultForm.year}
+                onChange={e => setNewDefaultForm(prev => ({ ...prev, year: e.target.value }))}
+              />
+            </div>
+            <div>
+              <Label>Salario mínimo</Label>
+              <Input
+                type="number"
+                placeholder="1750905"
+                value={newDefaultForm.salary_min}
+                onChange={e => setNewDefaultForm(prev => ({ ...prev, salary_min: e.target.value }))}
+              />
+            </div>
+            <div>
+              <Label>Auxilio de transporte</Label>
+              <Input
+                type="number"
+                placeholder="249095"
+                value={newDefaultForm.transport_allowance}
+                onChange={e => setNewDefaultForm(prev => ({ ...prev, transport_allowance: e.target.value }))}
+              />
+            </div>
+            <div>
+              <Label>UVT</Label>
+              <Input
+                type="number"
+                placeholder="52374"
+                value={newDefaultForm.uvt}
+                onChange={e => setNewDefaultForm(prev => ({ ...prev, uvt: e.target.value }))}
+              />
+            </div>
+          </div>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={() => setNewDefaultOpen(false)}>Cancelar</Button>
+            <Button
+              variant="outline"
+              onClick={() => createDefaultMutation.mutate(false)}
+              disabled={createDefaultMutation.isPending || !newDefaultForm.year}
+            >
+              Guardar sin activar
+            </Button>
+            <Button
+              onClick={() => createDefaultMutation.mutate(true)}
+              disabled={createDefaultMutation.isPending || !newDefaultForm.year}
+            >
+              {createDefaultMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Guardar y activar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
