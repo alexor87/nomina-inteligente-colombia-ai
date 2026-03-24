@@ -126,6 +126,14 @@ export class CompanyRegistrationService {
         created_at: new Date().toISOString()
       });
 
+      await supabase.from('company_payroll_configurations').insert({
+        company_id: company.id,
+        year: '2026',
+        salary_min: 1750905,
+        transport_allowance: 249095,
+        uvt: 52374,
+      });
+
       // Send team invitation if provided (non-blocking)
       if (data.invitedMember?.email && data.invitedMember?.role) {
         try {
