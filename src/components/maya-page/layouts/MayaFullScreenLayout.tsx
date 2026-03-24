@@ -54,12 +54,8 @@ export const MayaFullScreenLayout: React.FC = () => {
     </div>
   );
 
-  if (!FEATURES.MAYA_ENABLED) {
-    return layout;
-  }
-
   return (
-    <MayaProvider autoShow={location.pathname === '/maya'}>
+    <MayaProvider autoShow={FEATURES.MAYA_ENABLED && location.pathname === '/maya'}>
       {layout}
     </MayaProvider>
   );
