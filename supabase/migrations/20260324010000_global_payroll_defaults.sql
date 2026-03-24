@@ -17,8 +17,8 @@ ALTER TABLE public.global_payroll_defaults ENABLE ROW LEVEL SECURITY;
 -- Solo superadmins pueden escribir
 CREATE POLICY "SuperAdmins can manage global payroll defaults"
 ON public.global_payroll_defaults FOR ALL
-USING (EXISTS (SELECT 1 FROM public.saas_admins WHERE user_id = auth.uid()))
-WITH CHECK (EXISTS (SELECT 1 FROM public.saas_admins WHERE user_id = auth.uid()));
+USING (public.is_superadmin())
+WITH CHECK (public.is_superadmin());
 
 -- Cualquier usuario autenticado puede leer
 CREATE POLICY "Authenticated users can read global payroll defaults"
