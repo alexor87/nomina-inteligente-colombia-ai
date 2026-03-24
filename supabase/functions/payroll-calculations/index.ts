@@ -12,7 +12,7 @@ const DEBUG = Deno.env.get('DEBUG_PAYROLL') === 'true';
 
 // ✅ Valores legales por año (SMMLV + Auxilio Transporte + UVT)
 const YEAR_CONFIGS: Record<string, { salarioMinimo: number; auxilioTransporte: number; uvt: number }> = {
-  '2026': { salarioMinimo: 1750905, auxilioTransporte: 249095, uvt: 49799 },
+  '2026': { salarioMinimo: 1750905, auxilioTransporte: 249095, uvt: 52374 },
   '2025': { salarioMinimo: 1423500, auxilioTransporte: 200000, uvt: 49799 },
   '2024': { salarioMinimo: 1300000, auxilioTransporte: 162000, uvt: 47065 },
   '2023': { salarioMinimo: 1160000, auxilioTransporte: 140606, uvt: 42412 },
