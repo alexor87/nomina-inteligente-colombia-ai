@@ -10,7 +10,10 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
-import { Settings, Save, Loader2, Plus, Pencil, CheckCircle2 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Settings, Save, Loader2, Plus, Pencil, CheckCircle2, Trash2 } from 'lucide-react';
+
+interface FondoRange { minSMMLV: number; maxSMMLV: number | null; percentage: number; }
 
 interface GlobalPayrollDefault {
   id: string;
@@ -20,7 +23,41 @@ interface GlobalPayrollDefault {
   uvt: number;
   is_current_default: boolean;
   updated_at: string;
+  percentages: {
+    saludEmpleado: number; pensionEmpleado: number;
+    saludEmpleador: number; pensionEmpleador: number;
+    arl: number; cajaCompensacion: number;
+    icbf: number; sena: number;
+    cesantias: number; interesesCesantias: number;
+    prima: number; vacaciones: number;
+  };
+  fondo_solidaridad: { ranges: FondoRange[] };
+  arl_risk_levels: { I: number; II: number; III: number; IV: number; V: number };
 }
+
+const DEFAULT_PERCENTAGES: GlobalPayrollDefault['percentages'] = {
+  saludEmpleado: 0.04, pensionEmpleado: 0.04,
+  saludEmpleador: 0.085, pensionEmpleador: 0.12,
+  arl: 0.00522, cajaCompensacion: 0.04,
+  icbf: 0.03, sena: 0.02,
+  cesantias: 0.0833, interesesCesantias: 0.12,
+  prima: 0.0833, vacaciones: 0.0417,
+};
+
+const DEFAULT_FONDO: GlobalPayrollDefault['fondo_solidaridad'] = {
+  ranges: [
+    { minSMMLV: 4, maxSMMLV: 16, percentage: 1 },
+    { minSMMLV: 16, maxSMMLV: 17, percentage: 1.2 },
+    { minSMMLV: 17, maxSMMLV: 18, percentage: 1.4 },
+    { minSMMLV: 18, maxSMMLV: 19, percentage: 1.6 },
+    { minSMMLV: 19, maxSMMLV: 20, percentage: 1.8 },
+    { minSMMLV: 20, maxSMMLV: null, percentage: 2 },
+  ],
+};
+
+const DEFAULT_ARL: GlobalPayrollDefault['arl_risk_levels'] = {
+  I: 0.348, II: 0.435, III: 0.783, IV: 1.740, V: 3.219,
+};
 
 interface SystemSetting {
   id: string;
@@ -78,6 +115,9 @@ const AdminSettingsPage: React.FC = () => {
           salary_min: row.salary_min,
           transport_allowance: row.transport_allowance,
           uvt: row.uvt,
+          percentages: row.percentages,
+          fondo_solidaridad: row.fondo_solidaridad,
+          arl_risk_levels: row.arl_risk_levels,
           updated_by: user?.id,
           updated_at: new Date().toISOString(),
         })
@@ -349,23 +389,180 @@ const AdminSettingsPage: React.FC = () => {
       {/* Dialog: Editar año existente */}
       {editingDefault && (
         <Dialog open onOpenChange={() => setEditingDefault(null)}>
-          <DialogContent>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Editar parámetros {editingDefault.year}</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 py-2">
-              {(['salary_min', 'transport_allowance', 'uvt'] as const).map(field => (
-                <div key={field}>
-                  <Label>{field === 'salary_min' ? 'Salario mínimo' : field === 'transport_allowance' ? 'Auxilio de transporte' : 'UVT'}</Label>
-                  <Input
-                    type="number"
-                    value={editingDefault[field]}
-                    onChange={e => setEditingDefault(prev => prev ? { ...prev, [field]: Number(e.target.value) } : prev)}
-                  />
+            <Tabs defaultValue="anuales">
+              <TabsList className="w-full">
+                <TabsTrigger value="anuales" className="flex-1">Valores anuales</TabsTrigger>
+                <TabsTrigger value="porcentajes" className="flex-1">Porcentajes</TabsTrigger>
+                <TabsTrigger value="fondo" className="flex-1">Fondo Solidaridad</TabsTrigger>
+                <TabsTrigger value="arl" className="flex-1">ARL</TabsTrigger>
+              </TabsList>
+
+              {/* Tab 1: Valores anuales */}
+              <TabsContent value="anuales" className="space-y-4 pt-4">
+                {([
+                  ['salary_min', 'Salario mínimo'],
+                  ['transport_allowance', 'Auxilio de transporte'],
+                  ['uvt', 'UVT'],
+                ] as const).map(([field, label]) => (
+                  <div key={field}>
+                    <Label>{label}</Label>
+                    <Input
+                      type="number"
+                      value={(editingDefault as any)[field]}
+                      onChange={e => setEditingDefault(prev => prev ? { ...prev, [field]: Number(e.target.value) } : prev)}
+                    />
+                  </div>
+                ))}
+              </TabsContent>
+
+              {/* Tab 2: Porcentajes */}
+              <TabsContent value="porcentajes" className="pt-4">
+                <p className="text-xs text-muted-foreground mb-4">Los valores se ingresan y muestran en porcentaje (ej: 4 = 4%).</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {([
+                    ['saludEmpleado', 'Salud empleado'],
+                    ['saludEmpleador', 'Salud empleador'],
+                    ['pensionEmpleado', 'Pensión empleado'],
+                    ['pensionEmpleador', 'Pensión empleador'],
+                    ['arl', 'ARL (promedio)'],
+                    ['cajaCompensacion', 'Caja compensación'],
+                    ['icbf', 'ICBF'],
+                    ['sena', 'SENA'],
+                    ['cesantias', 'Cesantías'],
+                    ['interesesCesantias', 'Intereses cesantías'],
+                    ['prima', 'Prima'],
+                    ['vacaciones', 'Vacaciones'],
+                  ] as const).map(([key, label]) => (
+                    <div key={key}>
+                      <Label className="text-xs">{label}</Label>
+                      <div className="flex items-center gap-1">
+                        <Input
+                          type="number"
+                          step="0.001"
+                          value={Number(((editingDefault.percentages?.[key] ?? DEFAULT_PERCENTAGES[key]) * 100).toFixed(4))}
+                          onChange={e => setEditingDefault(prev => prev ? {
+                            ...prev,
+                            percentages: { ...(prev.percentages ?? DEFAULT_PERCENTAGES), [key]: Number(e.target.value) / 100 }
+                          } : prev)}
+                          className="text-sm"
+                        />
+                        <span className="text-muted-foreground text-sm">%</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-            <DialogFooter>
+              </TabsContent>
+
+              {/* Tab 3: Fondo Solidaridad */}
+              <TabsContent value="fondo" className="pt-4">
+                <p className="text-xs text-muted-foreground mb-4">Rangos basados en múltiplos del SMMLV. Dejar "Hasta" vacío para el último rango (sin límite).</p>
+                <table className="w-full text-sm mb-3">
+                  <thead>
+                    <tr className="text-left text-muted-foreground border-b border-border">
+                      <th className="pb-2 pr-2">Desde (SMMLV)</th>
+                      <th className="pb-2 pr-2">Hasta (SMMLV)</th>
+                      <th className="pb-2 pr-2">Aporte (%)</th>
+                      <th className="pb-2" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(editingDefault.fondo_solidaridad?.ranges ?? DEFAULT_FONDO.ranges).map((range, i) => (
+                      <tr key={i} className="border-b border-border last:border-0">
+                        <td className="py-1 pr-2">
+                          <Input
+                            type="number"
+                            value={range.minSMMLV}
+                            onChange={e => {
+                              const ranges = [...(editingDefault.fondo_solidaridad?.ranges ?? DEFAULT_FONDO.ranges)];
+                              ranges[i] = { ...ranges[i], minSMMLV: Number(e.target.value) };
+                              setEditingDefault(prev => prev ? { ...prev, fondo_solidaridad: { ranges } } : prev);
+                            }}
+                            className="h-8 text-sm"
+                          />
+                        </td>
+                        <td className="py-1 pr-2">
+                          <Input
+                            type="number"
+                            value={range.maxSMMLV ?? ''}
+                            placeholder="∞"
+                            onChange={e => {
+                              const ranges = [...(editingDefault.fondo_solidaridad?.ranges ?? DEFAULT_FONDO.ranges)];
+                              ranges[i] = { ...ranges[i], maxSMMLV: e.target.value === '' ? null : Number(e.target.value) };
+                              setEditingDefault(prev => prev ? { ...prev, fondo_solidaridad: { ranges } } : prev);
+                            }}
+                            className="h-8 text-sm"
+                          />
+                        </td>
+                        <td className="py-1 pr-2">
+                          <Input
+                            type="number"
+                            step="0.1"
+                            value={range.percentage}
+                            onChange={e => {
+                              const ranges = [...(editingDefault.fondo_solidaridad?.ranges ?? DEFAULT_FONDO.ranges)];
+                              ranges[i] = { ...ranges[i], percentage: Number(e.target.value) };
+                              setEditingDefault(prev => prev ? { ...prev, fondo_solidaridad: { ranges } } : prev);
+                            }}
+                            className="h-8 text-sm"
+                          />
+                        </td>
+                        <td className="py-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0 text-destructive"
+                            onClick={() => {
+                              const ranges = (editingDefault.fondo_solidaridad?.ranges ?? DEFAULT_FONDO.ranges).filter((_, idx) => idx !== i);
+                              setEditingDefault(prev => prev ? { ...prev, fondo_solidaridad: { ranges } } : prev);
+                            }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const ranges = [...(editingDefault.fondo_solidaridad?.ranges ?? DEFAULT_FONDO.ranges), { minSMMLV: 0, maxSMMLV: null, percentage: 0 }];
+                    setEditingDefault(prev => prev ? { ...prev, fondo_solidaridad: { ranges } } : prev);
+                  }}
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1" /> Agregar rango
+                </Button>
+              </TabsContent>
+
+              {/* Tab 4: ARL */}
+              <TabsContent value="arl" className="space-y-3 pt-4">
+                <p className="text-xs text-muted-foreground mb-2">Tarifas reguladas por el Ministerio de Trabajo. Ingresa en porcentaje (ej: 0.348 = 0.348%).</p>
+                {(['I', 'II', 'III', 'IV', 'V'] as const).map(level => (
+                  <div key={level} className="flex items-center gap-3">
+                    <Label className="w-16 shrink-0">Nivel {level}</Label>
+                    <div className="flex items-center gap-1 flex-1">
+                      <Input
+                        type="number"
+                        step="0.001"
+                        value={editingDefault.arl_risk_levels?.[level] ?? DEFAULT_ARL[level]}
+                        onChange={e => setEditingDefault(prev => prev ? {
+                          ...prev,
+                          arl_risk_levels: { ...(prev.arl_risk_levels ?? DEFAULT_ARL), [level]: Number(e.target.value) }
+                        } : prev)}
+                      />
+                      <span className="text-muted-foreground text-sm">%</span>
+                    </div>
+                  </div>
+                ))}
+              </TabsContent>
+            </Tabs>
+
+            <DialogFooter className="mt-4">
               <Button variant="outline" onClick={() => setEditingDefault(null)}>Cancelar</Button>
               <Button onClick={() => updateDefaultMutation.mutate(editingDefault)} disabled={updateDefaultMutation.isPending}>
                 {updateDefaultMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
