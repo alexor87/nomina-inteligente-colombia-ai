@@ -15,6 +15,7 @@ interface RecargoEntry {
   tipo: string;
   horas: number;
   valor: number;
+  factor: number;
   observacion?: string;
 }
 
@@ -94,6 +95,16 @@ export const NovedadRecargoConsolidatedForm: React.FC<NovedadRecargoConsolidated
   const [tiposRecargo] = useState(() => getTiposRecargoLocal(periodoFecha));
   const [isCalculating, setIsCalculating] = useState(false);
   const [dateError, setDateError] = useState<string>('');
+
+  // Valor hora base para recargos (mostrar en fórmulas)
+  // Divisor fijo = 220 desde jul 2025, antes usa jornada legal
+  const fechaRef = periodoFecha || new Date();
+  const divisorRecargo = fechaRef >= new Date('2025-07-01') ? 220 : (() => {
+    if (fechaRef >= new Date('2024-07-15')) return 230;
+    if (fechaRef >= new Date('2023-07-15')) return 235;
+    return 240;
+  })();
+  const valorHoraRecargo = Math.round(employeeSalary / divisorRecargo);
 
   // ✅ KISS: Validación simple de fecha
   const isDateInPeriod = (fecha: string): boolean => {
@@ -197,12 +208,15 @@ export const NovedadRecargoConsolidatedForm: React.FC<NovedadRecargoConsolidated
     const horas = parseFloat(currentEntry.horas);
     const valor = await calculateRecargoValue(currentEntry.tipo, horas, currentEntry.fecha);
 
+    const tipoInfo = tiposRecargo.find(t => t.value === currentEntry.tipo);
+
     const newEntry: RecargoEntry = {
       id: Date.now().toString(),
       fecha: currentEntry.fecha,
       tipo: currentEntry.tipo,
       horas: horas,
       valor: valor,
+      factor: tipoInfo?.factor || 0,
       observacion: currentEntry.observacion
     };
 
@@ -382,7 +396,7 @@ export const NovedadRecargoConsolidatedForm: React.FC<NovedadRecargoConsolidated
                       </Badge>
                     </div>
                     <div className="text-sm text-gray-600">
-                      {entry.horas} horas - {formatCurrency(entry.valor)}
+                      {entry.horas}h × {formatCurrency(valorHoraRecargo)} × {entry.factor} = <span className="font-medium text-gray-900">{formatCurrency(entry.valor)}</span>
                       {entry.observacion && (
                         <span className="block text-xs mt-1 italic">{entry.observacion}</span>
                       )}
