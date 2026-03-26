@@ -1,13 +1,11 @@
 
-import React, { useState, useEffect } from 'react';
-// ✅ ELIMINADO: import { calcularValorNovedad } - Solo backend calculations
+import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Clock, Plus, Trash2, Calculator, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Clock, Plus, Trash2, AlertCircle, Info } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { formatCurrency } from '@/lib/utils';
@@ -20,17 +18,38 @@ interface HorasExtraEntry {
   tipo: string;
   horas: number;
   valor: number;
+  factor: number;
   observacion?: string;
 }
 
-const tiposHorasExtra = [
-  { value: 'diurnas', label: 'Diurnas', factor: 1.25 },
-  { value: 'nocturnas', label: 'Nocturnas', factor: 1.75 },
-  { value: 'dominicales_diurnas', label: 'Dominicales Diurnas', factor: 2.0 },
-  { value: 'dominicales_nocturnas', label: 'Dominicales Nocturnas', factor: 2.5 },
-  { value: 'festivas_diurnas', label: 'Festivas Diurnas', factor: 2.0 },
-  { value: 'festivas_nocturnas', label: 'Festivas Nocturnas', factor: 2.5 }
-];
+// Factores dinámicos según Ley 2466/2025 (recargo dominical progresivo)
+const getRecargoDominical = (fecha: Date): number => {
+  if (fecha < new Date('2025-07-01')) return 0.75;
+  if (fecha < new Date('2026-07-01')) return 0.80;
+  if (fecha < new Date('2027-07-01')) return 0.90;
+  return 1.00;
+};
+
+const getTiposHorasExtraLocal = (fechaPeriodo: Date) => {
+  const rd = getRecargoDominical(fechaPeriodo);
+  return [
+    { value: 'diurnas', label: 'Diurnas', factor: 1.25 },
+    { value: 'nocturnas', label: 'Nocturnas', factor: 1.75 },
+    { value: 'dominicales_diurnas', label: 'Dominicales Diurnas', factor: +(1.25 + rd).toFixed(2) },
+    { value: 'dominicales_nocturnas', label: 'Dominicales Nocturnas', factor: +(1.75 + rd).toFixed(2) },
+    { value: 'festivas_diurnas', label: 'Festivas Diurnas', factor: +(1.25 + rd).toFixed(2) },
+    { value: 'festivas_nocturnas', label: 'Festivas Nocturnas', factor: +(1.75 + rd).toFixed(2) },
+  ];
+};
+
+// Jornada legal según Ley 2101/2021
+const getHorasSemanales = (fecha: Date): number => {
+  if (fecha >= new Date('2026-07-15')) return 42;
+  if (fecha >= new Date('2025-07-15')) return 44;
+  if (fecha >= new Date('2024-07-15')) return 46;
+  if (fecha >= new Date('2023-07-15')) return 47;
+  return 48;
+};
 
 interface NovedadHorasExtraConsolidatedFormProps {
   onBack: () => void;
@@ -62,14 +81,18 @@ export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsol
 
   const { calculateNovedad, isLoading: isCalculating } = useNovedadBackendCalculation();
 
-  // ✅ KISS: Validación simple de fecha en período
+  const fechaRef = periodoFecha || new Date();
+  const tiposHorasExtra = useMemo(() => getTiposHorasExtraLocal(fechaRef), [fechaRef]);
+
+  // Valor hora ordinaria para mostrar en fórmulas
+  const horasSemanales = getHorasSemanales(fechaRef);
+  const valorHoraOrdinaria = Math.round(employeeSalary / 30 / (horasSemanales / 6));
+
   const isDateInPeriod = (fecha: string): boolean => {
-    if (!fecha || !periodStartDate || !periodEndDate) return true; // Si no hay datos, permitir
-    
+    if (!fecha || !periodStartDate || !periodEndDate) return true;
     const selectedDate = new Date(fecha);
     const startDate = new Date(periodStartDate);
     const endDate = new Date(periodEndDate);
-    
     return selectedDate >= startDate && selectedDate <= endDate;
   };
 
@@ -77,44 +100,32 @@ export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsol
     if (!tipo || horas <= 0 || !fecha) return 0;
 
     try {
-      console.log('🧮 Calculando horas extra con backend (consistencia total):', { tipo, horas, fecha });
-      
-      // Convert fecha string to Date object for backend calculation
       const fechaCalculo = new Date(fecha);
-      
       const result = await calculateNovedad({
         tipoNovedad: 'horas_extra',
         subtipo: tipo,
         salarioBase: employeeSalary,
         horas: horas,
-        fechaPeriodo: typeof fechaCalculo === 'string' ? fechaCalculo : fechaCalculo.toISOString() // Use specific entry date instead of periodoFecha
+        fechaPeriodo: fechaCalculo.toISOString()
       });
 
       if (result?.valor) {
-        console.log('✅ Valor calculado por backend:', result.valor);
         return result.valor;
       }
-
-      // ❌ ELIMINADO: Fallback frontend calculation
-      console.error('⚠️ Error en cálculo backend - NO hay fallback frontend');
       return 0;
-      
     } catch (error) {
       console.error('❌ Error calculando horas extra:', error);
-      console.error('🚫 CRÍTICO: Solo cálculos backend permitidos');
       return 0;
     }
   };
 
   const handleAddEntry = async () => {
-    // ✅ Limpiar error previo
     setDateError('');
 
     if (!currentEntry.fecha || !currentEntry.tipo || !currentEntry.horas || parseFloat(currentEntry.horas) <= 0) {
       return;
     }
 
-    // ✅ KISS: Validación simple de fecha
     if (!isDateInPeriod(currentEntry.fecha)) {
       const startFormatted = periodStartDate ? formatDateForDisplay(periodStartDate) : '';
       const endFormatted = periodEndDate ? formatDateForDisplay(periodEndDate) : '';
@@ -123,8 +134,8 @@ export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsol
     }
 
     const horas = parseFloat(currentEntry.horas);
-    // Pass the specific date from the entry for calculation
     const valor = await calculateHorasExtraValue(currentEntry.tipo, horas, currentEntry.fecha);
+    const tipoInfo = tiposHorasExtra.find(t => t.value === currentEntry.tipo);
 
     const newEntry: HorasExtraEntry = {
       id: Date.now().toString(),
@@ -132,16 +143,12 @@ export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsol
       tipo: currentEntry.tipo,
       horas: horas,
       valor: valor,
+      factor: tipoInfo?.factor || 0,
       observacion: currentEntry.observacion
     };
 
     setEntries(prev => [...prev, newEntry]);
-    setCurrentEntry({
-      fecha: '',
-      tipo: '',
-      horas: '',
-      observacion: ''
-    });
+    setCurrentEntry({ fecha: '', tipo: '', horas: '', observacion: '' });
   };
 
   const handleRemoveEntry = (id: string) => {
@@ -161,7 +168,6 @@ export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsol
       constitutivo_salario: true
     }));
 
-    console.log('📋 HORAS EXTRA: Enviando batch al backend:', formDataArray);
     onSubmit(formDataArray);
   };
 
@@ -169,7 +175,8 @@ export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsol
   const totalValor = entries.reduce((sum, entry) => sum + entry.valor, 0);
 
   const getTipoLabel = (tipo: string) => {
-    return tiposHorasExtra.find(t => t.value === tipo)?.label || tipo;
+    const t = tiposHorasExtra.find(t => t.value === tipo);
+    return t ? `${t.label} (×${t.factor})` : tipo;
   };
 
   return (
@@ -181,19 +188,38 @@ export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsol
         <h3 className="text-lg font-semibold">Horas Extra</h3>
       </div>
 
+      {/* Tabla de referencia de factores */}
+      {employeeSalary > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Info className="h-4 w-4 text-blue-600" />
+            <span className="text-sm font-medium text-blue-800">
+              Valor hora ordinaria: {formatCurrency(valorHoraOrdinaria)} (jornada {horasSemanales}h/sem)
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-1">
+            {tiposHorasExtra.map((tipo) => (
+              <div key={tipo.value} className="flex justify-between text-xs text-blue-700">
+                <span>{tipo.label}</span>
+                <span className="font-medium">×{tipo.factor} = {formatCurrency(Math.round(valorHoraOrdinaria * tipo.factor))}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Current Entry Form */}
       <Card>
         <CardContent className="p-4 space-y-4">
           <h4 className="font-medium text-blue-800">Agregar Horas Extra</h4>
-          
-          {/* ✅ Mostrar error de fecha si existe */}
+
           {dateError && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>{dateError}</AlertDescription>
             </Alert>
           )}
-          
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Fecha *</Label>
@@ -202,7 +228,7 @@ export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsol
                 value={currentEntry.fecha}
                 onChange={(e) => {
                   setCurrentEntry(prev => ({ ...prev, fecha: e.target.value }));
-                  setDateError(''); // Limpiar error al cambiar fecha
+                  setDateError('');
                 }}
               />
             </div>
@@ -216,7 +242,7 @@ export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsol
                 <SelectContent>
                   {tiposHorasExtra.map((tipo) => (
                     <SelectItem key={tipo.value} value={tipo.value}>
-                      {tipo.label}
+                      {tipo.label} (×{tipo.factor})
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -251,7 +277,7 @@ export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsol
             </div>
           </div>
 
-          <Button 
+          <Button
             onClick={handleAddEntry}
             disabled={!currentEntry.fecha || !currentEntry.tipo || !currentEntry.horas || parseFloat(currentEntry.horas) <= 0 || isCalculating}
             className="w-full"
@@ -267,7 +293,7 @@ export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsol
         <Card>
           <CardContent className="p-4">
             <h4 className="font-medium text-green-800 mb-4">Horas Extra Registradas ({entries.length})</h4>
-            
+
             <div className="space-y-3">
               {entries.map((entry) => (
                 <div key={entry.id} className="flex items-center justify-between p-3 bg-gray-50 rounded border">
@@ -281,7 +307,7 @@ export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsol
                       </Badge>
                     </div>
                     <div className="text-sm text-gray-600">
-                      {entry.horas} horas - {formatCurrency(entry.valor)}
+                      {entry.horas}h × {formatCurrency(valorHoraOrdinaria)} × {entry.factor} = <span className="font-medium text-gray-900">{formatCurrency(entry.valor)}</span>
                       {entry.observacion && (
                         <span className="block text-xs mt-1 italic">{entry.observacion}</span>
                       )}
@@ -320,7 +346,7 @@ export const NovedadHorasExtraConsolidatedForm: React.FC<NovedadHorasExtraConsol
         <Button variant="outline" onClick={onBack}>
           Cancelar
         </Button>
-        <Button 
+        <Button
           onClick={handleSubmit}
           disabled={entries.length === 0 || isSubmitting}
           className="bg-blue-600 hover:bg-blue-700 min-w-[140px]"
