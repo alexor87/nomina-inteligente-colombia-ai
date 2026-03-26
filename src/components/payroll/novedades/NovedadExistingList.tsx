@@ -76,6 +76,12 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
       return ingresosSubtipos[subtipo] || subtipo;
     }
 
+    if (tipo === 'bonificacion') {
+      if (subtipo === 'salarial') return 'Bonificación Salarial';
+      if (subtipo === 'no_salarial') return 'Bonificación No Salarial';
+      return 'Bonificación';
+    }
+
     const tipos: Record<string, string> = {
       'horas_extra': 'Horas Extra',
       'bonificacion': 'Bonificación',
