@@ -32,12 +32,14 @@ export class SecureNovedadesService extends SecureBaseService {
         empleado_id: novedadData.empleado_id,
         periodo_id: novedadData.periodo_id,
         tipo_novedad: novedadData.tipo_novedad,
+        subtipo: novedadData.subtipo || undefined,
         valor: novedadData.valor,
         horas: novedadData.horas,
         dias: novedadData.dias,
         observacion: novedadData.observacion,
         fecha_inicio: novedadData.fecha_inicio,
         fecha_fin: novedadData.fecha_fin,
+        constitutivo_salario: novedadData.constitutivo_salario ?? false,
         base_calculo: novedadData.base_calculo ? JSON.stringify(novedadData.base_calculo) : undefined,
       };
 
@@ -53,12 +55,14 @@ export class SecureNovedadesService extends SecureBaseService {
         empleado_id: novedad.empleado_id,
         periodo_id: novedad.periodo_id,
         tipo_novedad: novedad.tipo_novedad,
+        subtipo: novedad.subtipo || undefined,
         valor: Number(novedad.valor || 0),
         horas: Number(novedad.horas || 0),
         dias: novedad.dias || 0,
         observacion: novedad.observacion || '',
         fecha_inicio: novedad.fecha_inicio || '',
         fecha_fin: novedad.fecha_fin || '',
+        constitutivo_salario: novedad.constitutivo_salario ?? false,
         base_calculo: novedad.base_calculo ? JSON.parse(novedad.base_calculo) : undefined,
         created_at: novedad.created_at,
         updated_at: novedad.updated_at
@@ -80,7 +84,7 @@ export class SecureNovedadesService extends SecureBaseService {
 
       const { data, error } = await this.secureQuery(
         'payroll_novedades', companyId,
-        'id,company_id,empleado_id,periodo_id,tipo_novedad,valor,horas,dias,observacion,fecha_inicio,fecha_fin,base_calculo,created_at,updated_at',
+        'id,company_id,empleado_id,periodo_id,tipo_novedad,subtipo,valor,horas,dias,observacion,fecha_inicio,fecha_fin,constitutivo_salario,base_calculo,created_at,updated_at',
         { empleado_id: empleadoId, periodo_id: periodId }
       );
 
@@ -92,12 +96,14 @@ export class SecureNovedadesService extends SecureBaseService {
         empleado_id: novedad.empleado_id,
         periodo_id: novedad.periodo_id,
         tipo_novedad: novedad.tipo_novedad,
+        subtipo: novedad.subtipo || undefined,
         valor: Number(novedad.valor || 0),
         horas: Number(novedad.horas || 0),
         dias: novedad.dias || 0,
         observacion: novedad.observacion || '',
         fecha_inicio: novedad.fecha_inicio || '',
         fecha_fin: novedad.fecha_fin || '',
+        constitutivo_salario: novedad.constitutivo_salario ?? false,
         base_calculo: novedad.base_calculo ? JSON.parse(novedad.base_calculo) : undefined,
         created_at: novedad.created_at,
         updated_at: novedad.updated_at
