@@ -274,7 +274,8 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
             subtipo: formData.subtipo,
             salarioBase: employeeSalary,
             dias: dias,
-            fechaPeriodo: startDate
+            fechaPeriodo: startDate,
+            companyId: companyId
           });
 
           if (calculationResult) {
@@ -491,6 +492,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
             periodoFecha={getPeriodDate()}
             periodStartDate={periodStartDate}
             periodEndDate={periodEndDate}
+            companyId={companyId || undefined}
           />
         );
       case 'retencion_fuente':
