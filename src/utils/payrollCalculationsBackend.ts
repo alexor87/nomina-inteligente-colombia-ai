@@ -126,6 +126,10 @@ export const convertToBaseEmployeeData = (employee: PayrollEmployee): BaseEmploy
 
 // ✅ FUNCIÓN NORMATIVA CORREGIDA: Determinar si una novedad es constitutiva según normas laborales
 export const isNovedadConstitutiva = (tipoNovedad: string, valorExplícito?: boolean): boolean => {
+  // Tipos que por ley colombiana SIEMPRE son constitutivos de salario (Art. 127 CST)
+  const ALWAYS_CONSTITUTIVE_BY_LAW = ['horas_extra', 'recargo_nocturno', 'recargo_dominical'];
+  if (ALWAYS_CONSTITUTIVE_BY_LAW.includes(tipoNovedad)) return true;
+
   // Si hay valor explícito, usarlo (usuario ha decidido conscientemente)
   if (valorExplícito !== null && valorExplícito !== undefined) {
     return Boolean(valorExplícito);
