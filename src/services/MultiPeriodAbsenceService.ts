@@ -290,7 +290,7 @@ export class MultiPeriodAbsenceService {
 
     // Buscar ausencias que intersectan con el período
     const { data: absences } = await supabase
-      .from('employee_vacation_periods')
+      .from('employee_absences')
       .select(`
         *,
         employees!inner(id, nombre, apellido, salario_base)

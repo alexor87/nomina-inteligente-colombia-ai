@@ -1045,7 +1045,7 @@ async function executeRegisterVacationAction(action: any) {
   };
 
   const { data: vacation, error: vacationError } = await supabase
-    .from('employee_vacation_periods')
+    .from('employee_absences')
     .insert(vacationData)
     .select()
     .single();
@@ -1105,7 +1105,7 @@ async function executeRegisterAbsenceAction(action: any) {
   };
 
   const { data: absence, error: absenceError } = await supabase
-    .from('employee_vacation_periods')
+    .from('employee_absences')
     .insert(absenceData)
     .select()
     .single();

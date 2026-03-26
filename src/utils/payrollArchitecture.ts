@@ -21,14 +21,14 @@ export const PAYROLL_ARCHITECTURE = {
   // ✅ FLUJO DE DATOS
   DATA_FLOW: {
     VACATION_MODULE: {
-      creates: 'employee_vacation_periods',
+      creates: 'employee_absences',
       syncs_to: 'payroll_novedades',
       handles: 'conflicts_resolution'
     },
     NOVEDAD_MODULE: {
       is_source_of_truth: true,
       feeds: 'payroll_liquidation',
-      syncs_from: 'employee_vacation_periods'
+      syncs_from: 'employee_absences'
     },
     PAYROLL_MODULE: {
       reads_from: 'payroll_novedades',
