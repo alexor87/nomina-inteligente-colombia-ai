@@ -138,7 +138,7 @@ export const NovedadRecargoConsolidatedForm: React.FC<NovedadRecargoConsolidated
         subtipoMapped = 'nocturno';
       } else { // nocturno_dominical
         tipoNovedadMapped = 'recargo_nocturno';
-        subtipoMapped = 'dominical';
+        subtipoMapped = 'nocturno_dominical';
       }
       
       console.log('🎯 RECARGO CONSOLIDADO: Calculando:', {
