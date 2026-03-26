@@ -11,6 +11,7 @@ export interface PayrollNovedad {
   horas?: number;
   valor: number;
   base_calculo?: BaseCalculoData;
+  constitutivo_salario?: boolean;
   observacion?: string;
   adjunto_url?: string;
   creado_por?: string;
@@ -38,6 +39,7 @@ export interface CreateNovedadData {
   horas?: number;
   valor?: number;
   base_calculo?: BaseCalculoData;
+  constitutivo_salario?: boolean;
   observacion?: string;
   adjunto_url?: string;
 }
