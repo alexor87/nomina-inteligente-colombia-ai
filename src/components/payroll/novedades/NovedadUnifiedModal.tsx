@@ -386,7 +386,25 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
             subtipoToSave = 'no_salarial';
           }
         }
-        
+
+        // Si es otros_ingresos, mapear al tipo_novedad correcto del enum DB
+        if (selectedType === 'otros_ingresos') {
+          const entrySubtipo = entry.subtipo || entry.tipo_novedad || entry.tipo;
+          if (entrySubtipo === 'comision') {
+            tipoNovedadToSave = 'comision';
+            subtipoToSave = undefined;
+          } else if (entrySubtipo === 'prima_extralegal') {
+            tipoNovedadToSave = 'prima';
+            subtipoToSave = 'extralegal';
+          } else if (entrySubtipo === 'auxilio_alimentacion') {
+            tipoNovedadToSave = 'otros_ingresos';
+            subtipoToSave = 'auxilio_alimentacion';
+          } else if (entrySubtipo === 'otros_ingresos') {
+            tipoNovedadToSave = 'otros_ingresos';
+            subtipoToSave = undefined;
+          }
+        }
+
         const submitData: CreateNovedadData = {
           empleado_id: employeeId,
           periodo_id: periodId,
