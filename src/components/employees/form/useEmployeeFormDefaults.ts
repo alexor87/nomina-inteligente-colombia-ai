@@ -1,8 +1,12 @@
 
 import { EmployeeFormData } from './types';
 import { EmployeeUnified } from '@/types/employee-unified';
+import { ConfigurationService } from '@/services/ConfigurationService';
 
 export const useEmployeeFormDefaults = (employee?: EmployeeUnified | null): EmployeeFormData => {
+  const currentYear = new Date().getFullYear().toString();
+  const { salarioMinimo } = ConfigurationService.getConfiguration(currentYear);
+
   return {
     id: employee?.id,
     cedula: employee?.cedula || '',
@@ -17,7 +21,7 @@ export const useEmployeeFormDefaults = (employee?: EmployeeUnified | null): Empl
     direccion: employee?.direccion || '',
     ciudad: employee?.ciudad || '',
     departamento: employee?.departamento || '',
-    salarioBase: employee?.salarioBase || 0,
+    salarioBase: employee?.salarioBase || salarioMinimo,
     tipoContrato: employee?.tipoContrato || 'indefinido',
     fechaIngreso: employee?.fechaIngreso || new Date().toISOString().split('T')[0],
     periodicidadPago: employee?.periodicidadPago || 'mensual',
