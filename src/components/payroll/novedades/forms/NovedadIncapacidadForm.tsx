@@ -20,6 +20,7 @@ interface NovedadIncapacidadFormProps {
   periodoFecha?: Date;
   periodStartDate?: string;
   periodEndDate?: string;
+  companyId?: string;
 }
 
 const INCAPACIDAD_SUBTIPOS = [
@@ -46,7 +47,8 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
   isSubmitting,
   periodoFecha,
   periodStartDate,
-  periodEndDate
+  periodEndDate,
+  companyId
 }) => {
   const [formData, setFormData] = useState({
     subtipo: 'general',
@@ -108,7 +110,8 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
           subtipo: formData.subtipo,
           salarioBase: employeeSalary,
           dias: calculatedDays,
-          fechaPeriodo: periodoFecha.toISOString()
+          fechaPeriodo: periodoFecha.toISOString(),
+          companyId: companyId
         },
         (result) => {
           if (result && result.valor) {
@@ -179,12 +182,25 @@ export const NovedadIncapacidadForm: React.FC<NovedadIncapacidadFormProps> = ({
 
   const currentSubtipoInfo = getSubtipoInfo(formData.subtipo);
 
+  // ✅ SMLV por año para cálculo de display
+  const getSmlvForYear = (year: number): number => {
+    const smlvByYear: Record<number, number> = {
+      2026: 1750905,
+      2025: 1423500,
+      2024: 1300000,
+      2023: 1160000,
+    };
+    return smlvByYear[year] ?? 1750905;
+  };
+
+  const periodoYear = periodoFecha ? periodoFecha.getFullYear() : 2026;
+
   // ✅ CALCULAR DESGLOSE CORRECTO CON SMLDV (solo para mostrar en UI)
   const getIncapacityBreakdown = (days: number, subtipo: string) => {
     if (days <= 0 || subtipo !== 'general') return null;
-    
+
     const dailySalary = employeeSalary / 30;
-    const smldv = 1423500 / 30; // SMLDV 2025
+    const smldv = getSmlvForYear(periodoYear) / 30;
     
     if (days <= 2) {
       return {
