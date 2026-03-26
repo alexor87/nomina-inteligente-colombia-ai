@@ -5,6 +5,9 @@ import { EmployeeFormData } from './types';
 import { FormField } from './FormField';
 import { CONTRACT_TYPES } from '@/types/employee-config';
 import { ESTADOS_EMPLEADO } from '@/types/employee-extended';
+import { ConfigurationService } from '@/services/ConfigurationService';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertTriangle } from 'lucide-react';
 
 interface LaborInfoSectionProps {
   control?: Control<EmployeeFormData>;
@@ -35,20 +38,39 @@ export const LaborInfoSection: React.FC<LaborInfoSectionProps> = ({
     return null;
   }
 
+  const currentYear = new Date().getFullYear().toString();
+  const { salarioMinimo } = ConfigurationService.getConfiguration(currentYear);
+  const salarioActual = control ? Number(control._getWatch('salarioBase')) || 0 : 0;
+  const salarioInferior = salarioActual > 0 && salarioActual < salarioMinimo;
+
+  const fmtCOP = (n: number) =>
+    new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n);
+
   return (
     <div className="space-y-6">
       <div>
         <h3 className="text-lg font-medium text-gray-900 mb-4">Información Laboral</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField
-            name="salarioBase"
-            label="Salario Base"
-            type="number"
-            control={control!}
-            errors={errors}
-            required
-            placeholder="2500000"
-          />
+          <div className="space-y-2">
+            <FormField
+              name="salarioBase"
+              label="Salario Base"
+              type="number"
+              control={control!}
+              errors={errors}
+              required
+              placeholder="2500000"
+            />
+            {salarioInferior && (
+              <Alert className="border-amber-200 bg-amber-50">
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                <AlertDescription className="text-amber-800 text-xs">
+                  Este salario es inferior al salario mínimo legal vigente ({fmtCOP(salarioMinimo)}).
+                  Verifica que esta persona realmente tendrá un salario inferior al mínimo.
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
 
           <FormField
             name="tipoContrato"
