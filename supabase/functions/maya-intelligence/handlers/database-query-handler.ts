@@ -623,7 +623,7 @@ Responde SOLO con el SQL optimizado, sin explicaciones:`;
   private generateVacationSQL(message: string, companyId: string, names: string[], years: number[]): string {
     let sql = `SELECT e.nombre, e.apellido, evp.type, evp.start_date, evp.end_date, 
                evp.days_count, evp.status
-               FROM employee_vacation_periods evp
+               FROM employee_absences evp
                JOIN employees e ON evp.employee_id = e.id
                WHERE evp.company_id = '${companyId}'`;
     

@@ -27,7 +27,7 @@ export class SyncValidationService {
     try {
       // Verificar que las funciones de trigger existen consultando directamente
       const { data: vacationTrigger } = await supabase
-        .from('employee_vacation_periods')
+        .from('employee_absences')
         .select('id')
         .limit(1);
       
@@ -67,7 +67,7 @@ export class SyncValidationService {
     try {
       // Obtener vacaciones que deberían tener novedades correspondientes
       const { data: vacations } = await supabase
-        .from('employee_vacation_periods')
+        .from('employee_absences')
         .select('id, employee_id, start_date, end_date, days_count, type')
         .in('type', ['vacaciones', 'licencia_remunerada', 'licencia_no_remunerada', 'incapacidad', 'ausencia']);
 
@@ -109,7 +109,7 @@ export class SyncValidationService {
       // 1. Crear una vacación de prueba
       const testVacationId = crypto.randomUUID();
       const { error: insertError } = await supabase
-        .from('employee_vacation_periods')
+        .from('employee_absences')
         .insert({
           id: testVacationId,
           employee_id: employeeId,
@@ -141,7 +141,7 @@ export class SyncValidationService {
         
         // Limpiar la vacación de prueba
         await supabase
-          .from('employee_vacation_periods')
+          .from('employee_absences')
           .delete()
           .eq('id', testVacationId);
         
@@ -155,7 +155,7 @@ export class SyncValidationService {
 
       // 5. Limpiar datos de prueba
       await supabase
-        .from('employee_vacation_periods')
+        .from('employee_absences')
         .delete()
         .eq('id', testVacationId);
 

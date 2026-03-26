@@ -170,7 +170,7 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
   const handleViewVacationDetail = async (item: DisplayNovedad) => {
     try {
       const { data: vacation, error } = await supabase
-        .from('employee_vacation_periods')
+        .from('employee_absences')
         .select(`
           *,
           employee:employees(nombre, apellido, cedula)
@@ -293,7 +293,7 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
           console.log('🗑️ NovedadExistingList: Eliminando ausencia y actualizando cache global:', item.id);
           
           const { error } = await supabase
-            .from('employee_vacation_periods')
+            .from('employee_absences')
             .delete()
             .eq('id', item.id);
 
@@ -368,7 +368,7 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
       console.log('🗑️ NovedadExistingList: Eliminando ausencia desde modal y actualizando cache global:', vacationId);
       
       const { error } = await supabase
-        .from('employee_vacation_periods')
+        .from('employee_absences')
         .delete()
         .eq('id', vacationId);
 

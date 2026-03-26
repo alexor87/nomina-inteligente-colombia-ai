@@ -1245,16 +1245,19 @@ export type Database = {
           },
         ]
       }
-      employee_vacation_periods: {
+      employee_absences: {
         Row: {
           company_id: string
           created_at: string
           created_by: string | null
           days_count: number
+          diagnosis: string | null
           employee_id: string
           end_date: string
           id: string
+          medical_certificate_url: string | null
           observations: string | null
+          payer_type: string | null
           processed_in_period_id: string | null
           start_date: string
           status: string
@@ -1267,10 +1270,13 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           days_count: number
+          diagnosis?: string | null
           employee_id: string
           end_date: string
           id?: string
+          medical_certificate_url?: string | null
           observations?: string | null
+          payer_type?: string | null
           processed_in_period_id?: string | null
           start_date: string
           status?: string
@@ -1283,10 +1289,13 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           days_count?: number
+          diagnosis?: string | null
           employee_id?: string
           end_date?: string
           id?: string
+          medical_certificate_url?: string | null
           observations?: string | null
+          payer_type?: string | null
           processed_in_period_id?: string | null
           start_date?: string
           status?: string
@@ -1296,28 +1305,28 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "employee_vacation_periods_company_id_fkey"
+            foreignKeyName: "employee_absences_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "employee_vacation_periods_employee_id_fkey"
+            foreignKeyName: "employee_absences_employee_id_fkey"
             columns: ["employee_id"]
             isOneToOne: false
             referencedRelation: "employees"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "employee_vacation_periods_employee_id_fkey"
+            foreignKeyName: "employee_absences_employee_id_fkey"
             columns: ["employee_id"]
             isOneToOne: false
             referencedRelation: "employees_limited"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "employee_vacation_periods_processed_in_period_id_fkey"
+            foreignKeyName: "employee_absences_processed_in_period_id_fkey"
             columns: ["processed_in_period_id"]
             isOneToOne: false
             referencedRelation: "payroll_periods_real"

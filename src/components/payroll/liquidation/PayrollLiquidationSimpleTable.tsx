@@ -27,6 +27,7 @@ import { PayrollCalculationService } from '@/services/PayrollCalculationService'
 import { NoveltyImportDrawer } from '@/components/payroll/novelties-import/NoveltyImportDrawer';
 import { useEmployeeNovedadesCacheStore } from '@/stores/employeeNovedadesCacheStore';
 import { SalaryIncreaseService } from '@/services/employees/SalaryIncreaseService';
+import { VacationNovedadSyncService } from '@/services/VacationNovedadSyncService';
 
 interface PayrollLiquidationSimpleTableProps {
   employees: PayrollEmployee[];
@@ -458,23 +459,43 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
       console.log('⚡ UI Optimista: Mostrando estimación instantánea +', formatCurrency(estimate));
     }
     
+    const ABSENCE_TYPES = ['vacaciones', 'licencia_remunerada', 'licencia_no_remunerada', 'incapacidad', 'ausencia'];
+
     try {
-      const result = await createNovedad({
-        ...data,
-        empleado_id: selectedEmployee.id,
-        periodo_id: currentPeriodId
-      });
-      
+      let result;
+
+      if (ABSENCE_TYPES.includes(data.tipo_novedad)) {
+        // Ausencias → employee_absences (fuente única de verdad)
+        // El trigger sync_vacation_to_novedad auto-crea el registro en payroll_novedades
+        console.log('🏖️ Ausencia detectada, enrutando a VacationNovedadSyncService:', data.tipo_novedad);
+        result = await VacationNovedadSyncService.createVacationAbsence({
+          employee_id: selectedEmployee.id,
+          type: data.tipo_novedad as any,
+          subtipo: data.subtipo,
+          start_date: data.fecha_inicio!,
+          end_date: data.fecha_fin!,
+          observations: data.observacion,
+          periodo_id: currentPeriodId,
+        });
+      } else {
+        // Novedades normales (horas extra, bonificaciones, etc.) → payroll_novedades directo
+        result = await createNovedad({
+          ...data,
+          empleado_id: selectedEmployee.id,
+          periodo_id: currentPeriodId
+        });
+      }
+
       if (result) {
         console.log('✅ Novedad creada exitosamente');
         novedadChangedRef.current = true;
-        
+
         // ✅ NUEVO: Disparar recálculo batch automáticamente
         useEmployeeNovedadesCacheStore.getState().setLastRefreshTime(Date.now());
         console.log('⏰ lastRefreshTime actualizado - recálculo batch se ejecutará automáticamente');
-        
+
         handleCloseNovedadModal();
-        
+
         toast({
           title: "✅ Novedad creada",
           description: "El recálculo se ejecutará automáticamente",

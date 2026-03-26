@@ -1,0 +1,231 @@
+
+import { VacationAbsence } from '@/types/vacations';
+import { CustomModal, CustomModalHeader, CustomModalTitle } from '@/components/ui/custom-modal';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { Calendar, User, Clock, FileText, Edit, Trash2, Stethoscope, ExternalLink } from 'lucide-react';
+import { formatDateForDisplay, formatDateTimeForDisplay } from '@/utils/dateUtils';
+
+interface AbsenceDetailModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  vacation: VacationAbsence | null;
+  onEdit?: (vacation: VacationAbsence) => void;
+  onDelete?: (id: string) => void;
+}
+
+export const AbsenceDetailModal = ({
+  isOpen,
+  onClose,
+  vacation,
+  onEdit,
+  onDelete
+}: AbsenceDetailModalProps) => {
+  if (!vacation) return null;
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'pendiente':
+        return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">Pendiente</Badge>;
+      case 'liquidada':
+        return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Liquidada</Badge>;
+      case 'cancelada':
+        return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">Cancelada</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
+  const getPayerTypeLabel = (payerType: string) => {
+    switch (payerType) {
+      case 'employer': return 'Empleador';
+      case 'eps': return 'EPS';
+      case 'arl': return 'ARL';
+      default: return payerType;
+    }
+  };
+
+  return (
+    <CustomModal isOpen={isOpen} onClose={onClose} className="max-w-2xl">
+      <CustomModalHeader>
+        <CustomModalTitle className="flex items-center gap-2">
+          <Calendar className="h-5 w-5" />
+          Detalle de Ausencia
+        </CustomModalTitle>
+      </CustomModalHeader>
+
+      <div className="space-y-6 mt-6">
+        {/* Informacion del empleado */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+            <User className="h-4 w-4" />
+            EMPLEADO
+          </div>
+          <div className="pl-6">
+            <div className="text-lg font-semibold">
+              {vacation.employee?.nombre} {vacation.employee?.apellido}
+            </div>
+            <div className="text-sm text-muted-foreground">
+              Cedula: {vacation.employee?.cedula}
+            </div>
+          </div>
+        </div>
+
+        <Separator />
+
+        {/* Informacion de fechas */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+            <Calendar className="h-4 w-4" />
+            PERIODO DE AUSENCIA
+          </div>
+          <div className="pl-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <div className="text-sm text-muted-foreground">Fecha de inicio</div>
+              <div className="font-medium">{formatDateForDisplay(vacation.start_date)}</div>
+            </div>
+            <div>
+              <div className="text-sm text-muted-foreground">Fecha de fin</div>
+              <div className="font-medium">{formatDateForDisplay(vacation.end_date)}</div>
+            </div>
+          </div>
+          <div className="pl-6">
+            <div className="text-sm text-muted-foreground">Total de dias</div>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="text-lg px-3 py-1">
+                {vacation.days_count} dias
+              </Badge>
+            </div>
+          </div>
+        </div>
+
+        <Separator />
+
+        {/* Estado y observaciones */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+            <FileText className="h-4 w-4" />
+            INFORMACION ADICIONAL
+          </div>
+          <div className="pl-6 space-y-3">
+            <div>
+              <div className="text-sm text-muted-foreground">Estado</div>
+              <div className="mt-1">{getStatusBadge(vacation.status)}</div>
+            </div>
+            {vacation.observations && (
+              <div>
+                <div className="text-sm text-muted-foreground">Observaciones</div>
+                <div className="mt-1 p-3 bg-muted rounded-lg">
+                  {vacation.observations}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Informacion de incapacidad - Solo mostrar cuando el tipo es 'incapacidad' */}
+        {vacation.type === 'incapacidad' && (
+          <>
+            <Separator />
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                <Stethoscope className="h-4 w-4" />
+                INFORMACION DE INCAPACIDAD
+              </div>
+              <div className="pl-6 space-y-3">
+                {(vacation as any).payer_type && (
+                  <div>
+                    <div className="text-sm text-muted-foreground">Responsable de pago</div>
+                    <div className="mt-1">
+                      <Badge variant="outline">
+                        {getPayerTypeLabel((vacation as any).payer_type)}
+                      </Badge>
+                    </div>
+                  </div>
+                )}
+                {(vacation as any).diagnosis && (
+                  <div>
+                    <div className="text-sm text-muted-foreground">Diagnostico</div>
+                    <div className="mt-1 p-3 bg-muted rounded-lg">
+                      {(vacation as any).diagnosis}
+                    </div>
+                  </div>
+                )}
+                {(vacation as any).medical_certificate_url && (
+                  <div>
+                    <div className="text-sm text-muted-foreground">Certificado medico</div>
+                    <div className="mt-1">
+                      <a
+                        href={(vacation as any).medical_certificate_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 underline"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        Ver certificado
+                      </a>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+
+        <Separator />
+
+        {/* Informacion de auditoria */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+            <Clock className="h-4 w-4" />
+            HISTORIAL
+          </div>
+          <div className="pl-6 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div>
+              <div className="text-muted-foreground">Creado el</div>
+              <div>{formatDateTimeForDisplay(vacation.created_at)}</div>
+            </div>
+            <div>
+              <div className="text-muted-foreground">Ultima actualizacion</div>
+              <div>{formatDateTimeForDisplay(vacation.updated_at)}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Botones de accion */}
+        <div className="flex justify-end gap-3 pt-6 border-t">
+          <Button variant="outline" onClick={onClose}>
+            Cerrar
+          </Button>
+          {vacation.status === 'pendiente' && onEdit && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                onEdit(vacation);
+                onClose();
+              }}
+            >
+              <Edit className="h-4 w-4 mr-2" />
+              Editar
+            </Button>
+          )}
+          {vacation.status === 'pendiente' && onDelete && (
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (confirm('Esta seguro de que desea eliminar esta ausencia?')) {
+                  onDelete(vacation.id);
+                  onClose();
+                }
+              }}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Eliminar
+            </Button>
+          )}
+        </div>
+      </div>
+    </CustomModal>
+  );
+};
