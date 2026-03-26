@@ -121,6 +121,31 @@ export class SimplePeriodService {
           .single();
 
         if (error) {
+          // Si el período ya existe (duplicate key), buscar el existente
+          if (error.code === '23505') {
+            console.log('⚠️ Período ya existe, recuperando existente...');
+            const { data: existing } = await supabase
+              .from('payroll_periods_real')
+              .select('*')
+              .eq('company_id', companyId)
+              .eq('fecha_inicio', period.startDate)
+              .eq('fecha_fin', period.endDate)
+              .single();
+
+            if (existing) {
+              console.log('✅ Período existente recuperado:', existing.id);
+              return {
+                id: existing.id,
+                label: period.label,
+                startDate: existing.fecha_inicio,
+                endDate: existing.fecha_fin,
+                periodNumber: period.periodNumber,
+                canSelect: true,
+                needsCreation: false
+              };
+            }
+          }
+
           console.error('❌ Error creando período:', error);
           return null;
         }
