@@ -102,6 +102,7 @@ export const NovedadBonificacionesConsolidatedForm: React.FC<NovedadBonificacion
 
     const formDataArray = entries.map(entry => ({
       tipo_novedad: entry.tipo_novedad,
+      subtipo: entry.tipo_novedad === 'bonificacion_salarial' ? 'salarial' : 'no_salarial',
       valor: entry.valor,
       observacion: entry.observacion || undefined,
       constitutivo_salario: entry.constitutivo

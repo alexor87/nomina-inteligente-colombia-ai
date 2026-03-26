@@ -376,6 +376,16 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
             subtipoToSave = 'dominical';
           }
         }
+
+        // Si es bonificación, derivar subtipo desde tipo_novedad del form
+        if (selectedType === 'bonificacion') {
+          const entryType = entry.subtipo || entry.tipo_novedad || entry.tipo;
+          if (entryType === 'bonificacion_salarial') {
+            subtipoToSave = 'salarial';
+          } else if (entryType === 'bonificacion_no_salarial') {
+            subtipoToSave = 'no_salarial';
+          }
+        }
         
         const submitData: CreateNovedadData = {
           empleado_id: employeeId,
