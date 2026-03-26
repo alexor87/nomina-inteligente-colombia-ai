@@ -56,13 +56,16 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
       switch (subtipo) {
         case 'nocturno':
           return 'Recargo nocturno';
-        case 'dominical':
-          return 'Recargo dominical';
         case 'nocturno_dominical':
           return 'Recargo nocturno dominical';
         default:
           return 'Recargo nocturno';
       }
+    }
+
+    if (tipo === 'recargo_dominical') {
+      if (subtipo === 'nocturno_dominical') return 'Recargo nocturno dominical';
+      return 'Recargo dominical';
     }
 
     // Mapeo de subtipos de ingresos adicionales

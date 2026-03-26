@@ -373,7 +373,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
             subtipoToSave = 'nocturno';
           } else if (entryType === 'nocturno_dominical') {
             tipoNovedadToSave = 'recargo_nocturno';
-            subtipoToSave = 'dominical';
+            subtipoToSave = 'nocturno_dominical';
           }
         }
 
