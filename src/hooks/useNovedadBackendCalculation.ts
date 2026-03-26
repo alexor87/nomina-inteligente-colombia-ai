@@ -12,6 +12,7 @@ interface NovedadCalculationInput {
   valorManual?: number;
   cuotas?: number;
   fechaPeriodo?: string;
+  companyId?: string;
 }
 
 interface NovedadCalculationResult {
@@ -82,7 +83,8 @@ export const useNovedadBackendCalculation = () => {
         salarioBase: input.salarioBase,
         horas: input.horas || undefined,
         dias: input.dias || undefined,
-        fechaPeriodo: fechaParaCalculo
+        fechaPeriodo: fechaParaCalculo,
+        companyId: input.companyId || undefined
       };
 
       const { data, error: apiError } = await supabase.functions.invoke('payroll-calculations', {

@@ -767,7 +767,7 @@ async function calculateNovedadesTotals(supabase: any, data: any) {
   // ✅ Get dynamic configuration
   const config = companyId
     ? await getOfficialValues(supabase, companyId, year)
-    : { salarioMinimo: 1423500, auxilioTransporte: 200000, uvt: 49799 }; // Fallback
+    : (YEAR_CONFIGS[year] ?? YEAR_CONFIGS['2026']); // Fallback dinámico por año
 
   console.log('📊 BACKEND: Calculando totales de novedades con política:', {
     salarioBase,
@@ -945,13 +945,13 @@ async function calculateSingleNovedad(supabase: any, data: any) {
     companyId
   } = data;
 
-  const year = fechaPeriodo ? new Date(fechaPeriodo).getFullYear().toString() : '2025';
+  const year = fechaPeriodo ? new Date(fechaPeriodo).getFullYear().toString() : '2026';
   
   // ✅ Get dynamic configuration
   const config = companyId
     ? await getOfficialValues(supabase, companyId, year)
-    : { salarioMinimo: 1423500, auxilioTransporte: 200000, uvt: 49799 }; // Fallback
-  
+    : (YEAR_CONFIGS[year] ?? YEAR_CONFIGS['2026']); // Fallback dinámico por año
+
   console.log('🧩 calculateSingleNovedad:', {
     tipoNovedad, subtipo, salarioBase, horas, dias, fechaPeriodo, year
   });
