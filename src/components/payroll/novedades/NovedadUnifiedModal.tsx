@@ -17,6 +17,7 @@ import { NovedadRecargoConsolidatedForm } from './forms/NovedadRecargoConsolidat
 import { NovedadVacacionesConsolidatedForm } from './forms/NovedadVacacionesConsolidatedForm';
 import { NovedadVacacionesForm } from './forms/NovedadVacacionesForm';
 import { useNovedadBackendCalculation } from '@/hooks/useNovedadBackendCalculation';
+import { NovedadesCalculationService } from '@/services/NovedadesCalculationService';
 import { VacationAbsenceForm } from '@/components/vacations/VacationAbsenceForm';
 import { VacationAbsenceFormData, VacationAbsenceType } from '@/types/vacations';
 import { useVacationEmployees } from '@/hooks/useVacationEmployees';
@@ -434,8 +435,13 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
         }
       }
       
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
+      // Invalidar caché de cálculos para forzar recálculo fresco
+      if (employeeId) {
+        NovedadesCalculationService.invalidateCache(employeeId, periodId);
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 500));
+
       if (mode === 'ajustes') {
         handleClose();
       } else {
