@@ -2,7 +2,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { DisplayNovedad, convertNovedadToDisplay } from '@/types/vacation-integration';
 import { NovedadesEnhancedService } from './NovedadesEnhancedService';
-import { NovedadesCalculationService } from './NovedadesCalculationService';
 
 export class PayrollIntegratedDataService {
   static async getEmployeePeriodData(
@@ -21,37 +20,15 @@ export class PayrollIntegratedDataService {
         return [];
       }
 
-      // ✅ Obtener novedades y breakdown del backend
-      const [novedadesData, breakdown] = await Promise.all([
-        NovedadesEnhancedService.getNovedadesByEmployee(employeeId, periodId),
-        NovedadesCalculationService.getEmployeeNovedadesBreakdown(employeeId, periodId)
-      ]);
+      // ✅ Obtener novedades de la DB (valores ya calculados al crear)
+      const novedadesData = await NovedadesEnhancedService.getNovedadesByEmployee(employeeId, periodId);
 
-      // ✅ Crear un mapa de valores calculados por el backend
-      const calculatedValuesMap = new Map();
-      breakdown.forEach((item: any) => {
-        const key = `${item.tipo_novedad}_${item.subtipo || 'default'}`;
-        calculatedValuesMap.set(key, {
-          valorCalculado: item.valorCalculado,
-          valorOriginal: item.valorOriginal,
-          detalleCalculo: item.detalleCalculo
-        });
-      });
-
-      // ✅ Convertir novedades usando valores calculados del backend
+      // ✅ Convertir novedades usando valores almacenados en DB (ya calculados al crear)
+      // NOTA: No sobreescribir valor con breakdown por tipo_novedad+subtipo,
+      // porque cuando hay múltiples entradas del mismo tipo (ej: 2 recargos nocturnos),
+      // el Map colisiona y todas reciben el mismo valor.
       const displayData: DisplayNovedad[] = novedadesData.map(novedad => {
-        const key = `${novedad.tipo_novedad}_${novedad.subtipo || 'default'}`;
-        const calculatedInfo = calculatedValuesMap.get(key);
-        
-        const displayNovedad = convertNovedadToDisplay(novedad);
-        
-        if (calculatedInfo && calculatedInfo.valorCalculado !== undefined) {
-          displayNovedad.valor = calculatedInfo.valorCalculado;
-          displayNovedad.valorOriginal = calculatedInfo.valorOriginal;
-          displayNovedad.observacion = `${displayNovedad.observacion || ''} | ${calculatedInfo.detalleCalculo || ''}`.trim();
-        }
-        
-        return displayNovedad;
+        return convertNovedadToDisplay(novedad);
       });
 
       const sortedData = displayData.sort((a, b) =>
