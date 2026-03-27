@@ -301,6 +301,11 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       
       const result = await onSubmit(novedadData);
 
+      // ✅ Si la creación falló (hook retorna null), no mostrar toast de éxito
+      if (!result) {
+        return;
+      }
+
       await new Promise(resolve => setTimeout(resolve, 300));
 
       if (mode === 'ajustes') {

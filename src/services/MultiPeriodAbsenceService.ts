@@ -46,10 +46,13 @@ export class MultiPeriodAbsenceService {
     
     if (configuredPeriodicity === 'quincenal') {
       // Quincenal: cruza si abarca 1-15 y 16-fin de mes, o múltiples meses
-      const startDay = startDateObj.getDate();
-      const endDay = endDateObj.getDate();
-      const sameMonth = startDateObj.getMonth() === endDateObj.getMonth() && 
-                       startDateObj.getFullYear() === endDateObj.getFullYear();
+      // ✅ CORRECCIÓN: Usar UTC para evitar bug de timezone (Colombia UTC-5)
+      // new Date('2026-01-01') crea fecha UTC, pero getDate() retorna día local
+      // En UTC-5, Jan 1 UTC = Dec 31 local → sameMonth = false incorrectamente
+      const startDay = startDateObj.getUTCDate();
+      const endDay = endDateObj.getUTCDate();
+      const sameMonth = startDateObj.getUTCMonth() === endDateObj.getUTCMonth() &&
+                       startDateObj.getUTCFullYear() === endDateObj.getUTCFullYear();
       
       if (!sameMonth) {
         logicallyCrossesMultiple = true; // Cruza meses = múltiples quincenas
@@ -122,9 +125,9 @@ export class MultiPeriodAbsenceService {
         const finalDate = new Date(endDate);
         
         while (currentDate <= finalDate) {
-          const year = currentDate.getFullYear();
-          const month = currentDate.getMonth();
-          const day = currentDate.getDate();
+          const year = currentDate.getUTCFullYear();
+          const month = currentDate.getUTCMonth();
+          const day = currentDate.getUTCDate();
           
           let segmentStart: Date;
           let segmentEnd: Date;
