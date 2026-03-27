@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollNovedad } from '@/types/novedades-enhanced';
+import { isNovedadConstitutiva } from '@/utils/payrollCalculationsBackend';
 
 // ✅ Helper: Calculate inclusive days between two dates (16-19 = 4 days)
 const diffDaysInclusive = (start?: string, end?: string): number | undefined => {
@@ -183,7 +184,7 @@ class NovedadesCalculationServiceClass {
             valor: novedad.valor,
             dias: safeDays,
             horas: (novedad as any).horas,
-            constitutivo_salario: novedad.tipo_novedad === 'horas_extra' || novedad.tipo_novedad === 'recargo_nocturno' || novedad.tipo_novedad === 'recargo_dominical'
+            constitutivo_salario: isNovedadConstitutiva(novedad.tipo_novedad, novedad.constitutivo_salario)
           };
         })
       };
@@ -294,7 +295,7 @@ class NovedadesCalculationServiceClass {
             valor: novedad.valor,
             dias: safeDays,
             horas: (novedad as any).horas,
-            constitutivo_salario: novedad.tipo_novedad === 'horas_extra' || novedad.tipo_novedad === 'recargo_nocturno' || novedad.tipo_novedad === 'recargo_dominical'
+            constitutivo_salario: isNovedadConstitutiva(novedad.tipo_novedad, novedad.constitutivo_salario)
           };
         })
       };

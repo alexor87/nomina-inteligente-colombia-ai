@@ -110,7 +110,7 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
     const details: string[] = [];
     
     // Para bonificaciones y otros ingresos: mostrar constitutividad
-    if (['bonificacion', 'otros_ingresos', 'horas_extra'].includes(item.tipo_novedad)) {
+    if (['bonificacion', 'otros_ingresos', 'horas_extra', 'comision', 'prima'].includes(item.tipo_novedad)) {
       if (item.constitutivo_salario !== undefined) {
         details.push(item.constitutivo_salario 
           ? '✓ Constitutivo de salario' 
