@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { VacationIntegrationResult, VacationProcessingOptions } from '@/types/vacation-integration';
 import { NovedadesCalculationService } from '@/services/NovedadesCalculationService';
+import { calculateBusinessDays } from '@/utils/businessDayCalculator';
 
 export class AbsencePayrollIntegrationService {
   static async processAbsencesForPayroll(options: VacationProcessingOptions): Promise<VacationIntegrationResult> {
@@ -9,7 +10,7 @@ export class AbsencePayrollIntegrationService {
 
       const { data: intersectingAbsences, error: absenceError } = await supabase
         .from('employee_absences')
-        .select('*')
+        .select('*, employees(dias_descanso)')
         .eq('company_id', options.companyId)
         .eq('status', 'pendiente')
         .lte('start_date', options.endDate)
@@ -35,11 +36,14 @@ export class AbsencePayrollIntegrationService {
       let totalProcessedDays = 0;
 
       for (const absence of intersectingAbsences) {
+        const restDays = (absence as any).employees?.dias_descanso || ['sabado', 'domingo'];
         const periodDays = this.calculatePeriodIntersectionDays(
           absence.start_date,
           absence.end_date,
           options.startDate,
-          options.endDate
+          options.endDate,
+          absence.type,
+          restDays
         );
 
         if (periodDays > 0) {
@@ -108,7 +112,9 @@ export class AbsencePayrollIntegrationService {
     absenceStart: string,
     absenceEnd: string,
     periodStart: string,
-    periodEnd: string
+    periodEnd: string,
+    absenceType?: string,
+    restDays: string[] = ['sabado', 'domingo']
   ): number {
     const absStartDate = new Date(absenceStart);
     const absEndDate = new Date(absenceEnd);
@@ -122,14 +128,26 @@ export class AbsencePayrollIntegrationService {
       return 0;
     }
 
-    const diffTime = intersectionEnd.getTime() - intersectionStart.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    const intStartStr = intersectionStart.toISOString().split('T')[0];
+    const intEndStr = intersectionEnd.toISOString().split('T')[0];
+
+    // Vacaciones: contar días HÁBILES (excluye días de descanso del empleado y festivos colombianos)
+    // Otros tipos (incapacidad, etc.): contar días calendario
+    let diffDays: number;
+    if (absenceType === 'vacaciones') {
+      diffDays = calculateBusinessDays(intStartStr, intEndStr, restDays);
+    } else {
+      const diffTime = intersectionEnd.getTime() - intersectionStart.getTime();
+      diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    }
 
     console.log(`Intersection calculation:`, {
       absence: `${absenceStart} - ${absenceEnd}`,
       period: `${periodStart} - ${periodEnd}`,
-      intersection: `${intersectionStart.toISOString().split('T')[0]} - ${intersectionEnd.toISOString().split('T')[0]}`,
-      days: diffDays
+      intersection: `${intStartStr} - ${intEndStr}`,
+      days: diffDays,
+      type: absenceType || 'unknown',
+      method: absenceType === 'vacaciones' ? 'business_days' : 'calendar_days'
     });
 
     return Math.max(0, diffDays);
