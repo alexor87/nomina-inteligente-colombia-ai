@@ -112,6 +112,17 @@ async function processNovedadChanges(
 
   console.log(`📝 Novedad changes: +${created.length} ~${updated.length} -${deleted.length}`)
 
+  // 🔒 SECURITY: Validate all novedad values are non-negative (ALTO-5)
+  const allNovedades = [...created, ...updated]
+  for (const novedad of allNovedades) {
+    if (novedad.valor !== undefined && novedad.valor < 0) {
+      throw new Error(`Valor de novedad no puede ser negativo: ${novedad.valor}`)
+    }
+    if (novedad.dias !== undefined && novedad.dias < 0) {
+      throw new Error(`Días de novedad no pueden ser negativos: ${novedad.dias}`)
+    }
+  }
+
   // Create new novedades
   for (const novedad of created) {
     try {

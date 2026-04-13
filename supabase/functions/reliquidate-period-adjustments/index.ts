@@ -2,10 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { processUnifiedChanges } from './processUnifiedChanges.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+import { getCorsHeaders, corsHeaders } from '../_shared/cors.ts'
 
 // ✅ VALORES OFICIALES CORREGIDOS 2025/2024
 const OFFICIAL_VALUES = {
@@ -122,22 +119,45 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { 
-      periodId, 
-      affectedEmployeeIds, 
-      justification, 
+    // 🔒 SECURITY: Validate authenticated user and extract identity from JWT
+    const authHeader = req.headers.get('authorization')
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'No autorizado: token de autenticación requerido' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const userClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    )
+    const { data: { user }, error: authError } = await userClient.auth.getUser()
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'No autorizado: sesión inválida' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const {
+      periodId,
+      affectedEmployeeIds,
+      justification,
       editType = 'legacy',
       compositionChanges,
-      novedadChanges 
+      novedadChanges
     }: ReliquidationRequest = await req.json()
 
-    console.log('🔄 Starting period reliquidation:', { 
-      periodId, 
+    console.log('🔄 Starting period reliquidation:', {
+      periodId,
       editType,
+      userId: user.id.slice(0, 8),
       affectedEmployeeIds: affectedEmployeeIds.length,
-      compositionChanges: compositionChanges ? 
+      compositionChanges: compositionChanges ?
         `+${compositionChanges.added_employees?.length || 0} -${compositionChanges.removed_employees?.length || 0}` : 'none',
-      novedadChanges: novedadChanges ? 
+      novedadChanges: novedadChanges ?
         `+${novedadChanges.created?.length || 0} ~${novedadChanges.updated?.length || 0} -${novedadChanges.deleted?.length || 0}` : 'none'
     })
 
@@ -149,7 +169,34 @@ serve(async (req) => {
       .single()
 
     if (periodError || !periodData) {
-      throw new Error(`Período no encontrado: ${periodError?.message}`)
+      return new Response(
+        JSON.stringify({ error: 'Período no encontrado' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // 🔒 SECURITY: Validate user belongs to the period's company (CRÍTICO-2)
+    const { data: userProfile, error: profileError } = await supabase
+      .from('profiles')
+      .select('company_id')
+      .eq('user_id', user.id)
+      .single()
+
+    if (profileError || !userProfile || userProfile.company_id !== periodData.company_id) {
+      console.error(`🚨 [SECURITY] Cross-company reliquidation blocked: user ${user.id.slice(0, 8)} tried to access period of company ${periodData.company_id}`)
+      return new Response(
+        JSON.stringify({ error: 'No tienes permiso para modificar este período' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // 🔒 SECURITY: Block reliquidation of closed periods (ALTO-6)
+    if (periodData.estado === 'cerrado') {
+      console.warn(`⚠️ [SECURITY] Attempt to reliquidate closed period ${periodId} by user ${user.id.slice(0, 8)}`)
+      return new Response(
+        JSON.stringify({ error: 'No se puede reliquidar un período cerrado. Debe reabrirlo primero.' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
     // Get all payroll novedades for affected employees in this period
