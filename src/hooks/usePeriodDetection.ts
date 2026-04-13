@@ -57,16 +57,17 @@ export const usePeriodDetection = () => {
 
       // 🎯 Si cruza múltiples períodos, manejar inmediatamente
       if (multiPeriodAnalysis.crossesMultiplePeriods) {
-        // Verificar si hay períodos existentes o son teóricos
-        if (multiPeriodAnalysis.segments.length > 0 && 
-            multiPeriodAnalysis.segments[0].periodId !== 'pending-creation') {
-          // ✅ Multi-período con períodos existentes en DB
-          const primarySegment = multiPeriodAnalysis.segments[0];
+        // Buscar el primer segmento con período real en DB (no solo el primero)
+        const existingSegment = multiPeriodAnalysis.segments.find(
+          (s: any) => s.periodId && s.periodId !== 'pending-creation'
+        );
+
+        if (existingSegment) {
           const totalPeriods = multiPeriodAnalysis.segments.length;
-          
+
           return {
-            periodId: primarySegment.periodId,
-            periodName: primarySegment.periodName,
+            periodId: existingSegment.periodId,
+            periodName: existingSegment.periodName,
             isExact: false,
             isAutoCreated: false,
             crossesMultiplePeriods: true,
@@ -74,7 +75,7 @@ export const usePeriodDetection = () => {
             message: `⚡ Ausencia multi-período: ${totalPeriods} períodos (${multiPeriodAnalysis.totalDays} días)`
           };
         } else {
-          // ⚠️ Multi-período sin períodos creados (segmentos teóricos)
+          // Todos los segmentos son teóricos — no hay período en DB
           return {
             periodId: null,
             periodName: null,
