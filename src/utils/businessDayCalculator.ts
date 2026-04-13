@@ -1,5 +1,8 @@
 import { isColombianHoliday, getColombianHolidaysWithNames } from './colombianHolidays';
 
+/** Máximo de días hábiles de vacaciones por solicitud */
+export const MAX_VACATION_DAYS = 30;
+
 /**
  * Mapeo de nombres de días a getDay() (0=domingo, 1=lunes, ..., 6=sábado)
  */
@@ -165,6 +168,10 @@ export function getVacationBreakdown(
 
     if (isRest) {
       restDaysCount++;
+      // Si el festivo cae en día de descanso, mostrar el nombre aunque no cuente aparte
+      if (holidayMatch) {
+        holidayNames.push(holidayMatch.name);
+      }
     } else if (holidayMatch) {
       holidaysCount++;
       holidayNames.push(holidayMatch.name);

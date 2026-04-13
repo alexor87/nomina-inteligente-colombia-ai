@@ -141,7 +141,7 @@ export const employeeFormSchema = z.object({
     .refine((date) => !date || notFutureDate(date), 'La fecha de firma del contrato no puede ser futura')
     .optional(),
   fechaFinalizacionContrato: z.string().optional(),
-  tipoJornada: z.enum(['completa', 'parcial', 'horas']).optional(),
+  tipoJornada: z.enum(['completa', 'parcial', 'horas', 'flexible']).optional(),
   diasTrabajo: z.number().optional(),
   horasTrabajo: z.number().optional(),
   diasDescanso: z.array(z.string()).optional(),
