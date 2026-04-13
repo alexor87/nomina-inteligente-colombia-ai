@@ -389,4 +389,11 @@ export class EmployeeAbsenceService {
     }
     return data.company_id;
   }
+
+  // Aliases para backward compatibility (VacationNovedadSyncService)
+  static createVacationAbsence = EmployeeAbsenceService.createAbsence;
+  static getUnifiedVacationData = EmployeeAbsenceService.getUnifiedAbsenceData;
+  static updateVacationAbsence = EmployeeAbsenceService.updateAbsence;
+  static deleteVacationAbsence = EmployeeAbsenceService.deleteAbsence;
+  static subscribeToVacationChanges = EmployeeAbsenceService.subscribeToAbsenceChanges;
 }
