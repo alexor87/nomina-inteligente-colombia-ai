@@ -103,8 +103,9 @@ export class MayaChatService {
 
   private saveToStorage(): void {
     try {
-      localStorage.setItem(MayaChatService.STORAGE_KEY, JSON.stringify(this.currentConversation));
-      console.log('🤖 MAYA: Saved conversation to localStorage', { messageCount: this.currentConversation.messages.length });
+      // Excluir companyId del almacenamiento para no exponer datos sensibles
+      const { companyId, ...safeConversation } = this.currentConversation as any;
+      localStorage.setItem(MayaChatService.STORAGE_KEY, JSON.stringify(safeConversation));
     } catch (error) {
       console.error('🤖 MAYA: Error saving to localStorage', error);
     }

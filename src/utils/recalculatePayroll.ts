@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { PayrollRecalculationService } from '@/services/PayrollRecalculationService';
 import { toast } from 'sonner';
+import { getUserFriendlyError } from './errorMessages';
 import { useEmployeeNovedadesCacheStore } from '@/stores/employeeNovedadesCacheStore';
 
 export const recalculateCurrentPeriod = async (periodId: string) => {
@@ -40,7 +41,7 @@ export const recalculateCurrentPeriod = async (periodId: string) => {
 
   } catch (error: any) {
     console.error('❌ Error en recálculo:', error);
-    toast.error(`Error: ${error.message}`, { id: 'recalc' });
+    toast.error(getUserFriendlyError(error), { id: 'recalc' });
   }
 };
 

@@ -18,7 +18,7 @@ export class CompanyConfigurationService {
         return null;
       }
 
-      console.log('Usuario actual:', user.id, user.email);
+      console.log('Usuario actual:', user.id?.slice(0, 8));
 
       const { data: profile, error } = await supabase
         .from('profiles')

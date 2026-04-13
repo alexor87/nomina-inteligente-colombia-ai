@@ -305,6 +305,12 @@ export const UsuariosRolesSettings = () => {
     }
   };
 
+  const simularEnvioInvitacion = async (email: string): Promise<void> => {
+    // Simular delay de red
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Invitación enviada exitosamente
+  };
+
   const cambiarEstadoUsuario = (id: string, nuevoEstado: Usuario['estado']) => {
     const usuariosActualizados = usuarios.map(usuario => {
       if (usuario.id === id) {

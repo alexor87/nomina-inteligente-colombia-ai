@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { calculateDaysBetween } from '@/utils/dateUtils';
 import { usePeriodDetection } from './usePeriodDetection';
+import { getUserFriendlyError } from '@/utils/errorMessages';
 
 export const useAbsences = (filters: VacationAbsenceFilters = {}) => {
   const { user } = useAuth();
@@ -197,7 +198,7 @@ export const useAbsences = (filters: VacationAbsenceFilters = {}) => {
     },
     onError: (error: any) => {
       console.error('Error creating absence:', error);
-      toast.error(error.message || 'Error al registrar la ausencia');
+      toast.error(getUserFriendlyError(error));
     },
   });
 
@@ -249,7 +250,7 @@ export const useAbsences = (filters: VacationAbsenceFilters = {}) => {
     },
     onError: (error: any) => {
       console.error('Error updating absence:', error);
-      toast.error(error.message || 'Error al actualizar la ausencia');
+      toast.error(getUserFriendlyError(error));
     },
   });
 
