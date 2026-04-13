@@ -6,8 +6,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { CalendarDays, Clock, AlertTriangle, CheckCircle, Loader2, Zap } from 'lucide-react';
+import { CalendarDays, Clock, AlertTriangle, CheckCircle, Loader2, Zap, Sun, PartyPopper, Info } from 'lucide-react';
 import { useEffect } from 'react';
+import { VacationBreakdown } from '@/utils/businessDayCalculator';
 
 interface Employee {
   id: string;
@@ -26,6 +27,16 @@ interface PeriodInfo {
   periodSegments?: any[];
 }
 
+const DAY_LABELS: Record<string, string> = {
+  lunes: 'Lun',
+  martes: 'Mar',
+  miercoles: 'Mie',
+  jueves: 'Jue',
+  viernes: 'Vie',
+  sabado: 'Sab',
+  domingo: 'Dom',
+};
+
 interface AbsenceFormFieldsProps {
   formData: VacationAbsenceFormData;
   setFormData: (data: VacationAbsenceFormData) => void;
@@ -35,6 +46,12 @@ interface AbsenceFormFieldsProps {
   periodInfo: PeriodInfo | null;
   isDetectingPeriod: boolean;
   hideEmployeeSelection?: boolean;
+  // Vacation business days props
+  diasHabiles?: number;
+  setDiasHabiles?: (days: number) => void;
+  employeeRestDays?: string[];
+  vacationBreakdown?: VacationBreakdown | null;
+  isLoadingRestDays?: boolean;
 }
 
 export const AbsenceFormFields = ({
@@ -45,11 +62,17 @@ export const AbsenceFormFields = ({
   isSubmitting,
   periodInfo,
   isDetectingPeriod,
-  hideEmployeeSelection = false
+  hideEmployeeSelection = false,
+  diasHabiles = 0,
+  setDiasHabiles,
+  employeeRestDays = ['sabado', 'domingo'],
+  vacationBreakdown = null,
+  isLoadingRestDays = false,
 }: AbsenceFormFieldsProps) => {
   const selectedEmployee = employees.find(emp => emp.id === formData.employee_id);
   const showSubtypeField = requiresSubtype(formData.type);
   const availableSubtypes = getSubtypesForType(formData.type);
+  const isVacaciones = formData.type === 'vacaciones';
 
   // DEBUG: Verificar estado del dropdown
   useEffect(() => {
@@ -78,6 +101,12 @@ export const AbsenceFormFields = ({
     if (periodInfo?.isAutoCreated) return 'border-orange-200 bg-orange-50';
     if (periodInfo) return 'border-blue-200 bg-blue-50';
     return 'border-gray-200 bg-gray-50';
+  };
+
+  const formatDate = (dateStr: string): string => {
+    if (!dateStr) return '';
+    const [year, month, day] = dateStr.split('-');
+    return `${day}/${month}/${year}`;
   };
 
   return (
@@ -137,8 +166,14 @@ export const AbsenceFormFields = ({
               ...formData,
               type: value as any,
               subtipo: undefined,
+              // Reset end_date when switching to vacaciones (will be auto-calculated)
+              ...(value === 'vacaciones' ? { end_date: '' } : {}),
               ...( value !== 'incapacidad' ? { payer_type: undefined, diagnosis: undefined, medical_certificate_url: undefined } : {})
             });
+            // Reset business days when switching type
+            if (value === 'vacaciones' && setDiasHabiles) {
+              setDiasHabiles(0);
+            }
           }}
           disabled={isSubmitting}
         >
@@ -230,38 +265,140 @@ export const AbsenceFormFields = ({
         </div>
       )}
 
-      {/* Date Range */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="start_date">Fecha Inicio *</Label>
-          <Input
-            id="start_date"
-            type="date"
-            value={formData.start_date}
-            onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
-            disabled={isSubmitting}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="end_date">Fecha Fin *</Label>
-          <Input
-            id="end_date"
-            type="date"
-            value={formData.end_date}
-            onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
-            disabled={isSubmitting}
-          />
-        </div>
-      </div>
+      {/* ====== VACACIONES: Fecha Inicio + Dias Habiles ====== */}
+      {isVacaciones ? (
+        <>
+          {/* Dias de descanso del empleado (info) */}
+          {formData.employee_id && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Info className="h-3.5 w-3.5" />
+              <span>
+                Dias de descanso:{' '}
+                {isLoadingRestDays ? (
+                  'Cargando...'
+                ) : (
+                  employeeRestDays.map(d => DAY_LABELS[d] || d).join(', ')
+                )}
+              </span>
+            </div>
+          )}
 
-      {/* Days Calculation */}
-      {calculatedDays > 0 && (
-        <div className="flex items-center space-x-2">
-          <CalendarDays className="h-4 w-4 text-blue-500" />
-          <span className="text-sm font-medium">
-            Total dias: <Badge variant="outline">{calculatedDays}</Badge>
-          </span>
-        </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Fecha Inicio */}
+            <div className="space-y-2">
+              <Label htmlFor="start_date">Fecha Inicio *</Label>
+              <Input
+                id="start_date"
+                type="date"
+                value={formData.start_date}
+                onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                disabled={isSubmitting}
+              />
+            </div>
+
+            {/* Dias Habiles */}
+            <div className="space-y-2">
+              <Label htmlFor="dias_habiles">Dias habiles de vacaciones *</Label>
+              <Input
+                id="dias_habiles"
+                type="number"
+                min={1}
+                max={30}
+                placeholder="Ej: 15"
+                value={diasHabiles > 0 ? diasHabiles : ''}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value, 10);
+                  if (setDiasHabiles) {
+                    setDiasHabiles(isNaN(val) ? 0 : Math.max(0, Math.min(30, val)));
+                  }
+                }}
+                disabled={isSubmitting || isLoadingRestDays}
+              />
+            </div>
+          </div>
+
+          {/* Fecha Fin calculada + Desglose */}
+          {vacationBreakdown && diasHabiles > 0 && formData.start_date && (
+            <Card className="border-emerald-200 bg-emerald-50">
+              <CardContent className="pt-5 pb-4 px-5">
+                <div className="space-y-3">
+                  {/* Fecha fin calculada */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-emerald-800">
+                      Fecha de regreso
+                    </span>
+                    <Badge variant="outline" className="bg-white text-emerald-700 border-emerald-300 text-sm px-3 py-1">
+                      {formatDate(vacationBreakdown.endDate)}
+                    </Badge>
+                  </div>
+
+                  {/* Desglose */}
+                  <div className="grid grid-cols-2 gap-2 text-xs text-emerald-700">
+                    <div className="flex items-center gap-1.5">
+                      <CalendarDays className="h-3.5 w-3.5" />
+                      <span>{vacationBreakdown.calendarDays} dias calendario</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <CheckCircle className="h-3.5 w-3.5" />
+                      <span>{vacationBreakdown.businessDays} dias habiles</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Sun className="h-3.5 w-3.5" />
+                      <span>{vacationBreakdown.restDaysCount} dias descanso</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <PartyPopper className="h-3.5 w-3.5" />
+                      <span>{vacationBreakdown.holidaysCount} festivo(s)</span>
+                    </div>
+                  </div>
+
+                  {/* Nombres de festivos */}
+                  {vacationBreakdown.holidayNames.length > 0 && (
+                    <div className="text-xs text-emerald-600 bg-emerald-100/50 rounded px-3 py-2">
+                      Festivos: {vacationBreakdown.holidayNames.join(', ')}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </>
+      ) : (
+        /* ====== OTROS TIPOS: Fecha Inicio + Fecha Fin (manual) ====== */
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="start_date">Fecha Inicio *</Label>
+              <Input
+                id="start_date"
+                type="date"
+                value={formData.start_date}
+                onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                disabled={isSubmitting}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="end_date">Fecha Fin *</Label>
+              <Input
+                id="end_date"
+                type="date"
+                value={formData.end_date}
+                onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                disabled={isSubmitting}
+              />
+            </div>
+          </div>
+
+          {/* Days Calculation (only for non-vacation types) */}
+          {calculatedDays > 0 && (
+            <div className="flex items-center space-x-2">
+              <CalendarDays className="h-4 w-4 text-blue-500" />
+              <span className="text-sm font-medium">
+                Total dias: <Badge variant="outline">{calculatedDays}</Badge>
+              </span>
+            </div>
+          )}
+        </>
       )}
 
       {/* Informacion de periodo(s) detectado(s) */}

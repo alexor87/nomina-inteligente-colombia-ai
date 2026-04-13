@@ -34,7 +34,12 @@ export const AbsenceForm = ({
     setFormData,
     calculatedDays,
     periodInfo,
-    isDetectingPeriod
+    isDetectingPeriod,
+    diasHabiles,
+    setDiasHabiles,
+    employeeRestDays,
+    vacationBreakdown,
+    isLoadingRestDays,
   } = useVacationAbsenceForm(editingVacation, isOpen, preselectedEmployeeId);
 
   const { data: employees = [] } = useVacationEmployees(isOpen);
@@ -92,6 +97,11 @@ export const AbsenceForm = ({
           periodInfo={periodInfo}
           isDetectingPeriod={isDetectingPeriod}
           hideEmployeeSelection={hideEmployeeSelection}
+          diasHabiles={diasHabiles}
+          setDiasHabiles={setDiasHabiles}
+          employeeRestDays={employeeRestDays}
+          vacationBreakdown={vacationBreakdown}
+          isLoadingRestDays={isLoadingRestDays}
         />
 
         <AbsenceFormActions
@@ -129,6 +139,11 @@ export const AbsenceForm = ({
           periodInfo={periodInfo}
           isDetectingPeriod={isDetectingPeriod}
           hideEmployeeSelection={hideEmployeeSelection}
+          diasHabiles={diasHabiles}
+          setDiasHabiles={setDiasHabiles}
+          employeeRestDays={employeeRestDays}
+          vacationBreakdown={vacationBreakdown}
+          isLoadingRestDays={isLoadingRestDays}
         />
 
         <AbsenceFormActions
