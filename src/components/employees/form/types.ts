@@ -144,6 +144,7 @@ export const employeeFormSchema = z.object({
   tipoJornada: z.enum(['completa', 'parcial', 'horas']).optional(),
   diasTrabajo: z.number().optional(),
   horasTrabajo: z.number().optional(),
+  diasDescanso: z.array(z.string()).optional(),
   beneficiosExtralegales: z.boolean().optional(),
   clausulasEspeciales: z.string().optional(),
   
