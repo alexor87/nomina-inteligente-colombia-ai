@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { NovedadIncapacidadForm } from './forms/NovedadIncapacidadForm';
 import { NovedadLicenciasForm } from './forms/NovedadLicenciasForm';
@@ -12,6 +14,7 @@ import { NovedadDeduccionesConsolidatedForm } from './forms/NovedadDeduccionesCo
 import { NovedadRetefuenteForm } from './forms/NovedadRetefuenteForm';
 import { NovedadTypeSelector, NovedadCategory } from './NovedadTypeSelector';
 import { NovedadType, CreateNovedadData } from '@/types/novedades-enhanced';
+import { DisplayNovedad } from '@/types/vacation-integration';
 import { useToast } from '@/hooks/use-toast';
 import { NovedadRecargoConsolidatedForm } from './forms/NovedadRecargoConsolidatedForm';
 import { NovedadVacacionesConsolidatedForm } from './forms/NovedadVacacionesConsolidatedForm';
@@ -51,6 +54,9 @@ interface NovedadUnifiedModalProps {
   companyId?: string | null;
   currentLiquidatedValues?: EmployeeLiquidatedValues;
   canEdit?: boolean;
+  editingNovedad?: DisplayNovedad | null;
+  onUpdate?: (id: string, data: Partial<CreateNovedadData>) => Promise<any>;
+  onClearEditing?: () => void;
 }
 
 const categoryToNovedadType: Record<NovedadCategory, NovedadType> = {
@@ -90,9 +96,12 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   mode = 'liquidacion',
   companyId,
   currentLiquidatedValues,
-  canEdit = true
+  canEdit = true,
+  editingNovedad,
+  onUpdate,
+  onClearEditing
 }) => {
-  const [currentStep, setCurrentStep] = useState<'list' | 'selector' | 'form' | 'absence'>('list');
+  const [currentStep, setCurrentStep] = useState<'list' | 'selector' | 'form' | 'absence' | 'edit'>('list');
   const [selectedType, setSelectedType] = useState<NovedadType | null>(selectedNovedadType);
   const [selectedAbsenceType, setSelectedAbsenceType] = useState<VacationAbsenceType | null>(null);
   const [employeeName, setEmployeeName] = useState<string>('');
@@ -102,7 +111,18 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   const [periodStartDate, setPeriodStartDate] = useState<string>('');
   const [periodEndDate, setPeriodEndDate] = useState<string>('');
   const [employeeRestDays, setEmployeeRestDays] = useState<string[]>(['sabado', 'domingo']);
+  const [internalEditingNovedad, setInternalEditingNovedad] = useState<DisplayNovedad | null>(null);
+  const [editFormData, setEditFormData] = useState<{
+    valor: number;
+    dias: number;
+    fecha_inicio: string;
+    fecha_fin: string;
+    observacion: string;
+  }>({ valor: 0, dias: 0, fecha_inicio: '', fecha_fin: '', observacion: '' });
   const { toast } = useToast();
+
+  // The active editing novedad (from prop or internal state)
+  const activeEditingNovedad = editingNovedad || internalEditingNovedad;
   
   const { calculateNovedad } = useNovedadBackendCalculation();
 
@@ -158,11 +178,26 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     fetchRestDays();
   }, [employeeId]);
 
+  // Enter edit mode when editingNovedad prop is set from parent
+  useEffect(() => {
+    if (editingNovedad) {
+      setInternalEditingNovedad(editingNovedad);
+      setEditFormData({
+        valor: editingNovedad.valor || 0,
+        dias: editingNovedad.dias || 0,
+        fecha_inicio: editingNovedad.fecha_inicio || '',
+        fecha_fin: editingNovedad.fecha_fin || '',
+        observacion: editingNovedad.observacion || ''
+      });
+      setCurrentStep('edit');
+    }
+  }, [editingNovedad]);
+
   useEffect(() => {
     if (selectedNovedadType) {
       setSelectedType(selectedNovedadType);
       setCurrentStep('form');
-    } else {
+    } else if (!editingNovedad) {
       // Always start in 'list' step to show existing novedades first
       setCurrentStep('list');
       setSelectedType(null);
@@ -205,7 +240,9 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     setCurrentStep('list');
     setSelectedType(null);
     setSelectedAbsenceType(null);
+    setInternalEditingNovedad(null);
     setRefreshTrigger(0);
+    onClearEditing?.();
     setOpen(false);
     onClose?.();
   };
@@ -234,6 +271,8 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     setCurrentStep('list');
     setSelectedType(null);
     setSelectedAbsenceType(null);
+    setInternalEditingNovedad(null);
+    onClearEditing?.();
     setRefreshTrigger(Date.now());
   };
 
@@ -517,6 +556,183 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     }
   };
 
+  const handleEditSubmit = async () => {
+    if (!internalEditingNovedad || !onUpdate) return;
+
+    setIsSubmitting(true);
+    try {
+      // Recalculate value if days changed and it's a type that needs recalculation
+      let finalValue = editFormData.valor;
+      const RECALCULABLE_TYPES = ['vacaciones', 'incapacidad', 'licencia_remunerada', 'ausencia', 'licencia_no_remunerada'];
+
+      if (RECALCULABLE_TYPES.includes(internalEditingNovedad.tipo_novedad) &&
+          editFormData.dias !== internalEditingNovedad.dias &&
+          editFormData.fecha_inicio && editFormData.fecha_fin && employeeSalary) {
+        try {
+          const result = await calculateNovedad({
+            tipoNovedad: internalEditingNovedad.tipo_novedad as NovedadType,
+            subtipo: internalEditingNovedad.subtipo,
+            salarioBase: employeeSalary,
+            dias: editFormData.dias,
+            fechaPeriodo: startDate,
+            companyId: companyId || undefined
+          });
+          if (result) {
+            finalValue = result.valor;
+          }
+        } catch {
+          console.warn('Could not recalculate, using manual value');
+        }
+      }
+
+      await onUpdate(internalEditingNovedad.id, {
+        valor: finalValue,
+        dias: editFormData.dias || undefined,
+        fecha_inicio: editFormData.fecha_inicio || undefined,
+        fecha_fin: editFormData.fecha_fin || undefined,
+        observacion: editFormData.observacion || undefined
+      });
+
+      if (employeeId) {
+        NovedadesCalculationService.invalidateCache(employeeId, periodId);
+      }
+
+      toast({
+        title: "Novedad actualizada",
+        description: `Novedad actualizada correctamente`,
+        className: "border-green-200 bg-green-50"
+      });
+
+      setInternalEditingNovedad(null);
+      onClearEditing?.();
+      setCurrentStep('list');
+      setRefreshTrigger(Date.now());
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "No se pudo actualizar la novedad",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setInternalEditingNovedad(null);
+    onClearEditing?.();
+    setCurrentStep('list');
+    setRefreshTrigger(Date.now());
+  };
+
+  const renderEditForm = () => {
+    if (!internalEditingNovedad) return null;
+
+    const tipoLabel = internalEditingNovedad.tipo_novedad.replace(/_/g, ' ');
+    const hasDateFields = !!internalEditingNovedad.fecha_inicio;
+
+    // Recalculate days when dates change for vacation types
+    const handleDateChange = (field: 'fecha_inicio' | 'fecha_fin', value: string) => {
+      const newData = { ...editFormData, [field]: value };
+      setEditFormData(newData);
+
+      if (newData.fecha_inicio && newData.fecha_fin) {
+        if (internalEditingNovedad.tipo_novedad === 'vacaciones') {
+          const days = calculateBusinessDays(newData.fecha_inicio, newData.fecha_fin, employeeRestDays);
+          setEditFormData(prev => ({ ...prev, [field]: value, dias: days }));
+        } else if (['incapacidad', 'licencia_remunerada', 'ausencia', 'licencia_no_remunerada'].includes(internalEditingNovedad.tipo_novedad)) {
+          const diffTime = new Date(newData.fecha_fin).getTime() - new Date(newData.fecha_inicio).getTime();
+          const days = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+          setEditFormData(prev => ({ ...prev, [field]: value, dias: Math.max(0, days) }));
+        }
+      }
+    };
+
+    return (
+      <div className="p-4 space-y-4">
+        <div className="bg-muted/50 rounded-lg p-3 mb-4">
+          <p className="text-sm font-medium capitalize">{tipoLabel}</p>
+          {internalEditingNovedad.subtipo && (
+            <p className="text-xs text-muted-foreground capitalize">{internalEditingNovedad.subtipo.replace(/_/g, ' ')}</p>
+          )}
+        </div>
+
+        {hasDateFields && (
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-fecha-inicio">Fecha Inicio</Label>
+              <Input
+                id="edit-fecha-inicio"
+                type="date"
+                value={editFormData.fecha_inicio}
+                onChange={(e) => handleDateChange('fecha_inicio', e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-fecha-fin">Fecha Fin</Label>
+              <Input
+                id="edit-fecha-fin"
+                type="date"
+                value={editFormData.fecha_fin}
+                onChange={(e) => handleDateChange('fecha_fin', e.target.value)}
+              />
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="edit-dias">Días</Label>
+            <Input
+              id="edit-dias"
+              type="number"
+              min="0"
+              value={editFormData.dias}
+              onChange={(e) => setEditFormData(prev => ({ ...prev, dias: Number(e.target.value) }))}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="edit-valor">Valor ($)</Label>
+            <Input
+              id="edit-valor"
+              type="number"
+              min="0"
+              value={editFormData.valor}
+              onChange={(e) => setEditFormData(prev => ({ ...prev, valor: Number(e.target.value) }))}
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="edit-observacion">Observación</Label>
+          <Input
+            id="edit-observacion"
+            type="text"
+            value={editFormData.observacion}
+            onChange={(e) => setEditFormData(prev => ({ ...prev, observacion: e.target.value }))}
+            placeholder="Observaciones..."
+          />
+        </div>
+
+        <div className="flex justify-end gap-2 pt-4 border-t">
+          <Button
+            variant="secondary"
+            onClick={handleCancelEdit}
+            disabled={isSubmitting}
+          >
+            Cancelar
+          </Button>
+          <Button
+            onClick={handleEditSubmit}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? 'Guardando...' : 'Guardar Cambios'}
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
   const renderNovedadForm = () => {
     if (!selectedType || !employeeId) return null;
 
@@ -644,6 +860,17 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
             mode={mode}
             companyId={companyId}
             canEdit={canEdit}
+            onEdit={onUpdate ? (novedad) => {
+              setInternalEditingNovedad(novedad);
+              setEditFormData({
+                valor: novedad.valor || 0,
+                dias: novedad.dias || 0,
+                fecha_inicio: novedad.fecha_inicio || '',
+                fecha_fin: novedad.fecha_fin || '',
+                observacion: novedad.observacion || ''
+              });
+              setCurrentStep('edit');
+            } : undefined}
           />
         </div>
       );
@@ -668,6 +895,15 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
         <div>
           {renderCurrentValues()}
           {renderNovedadForm()}
+        </div>
+      );
+    }
+
+    if (currentStep === 'edit') {
+      return (
+        <div>
+          {renderCurrentValues()}
+          {renderEditForm()}
         </div>
       );
     }
@@ -707,7 +943,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       >
         <DialogHeader>
           <DialogTitle>
-            {mode === 'ajustes' ? '📝 Agregar Ajuste' : '📋 Gestionar Novedades'}
+            {currentStep === 'edit' ? '✏️ Editar Novedad' : mode === 'ajustes' ? '📝 Agregar Ajuste' : '📋 Gestionar Novedades'}
           </DialogTitle>
           <DialogDescription>
             {mode === 'ajustes' 
