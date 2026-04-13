@@ -33,6 +33,7 @@ export interface EmployeeUnified {
   tipoJornada: 'completa' | 'parcial' | 'horas';
   diasTrabajo?: number;
   horasTrabajo?: number;
+  diasDescanso?: string[];
   beneficiosExtralegales?: boolean;
   clausulasEspeciales?: string;
   
@@ -93,6 +94,7 @@ export const mapDatabaseToUnified = (dbData: any): EmployeeUnified => {
     tipoJornada: dbData.tipo_jornada || 'completa',
     diasTrabajo: Number(dbData.dias_trabajo) || 30,
     horasTrabajo: Number(dbData.horas_trabajo) || 8,
+    diasDescanso: dbData.dias_descanso || ['sabado', 'domingo'],
     beneficiosExtralegales: Boolean(dbData.beneficios_extralegales),
     clausulasEspeciales: dbData.clausulas_especiales || undefined,
     banco: dbData.banco || undefined,
@@ -143,6 +145,7 @@ export const mapUnifiedToDatabase = (unified: EmployeeUnified) => {
     tipo_jornada: unified.tipoJornada,
     dias_trabajo: unified.diasTrabajo || 30,
     horas_trabajo: unified.horasTrabajo || 8,
+    dias_descanso: unified.diasDescanso || ['sabado', 'domingo'],
     beneficios_extralegales: unified.beneficiosExtralegales || false,
     clausulas_especiales: unified.clausulasEspeciales || null,
     banco: unified.banco || null,

@@ -211,6 +211,46 @@ export const LaborInfoSection: React.FC<LaborInfoSectionProps> = ({
             errors={errors}
           />
         </div>
+
+        {/* Días de descanso */}
+        <div className="space-y-2 col-span-full">
+          <label className="text-sm font-medium text-gray-700">Días de descanso</label>
+          <div className="flex flex-wrap gap-x-4 gap-y-2">
+            {[
+              { value: 'lunes', label: 'Lunes' },
+              { value: 'martes', label: 'Martes' },
+              { value: 'miercoles', label: 'Miércoles' },
+              { value: 'jueves', label: 'Jueves' },
+              { value: 'viernes', label: 'Viernes' },
+              { value: 'sabado', label: 'Sábado' },
+              { value: 'domingo', label: 'Domingo' },
+            ].map((day) => {
+              const currentDays = watch ? watch('diasDescanso') || ['sabado', 'domingo'] : ['sabado', 'domingo'];
+              const isChecked = currentDays.includes(day.value);
+
+              return (
+                <label key={day.value} className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={(e) => {
+                      if (!setValue) return;
+                      const updated = e.target.checked
+                        ? [...currentDays, day.value]
+                        : currentDays.filter((d: string) => d !== day.value);
+                      setValue('diasDescanso', updated);
+                    }}
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-600">{day.label}</span>
+                </label>
+              );
+            })}
+          </div>
+          <p className="text-xs text-gray-400">
+            Estos días se excluyen del conteo de días hábiles en vacaciones y licencias
+          </p>
+        </div>
       </div>
     </div>
   );
