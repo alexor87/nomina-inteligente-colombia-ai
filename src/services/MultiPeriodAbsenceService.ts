@@ -58,8 +58,6 @@ export class MultiPeriodAbsenceService {
         logicallyCrossesMultiple = true; // Cruza meses = múltiples quincenas
       } else if (startDay <= 15 && endDay >= 16) {
         logicallyCrossesMultiple = true; // Cruza ambas quincenas del mismo mes
-      } else if (totalDaysSpan > 15) {
-        logicallyCrossesMultiple = true; // Más de 15 días = múltiples períodos
       }
     } else if (configuredPeriodicity === 'semanal') {
       logicallyCrossesMultiple = totalDaysSpan > 7;
