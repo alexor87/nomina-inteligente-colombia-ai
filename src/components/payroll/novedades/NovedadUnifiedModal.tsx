@@ -24,6 +24,7 @@ import { useVacationEmployees } from '@/hooks/useVacationEmployees';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { NovedadExistingList } from './NovedadExistingList';
 import { formatCurrency } from '@/lib/utils';
+import { calculateBusinessDays } from '@/utils/businessDayCalculator';
 
 interface EmployeeLiquidatedValues {
   salario_base: number;
@@ -100,6 +101,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [periodStartDate, setPeriodStartDate] = useState<string>('');
   const [periodEndDate, setPeriodEndDate] = useState<string>('');
+  const [employeeRestDays, setEmployeeRestDays] = useState<string[]>(['sabado', 'domingo']);
   const { toast } = useToast();
   
   const { calculateNovedad } = useNovedadBackendCalculation();
@@ -134,6 +136,27 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
 
     loadPeriodDates();
   }, [periodId]);
+
+  // Fetch días de descanso del empleado para cálculo correcto de vacaciones
+  useEffect(() => {
+    const fetchRestDays = async () => {
+      if (!employeeId) {
+        setEmployeeRestDays(['sabado', 'domingo']);
+        return;
+      }
+      try {
+        const { data } = await supabase
+          .from('employees')
+          .select('dias_descanso')
+          .eq('id', employeeId)
+          .single();
+        setEmployeeRestDays(data?.dias_descanso || ['sabado', 'domingo']);
+      } catch {
+        setEmployeeRestDays(['sabado', 'domingo']);
+      }
+    };
+    fetchRestDays();
+  }, [employeeId]);
 
   useEffect(() => {
     if (selectedNovedadType) {
@@ -262,8 +285,12 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
 
     setIsSubmitting(true);
     try {
-      const dias = formData.start_date && formData.end_date 
-        ? Math.ceil((new Date(formData.end_date).getTime() - new Date(formData.start_date).getTime()) / (1000 * 60 * 60 * 24)) + 1
+      // Vacaciones: contar días HÁBILES (excluye días de descanso del empleado y festivos colombianos)
+      // Otros tipos (incapacidad, etc.): contar días calendario
+      const dias = formData.start_date && formData.end_date
+        ? formData.type === 'vacaciones'
+          ? calculateBusinessDays(formData.start_date, formData.end_date, employeeRestDays)
+          : Math.ceil((new Date(formData.end_date).getTime() - new Date(formData.start_date).getTime()) / (1000 * 60 * 60 * 24)) + 1
         : 0;
 
       let valorCalculado = 0;

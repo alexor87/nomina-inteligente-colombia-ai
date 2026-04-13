@@ -1,5 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
+import { calculateBusinessDays } from '@/utils/businessDayCalculator';
 
 export interface PeriodSegment {
   periodId: string;
@@ -294,7 +295,7 @@ export class MultiPeriodAbsenceService {
       .from('employee_absences')
       .select(`
         *,
-        employees!inner(id, nombre, apellido, salario_base)
+        employees!inner(id, nombre, apellido, salario_base, dias_descanso)
       `)
       .eq('company_id', companyId)
       .eq('status', 'pendiente')
@@ -322,7 +323,12 @@ export class MultiPeriodAbsenceService {
       // Calcular intersección
       const segmentStart = absence.start_date > period.fecha_inicio ? absence.start_date : period.fecha_inicio;
       const segmentEnd = absence.end_date < period.fecha_fin ? absence.end_date : period.fecha_fin;
-      const segmentDays = this.calculateDaysBetween(segmentStart, segmentEnd);
+      // Vacaciones: contar días HÁBILES (excluye días de descanso del empleado y festivos colombianos)
+      // Otros tipos (incapacidad, etc.): contar días calendario
+      const employeeRestDays = absence.employees?.dias_descanso || ['sabado', 'domingo'];
+      const segmentDays = absence.type === 'vacaciones'
+        ? calculateBusinessDays(segmentStart, segmentEnd, employeeRestDays)
+        : this.calculateDaysBetween(segmentStart, segmentEnd);
 
       if (segmentDays > 0) {
         // Calcular valor proporcional
