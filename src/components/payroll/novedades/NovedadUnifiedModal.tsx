@@ -268,7 +268,9 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
 
       let valorCalculado = 0;
 
-      if (formData.type === 'incapacidad' && dias > 0) {
+      // Calcular valor para TODOS los tipos de ausencia que requieren cálculo
+      const ABSENCE_TYPES_WITH_CALC = ['incapacidad', 'licencia_remunerada', 'vacaciones', 'ausencia', 'licencia_no_remunerada'];
+      if (ABSENCE_TYPES_WITH_CALC.includes(formData.type) && dias > 0) {
         try {
           const calculationResult = await calculateNovedad({
             tipoNovedad: formData.type as NovedadType,
@@ -281,9 +283,15 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
 
           if (calculationResult) {
             valorCalculado = calculationResult.valor;
+            console.log(`✅ Valor calculado para ${formData.type}: $${valorCalculado}`);
           }
         } catch (error) {
-          console.error('❌ Error calculando incapacidad en backend:', error);
+          console.error(`❌ Error calculando ${formData.type} en backend:`, error);
+          // Fallback: calcular valor básico para licencia_remunerada y vacaciones (100% salario diario)
+          if (['licencia_remunerada', 'vacaciones'].includes(formData.type)) {
+            valorCalculado = Math.round((employeeSalary / 30) * dias);
+            console.log(`⚠️ Fallback: valor calculado localmente para ${formData.type}: $${valorCalculado}`);
+          }
         }
       }
 
@@ -318,20 +326,19 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       }
 
       // Show different messages based on submission result
+      const valorMsg = valorCalculado > 0 ? ` por $${valorCalculado.toLocaleString()}` : '';
+      const tipoMsg = formData.type.replace(/_/g, ' ');
+
       if (result && 'isPending' in result && result.isPending) {
         toast({
           title: "Novedad guardada como ajuste pendiente",
-          description: `${formData.type === 'incapacidad' && valorCalculado > 0 
-            ? `Incapacidad por $${valorCalculado.toLocaleString()} agregada` 
-            : 'Ausencia agregada'}. Usa "Aplicar Ajustes" para confirmar y reliquidar el período.`,
+          description: `${tipoMsg}${valorMsg} agregada (${dias} días). Usa "Aplicar Ajustes" para confirmar y reliquidar el período.`,
           variant: "warning"
         });
       } else {
         toast({
           title: "Novedad aplicada inmediatamente",
-          description: `${formData.type === 'incapacidad' && valorCalculado > 0 
-            ? `Incapacidad calculada correctamente ($${valorCalculado.toLocaleString()})` 
-            : 'Ausencia registrada correctamente'} y aplicada al período`,
+          description: `${tipoMsg}${valorMsg} registrada correctamente (${dias} días) y aplicada al período`,
           className: "border-green-200 bg-green-50"
         });
       }
