@@ -23,9 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 .env
-.env.local
-.env.staging
-.env.production
-.env.e2e
+.env.*
+!.env.example
 playwright-report/
 test-results/
