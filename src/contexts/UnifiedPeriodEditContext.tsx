@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { PayrollCalculationBackendService } from '@/services/PayrollCalculationBackendService';
 import { useToast } from '@/hooks/use-toast';
 import { useDebounce } from '@/hooks/useDebounce';
+import { getUserFriendlyError } from '@/utils/errorMessages';
 
 // Types for unified editing
 export interface PeriodEmployee {
@@ -194,9 +195,10 @@ export const UnifiedPeriodEditProvider: React.FC<UnifiedPeriodEditProviderProps>
         sessionId: session.id
       });
 
-      // Save session state to sessionStorage for recovery
+      // Save session state to sessionStorage for recovery (strip PII — SEC-6)
+      const safeEmployees = employees.map(({ nombre, apellido, cedula, salario_base, ...rest }) => rest);
       sessionStorage.setItem(`unified-edit-${periodId}`, JSON.stringify({
-        employees,
+        employees: safeEmployees,
         novedades: periodNovedades,
         originalTotals
       }));
@@ -517,7 +519,7 @@ export const UnifiedPeriodEditProvider: React.FC<UnifiedPeriodEditProviderProps>
       setEditState(prev => ({ ...prev, isRecalculating: false }));
       toast({
         title: "Error al guardar cambios",
-        description: error instanceof Error ? error.message : 'Error desconocido',
+        description: getUserFriendlyError(error),
         variant: "destructive"
       });
       throw error;
@@ -566,8 +568,10 @@ export const UnifiedPeriodEditProvider: React.FC<UnifiedPeriodEditProviderProps>
 
   const saveToSessionStorage = () => {
     if (editState.periodId) {
+      // Strip PII from employees before saving to sessionStorage (SEC-6)
+      const safeEmployees = editState.employees.map(({ nombre, apellido, cedula, salario_base, ...rest }) => rest);
       sessionStorage.setItem(`unified-edit-${editState.periodId}`, JSON.stringify({
-        employees: editState.employees,
+        employees: safeEmployees,
         novedades: editState.novedades,
         originalTotals: editState.originalTotals
       }));

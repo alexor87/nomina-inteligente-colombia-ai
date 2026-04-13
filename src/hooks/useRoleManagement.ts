@@ -14,6 +14,7 @@ export const useRoleManagement = (user: User | null, profile: any) => {
   const [roles, setRoles] = useState<UserRole[]>([]);
   const [isLoadingRoles, setIsLoadingRoles] = useState(true);
   const [hasOptimisticRole, setHasOptimisticRole] = useState(false);
+  const [roleLoadFailed, setRoleLoadFailed] = useState(false);
   const fetchAttempts = useRef(0);
   const maxAttempts = 3;
   const fetchTimeout = useRef<NodeJS.Timeout | null>(null);
@@ -42,7 +43,7 @@ export const useRoleManagement = (user: User | null, profile: any) => {
       return;
     }
 
-    console.log(`🔍 [ROLES] Fetching roles for user (attempt ${fetchAttempts.current + 1}):`, user.email);
+    console.log(`🔍 [ROLES] Fetching roles for user (attempt ${fetchAttempts.current + 1}):`, user.id?.slice(0, 8));
     
     try {
       // Intentar RPC primero
@@ -59,6 +60,7 @@ export const useRoleManagement = (user: User | null, profile: any) => {
         setRoles(transformedRoles);
         setIsLoadingRoles(false);
         setHasOptimisticRole(false);
+        setRoleLoadFailed(false);
         fetchAttempts.current = 0;
         return;
       }
@@ -80,6 +82,7 @@ export const useRoleManagement = (user: User | null, profile: any) => {
         setRoles(fallbackRoles);
         setIsLoadingRoles(false);
         setHasOptimisticRole(false);
+        setRoleLoadFailed(false);
         fetchAttempts.current = 0;
         return;
       }
@@ -117,35 +120,33 @@ export const useRoleManagement = (user: User | null, profile: any) => {
 
     } catch (error) {
       console.error('❌ [ROLES] Error fetching roles:', error);
-      
-      // En caso de error, crear rol optimista si es posible
-      if (profile?.company_id) {
-        createOptimisticRole();
-      } else {
-        setRoles([]);
-        setIsLoadingRoles(false);
-        setHasOptimisticRole(false);
-      }
+
+      // En caso de error, NO otorgar acceso — marcar como fallo
+      setRoles([]);
+      setIsLoadingRoles(false);
+      setHasOptimisticRole(false);
+      setRoleLoadFailed(true);
     }
   }, [user, profile?.company_id, createOptimisticRole]);
 
   // Timeout de seguridad para evitar carga infinita
   useEffect(() => {
     const safetyTimeout = setTimeout(() => {
-      if (isLoadingRoles && user && profile?.company_id) {
-        console.log('⏰ [ROLES] Safety timeout reached, creating optimistic role');
-        createOptimisticRole();
+      if (isLoadingRoles && user) {
+        console.log('⏰ [ROLES] Safety timeout reached — denying access');
+        setIsLoadingRoles(false);
+        setRoleLoadFailed(true);
       }
     }, 10000); // 10 segundos máximo
 
     return () => clearTimeout(safetyTimeout);
-  }, [isLoadingRoles, user, profile?.company_id, createOptimisticRole]);
+  }, [isLoadingRoles, user]);
 
   // Configurar suscripción en tiempo real
   useEffect(() => {
     if (!user) return;
 
-    console.log('🔔 [ROLES] Setting up real-time subscription for user:', user.email);
+    console.log('🔔 [ROLES] Setting up real-time subscription for user:', user.id?.slice(0, 8));
 
     const channel = supabase
       .channel('user-roles-changes')
@@ -204,6 +205,7 @@ export const useRoleManagement = (user: User | null, profile: any) => {
     roles,
     isLoadingRoles,
     hasOptimisticRole,
+    roleLoadFailed,
     refetchRoles: fetchUserRoles
   };
 };
