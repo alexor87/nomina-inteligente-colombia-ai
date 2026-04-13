@@ -7,24 +7,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { CalendarDays, Clock, AlertTriangle, CheckCircle, Loader2, Zap, Sun, PartyPopper, Info } from 'lucide-react';
-import { useEffect } from 'react';
 import { VacationBreakdown } from '@/utils/businessDayCalculator';
+import { PeriodDetectionResult } from '@/hooks/usePeriodDetection';
 
 interface Employee {
   id: string;
   nombre: string;
   apellido: string;
   cedula: string;
-}
-
-interface PeriodInfo {
-  periodId: string | null;
-  periodName: string | null;
-  isExact: boolean;
-  isAutoCreated: boolean;
-  message: string;
-  crossesMultiplePeriods?: boolean;
-  periodSegments?: any[];
 }
 
 const DAY_LABELS: Record<string, string> = {
@@ -43,7 +33,7 @@ interface AbsenceFormFieldsProps {
   employees: Employee[];
   calculatedDays: number;
   isSubmitting: boolean;
-  periodInfo: PeriodInfo | null;
+  periodInfo: PeriodDetectionResult | null;
   isDetectingPeriod: boolean;
   hideEmployeeSelection?: boolean;
   // Vacation business days props
@@ -73,18 +63,6 @@ export const AbsenceFormFields = ({
   const showSubtypeField = requiresSubtype(formData.type);
   const availableSubtypes = getSubtypesForType(formData.type);
   const isVacaciones = formData.type === 'vacaciones';
-
-  // DEBUG: Verificar estado del dropdown
-  useEffect(() => {
-    console.log('AbsenceFormFields - Estado del dropdown:', {
-      employeesCount: employees.length,
-      selectedEmployeeId: formData.employee_id,
-      selectedEmployeeFound: !!selectedEmployee,
-      selectedEmployeeName: selectedEmployee ? `${selectedEmployee.nombre} ${selectedEmployee.apellido}` : 'N/A',
-      allEmployeeIds: employees.map(emp => emp.id),
-      hideEmployeeSelection
-    });
-  }, [employees, formData.employee_id, selectedEmployee, hideEmployeeSelection]);
 
   const getPeriodStatusIcon = () => {
     if (isDetectingPeriod) return <Loader2 className="h-4 w-4 animate-spin" />;
@@ -118,7 +96,6 @@ export const AbsenceFormFields = ({
           <Select
             value={formData.employee_id}
             onValueChange={(value) => {
-              console.log('Empleado seleccionado:', value);
               setFormData({ ...formData, employee_id: value });
             }}
             disabled={isSubmitting}

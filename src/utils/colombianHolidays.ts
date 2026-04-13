@@ -50,11 +50,18 @@ function addDays(date: Date, days: number): Date {
   return result;
 }
 
+// Cache de festivos por año para evitar recalcular
+const holidayCache = new Map<number, Date[]>();
+const holidayWithNamesCache = new Map<number, { date: Date; name: string }[]>();
+
 /**
  * Retorna todos los festivos colombianos para un año dado.
  * Cada festivo es un Date a las 00:00 hora local.
+ * Usa cache interno para evitar recálculos.
  */
 export function getColombianHolidays(year: number): Date[] {
+  const cached = holidayCache.get(year);
+  if (cached) return cached;
   const easter = getEasterDate(year);
   const holidays: Date[] = [];
 
@@ -88,7 +95,9 @@ export function getColombianHolidays(year: number): Date[] {
   holidays.push(moveToNextMonday(new Date(year, 10, 1)));  // Todos los Santos
   holidays.push(moveToNextMonday(new Date(year, 10, 11))); // Independencia de Cartagena
 
-  return holidays.sort((a, b) => a.getTime() - b.getTime());
+  const sorted = holidays.sort((a, b) => a.getTime() - b.getTime());
+  holidayCache.set(year, sorted);
+  return sorted;
 }
 
 /**
@@ -108,9 +117,12 @@ export function isColombianHoliday(date: Date, year?: number): boolean {
  * Nombres de los festivos colombianos para un año dado.
  */
 export function getColombianHolidaysWithNames(year: number): { date: Date; name: string }[] {
+  const cached = holidayWithNamesCache.get(year);
+  if (cached) return cached;
+
   const easter = getEasterDate(year);
 
-  return [
+  const result = [
     { date: new Date(year, 0, 1), name: 'Año Nuevo' },
     { date: moveToNextMonday(new Date(year, 0, 6)), name: 'Reyes Magos' },
     { date: moveToNextMonday(new Date(year, 2, 19)), name: 'San José' },
@@ -130,4 +142,6 @@ export function getColombianHolidaysWithNames(year: number): { date: Date; name:
     { date: new Date(year, 11, 8), name: 'Inmaculada Concepción' },
     { date: new Date(year, 11, 25), name: 'Navidad' },
   ].sort((a, b) => a.date.getTime() - b.date.getTime());
+  holidayWithNamesCache.set(year, result);
+  return result;
 }
