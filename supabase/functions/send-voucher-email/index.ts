@@ -6,6 +6,17 @@ import { checkRateLimit, rateLimitResponse } from "../_shared/rate-limiter.ts";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
+// Escape HTML to prevent injection in email templates (ALTO-4)
+function escapeHtml(str: string | null | undefined): string {
+  if (!str) return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -130,8 +141,8 @@ const handler = async (req: Request): Promise<Response> => {
             <div class="message-section">
               <h2 style="color: #667eea; margin-bottom: 20px;">Estimado colaborador,</h2>
               <p style="font-size: 16px; margin-bottom: 15px;">
-                La empresa <strong>${companyInfo?.razon_social || 'Su empresa'}</strong> le ha enviado 
-                el comprobante de nómina correspondiente al período <strong>${periodText}</strong>.
+                La empresa <strong>${escapeHtml(companyInfo?.razon_social) || 'Su empresa'}</strong> le ha enviado
+                el comprobante de nómina correspondiente al período <strong>${escapeHtml(periodText)}</strong>.
               </p>
               <p style="font-size: 14px; color: #666;">
                 Encontrará todos los detalles de su pago en el archivo PDF adjunto a este correo.
@@ -146,10 +157,10 @@ const handler = async (req: Request): Promise<Response> => {
             </div>
 
             <div class="company-info">
-              <h3 style="color: #667eea; margin-bottom: 10px;">${companyInfo?.razon_social || 'Empresa'}</h3>
-              ${companyInfo?.nit ? `<p style="margin: 5px 0;"><strong>NIT:</strong> ${companyInfo.nit}</p>` : ''}
-              ${companyInfo?.email ? `<p style="margin: 5px 0;"><strong>Email:</strong> ${companyInfo.email}</p>` : ''}
-              ${companyInfo?.telefono ? `<p style="margin: 5px 0;"><strong>Teléfono:</strong> ${companyInfo.telefono}</p>` : ''}
+              <h3 style="color: #667eea; margin-bottom: 10px;">${escapeHtml(companyInfo?.razon_social) || 'Empresa'}</h3>
+              ${companyInfo?.nit ? `<p style="margin: 5px 0;"><strong>NIT:</strong> ${escapeHtml(companyInfo.nit)}</p>` : ''}
+              ${companyInfo?.email ? `<p style="margin: 5px 0;"><strong>Email:</strong> ${escapeHtml(companyInfo.email)}</p>` : ''}
+              ${companyInfo?.telefono ? `<p style="margin: 5px 0;"><strong>Teléfono:</strong> ${escapeHtml(companyInfo.telefono)}</p>` : ''}
             </div>
           </div>
 
