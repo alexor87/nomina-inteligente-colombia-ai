@@ -155,5 +155,44 @@ describe('businessDayCalculator', () => {
       // Y debería tener menos días de descanso
       expect(breakdownCustom.restDaysCount).toBeLessThan(breakdownStandard.restDaysCount);
     });
+
+    it('muestra nombre de festivo que cae en dia de descanso', () => {
+      // Navidad 2022 (25 dic) cae en domingo → es día de descanso Y festivo
+      // El nombre debe aparecer en holidayNames pero no incrementar holidaysCount
+      const breakdown = getVacationBreakdown('2022-12-19', 5, ['sabado', 'domingo']);
+      // 19(lun),20(mar),21(mie),22(jue),23(vie) = 5 días hábiles → endDate = 23 dic
+      expect(breakdown.endDate).toBe('2022-12-23');
+      // Sáb 24 y Dom 25 no están en el rango (endDate es 23)
+      // Probemos con un rango que incluya el 25
+      const breakdown2 = getVacationBreakdown('2022-12-19', 8, ['sabado', 'domingo']);
+      // 19-23 = 5 días, fds 24-25, 26(lun)=6, 27(mar)=7, 28(mie)=8 → endDate = 28
+      expect(breakdown2.endDate).toBe('2022-12-28');
+      // Navidad (25 dic, domingo) cae en descanso → nombre debe aparecer
+      expect(breakdown2.holidayNames).toContain('Navidad');
+      // Pero no debe contarse como festivo aparte (ya se cuenta como descanso)
+      // La invariante cambia: calendarDays = businessDays + restDaysCount + holidaysCount
+      // El festivo en descanso NO incrementa holidaysCount
+      expect(breakdown2.calendarDays).toBe(
+        breakdown2.businessDays + breakdown2.restDaysCount + breakdown2.holidaysCount
+      );
+    });
+  });
+
+  describe('roundtrip consistency', () => {
+    it('calculateBusinessDays(start, calculateEndDate(start, N)) === N', () => {
+      const testCases = [
+        { start: '2026-01-05', days: 1 },
+        { start: '2026-01-05', days: 5 },
+        { start: '2026-01-05', days: 15 },
+        { start: '2026-03-30', days: 10 },
+        { start: '2026-12-21', days: 15 },
+      ];
+
+      for (const { start, days } of testCases) {
+        const endDate = calculateEndDate(start, days, ['sabado', 'domingo']);
+        const counted = calculateBusinessDays(start, endDate, ['sabado', 'domingo']);
+        expect(counted, `roundtrip failed for start=${start}, days=${days}`).toBe(days);
+      }
+    });
   });
 });

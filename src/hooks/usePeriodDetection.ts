@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { MultiPeriodAbsenceService } from '@/services/MultiPeriodAbsenceService';
 
-interface PeriodDetectionResult {
+export interface PeriodDetectionResult {
   periodId: string | null;
   periodName: string | null;
   isExact: boolean;
