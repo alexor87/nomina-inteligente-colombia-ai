@@ -94,6 +94,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
   const {
     loadNovedadesTotals,
     createNovedad,
+    updateNovedad,
     getEmployeeNovedades,
     getEmployeeNovedadesSync,
     refreshEmployeeNovedades,
@@ -704,6 +705,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
           periodId={currentPeriodId}
           companyId={companyId || ''}
           onSubmit={handleNovedadSubmit}
+          onUpdate={updateNovedad}
           selectedNovedadType={null}
           onClose={handleCloseNovedadModal}
           onEmployeeNovedadesChange={handleNovedadChange}

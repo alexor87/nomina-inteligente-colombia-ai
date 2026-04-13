@@ -50,7 +50,7 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({
   const [showDebugMode, setShowDebugMode] = useState(false);
 
   const { createNovedad } = useNovedades(periodoId);
-  const { refreshEmployeeNovedades } = usePayrollNovedadesUnified(periodoId);
+  const { refreshEmployeeNovedades, updateNovedad } = usePayrollNovedadesUnified(periodoId);
 
   const handleCreateNovedad = async (data: CreateNovedadData) => {
     if (!selectedEmployee) return;
@@ -222,6 +222,7 @@ export const PayrollTable: React.FC<PayrollTableProps> = ({
           employeeSalary={selectedEmployee.baseSalary}
           periodId={periodoId}
           onSubmit={handleCreateNovedad}
+          onUpdate={updateNovedad}
           selectedNovedadType={null}
           onClose={() => {
             setIsNovedadModalOpen(false);
