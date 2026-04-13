@@ -25,6 +25,7 @@ interface NovedadExistingListProps {
   mode?: 'liquidacion' | 'ajustes';
   companyId?: string | null;
   canEdit?: boolean;
+  onEdit?: (novedad: DisplayNovedad) => void;
 }
 
 export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
@@ -37,7 +38,8 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
   onEmployeeNovedadesChange,
   mode = 'liquidacion',
   companyId,
-  canEdit = true
+  canEdit = true,
+  onEdit
 }) => {
   const [integratedData, setIntegratedData] = useState<DisplayNovedad[]>([]);
   const [pendingAdjustments, setPendingAdjustments] = useState<PendingAdjustmentRecord[]>([]);
@@ -176,10 +178,14 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
   }, [refreshTrigger]);
 
   const handleEditNovedad = (item: DisplayNovedad) => {
-    toast({
-      title: "Funcionalidad en desarrollo",
-      description: "La edición de novedades estará disponible próximamente",
-    });
+    if (onEdit) {
+      onEdit(item);
+    } else {
+      toast({
+        title: "Funcionalidad en desarrollo",
+        description: "La edición de novedades estará disponible próximamente",
+      });
+    }
   };
 
   const handleViewVacationDetail = async (item: DisplayNovedad) => {

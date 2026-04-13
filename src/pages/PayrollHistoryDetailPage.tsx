@@ -115,6 +115,7 @@ function PayrollHistoryDetailPageContent() {
     isLoading: isLoadingNovedades,
     refetch: refetchNovedades,
     createNovedad,
+    updateNovedad,
     getEmployeeNovedadesList
   } = usePayrollNovedadesUnified({ 
     companyId: periodData?.company_id, 
@@ -978,6 +979,7 @@ function PayrollHistoryDetailPageContent() {
         employeeSalary={employees.find(e => e.id === selectedEmployeeId)?.salario_base}
         periodId={periodId}
         onSubmit={handleNovedadSubmit}
+        onUpdate={updateNovedad}
         onClose={() => setShowAdjustmentModal(false)}
         onEmployeeNovedadesChange={handleEmployeeNovedadesChange}
         selectedNovedadType={null}
