@@ -120,7 +120,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     isRefreshingUserData.current = true;
-    console.log('🔄 [AUTH] Refreshing user data for:', currentUser.email);
+    console.log('🔄 [AUTH] Refreshing user data for:', currentUser.id?.slice(0, 8));
 
     try {
       // Fetch profile
@@ -184,7 +184,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('🔄 Auth state changed:', event, session?.user?.email);
+        console.log('🔄 Auth state changed:', event, session?.user?.id?.slice(0, 8));
         setSession(session);
         setUser(session?.user ?? null);
         
@@ -207,7 +207,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Check for existing session
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-      console.log('🔍 Initial session check:', session?.user?.email);
+      console.log('🔍 Initial session check:', session?.user?.id?.slice(0, 8));
       setSession(session);
       setUser(session?.user ?? null);
       

@@ -16,7 +16,7 @@ export const Layout = () => {
   const { user, loading } = useAuth();
   const { isTrialExpired } = useSubscription();
 
-  console.log('🏗️ Layout rendered with sidebar collapsed:', sidebarCollapsed, 'user:', user?.email);
+  console.log('🏗️ Layout rendered with sidebar collapsed:', sidebarCollapsed, 'user:', user?.id?.slice(0, 8));
 
   // Mostrar loading mientras se verifica la autenticación
   if (loading) {

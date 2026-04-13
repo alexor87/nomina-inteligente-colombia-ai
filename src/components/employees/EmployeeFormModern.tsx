@@ -11,6 +11,8 @@ import { EmployeeFormHeader } from './form/EmployeeFormHeader';
 import { EmployeeFormContent } from './form/EmployeeFormContent';
 import { EmployeeFormFooter } from './form/EmployeeFormFooter';
 import { useEmployeeForm } from './form/useEmployeeForm';
+import { getUserFriendlyError } from '@/utils/errorMessages';
+import { toast } from 'sonner';
 
 interface EmployeeFormModernProps {
   employee?: EmployeeUnified;
@@ -148,11 +150,7 @@ export const EmployeeFormModern = ({ employee, onSuccess, onCancel, onDataRefres
       console.error('❌ Error in form submission:', error);
       
       // Mostrar error al usuario si es posible
-      if (error instanceof Error) {
-        alert(`Error al guardar: ${error.message}`);
-      } else {
-        alert('Error desconocido al guardar el empleado');
-      }
+      toast.error(getUserFriendlyError(error));
     }
   };
 
