@@ -281,10 +281,24 @@ export class DatabaseQueryHandler extends BaseHandler {
     return this.generateBasicSQL(context);
   }
 
+  // Sanitize user input to mitigate prompt injection (CRÍTICO-3)
+  private sanitizeUserMessage(message: string): string {
+    return message
+      .replace(/"/g, '\\"')
+      .replace(/\n/g, ' ')
+      .replace(/\r/g, '')
+      .replace(/;/g, '')
+      .replace(/--/g, '')
+      .replace(/\/\*/g, '')
+      .replace(/\*\//g, '')
+      .substring(0, 500);
+  }
+
   private buildSQLGenerationPrompt(context: QueryContext): string {
+    const sanitizedMessage = this.sanitizeUserMessage(context.userMessage);
     return `Eres un experto en SQL y análisis de datos de nómina colombiana. Genera una consulta SQL SEGURA y OPTIMIZADA.
 
-PREGUNTA DEL USUARIO: "${context.userMessage}"
+PREGUNTA DEL USUARIO: "${sanitizedMessage}"
 
 ESQUEMA DE BASE DE DATOS DISPONIBLE:
 - employees (id, company_id, nombre, apellido, salario_base, cargo, estado, fecha_ingreso, custom_fields)

@@ -86,15 +86,27 @@ export class ReportsExportService {
     return newExport;
   }
 
+  // Sanitize cell value against CSV formula injection (ALTO-2)
+  private static sanitizeCSVCell(value: any): string {
+    if (value === null || value === undefined) return '';
+    const str = String(value);
+    // Prefix with single quote if cell starts with formula characters
+    if (/^[=+\-@|\\]/.test(str)) {
+      return `'${str}`;
+    }
+    return str;
+  }
+
   private static generateCSVFromArray(data: any[]): string {
     if (data.length === 0) return '';
-    
+
     const headers = Object.keys(data[0]);
     const csvContent = [
       headers.join(','),
-      ...data.map(row => 
+      ...data.map(row =>
         headers.map(header => {
-          const value = row[header];
+          const raw = row[header];
+          const value = this.sanitizeCSVCell(raw);
           if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
             return `"${value.replace(/"/g, '""')}"`;
           }
@@ -102,7 +114,7 @@ export class ReportsExportService {
         }).join(',')
       )
     ].join('\n');
-    
+
     return csvContent;
   }
 }

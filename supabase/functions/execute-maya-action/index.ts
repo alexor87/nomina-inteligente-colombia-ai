@@ -1,10 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { getCorsHeaders, corsHeaders } from '../_shared/cors.ts';
 
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
@@ -110,24 +107,73 @@ serve(async (req) => {
     const { action } = await req.json();
     console.log(`[execute-maya-action] Executing action:`, action);
 
-    // 🔒 SECURITY: Validate company access if companyId is present
-    if (action.parameters?.companyId) {
-      const authHeader = req.headers.get('authorization');
-      const validation = await validateCompanyAccess(action.parameters.companyId, authHeader);
-      
-      if (!validation.valid) {
-        console.error(`🚨 [SECURITY] Action blocked:`, validation.error);
+    // 🔒 SECURITY: companyId is MANDATORY for all actions (MEDIO-3)
+    if (!action.parameters?.companyId) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: 'Error: companyId es obligatorio para ejecutar acciones.',
+          securityError: true
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // 🔒 SECURITY: Validate company access
+    const authHeader = req.headers.get('authorization');
+    const validation = await validateCompanyAccess(action.parameters.companyId, authHeader);
+
+    if (!validation.valid) {
+      console.error(`🚨 [SECURITY] Action blocked:`, validation.error);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: '🔒 Acceso denegado: No tienes permiso para realizar acciones en esta empresa.',
+          securityError: true
+        }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(`✅ [SECURITY] Company access validated for user ${validation.userId?.slice(0, 8)}`);
+
+    // 🔒 SECURITY: Validate role-based access for write actions (CRÍTICO-4)
+    const WRITE_ACTIONS = [
+      'create_employee', 'update_employee', 'delete_employee',
+      'send_voucher', 'confirm_send_voucher', 'send_voucher_all',
+      'liquidate_complete', 'liquidate_payroll_complete',
+      'create_novedad', 'update_novedad', 'delete_novedad'
+    ];
+
+    if (WRITE_ACTIONS.includes(action.type)) {
+      const { data: userRoles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', validation.userId)
+        .eq('company_id', action.parameters.companyId);
+
+      const roles = (userRoles || []).map((r: any) => r.role);
+      const hasWriteAccess = roles.some((r: string) =>
+        ['administrador', 'rrhh', 'superadmin'].includes(r)
+      );
+
+      if (!hasWriteAccess) {
+        console.error(`🚨 [SECURITY] Role-based access denied: user ${validation.userId?.slice(0, 8)} with roles [${roles.join(',')}] tried action ${action.type}`);
+        await logSecurityViolation(
+          validation.userId || '',
+          validation.userCompanyId || '',
+          action.parameters.companyId,
+          'insufficient_role_for_action'
+        );
         return new Response(
-          JSON.stringify({ 
-            success: false, 
-            message: '🔒 Acceso denegado: No tienes permiso para realizar acciones en esta empresa.',
+          JSON.stringify({
+            success: false,
+            message: '🔒 No tienes el rol necesario para realizar esta acción. Se requiere rol de administrador o RRHH.',
             securityError: true
           }),
           { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
-      
-      console.log(`✅ [SECURITY] Company access validated for user ${validation.userId}`);
     }
 
     // Voucher actions
