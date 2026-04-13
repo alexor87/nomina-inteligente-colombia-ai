@@ -163,6 +163,7 @@ export function useUnifiedAbsences(filters: VacationAbsenceFilters) {
   return {
     // Unified data with helper functions
     absences: unifiedData,
+    vacationsAbsences: unifiedData,
     isLoading,
     error,
     refetch,
@@ -171,8 +172,11 @@ export function useUnifiedAbsences(filters: VacationAbsenceFilters) {
 
     // CRUD functions
     createAbsence: createMutation.mutateAsync,
+    createVacationAbsence: createMutation.mutateAsync,
     updateAbsence: updateMutation.mutateAsync,
+    updateVacationAbsence: updateMutation.mutateAsync,
     deleteAbsence: deleteMutation.mutateAsync,
+    deleteVacationAbsence: deleteMutation.mutateAsync,
 
     // Mutation states
     isCreating: createMutation.isPending,
