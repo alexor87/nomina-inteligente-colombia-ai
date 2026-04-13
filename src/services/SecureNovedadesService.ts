@@ -68,14 +68,17 @@ export class SecureNovedadesService extends SecureBaseService {
         updated_at: novedad.updated_at
       };
     } catch (error) {
-      logger.error('❌ Error creating novedad:', error, {
+      const errorMsg = (error as any)?.message || (error as any)?.details || String(error);
+      logger.error('❌ Error creating novedad:', errorMsg, {
         tipo_novedad: novedadData.tipo_novedad,
         subtipo: novedadData.subtipo,
         empleado_id: novedadData.empleado_id,
-        periodo_id: novedadData.periodo_id
+        periodo_id: novedadData.periodo_id,
+        valor: novedadData.valor
       });
-      await this.logSecurityViolation('payroll_novedades', 'create', 'create_attempt_failed', { error: (error as Error).message });
-      throw error;
+      await this.logSecurityViolation('payroll_novedades', 'create', 'create_attempt_failed', { error: errorMsg });
+      // Re-throw with descriptive message including the original error
+      throw new Error(`Error creando novedad (${novedadData.tipo_novedad}): ${errorMsg}`);
     }
   }
 

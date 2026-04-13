@@ -237,9 +237,9 @@ export const usePayrollNovedadesUnified = (
       logger.log('🔄 Creando novedad:', data);
       
       const result = await NovedadesEnhancedService.createNovedad(data);
-      
+
       if (!result) {
-        throw new Error('No se pudo crear la novedad');
+        throw new Error('No se pudo crear la novedad. Verifique que el período y empleado sean válidos.');
       }
       
       return result;
