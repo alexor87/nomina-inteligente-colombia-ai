@@ -510,6 +510,7 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
         description: error?.message || "No se pudo crear la novedad",
         variant: "destructive"
       });
+      throw error; // Re-lanzar para que el modal no muestre toast de éxito
     }
   };
 
