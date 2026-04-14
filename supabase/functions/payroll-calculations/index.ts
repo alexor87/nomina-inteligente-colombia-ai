@@ -534,8 +534,28 @@ async function calculatePayroll(supabase: any, data: any) {
       deduccionesDetectadas.push(`${novedad.tipo_novedad}: $${valorDeduccion.toLocaleString()}`);
       if (DEBUG) console.log(`💸 DEDUCCIÓN detectada: ${novedad.tipo_novedad} → $${valorDeduccion.toLocaleString()}`);
       // ✅ NO sumar a extraPay
+    } else if (novedad.tipo_novedad === 'recargo_nocturno' || novedad.tipo_novedad === 'recargo_dominical') {
+      // ✅ FIX: Recalcular recargos con calculatePureSurcharge (siempre constitutivos - Art. 127 CST)
+      const horasNum = Number(novedad.horas || 0);
+      const fechaRecargo = new Date(`${year}-01-15`);
+      if (horasNum > 0) {
+        const type = novedad.tipo_novedad === 'recargo_dominical'
+          ? 'dominical' as const
+          : (novedad.subtipo === 'dominical' || novedad.subtipo === 'nocturno_dominical')
+            ? 'nocturno_dominical' as const
+            : 'nocturno' as const;
+        const result = calculatePureSurcharge({ type, salarioBase: baseSalary, horas: horasNum, fecha: fechaRecargo });
+        totalConstitutiveNovedades += result.valor;
+        extraPay += result.valor;
+        if (DEBUG) console.log(`🌙 RECARGO (recalculado): ${novedad.tipo_novedad}/${novedad.subtipo} → type=${type}, ${horasNum}h, factor=${result.factor}, valor=$${result.valor}`);
+      } else {
+        // Sin horas, usar valor del DB
+        totalConstitutiveNovedades += novedad.valor || 0;
+        extraPay += novedad.valor || 0;
+        if (DEBUG) console.log(`🌙 RECARGO (sin horas, DB): ${novedad.tipo_novedad} → $${novedad.valor || 0}`);
+      }
     } else if (novedad.constitutivo_salario) {
-      // Other constitutive novedades (NO incluye licencia_remunerada que ya se procesó arriba)
+      // Other constitutive novedades (NO incluye licencia_remunerada ni recargos que ya se procesaron arriba)
       totalConstitutiveNovedades += novedad.valor || 0;
       extraPay += novedad.valor || 0;
     } else {
@@ -848,18 +868,26 @@ async function calculateNovedadesTotals(supabase: any, data: any) {
           valorCalculado
         });
       }
-    } else if (tipo_novedad === 'recargo_nocturno') {
-      // Solo recargo (35%) sobre base de recargos
+    } else if (tipo_novedad === 'recargo_nocturno' || tipo_novedad === 'recargo_dominical') {
+      // ✅ FIX: Usar calculatePureSurcharge para todos los recargos (nocturno, dominical, nocturno_dominical)
       const horasNum = Number(horas || 0);
       if (horasNum > 0) {
-        const recargo = 0.35;
-        valorCalculado = Math.round(valorHoraRecargoBase * horasNum * recargo);
-        detalleCalculo = `Recargo nocturno: ${horasNum} h × $${Math.round(valorHoraRecargoBase).toLocaleString()} × 0.35 = $${valorCalculado.toLocaleString()}`;
+        const type = tipo_novedad === 'recargo_dominical'
+          ? 'dominical'
+          : (subtipo === 'dominical' || subtipo === 'nocturno_dominical')
+            ? 'nocturno_dominical'
+            : 'nocturno';
 
-        console.log('🌙 Recargo nocturno:', {
+        const result = calculatePureSurcharge({ type, salarioBase: salarioBase, horas: horasNum, fecha });
+        valorCalculado = result.valor;
+        detalleCalculo = result.detalleCalculo;
+
+        console.log('🌙 Recargo (calculatePureSurcharge):', {
+          tipo_novedad,
+          subtipo,
+          type,
           horasNum,
-          base: Math.round(valorHoraRecargoBase),
-          recargo,
+          factor: result.factor,
           valorCalculado
         });
       }
