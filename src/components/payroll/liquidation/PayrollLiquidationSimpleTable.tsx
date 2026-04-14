@@ -503,11 +503,11 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
           className: "border-green-200 bg-green-50"
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Error en creación de novedad:', error);
       toast({
         title: "❌ Error",
-        description: "No se pudo crear la novedad",
+        description: error?.message || "No se pudo crear la novedad",
         variant: "destructive"
       });
     }

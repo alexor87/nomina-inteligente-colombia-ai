@@ -121,9 +121,6 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
   }>({ valor: 0, dias: 0, fecha_inicio: '', fecha_fin: '', observacion: '' });
   const { toast } = useToast();
 
-  // The active editing novedad (from prop or internal state)
-  const activeEditingNovedad = editingNovedad || internalEditingNovedad;
-  
   const { calculateNovedad } = useNovedadBackendCalculation();
 
   const getPeriodDate = useCallback(() => {
@@ -202,7 +199,7 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
       setCurrentStep('list');
       setSelectedType(null);
     }
-  }, [selectedNovedadType, open, mode]);
+  }, [selectedNovedadType, open, mode, editingNovedad]);
 
   useEffect(() => {
     if (open) {
