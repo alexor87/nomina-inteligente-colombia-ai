@@ -1,7 +1,9 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { DisplayNovedad, convertNovedadToDisplay } from '@/types/vacation-integration';
+import { DisplayNovedad, convertNovedadToDisplay, ABSENCE_VISUAL_CONFIG, UNIFIED_STATUS_MAPPING } from '@/types/vacation-integration';
 import { NovedadesEnhancedService } from './NovedadesEnhancedService';
+import { MultiPeriodAbsenceService } from './MultiPeriodAbsenceService';
+import { AbsenceType } from '@/types/absences';
 
 export class PayrollIntegratedDataService {
   static async getEmployeePeriodData(
@@ -31,7 +33,49 @@ export class PayrollIntegratedDataService {
         return convertNovedadToDisplay(novedad);
       });
 
-      const sortedData = displayData.sort((a, b) =>
+      // ✅ Buscar ausencias que se solapan con el periodo pero no tienen novedad persistida
+      const autoNovedades = await MultiPeriodAbsenceService.generatePartialNovedadesForPeriod(periodId, period.company_id);
+      const existingIds = new Set(novedadesData.map(n => n.id));
+      const employeeAutoNovedades = autoNovedades.filter(
+        auto => auto.empleado_id === employeeId && !existingIds.has(auto.originalAbsenceId)
+      );
+
+      const autoDisplayData: DisplayNovedad[] = employeeAutoNovedades.map(auto => {
+        const absenceType = auto.tipo_novedad as AbsenceType;
+        const config = ABSENCE_VISUAL_CONFIG[absenceType];
+        const statusConfig = UNIFIED_STATUS_MAPPING['pendiente'];
+
+        return {
+          id: auto.id,
+          empleado_id: auto.empleado_id,
+          periodo_id: periodId,
+          tipo_novedad: auto.tipo_novedad,
+          subtipo: auto.subtipo,
+          valor: auto.valor,
+          dias: auto.dias,
+          fecha_inicio: auto.fecha_inicio,
+          fecha_fin: auto.fecha_fin,
+          observacion: auto.observacion,
+          origen: 'vacaciones' as const,
+          status: 'pendiente' as const,
+          isConfirmed: false,
+          isFragmented: auto.isPartial,
+          canEdit: false,
+          canDelete: false,
+          badgeColor: config?.badge.color || 'bg-blue-100 text-blue-800',
+          badgeIcon: config?.badge.icon || '📋',
+          badgeLabel: auto.isPartial
+            ? `${config?.badge.label || 'Ausencia'} (parcial)`
+            : config?.badge.label || 'Ausencia',
+          statusColor: statusConfig.color,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+      });
+
+      const allDisplayData = [...displayData, ...autoDisplayData];
+
+      const sortedData = allDisplayData.sort((a, b) =>
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
 
