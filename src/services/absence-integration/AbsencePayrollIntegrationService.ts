@@ -139,10 +139,16 @@ export class AbsencePayrollIntegrationService {
     } else {
       const diffTime = intersectionEnd.getTime() - intersectionStart.getTime();
       diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-      // Convención nómina colombiana: cada quincena = 15 días (mes de 30 días)
+      // Convención nómina colombiana (Art. 134 CST): cada quincena = 15 días
       const startDay = new Date(periodStart).getUTCDate();
       if (startDay === 1 || startDay === 16) {
-        diffDays = Math.min(diffDays, 15);
+        // Si la ausencia cubre TODO el periodo → siempre 15 días (incluso Feb 16-28)
+        if (intStartStr <= periodStart && intEndStr >= periodEnd) {
+          diffDays = 15;
+        } else {
+          // Parcial → tope 15 (para meses de 31 días)
+          diffDays = Math.min(diffDays, 15);
+        }
       }
     }
 

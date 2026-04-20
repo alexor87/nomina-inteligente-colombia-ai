@@ -331,7 +331,7 @@ export class MultiPeriodAbsenceService {
         segmentDays = calculateBusinessDays(segmentStart, segmentEnd, employeeRestDays);
       } else {
         const calendarDays = this.calculateDaysBetween(segmentStart, segmentEnd);
-        segmentDays = this.applyPayrollDaysCap(calendarDays, period.fecha_inicio, period.fecha_fin);
+        segmentDays = this.applyPayrollDaysCap(calendarDays, period.fecha_inicio, period.fecha_fin, segmentStart, segmentEnd);
       }
 
       if (segmentDays > 0) {
@@ -395,13 +395,24 @@ export class MultiPeriodAbsenceService {
   }
 
   /**
-   * Aplica convención de 30 días/mes: cada quincena = 15 días máximo.
-   * Evita que meses de 31 días paguen más que el salario mensual.
+   * Aplica convención de 30 días/mes (Art. 134 CST): cada quincena = 15 días.
+   * - Si la ausencia cubre TODO el periodo → siempre 15 días (incluso Feb 16-28 = 15, no 13)
+   * - Si la ausencia es parcial → días calendario, tope 15 (para meses de 31 días)
    */
-  private static applyPayrollDaysCap(calendarDays: number, periodStart: string, periodEnd: string): number {
+  private static applyPayrollDaysCap(
+    calendarDays: number,
+    periodStart: string,
+    periodEnd: string,
+    segmentStart: string,
+    segmentEnd: string
+  ): number {
     const startDay = new Date(periodStart).getUTCDate();
-    // Quincena 1 (1-15) o Quincena 2 (16-fin): máximo 15 días
     if (startDay === 1 || startDay === 16) {
+      // Ausencia cubre todo el periodo → quincena completa = 15 días
+      if (segmentStart <= periodStart && segmentEnd >= periodEnd) {
+        return 15;
+      }
+      // Ausencia parcial → días calendario, tope 15
       return Math.min(calendarDays, 15);
     }
     return calendarDays;
