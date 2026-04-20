@@ -324,11 +324,15 @@ export class MultiPeriodAbsenceService {
       const segmentStart = absence.start_date > period.fecha_inicio ? absence.start_date : period.fecha_inicio;
       const segmentEnd = absence.end_date < period.fecha_fin ? absence.end_date : period.fecha_fin;
       // Vacaciones: contar días HÁBILES (excluye días de descanso del empleado y festivos colombianos)
-      // Otros tipos (incapacidad, etc.): contar días calendario
+      // Otros tipos (incapacidad, licencia, etc.): contar días con convención 30 días/mes
       const employeeRestDays = absence.employees?.dias_descanso || ['sabado', 'domingo'];
-      const segmentDays = absence.type === 'vacaciones'
-        ? calculateBusinessDays(segmentStart, segmentEnd, employeeRestDays)
-        : this.calculateDaysBetween(segmentStart, segmentEnd);
+      let segmentDays: number;
+      if (absence.type === 'vacaciones') {
+        segmentDays = calculateBusinessDays(segmentStart, segmentEnd, employeeRestDays);
+      } else {
+        const calendarDays = this.calculateDaysBetween(segmentStart, segmentEnd);
+        segmentDays = this.applyPayrollDaysCap(calendarDays, period.fecha_inicio, period.fecha_fin);
+      }
 
       if (segmentDays > 0) {
         // Calcular valor proporcional
@@ -388,6 +392,19 @@ export class MultiPeriodAbsenceService {
     const end = new Date(endDate);
     const diffTime = Math.abs(end.getTime() - start.getTime());
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+  }
+
+  /**
+   * Aplica convención de 30 días/mes: cada quincena = 15 días máximo.
+   * Evita que meses de 31 días paguen más que el salario mensual.
+   */
+  private static applyPayrollDaysCap(calendarDays: number, periodStart: string, periodEnd: string): number {
+    const startDay = new Date(periodStart).getUTCDate();
+    // Quincena 1 (1-15) o Quincena 2 (16-fin): máximo 15 días
+    if (startDay === 1 || startDay === 16) {
+      return Math.min(calendarDays, 15);
+    }
+    return calendarDays;
   }
 
   /**
