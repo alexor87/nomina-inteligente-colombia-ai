@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { logger } from '@/lib/logger';
 import { NovedadesEnhancedService, CreateNovedadData } from '@/services/NovedadesEnhancedService';
 import { NovedadesCalculationService, NovedadesTotals } from '@/services/NovedadesCalculationService';
+import { MultiPeriodAbsenceService } from '@/services/MultiPeriodAbsenceService';
 import { PayrollNovedad } from '@/types/novedades-enhanced';
 import { useToast } from '@/hooks/use-toast';
 import { useEmployeeNovedadesCacheStore } from '@/stores/employeeNovedadesCacheStore';
@@ -114,6 +115,7 @@ export const usePayrollNovedadesUnified = (
   });
 
   // ✅ OPTIMIZADO: Una sola query para todas las novedades del período, cálculo in-memory
+  // ✅ Incluye novedades auto-generadas desde ausencias multi-periodo
   const loadNovedadesTotals = useCallback(async (employeeIds: string[]) => {
     if (!periodId || !companyId) return;
 
@@ -121,23 +123,40 @@ export const usePayrollNovedadesUnified = (
       // Una sola llamada a BD para todas las novedades del período
       const allNovedades = await NovedadesEnhancedService.getNovedadesByPeriod(periodId, companyId);
 
+      // ✅ Obtener también novedades auto-generadas desde ausencias que se solapan
+      const autoNovedades = await MultiPeriodAbsenceService.generatePartialNovedadesForPeriod(periodId, companyId);
+      const existingIds = new Set(allNovedades.map(n => n.id));
+
       const totalsMap: Record<string, NovedadesTotals> = {};
 
       for (const employeeId of employeeIds) {
         const novedades = allNovedades.filter(n => n.empleado_id === employeeId);
+        const employeeAutoNovedades = autoNovedades.filter(
+          auto => auto.empleado_id === employeeId && !existingIds.has(auto.originalAbsenceId)
+        );
 
-        const totalDevengos = novedades
+        const totalDevengosConfirmados = novedades
           .filter(n => (n.valor ?? 0) > 0)
           .reduce((s, n) => s + (n.valor ?? 0), 0);
-        const totalDeducciones = novedades
+        const totalDeduccionesConfirmadas = novedades
           .filter(n => (n.valor ?? 0) < 0)
           .reduce((s, n) => s + Math.abs(n.valor ?? 0), 0);
+
+        const totalDevengosAuto = employeeAutoNovedades
+          .filter(n => (n.valor ?? 0) > 0)
+          .reduce((s, n) => s + (n.valor ?? 0), 0);
+        const totalDeduccionesAuto = employeeAutoNovedades
+          .filter(n => (n.valor ?? 0) < 0)
+          .reduce((s, n) => s + Math.abs(n.valor ?? 0), 0);
+
+        const totalDevengos = totalDevengosConfirmados + totalDevengosAuto;
+        const totalDeducciones = totalDeduccionesConfirmadas + totalDeduccionesAuto;
 
         totalsMap[employeeId] = {
           totalDevengos,
           totalDeducciones,
           totalNeto: totalDevengos - totalDeducciones,
-          hasNovedades: novedades.length > 0
+          hasNovedades: novedades.length > 0 || employeeAutoNovedades.length > 0
         };
       }
 
