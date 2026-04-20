@@ -264,9 +264,29 @@ export const usePayrollUnified = (companyId: string) => {
 
         if (activeEmployees && activeEmployees.length > 0) {
           logger.log(`✅ Encontrados ${activeEmployees.length} empleados activos`);
-          
+
+          // ✅ Filtrar empleados con fecha_ingreso posterior al fin del periodo
+          // El trigger check_payroll_hire_date aborta todo el upsert si alguna
+          // fecha_ingreso > period.fecha_fin. Excluir esos empleados evita el 400.
+          const periodEndDate = period.fecha_fin;
+          const eligibleEmployees = activeEmployees.filter(emp => {
+            if (!emp.fecha_ingreso) return true;
+            return emp.fecha_ingreso <= periodEndDate;
+          });
+
+          const skippedCount = activeEmployees.length - eligibleEmployees.length;
+          if (skippedCount > 0) {
+            logger.warn(`⚠️ ${skippedCount} empleados omitidos: fecha_ingreso posterior al fin del periodo (${periodEndDate})`);
+          }
+
+          if (eligibleEmployees.length === 0) {
+            logger.warn('⚠️ No hay empleados elegibles para este periodo (todas las fechas de ingreso son posteriores)');
+            setEmployees([]);
+            return;
+          }
+
           const workedDays = calculateWorkedDays(startDate, endDate);
-          const payrollRecords = activeEmployees.map(emp => ({
+          const payrollRecords = eligibleEmployees.map(emp => ({
             company_id: companyId,
             employee_id: emp.id,
             period_id: period.id,
