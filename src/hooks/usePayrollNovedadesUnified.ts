@@ -200,31 +200,53 @@ export const usePayrollNovedadesUnified = (
 
   // ✅ CONSOLIDADO: Refresh employee novedades usando store global + estado síncrono
   const refreshEmployeeNovedades = useCallback(async (employeeId: string): Promise<NovedadesTotals | null> => {
-    if (!periodId) return null;
-    
+    if (!periodId || !companyId) return null;
+
     try {
       logger.log('🔄 Refrescando novedades específicas del empleado:', employeeId);
-      
+
       // ✅ CRÍTICO: Invalidar caché ANTES de calcular para forzar recálculo fresco
       NovedadesCalculationService.invalidateCache(employeeId, periodId);
-      
+
       const employeeNovedades = await NovedadesEnhancedService.getNovedadesByEmployee(employeeId, periodId);
       setEmployeeNovedades(employeeId, employeeNovedades);
-      
-      // ✅ NUEVO: Actualizar también el estado síncrono
+
+      // ✅ Obtener totales de novedades persistidas
       const backendTotals = await NovedadesCalculationService.calculateEmployeeNovedadesTotals(employeeId, periodId);
+
+      // ✅ Sumar también auto-generadas desde ausencias multi-periodo
+      const autoNovedades = await MultiPeriodAbsenceService.generatePartialNovedadesForPeriod(periodId, companyId);
+      const existingIds = new Set(employeeNovedades.map(n => n.id));
+      const employeeAutoNovedades = autoNovedades.filter(
+        auto => auto.empleado_id === employeeId && !existingIds.has(auto.originalAbsenceId)
+      );
+
+      const totalDevengosAuto = employeeAutoNovedades
+        .filter(n => (n.valor ?? 0) > 0)
+        .reduce((s, n) => s + (n.valor ?? 0), 0);
+      const totalDeduccionesAuto = employeeAutoNovedades
+        .filter(n => (n.valor ?? 0) < 0)
+        .reduce((s, n) => s + Math.abs(n.valor ?? 0), 0);
+
+      const combinedTotals: NovedadesTotals = {
+        totalDevengos: backendTotals.totalDevengos + totalDevengosAuto,
+        totalDeducciones: backendTotals.totalDeducciones + totalDeduccionesAuto,
+        totalNeto: (backendTotals.totalDevengos + totalDevengosAuto) - (backendTotals.totalDeducciones + totalDeduccionesAuto),
+        hasNovedades: backendTotals.hasNovedades || employeeAutoNovedades.length > 0
+      };
+
       setNovedadesTotals(prev => ({
         ...prev,
-        [employeeId]: backendTotals
+        [employeeId]: combinedTotals
       }));
-      logger.log('✅ Totales síncronos refrescados para empleado:', employeeId, backendTotals);
-      
-      return backendTotals; // ✅ RETORNAR los totales calculados
+      logger.log('✅ Totales síncronos refrescados (confirmados + auto) para empleado:', employeeId, combinedTotals);
+
+      return combinedTotals;
     } catch (error) {
       logger.error(`Error refreshing novedades for employee ${employeeId}:`, error);
       return null;
     }
-  }, [periodId, setEmployeeNovedades]);
+  }, [periodId, companyId, setEmployeeNovedades]);
 
   // ✅ NUEVO: Función síncrona para obtener totales (renderizado React)
   const getEmployeeNovedadesSync = useCallback((employeeId: string): NovedadesTotals => {
