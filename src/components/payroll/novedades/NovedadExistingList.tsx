@@ -680,24 +680,24 @@ export const NovedadExistingList: React.FC<NovedadExistingListProps> = ({
                   <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
                   <div>
                     <span className="text-xs text-emerald-600 font-medium">Devengos</span>
-                    <p className="text-sm font-bold text-emerald-800">{formatCurrency(separatedTotals.confirmed.devengos)}</p>
+                    <p className="text-sm font-bold text-emerald-800">{formatCurrency(separatedTotals.confirmed.devengos + separatedTotals.estimated.devengos)}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-red-500"></div>
                   <div>
                     <span className="text-xs text-red-600 font-medium">Deducciones</span>
-                    <p className="text-sm font-bold text-red-600">{formatCurrency(separatedTotals.confirmed.deducciones)}</p>
+                    <p className="text-sm font-bold text-red-600">{formatCurrency(separatedTotals.confirmed.deducciones + separatedTotals.estimated.deducciones)}</p>
                   </div>
                 </div>
                 <div className="h-8 w-px bg-emerald-200"></div>
                 <div>
                   <span className="text-xs text-emerald-600 font-medium">Neto Total</span>
-                  <p className="text-lg font-bold text-emerald-900">{formatCurrency(separatedTotals.confirmed.neto)}</p>
+                  <p className="text-lg font-bold text-emerald-900">{formatCurrency(separatedTotals.confirmed.neto + separatedTotals.estimated.neto)}</p>
                 </div>
               </div>
               <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 border-emerald-300">
-                {separatedTotals.confirmed.count} novedad{separatedTotals.confirmed.count !== 1 ? 'es' : ''}
+                {separatedTotals.confirmed.count + separatedTotals.estimated.count} novedad{(separatedTotals.confirmed.count + separatedTotals.estimated.count) !== 1 ? 'es' : ''}
               </Badge>
             </div>
 
