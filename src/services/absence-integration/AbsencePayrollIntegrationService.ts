@@ -72,7 +72,7 @@ export class AbsencePayrollIntegrationService {
               console.log(`Absence ${absence.id} marked as fully processed`);
             }
           } else {
-            await this.registerPartialProcessing(absence.id, options.periodId, periodDays);
+            await this.registerPartialProcessing(absence.id, options.periodId, periodDays, absence, options.companyId);
             console.log(`Registered partial processing for absence ${absence.id} in period ${options.periodId}`);
           }
 
@@ -290,7 +290,7 @@ export class AbsencePayrollIntegrationService {
   private static async isPeriodProcessedForAbsence(absenceId: string, periodId: string): Promise<boolean> {
     const { data, error } = await supabase
       .from('employee_absences')
-      .select('processed_in_period_id, status')
+      .select('processed_in_period_id, status, employee_id, type')
       .eq('id', absenceId)
       .single();
 
@@ -298,20 +298,116 @@ export class AbsencePayrollIntegrationService {
       return false;
     }
 
-    return data.status === 'liquidada' && data.processed_in_period_id === periodId;
+    // Verificación directa por processed_in_period_id
+    if (data.processed_in_period_id === periodId) {
+      return true;
+    }
+
+    // Verificar si existe una novedad parcial creada por registerPartialProcessing
+    const { data: novedad } = await supabase
+      .from('payroll_novedades')
+      .select('id')
+      .eq('empleado_id', data.employee_id)
+      .eq('periodo_id', periodId)
+      .eq('tipo_novedad', data.type)
+      .like('observacion', `%[absence:${absenceId}]%`)
+      .maybeSingle();
+
+    return !!novedad;
   }
 
   private static async registerPartialProcessing(
     absenceId: string,
     periodId: string,
-    processedDays: number
+    processedDays: number,
+    absence: any,
+    companyId: string
   ): Promise<void> {
-    console.log(`Partial processing registered:`, {
-      absenceId,
-      periodId,
-      processedDays,
-      timestamp: new Date().toISOString()
-    });
+    try {
+      // Verificar si ya existe una novedad para ESTA ausencia específica en este periodo
+      const { data: existing } = await supabase
+        .from('payroll_novedades')
+        .select('id')
+        .eq('empleado_id', absence.employee_id)
+        .eq('periodo_id', periodId)
+        .eq('tipo_novedad', absence.type)
+        .like('observacion', `%[absence:${absenceId}]%`)
+        .maybeSingle();
+
+      // También verificar si el trigger ya creó la novedad con id = absenceId
+      const { data: triggerCreated } = await supabase
+        .from('payroll_novedades')
+        .select('id')
+        .eq('id', absenceId)
+        .eq('periodo_id', periodId)
+        .maybeSingle();
+
+      if (existing || triggerCreated) {
+        console.log(`Novedad ya existe para ausencia ${absenceId} en periodo ${periodId}, omitiendo`);
+        return;
+      }
+
+      // Obtener salario del empleado
+      const { data: employee } = await supabase
+        .from('employees')
+        .select('salario_base')
+        .eq('id', absence.employee_id)
+        .single();
+
+      if (!employee) {
+        console.error(`Employee not found for absence ${absenceId}`);
+        return;
+      }
+
+      const dailySalary = Number(employee.salario_base) / 30;
+      const calculatedValue = Math.round(this.calculateAbsenceValue(absence.type, Number(employee.salario_base), processedDays));
+
+      // Calcular fechas de intersección para este periodo
+      const { data: period } = await supabase
+        .from('payroll_periods_real')
+        .select('fecha_inicio, fecha_fin')
+        .eq('id', periodId)
+        .single();
+
+      if (!period) {
+        console.error(`Period not found: ${periodId}`);
+        return;
+      }
+
+      const segmentStart = absence.start_date > period.fecha_inicio ? absence.start_date : period.fecha_inicio;
+      const segmentEnd = absence.end_date < period.fecha_fin ? absence.end_date : period.fecha_fin;
+
+      // Generar ID único para esta novedad parcial
+      const novedadId = crypto.randomUUID();
+
+      const { error: insertError } = await supabase
+        .from('payroll_novedades')
+        .insert({
+          id: novedadId,
+          company_id: companyId,
+          empleado_id: absence.employee_id,
+          periodo_id: periodId,
+          tipo_novedad: absence.type,
+          subtipo: absence.subtipo || null,
+          fecha_inicio: segmentStart,
+          fecha_fin: segmentEnd,
+          dias: processedDays,
+          valor: calculatedValue,
+          observacion: `Auto-generada desde ausencia ${absence.start_date} → ${absence.end_date} [absence:${absenceId}]`,
+          constitutivo_salario: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          creado_por: absence.created_by
+        });
+
+      if (insertError) {
+        console.error(`Error inserting partial novedad for absence ${absenceId}:`, insertError);
+      } else {
+        console.log(`Partial novedad created: ${novedadId} for absence ${absenceId} in period ${periodId} (${processedDays} days, $${calculatedValue})`);
+      }
+    } catch (error) {
+      console.error(`Error in registerPartialProcessing for absence ${absenceId}:`, error);
+    }
   }
 
   static async detectAbsenceConflicts(companyId: string, startDate: string, endDate: string) {

@@ -111,8 +111,8 @@ export class AbsenceNovedadConflictDetector {
           )
         `)
         .eq('company_id', companyId)
-        .gte('start_date', startDate)
-        .lte('end_date', endDate)
+        .lte('start_date', endDate)
+        .gte('end_date', startDate)
         .in('status', ['pendiente', 'liquidada']);
 
       if (error) {
@@ -177,8 +177,8 @@ export class AbsenceNovedadConflictDetector {
         query = query.eq('periodo_id', periodId);
       } else {
         query = query
-          .gte('fecha_inicio', startDate)
-          .lte('fecha_fin', endDate);
+          .lte('fecha_inicio', endDate)
+          .gte('fecha_fin', startDate);
       }
 
       const { data: novedades, error } = await query;
