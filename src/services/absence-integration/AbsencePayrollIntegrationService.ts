@@ -139,6 +139,11 @@ export class AbsencePayrollIntegrationService {
     } else {
       const diffTime = intersectionEnd.getTime() - intersectionStart.getTime();
       diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+      // Convención nómina colombiana: cada quincena = 15 días (mes de 30 días)
+      const startDay = new Date(periodStart).getUTCDate();
+      if (startDay === 1 || startDay === 16) {
+        diffDays = Math.min(diffDays, 15);
+      }
     }
 
     console.log(`Intersection calculation:`, {
