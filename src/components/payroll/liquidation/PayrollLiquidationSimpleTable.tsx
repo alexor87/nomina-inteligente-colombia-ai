@@ -115,14 +115,17 @@ export const PayrollLiquidationSimpleTable: React.FC<PayrollLiquidationSimpleTab
   };
 
   useEffect(() => {
-    const currentKey = `${employees.length}-${currentPeriodId}`;
-    if (employees.length > 0 && currentPeriodId && prevKeyRef.current !== currentKey) {
+    // ✅ Incluir companyId en la key: useCurrentCompany lo carga asíncronamente,
+    // sin él en la key el effect se marca como ejecutado con companyId=null
+    // y nunca vuelve a cargar los totales cuando el companyId llega.
+    const currentKey = `${employees.length}-${currentPeriodId}-${companyId}`;
+    if (employees.length > 0 && currentPeriodId && companyId && prevKeyRef.current !== currentKey) {
       console.log('📊 Cargando novedades para empleados, período:', currentPeriodId);
       const employeeIds = employees.map(emp => emp.id);
       loadNovedadesTotals(employeeIds);
       prevKeyRef.current = currentKey;
     }
-  }, [employees, currentPeriodId, loadNovedadesTotals]);
+  }, [employees, currentPeriodId, companyId, loadNovedadesTotals]);
 
   // ✅ NUEVA FUNCIÓN: Calcular un solo empleado (optimización selectiva)
   const recalculateSingleEmployee = async (employeeId: string) => {
