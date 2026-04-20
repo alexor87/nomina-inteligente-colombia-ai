@@ -190,6 +190,7 @@ export const convertAbsenceToDisplay = (
 export const convertVacationToDisplay = convertAbsenceToDisplay;
 
 // ✅ NUEVA FUNCIÓN: Calcular intersección de días (centralizada)
+// Aplica convención 30 días/mes: quincena completa = 15 días
 function calculatePeriodIntersectionDays(
   absenceStart: string,
   absenceEnd: string,
@@ -209,7 +210,19 @@ function calculatePeriodIntersectionDays(
   }
 
   const diffTime = intersectionEnd.getTime() - intersectionStart.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+  let diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+  // Convención nómina colombiana (Art. 134 CST): quincena = 15 días
+  const startDay = new Date(periodStart).getUTCDate();
+  if (startDay === 1 || startDay === 16) {
+    const intStartStr = intersectionStart.toISOString().split('T')[0];
+    const intEndStr = intersectionEnd.toISOString().split('T')[0];
+    if (intStartStr <= periodStart && intEndStr >= periodEnd) {
+      diffDays = 15;
+    } else {
+      diffDays = Math.min(diffDays, 15);
+    }
+  }
 
   return Math.max(0, diffDays);
 }

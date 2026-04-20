@@ -322,12 +322,27 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
     setIsSubmitting(true);
     try {
       // Vacaciones: contar días HÁBILES (excluye días de descanso del empleado y festivos colombianos)
-      // Otros tipos (incapacidad, etc.): contar días calendario
-      const dias = formData.start_date && formData.end_date
-        ? formData.type === 'vacaciones'
-          ? calculateBusinessDays(formData.start_date, formData.end_date, employeeRestDays)
-          : Math.ceil((new Date(formData.end_date).getTime() - new Date(formData.start_date).getTime()) / (1000 * 60 * 60 * 24)) + 1
-        : 0;
+      // Otros tipos (incapacidad, etc.): contar días calendario con convención 30 días/mes
+      let dias = 0;
+      if (formData.start_date && formData.end_date) {
+        if (formData.type === 'vacaciones') {
+          dias = calculateBusinessDays(formData.start_date, formData.end_date, employeeRestDays);
+        } else {
+          const calDays = Math.ceil((new Date(formData.end_date).getTime() - new Date(formData.start_date).getTime()) / (1000 * 60 * 60 * 24)) + 1;
+          // Convención Art. 134 CST: quincena = 15 días
+          if (startDate && endDate) {
+            const periodStartDay = new Date(startDate).getUTCDate();
+            if (periodStartDay === 1 || periodStartDay === 16) {
+              const coversFullPeriod = formData.start_date <= startDate && formData.end_date >= endDate;
+              dias = coversFullPeriod ? 15 : Math.min(calDays, 15);
+            } else {
+              dias = calDays;
+            }
+          } else {
+            dias = calDays;
+          }
+        }
+      }
 
       let valorCalculado = 0;
 
@@ -481,14 +496,31 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
           }
         }
 
+        // ✅ Convención Art. 134 CST: aplicar tope 15 días por quincena
+        let finalDias = entry.dias || undefined;
+        let finalValor = entry.valor || 0;
+        const ABSENCE_TYPES_CAPPED = ['incapacidad', 'licencia_remunerada', 'licencia_no_remunerada', 'ausencia'];
+        if (finalDias && startDate && endDate && ABSENCE_TYPES_CAPPED.includes(tipoNovedadToSave)) {
+          const periodStartDay = new Date(startDate).getUTCDate();
+          if (periodStartDay === 1 || periodStartDay === 16) {
+            const coversFullPeriod = entry.fecha_inicio && entry.fecha_fin &&
+              entry.fecha_inicio <= startDate && entry.fecha_fin >= endDate;
+            const cappedDias = coversFullPeriod ? 15 : Math.min(finalDias, 15);
+            if (cappedDias !== finalDias && finalValor > 0) {
+              finalValor = Math.round(finalValor * (cappedDias / finalDias));
+            }
+            finalDias = cappedDias;
+          }
+        }
+
         const submitData: CreateNovedadData = {
           empleado_id: employeeId,
           periodo_id: periodId,
           company_id: companyId || '',
           tipo_novedad: tipoNovedadToSave,
-          valor: entry.valor || 0,
+          valor: finalValor,
           horas: entry.horas || undefined,
-          dias: entry.dias || undefined,
+          dias: finalDias,
           observacion: entry.observacion || undefined,
           fecha_inicio: entry.fecha_inicio || undefined,
           fecha_fin: entry.fecha_fin || undefined,
@@ -639,7 +671,15 @@ export const NovedadUnifiedModal: React.FC<NovedadUnifiedModalProps> = ({
           setEditFormData(prev => ({ ...prev, [field]: value, dias: days }));
         } else if (['incapacidad', 'licencia_remunerada', 'ausencia', 'licencia_no_remunerada'].includes(internalEditingNovedad.tipo_novedad)) {
           const diffTime = new Date(newData.fecha_fin).getTime() - new Date(newData.fecha_inicio).getTime();
-          const days = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+          let days = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+          // Convención Art. 134 CST: quincena = 15 días
+          if (startDate && endDate) {
+            const periodStartDay = new Date(startDate).getUTCDate();
+            if (periodStartDay === 1 || periodStartDay === 16) {
+              const coversFullPeriod = newData.fecha_inicio <= startDate && newData.fecha_fin >= endDate;
+              days = coversFullPeriod ? 15 : Math.min(days, 15);
+            }
+          }
           setEditFormData(prev => ({ ...prev, [field]: value, dias: Math.max(0, days) }));
         }
       }
