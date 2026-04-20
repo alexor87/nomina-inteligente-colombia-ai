@@ -266,8 +266,8 @@ export const usePayrollUnified = (companyId: string) => {
           logger.log(`✅ Encontrados ${activeEmployees.length} empleados activos`);
 
           // ✅ Filtrar empleados con fecha_ingreso posterior al fin del periodo
-          // El trigger check_payroll_hire_date aborta todo el upsert si alguna
-          // fecha_ingreso > period.fecha_fin. Excluir esos empleados evita el 400.
+          // El trigger check_payroll_hire_date aborta toda la transacción si
+          // alguna fecha_ingreso > period.fecha_fin. Excluir esos empleados.
           const periodEndDate = period.fecha_fin;
           const eligibleEmployees = activeEmployees.filter(emp => {
             if (!emp.fecha_ingreso) return true;
@@ -280,38 +280,62 @@ export const usePayrollUnified = (companyId: string) => {
           }
 
           if (eligibleEmployees.length === 0) {
-            logger.warn('⚠️ No hay empleados elegibles para este periodo (todas las fechas de ingreso son posteriores)');
+            logger.warn('⚠️ No hay empleados elegibles para este periodo');
             setEmployees([]);
             return;
           }
 
           const workedDays = calculateWorkedDays(startDate, endDate);
-          const payrollRecords = eligibleEmployees.map(emp => ({
-            company_id: companyId,
-            employee_id: emp.id,
-            period_id: period.id,
-            periodo: period.periodo,
-            salario_base: Number(emp.salario_base) || 0,
-            dias_trabajados: workedDays,
-            total_devengado: Number(emp.salario_base) || 0,
-            total_deducciones: 0,
-            neto_pagado: Number(emp.salario_base) || 0,
-            estado: 'borrador'
-          }));
 
-          // Upsert con ignoreDuplicates: true para no sobreescribir registros existentes
-          // (evita unique constraint failure si addEmployees ya insertó algunos registros)
-          const { error: insertError } = await supabase
-            .from('payrolls')
-            .upsert(payrollRecords, { onConflict: 'company_id,employee_id,period_id', ignoreDuplicates: true });
+          // ✅ Insertar uno por uno para que un empleado problemático no rompa
+          // toda la liquidación. Registra error detallado por empleado fallido.
+          let insertedCount = 0;
+          const failures: Array<{ emp: string; error: any }> = [];
 
-          if (insertError) {
-            logger.error('Error creando registros de payroll:', insertError);
+          for (const emp of eligibleEmployees) {
+            const record = {
+              company_id: companyId,
+              employee_id: emp.id,
+              period_id: period.id,
+              periodo: period.periodo,
+              salario_base: Number(emp.salario_base) || 0,
+              dias_trabajados: workedDays,
+              total_devengado: Number(emp.salario_base) || 0,
+              total_deducciones: 0,
+              neto_pagado: Number(emp.salario_base) || 0,
+              estado: 'borrador'
+            };
+
+            const { error: insertError } = await supabase
+              .from('payrolls')
+              .upsert([record], { onConflict: 'company_id,employee_id,period_id', ignoreDuplicates: true });
+
+            if (insertError) {
+              failures.push({
+                emp: `${emp.nombre} ${emp.apellido} (id=${emp.id}, fecha_ingreso=${emp.fecha_ingreso})`,
+                error: {
+                  code: insertError.code,
+                  message: insertError.message,
+                  details: insertError.details,
+                  hint: insertError.hint
+                }
+              });
+            } else {
+              insertedCount++;
+            }
+          }
+
+          if (failures.length > 0) {
+            logger.error(`❌ ${failures.length}/${eligibleEmployees.length} empleados fallaron al insertar en payrolls:`, failures);
+          }
+
+          if (insertedCount === 0) {
+            logger.error('❌ Ningún empleado se pudo insertar — abortando carga');
             setEmployees([]);
             return;
           }
 
-          logger.log('✅ Registros de payroll creados exitosamente');
+          logger.log(`✅ ${insertedCount}/${eligibleEmployees.length} registros de payroll creados`);
 
           await supabase
             .from('payroll_periods_real')
